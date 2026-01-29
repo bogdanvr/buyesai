@@ -1,0 +1,811 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>BUYES AI — внедрение ИИ для роста бизнеса</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="icon" type="image/ico" href="{% static '/img/favicon.ico' %}">
+</head>
+<body>
+    <div id="preloader">
+        <div class="preloader-inner">
+            <img src="{% static 'img/logo_glass.png' %}" alt="BUYES AI" class="preloader-logo">
+        </div>
+    </div>
+    <div id="app" v-cloak>
+    <header class="header">
+        <div class="container header-inner">
+            <div class="header-left">
+                <div class="logo-block">
+                    <div class="logo"></div>
+                    <img src="{% static 'img/buyes-wh.svg' %}" width="100px" class="white-logo" alt="logo">
+                </div>
+    
+                <nav class="nav">
+                    <a href="#solutions">Решения</a>
+                    <a href="#who">Для кого</a>
+                    <a href="#cases">Кейсы</a>
+                    <a href="#process">Как работаем</a>
+                    <a href="#cta-final">AI-аудит</a>
+                </nav>
+            </div>
+    
+            <!-- Телефон — отдельная колонка по центру между меню и кнопкой -->
+            <div class="phone-link">
+                <a href="tel:+77020289811">+7 (702) 028-98-11</a>
+            </div>
+    
+            <div class="header-cta">
+                <button @click.prevent="openDiscuss('Оставить заявку')" class="btn btn-primary">Оставить заявку</button>
+                <button class="burger" aria-label="Меню">
+                    <img src="{% static 'img/burger.svg' %}" alt="Открыть меню">
+                </button>
+            </div>
+        </div>
+    
+        <!-- Мобильное меню (телефон здесь будет виден на мобиле) -->
+        <nav class="mobile-nav">
+            <a href="#solutions">Решения</a>
+            <a href="#who">Для кого</a>
+            <a href="#cases">Кейсы</a>
+            <a href="#process">Как работаем</a>
+            <a href="#cta-final">AI-аудит</a>
+            <a href="tel:+77020289811">Позвонить: +7 (702) 028-98-11</a>
+        </nav>
+    </header>
+    
+<main>
+    <!-- HERO -->
+    <section class="hero" id="hero">
+        <div id="particles-js"></div>
+        <div class="container hero-inner">
+            <div>
+                <div class="eyebrow">AI-системы под бизнес, а не ради хайпа</div>
+                <h1 class="hero-title">
+                    Внедряем ИИ-ассистентов, которые экономят десятки часов работы отдела каждый месяц
+                </h1>
+                <p class="hero-subtitle">
+                    Автоматизируем обработку заявок, аналитику и рутинные операции в продажах, снабжении и сервисе за 30–60 дней. 
+                    Без угрозы данным и с прозрачным расчётом эффекта.
+                </p>
+
+                <div class="hero-form-card">
+                    <div class="hero-form-title">Получите бесплатный AI-аудит процессов и прогноз экономии</div>
+                    <form class="hero-form" @submit.prevent="submitHeroForm">
+                        <div class="field">
+                            <label>Имя</label>
+                            <input v-model="name" type="text" placeholder="Как к вам обращаться?">
+                        </div>
+                        <div class="field">
+                            <label>Телефон или WhatsApp</label>
+                            <input @focus="onPhoneFocus('phone')" @input="onPhoneInput('phone', $event)" v-model="phone" type="tel" placeholder="+7 ...">
+                        </div>
+                        <div class="field">
+                            <label>Компания</label>
+                            <input v-model="company" type="text" placeholder="Название или ниша">
+                        </div>
+                        <div class="field">
+                            <label>Направление</label>
+                            <select v-model="direction">
+                                <option>Отдел продаж</option>
+                                <option>Снабжение / закупки</option>
+                                <option>Сервис / поддержка</option>
+                                <option>Маркетинг</option>
+                                <option>Пока не знаю, хочу консультацию</option>
+                            </select>
+                        </div>
+                        <div class="hero-form-row-full hero-form-footer">
+                            <button type="submit" class="btn btn-primary" :disabled="isSending">
+                                [[ isSending ? 'Отправляем...' : 'Получить AI-стратегию' ]]
+                            </button>
+                            <div class="hero-form-note">
+                                За 3–5 дней разберём 1–2 ключевых процесса, посчитаем эффект и пришлём PDF с планом внедрения.
+                            </div>
+                        </div>
+                    </form>
+                    <div class="hero-secondary-cta">
+                        <div class="chip">
+                            <span class="chip-dot"></span>
+                            Пилот от 30 дней, реальные KPI
+                        </div>
+                        <div class="chip">
+                            NDA и защита данных по ГОСТ/ISO
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hero-badges">
+                    <div class="hero-badge">10+ лет в аналитике и разработке</div>
+                    <div class="hero-badge">Опыт интеграций с 1С, CRM, маркетплейсами</div>
+                    <div class="hero-badge">Сопровождение после внедрения</div>
+                </div>
+            </div>
+
+            <div class="hero-visual-wrapper">
+                <div class="hero-visual-card">
+                    <div class="hero-logo-big" data-tilt></div>
+                    <div class="hero-3d-logo"></div>
+                    <div class="hero-metrics">
+                        <div class="hero-metric-card">
+                            <div class="hero-metric-label">Сокращение рутины</div>
+                            <div class="hero-metric-value">-35% времени отдела</div>
+                        </div>
+                        <div class="hero-metric-card">
+                            <div class="hero-metric-label">Рост конверсии</div>
+                            <div class="hero-metric-value">+12–25% к продажам</div>
+                        </div>
+                        <div class="hero-metric-card">
+                            <div class="hero-metric-label">Срок запуска</div>
+                            <div class="hero-metric-value">от 30 дней до пилота</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- </div> -->
+        </div>
+    </section>
+
+    <!-- КОМУ ПОМОГАЕМ -->
+    <section id="who">
+        <div class="container">
+            <div class="section-header">
+                <div>
+                    <div class="eyebrow">Кому особенно заходит ИИ</div>
+                    <h2 class="section-title">Отделы, где мы даём максимум эффекта</h2>
+                </div>
+                <p class="section-subtitle">
+                    Обычно начинаем с одного направления, где больше всего ручной работы и потерь денег —
+                    а потом масштабируем решения на остальные отделы и филиалы.
+                </p>
+            </div>
+
+            <div class="who-grid">
+                <article class="who-card">
+                    <div class="who-title">Продажи B2B и B2C</div>
+                    <div class="who-tag">Отделы с кучей повторяющихся запросов</div>
+                    <ul class="who-list">
+                        <li>автоответы в чатах и мессенджерах</li>
+                        <li>подсказки скриптов менеджеру</li>
+                        <li>резюме звонков и переписок в CRM</li>
+                    </ul>
+                </article>
+
+                <article class="who-card">
+                    <div class="who-title">Снабжение и закупки</div>
+                    <div class="who-tag">Склады, сети, дистрибьюторы</div>
+                    <ul class="who-list">
+                        <li>поиск «мертвых» остатков и точек роста</li>
+                        <li>ИИ-рекомендации по заказам</li>
+                        <li>аналитика по поставщикам и марже</li>
+                    </ul>
+                </article>
+
+                <article class="who-card">
+                    <div class="who-title">Сервис и поддержка</div>
+                    <div class="who-tag">Колл-центры и helpdesk</div>
+                    <ul class="who-list">
+                        <li>ИИ-боты закрывают до 60–70% тикетов</li>
+                        <li>знания из базы и регламентов</li>
+                        <li>контроль SLA и качества ответов</li>
+                    </ul>
+                </article>
+
+                <article class="who-card">
+                    <div class="who-title">Маркетинг и аналитика</div>
+                    <div class="who-tag">Рекламные кабинеты, CRM, BI</div>
+                    <ul class="who-list">
+                        <li>ИИ-отчеты «на человеческом языке»</li>
+                        <li>подсказки по бюджетам и каналам</li>
+                        <li>генерация идей и текстов кампаний</li>
+                    </ul>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <!-- РЕШЕНИЯ -->
+    <section id="solutions">
+        <div class="container">
+            <div class="section-header">
+                <div>
+                    <div class="eyebrow">Готовые сценарии</div>
+                    <h2 class="section-title">AI-решения, с которых стоит начать</h2>
+                </div>
+                <p class="section-subtitle">
+                    Вместо абстрактного «внедрим ИИ» — конкретные продукты с понятным результатом, сроками и бюджетом.
+                    Любой пакет можно доработать под ваши процессы.
+                </p>
+            </div>
+
+            <div class="solutions-grid">
+                <article class="solution-card">
+                    <div class="solution-label">Для отдела продаж</div>
+                    <div class="solution-name">AI-ассистент менеджера и клиентов</div>
+                    <p class="solution-desc">
+                        Отвечает клиентам 24/7, подсказывает менеджеру следующее действие и фиксирует всё в CRM.
+                    </p>
+                    <div class="solution-chip-row">
+                        <span class="solution-chip">Ответы в чатах и мессенджерах</span>
+                        <span class="solution-chip">Сводки по диалогам</span>
+                        <span class="solution-chip">Интеграция с CRM</span>
+                    </div>
+                    <div class="solution-footer">
+                        <div>
+                            <div class="solution-price">от 350 000 ₽ · 4–6 недель</div>
+                            <div class="solution-kpi">-30% времени на рутину, +10–20% конверсии</div>
+                        </div>
+                        <button class="btn btn-outline" @click.prevent="openDiscuss('AI-ассистент менеджера и клиентов')">Обсудить</button>
+                    </div>
+                </article>
+
+                <article class="solution-card">
+                    <div class="solution-label">Для снабжения и складов</div>
+                    <div class="solution-name">AI-аналитика закупок и остатков</div>
+                    <p class="solution-desc">
+                        Анализирует продажи, остатки и поставщиков. Подсвечивает замороженный капитал и рекомендует заказы.
+                    </p>
+                    <div class="solution-chip-row">
+                        <span class="solution-chip">Прогноз спроса</span>
+                        <span class="solution-chip">Мёртвые и медленные позиции</span>
+                        <span class="solution-chip">Рекомендации по заказам</span>
+                    </div>
+                    <div class="solution-footer">
+                        <div>
+                            <div class="solution-price">от 250 000 ₽ · от 4 недель</div>
+                            <div class="solution-kpi">-15–30% лишних остатков, +маржа</div>
+                        </div>
+                        <button class="btn btn-outline" @click.prevent="openDiscuss('AI-аналитика закупок и остатков')">Обсудить</button>
+                    </div>
+                </article>
+
+                <article class="solution-card">
+                    <div class="solution-label">Для сервиса и поддержки</div>
+                    <div class="solution-name">AI-чат и helpdesk-бот</div>
+                    <p class="solution-desc">
+                        Закрывает типовые вопросы клиентов, опираясь на вашу базу знаний, регламенты и прошлые тикеты.
+                    </p>
+                    <div class="solution-chip-row">
+                        <span class="solution-chip">До 60–70% тикетов без оператора</span>
+                        <span class="solution-chip">Интеграция с сайтом и мессенджерами</span>
+                        <span class="solution-chip">Контроль качества ответов</span>
+                    </div>
+                    <div class="solution-footer">
+                        <div>
+                            <div class="solution-price">от 180 000 ₽ · 3–4 недели</div>
+                            <div class="solution-kpi">-35% нагрузки на поддержку</div>
+                        </div>
+                        <button class="btn btn-outline" @click.prevent="openDiscuss('AI-чат и helpdesk-бот')">Обсудить</button>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <!-- КВИЗ / ЭФФЕКТ -->
+    <section id="quiz">
+        <div class="container">
+            <div class="section-header">
+                <div>
+                    <div class="eyebrow">Прикинуть эффект</div>
+                    <h2 class="section-title">Мини-опрос — и мы посчитаем экономию для вашего бизнеса</h2>
+                </div>
+                <p class="section-subtitle">
+                    Ответьте на несколько вопросов — и получите на почту оценку, сколько часов и денег может сэкономить ИИ
+                    в вашей компании.
+                </p>
+            </div>
+
+            <div class="quiz-wrapper">
+                <section class="quiz-card">
+                    <h3 style="margin-bottom:10px;font-size:15px;">Расскажите немного о бизнесе</h3>
+                    <div class="quiz-grid">
+                        <div class="field field-full">
+                            <label>Отрасль</label>
+                            <input type="text" placeholder="Производство, дистрибуция, услуги, e-commerce...">
+                        </div>
+                        <div class="field">
+                            <label>Размер команды</label>
+                            <input type="number" placeholder="Сколько сотрудников в отделе?">
+                        </div>
+                        <div class="field">
+                            <label>Тип отдела</label>
+                            <select>
+                                <option>Продажи</option>
+                                <option>Снабжение / закупки</option>
+                                <option>Сервис / поддержка</option>
+                                <option>Комбинация отделов</option>
+                            </select>
+                        </div>
+                        <div class="field field-full">
+                            <label>Главная боль</label>
+                            <select>
+                                <option>Много рутины и ручного ввода</option>
+                                <option>Падает качество обслуживания</option>
+                                <option>Не хватает аналитики и контроля</option>
+                                <option>Нужно увеличить продажи без расширения штата</option>
+                            </select>
+                        </div>
+                        <div class="field field-full">
+                            <label>Оборот / количество заявок в месяц (по желанию)</label>
+                            <input type="text" placeholder="Например: 20 млн ₽ или 1500 заявок">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" style="margin-top:12px;">Получить расчёт и дорожную карту</button>
+                </section>
+
+                <aside class="impact-card">
+                    <h3 style="margin-bottom:8px;font-size:15px;">Предварительная оценка эффекта</h3>
+                    <p class="impact-caption">
+                        На основе нашей статистики по похожим проектам:
+                    </p>
+                    <div style="margin:12px 0;">
+                        <div class="impact-value">-20–40% ручной работы</div>
+                        <div class="impact-caption">в автоматизированном отделе</div>
+                    </div>
+                    <div style="margin:12px 0;">
+                        <div class="impact-value">+10–25% выручки</div>
+                        <div class="impact-caption">за счёт скорости и качества обработки заявок</div>
+                    </div>
+                    <p style="margin-top:12px;font-size:12px;color:var(--text-muted);">
+                        Точный прогноз делаем после мини-интервью и анализа ваших данных (1С, CRM, Excel-отчёты).
+                        Всё в рамках NDA, без передачи данных в публичные модели.
+                    </p>
+                </aside>
+            </div>
+        </div>
+    </section>
+
+    <!-- КЕЙСЫ -->
+    <section id="cases">
+        <div class="container">
+            <div class="section-header">
+                <div>
+                    <div class="eyebrow">Реальные внедрения</div>
+                    <h2 class="section-title">Кейсы, где ИИ уже приносит деньги</h2>
+                </div>
+                <p class="section-subtitle">
+                    Ниже — выдержки из проектов. На встрече можем показать расширенные отчёты и живые дашборды
+                    (без раскрытия NDA-данных).
+                </p>
+            </div>
+
+            <div class="case-tabs">
+                <button class="case-tab active">Продажи</button>
+                <button class="case-tab">Снабжение</button>
+                <button class="case-tab">Сервис</button>
+            </div>
+
+            <div class="cases-grid">
+                <article class="case-card">
+                    <div class="case-client">Дистрибьютор электрооборудования · B2B</div>
+                    <div class="case-title">ИИ-помощник продавцов и телеграм-бот для клиентов</div>
+                    <div class="case-metrics">
+                        <div>
+                            <div class="case-metric-label">Конверсия в заказ</div>
+                            <div>+18% за 3 месяца</div>
+                        </div>
+                        <div>
+                            <div class="case-metric-label">Время на заявку</div>
+                            <div>10 мин → 2.5 мин</div>
+                        </div>
+                        <div>
+                            <div class="case-metric-label">Автоответы ИИ</div>
+                            <div>70% типовых вопросов</div>
+                        </div>
+                        <div>
+                            <div class="case-metric-label">Срок внедрения</div>
+                            <div>7 недель</div>
+                        </div>
+                    </div>
+                    <p class="case-quote">
+                        «Менеджеры перестали утонуть в однотипных запросах, ИИ сам подсказывает, что предложить клиенту».
+                    </p>
+                </article>
+
+                <article class="case-card">
+                    <div class="case-client">Оптовый склад · FMCG</div>
+                    <div class="case-title">AI-аналитика остатков и рекомендаций по заказу</div>
+                    <div class="case-metrics">
+                        <div>
+                            <div class="case-metric-label">Замороженный склад</div>
+                            <div>-23% за 6 месяцев</div>
+                        </div>
+                        <div>
+                            <div class="case-metric-label">Мёртвые позиции</div>
+                            <div>-31% номенклатуры</div>
+                        </div>
+                        <div>
+                            <div class="case-metric-label">Время на отчёт</div>
+                            <div>2 дня → 10 минут</div>
+                        </div>
+                        <div>
+                            <div class="case-metric-label">Срок пилота</div>
+                            <div>5 недель</div>
+                        </div>
+                    </div>
+                    <p class="case-quote">
+                        «Теперь видим, где деньги лежат на полке и как заказывать без перегруза склада».
+                    </p>
+                </article>
+
+                <article class="case-card">
+                    <div class="case-client">Сервисная компания · call-центр</div>
+                    <div class="case-title">ИИ-бот в поддержку с подключением к базе знаний</div>
+                    <div class="case-metrics">
+                        <div>
+                            <div class="case-metric-label">Нагрузка на операторов</div>
+                            <div>-37%</div>
+                        </div>
+                        <div>
+                            <div class="case-metric-label">Время первого ответа</div>
+                            <div>3 мин → &lt; 10 сек</div>
+                        </div>
+                        <div>
+                            <div class="case-metric-label">Удовлетворённость</div>
+                            <div>+14 п.п. NPS</div>
+                        </div>
+                        <div>
+                            <div class="case-metric-label">Срок внедрения</div>
+                            <div>4 недели</div>
+                        </div>
+                    </div>
+                    <p class="case-quote">
+                        «Клиенты перестали ждать на линии, а сложные вопросы уходят сразу к нужным сотрудникам».
+                    </p>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <!-- КАК МЫ РАБОТАЕМ -->
+    <section id="process">
+        <div class="container">
+            <div class="section-header">
+                <div>
+                    <div class="eyebrow">Прозрачный путь</div>
+                    <h2 class="section-title">Как мы внедряем ИИ в вашей компании</h2>
+                </div>
+                <p class="section-subtitle">
+                    Начинаем с диагностической сессии, чтобы не «тянуть ИИ за уши», а решить конкретную бизнес-задачу
+                    и выйти на окупаемость в понятный срок.
+                </p>
+            </div>
+
+            <div class="steps-grid">
+                <article class="step-card">
+                    <div class="step-label">Шаг 1</div>
+                    <div class="step-title">Диагностика и гипотезы</div>
+                    <div class="step-time">3–5 рабочих дней</div>
+                    <ul class="step-list">
+                        <li>интервью с владельцем процесса</li>
+                        <li>анализ 1С / CRM / отчётов</li>
+                        <li>фиксация KPI и портрета успеха</li>
+                    </ul>
+                </article>
+
+                <article class="step-card">
+                    <div class="step-label">Шаг 2</div>
+                    <div class="step-title">Прототип на реальных данных</div>
+                    <div class="step-time">2–4 недели</div>
+                    <ul class="step-list">
+                        <li>подключаем нужные источники данных</li>
+                        <li>делаем рабочий ИИ-прототип</li>
+                        <li>готовим демо для вашей команды</li>
+                    </ul>
+                </article>
+
+                <article class="step-card">
+                    <div class="step-label">Шаг 3</div>
+                    <div class="step-title">Пилот и измерение эффекта</div>
+                    <div class="step-time">30 дней</div>
+                    <ul class="step-list">
+                        <li>запускаем на ограниченном сегменте</li>
+                        <li>считаем время, деньги, качество</li>
+                        <li>корректируем сценарии ИИ</li>
+                    </ul>
+                </article>
+
+                <article class="step-card">
+                    <div class="step-label">Шаг 4</div>
+                    <div class="step-title">Масштабирование и сопровождение</div>
+                    <div class="step-time">по согласованному плану</div>
+                    <ul class="step-list">
+                        <li>подключаем филиалы и другие отделы</li>
+                        <li>обучаем сотрудников работе с ИИ</li>
+                        <li>берём на поддержку и развитие</li>
+                    </ul>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <!-- ТЕХНОЛОГИИ И БЕЗОПАСНОСТЬ -->
+    <section id="tech">
+        <div class="container">
+            <div class="section-header">
+                <div>
+                    <div class="eyebrow">Под капотом</div>
+                    <h2 class="section-title">Технологии и безопасность данных</h2>
+                </div>
+                <p class="section-subtitle">
+                    Работаем с современными моделями и стэком, но главная ценность — 
+                    корректная интеграция с вашими системами и аккуратное обращение с данными.
+                </p>
+            </div>
+
+            <div class="tech-grid">
+                <div>
+                    <div class="tech-logos">
+                        <div class="tech-logo-chip">OpenAI / локальные модели</div>
+                        <div class="tech-logo-chip">LangGraph / LangChain</div>
+                        <div class="tech-logo-chip">PostgreSQL, ClickHouse</div>
+                        <div class="tech-logo-chip">1С, Bitrix24, AmoCRM</div>
+                        <div class="tech-logo-chip">Django, FastAPI</div>
+                    </div>
+                    <ul class="tech-list" style="margin-top:10px;">
+                        <li>разворачиваем ИИ-сервисы в вашем контуре или в защищённом облаке;</li>
+                        <li>не используем ваши данные для обучения публичных моделей;</li>
+                        <li>ведём журнал действий ИИ-агентов для контроля и аудита;</li>
+                        <li>поддерживаем роль-based доступ к данным и дашбордам.</li>
+                    </ul>
+                </div>
+                <div class="quiz-card">
+                    <h3 style="font-size:15px;margin-bottom:8px;">Вопросы по безопасности?</h3>
+                    <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px;">
+                        На отдельном созвоне можем пройтись по всем нюансам: где живут данные, как ограничен доступ, 
+                        что именно уходит во внешние API, какие есть варианты полностью локальных решений.
+                    </p>
+                    <button @click.prevent="openDiscuss('Обсудить безопасность и инфраструктуру')" class="btn btn-outline">Обсудить безопасность и инфраструктуру</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- О КОМПАНИИ -->
+    <section id="about">
+        <div class="container">
+            <div class="section-header">
+                <div>
+                    <div class="eyebrow">Кто всё это делает</div>
+                    <h2 class="section-title">Команда инженеров, аналитиков и продуктологов</h2>
+                </div>
+                <p class="section-subtitle">
+                    Мы пришли в ИИ из реальной разработки и аналитики. Понимаем, как живут отделы продаж, снабжения и сервиса,
+                    и говорим с руководителями на одном языке.
+                </p>
+            </div>
+
+            <div class="about-grid">
+                <div>
+                    <p style="font-size:13px;">
+                        За последние годы реализовали десятки IT-проектов: от CRM-систем и дашбордов до
+                        сложных аналитических платформ. Сейчас фокус — на ИИ-решениях, которые опираются на эти данные и 
+                        приносят измеримую пользу.
+                    </p>
+                    <div class="about-facts">
+                        <div class="about-fact">
+                            10+ лет в разработке и аналитике
+                        </div>
+                        <div class="about-fact">
+                            Проекты в производстве, дистрибуции, e-commerce и услугах
+                        </div>
+                        <div class="about-fact">
+                            Поддержка и развитие после запуска
+                        </div>
+                    </div>
+                </div>
+                <div class="team-list">
+                    <article class="team-card">
+                        <div class="team-name">AI-архитектор</div>
+                        <div class="team-role">Проектирует агента, сценарии, выбирает модели</div>
+                    </article>
+                    <article class="team-card">
+                        <div class="team-name">Инженер по данным</div>
+                        <div class="team-role">Подключает 1С, CRM, склады, маркетплейсы</div>
+                    </article>
+                    <article class="team-card">
+                        <div class="team-name">Бизнес-аналитик</div>
+                        <div class="team-role">Переводит задачи бизнеса в требования к ИИ</div>
+                    </article>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq">
+        <div class="container">
+            <div class="section-header">
+                <div>
+                    <div class="eyebrow">Частые вопросы</div>
+                    <h2 class="section-title">Ответы до того, как вы их зададите</h2>
+                </div>
+            </div>
+
+            <div class="faq-grid">
+                <article class="faq-item">
+                    <div class="faq-q">Сколько стоит внедрение ИИ и когда оно окупится?</div>
+                    <div class="faq-a">
+                        Типовой пилот — от 180–350 тыс. ₽. Окупаемость считаем на диагностике:
+                        обычно это 3–9 месяцев за счёт экономии времени и роста выручки.
+                    </div>
+                </article>
+
+                <article class="faq-item">
+                    <div class="faq-q">Что, если у нас мало данных или всё в Excel?</div>
+                    <div class="faq-a">
+                        Это нормальный старт. Подключаемся к тому, что уже есть (Excel, Google Sheets, выгрузки из 1С),
+                        постепенно выстраивая более стройную витрину данных.
+                    </div>
+                </article>
+
+                <article class="faq-item">
+                    <div class="faq-q">Не заменит ли ИИ сотрудников и не будет ли сопротивления?</div>
+                    <div class="faq-a">
+                        Наша практика — сначала разгрузить людей от рутины и повысить качество,
+                        а не «сократить половину отдела». Плюс проводим обучающие сессии и демонстрации.
+                    </div>
+                </article>
+
+                <article class="faq-item">
+                    <div class="faq-q">Можем ли мы начать с маленького и безопасного проекта?</div>
+                    <div class="faq-a">
+                        Да, обычно стартуем с одного процесса и ограниченного набора сотрудников. 
+                        Сначала доказываем эффект на пилоте — потом масштабируем решение.
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <!-- ФИНАЛЬНЫЙ CTA -->
+    <section class="cta-final" id="cta-final">
+        <div class="container">
+            <div class="cta-card">
+                <div>
+                    <h2 class="cta-title">Получите AI-аудит и план внедрения под ваш бизнес</h2>
+                    <p class="cta-text">
+                        Оставьте контакты — в течение 3–5 рабочих дней мы разберём ваши процессы, оценим эффект от ИИ 
+                        и подготовим понятный план из нескольких шагов.
+                    </p>
+                    <ul class="cta-list">
+                        <li>1–2 онлайн-встречи по 40–60 минут;</li>
+                        <li>краткий отчёт с цифрами экономии и ростом выручки;</li>
+                        <li>предложение по пилоту с бюджетом и сроками.</li>
+                    </ul>
+                </div>
+                <div>
+                    <form>
+                        <div class="field">
+                            <label>Имя</label>
+                            <input v-model="PlanForm.name" type="text" placeholder="Ваше имя">
+                        </div>
+                        <div class="field" style="margin-top:8px;">
+                            <label>Телефон / мессенджер</label>
+                            <input @focus="onPhoneFocus('PlanForm.phone')" @input="onPhoneInput('PlanForm.phone', $event)" v-model="PlanForm.phone" type="tel" placeholder="+7 ...">
+                        </div>
+                        <div class="field" style="margin-top:8px;">
+                            <label>Компания и кратко задача</label>
+                            <input v-model="PlanForm.company" type="text" placeholder="Например: склад, много мёртвых остатков">
+                        </div>
+                        <button class="btn btn-primary" style="margin-top:12px;width:100%;">Запросить AI-аудит</button>
+                        <p style="font-size:11px;color:var(--text-muted);margin-top:6px;">
+                            Нажимая на кнопку, вы соглашаетесь с обработкой персональных данных.
+                        </p>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer class="footer">
+    <div class="container footer-inner">
+        <div>© 2024 BUYES · AI-решения для роста бизнеса</div>
+        <div class="footer-links">
+            <a href="#">Соглашение об обработке данных</a>
+            <a href="#hero">Вверх ↑</a>
+        </div>
+    </div>
+</footer>
+
+    <!-- Vue-модал "Обсудить" -->
+    <div
+        class="discuss-modal-backdrop"
+        v-show="isDiscussOpen"
+        style="display: none"
+        @click.self="closeDiscuss"
+    >
+        <div class="discuss-modal-card">
+            <button class="discuss-modal-close" @click="closeDiscuss">×</button>
+
+            <div class="discuss-modal-header">
+                <div class="discuss-modal-eyebrow">
+                    Обсудить проект с BUYES AI
+                </div>
+                <h3 class="discuss-modal-title">
+                    [[ discussTopic || 'Внедрение AI под вашу задачу' ]]
+                </h3>
+                <p class="discuss-modal-subtitle">
+                    Оставьте контакты, и мы предложим 1–2 варианта решения
+                    и примерный эффект по цифрам.
+                </p>
+            </div>
+
+            <form class="discuss-modal-form" @submit.prevent="submitDiscuss">
+                <div class="field">
+                    <label>Имя</label>
+                    <input
+                        type="text"
+                        placeholder="Как к вам обращаться?"
+                        v-model="discussForm.name"
+                    >
+                </div>
+
+                <div class="field">
+                    <label>Телефон или WhatsApp</label>
+                    <input
+                        type="tel"
+                        placeholder="+7 ..."
+                        v-model="discussForm.phone"
+                        @focus="onPhoneFocus('discussForm.phone')" 
+                        @input="onPhoneInput('discussForm.phone', $event)"
+                    >
+                </div>
+
+                <div class="field">
+                    <label>Компания / ниша</label>
+                    <input
+                        type="text"
+                        placeholder="Например: оптовая торговля металлом"
+                        v-model="discussForm.company"
+                    >
+                </div>
+
+                <div class="field">
+                    <label>Коротко о задаче</label>
+                    <textarea
+                        rows="3"
+                        placeholder="Где сейчас «болит»: продажи, снабжение, склад, поддержка, маркетинг?"
+                        v-model="discussForm.comment"
+                    ></textarea>
+                </div>
+
+                <div class="discuss-modal-footer">
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                        :disabled="isSendingDiscuss"
+                    >
+                        [[ isSendingDiscuss ? 'Отправляем...' : 'Обсудить проект' ]]
+                    </button>
+
+                    <div class="discuss-modal-note" v-if="!discussSent">
+                        Ответим в рабочее время, обычно в течение часа.
+                    </div>
+                    <div class="discuss-modal-note success" v-else>
+                        Спасибо! Мы получили заявку и свяжемся с вами.
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div> <!-- /#app -->
+<!-- Плавающая кнопка AI-чата (здесь можно подключить ваш виджет) -->
+<div class="chat-fab">
+    <button class="chat-fab-btn"></button>
+    <div class="chat-fab-hint">Спросить у AI-консультанта</div>
+</div>
+<script defer src="{% static '/js/vanilla-tilt.min.js' %}"></script>
+<script defer src="{% static '/js/tilt-auto.js' %}"></script>
+<script defer src="{% static '/js/particles.min.js' %}"></script>
+<script defer src="{% static '/js/particles-app.js' %}"></script>
+<script defer src="{% static '/js/nav.js' %}"></script>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script defer src="{% static '/js/main.js' %}"></script>
+</body>
+</html>
