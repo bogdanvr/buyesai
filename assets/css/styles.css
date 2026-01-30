@@ -1270,6 +1270,10 @@ section {
         flex-direction: column;
         align-items: stretch;
     }
+    .hero-form-footer .btn-primary {
+        width: 100%;
+        flex: 0 0 auto;
+    }
     .who-grid,
     .steps-grid,
     .team-list,
