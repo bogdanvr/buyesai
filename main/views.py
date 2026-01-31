@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from django.conf import settings
 from dadata import Dadata
+from main.services import get_client_ip
 
 
 def mainview(request):
@@ -12,10 +13,8 @@ def mainview(request):
 
 @require_GET
 def dadata_party(request):
-    xff = request.META.get("HTTP_X_FORWARDED_FOR")
-    if xff:
-        ip_address = xff.split(",")[0].strip()
-        print('ip', ip_address)
+    ip = get_client_ip(request)
+    print('ip', ip)
     query = (request.GET.get('q') or '').strip()
     if len(query) < 2:
         return JsonResponse({"suggestions": []})
