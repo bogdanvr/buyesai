@@ -11,6 +11,21 @@ createApp({
             direction: 'Отдел продаж',
             isSending: false,
             sent: false,
+            heroTriedSubmit: false,
+            companySuggestions: [],
+            isCompanySuggesting: false,
+            companySuggestTimer: null,
+            companySuggestAbort: null,
+            quizForm: {
+                industry: '',
+                teamSize: '',
+                department: '',
+                pain: '',
+                turnover: '',
+            },
+            isSendingQuiz: false,
+            quizSent: false,
+            quizTriedSubmit: false,
             isDiscussOpen: false,
             discussTopic: '',
             PlanForm: {
@@ -29,6 +44,43 @@ createApp({
             discussSent: false,
 
         };
+    },
+    computed: {
+        heroPhoneDigits() {
+            return (this.phone || '').replace(/\D/g, '');
+        },
+        isHeroNameValid() {
+            return !!(this.name || '').trim();
+        },
+        isHeroPhoneValid() {
+            return this.heroPhoneDigits.length === 11;
+        },
+        isHeroCompanyValid() {
+            return !!(this.company || '').trim();
+        },
+        isHeroDirectionValid() {
+            return !!(this.direction || '').trim();
+        },
+        isHeroFormValid() {
+            return !!(this.isHeroNameValid && this.isHeroCompanyValid && this.isHeroDirectionValid && this.isHeroPhoneValid);
+        },
+        isQuizIndustryValid() {
+            return !!(this.quizForm.industry || '').trim();
+        },
+        isQuizTeamSizeValid() {
+            const teamSize = String(this.quizForm.teamSize || '').trim();
+            const teamSizeNum = Number.parseInt(teamSize, 10);
+            return !!(teamSize && Number.isFinite(teamSizeNum) && teamSizeNum > 0);
+        },
+        isQuizDepartmentValid() {
+            return !!(this.quizForm.department || '').trim();
+        },
+        isQuizPainValid() {
+            return !!(this.quizForm.pain || '').trim();
+        },
+        isQuizFormValid() {
+            return !!(this.isQuizIndustryValid && this.isQuizTeamSizeValid && this.isQuizDepartmentValid && this.isQuizPainValid);
+        },
     },
     methods: {
         formatPhone(raw) {
@@ -72,23 +124,94 @@ createApp({
             const formatted = this.formatPhone(e.target.value);
             this.setByPath(path, formatted);
           },
+
+          onCompanyInput(e) {
+            const query = (e && e.target && e.target.value) ? e.target.value : this.company;
+            this.fetchCompanySuggestions(query);
+          },
+
+          fetchCompanySuggestions(query) {
+            const value = (query || '').trim();
+            if (this.companySuggestTimer) {
+                clearTimeout(this.companySuggestTimer);
+            }
+            if (value.length < 2) {
+                this.companySuggestions = [];
+                return;
+            }
+            this.companySuggestTimer = setTimeout(() => {
+                this.requestCompanySuggestions(value);
+            }, 250);
+          },
+
+          async requestCompanySuggestions(query) {
+            if (this.companySuggestAbort) {
+                this.companySuggestAbort.abort();
+            }
+            const controller = new AbortController();
+            this.companySuggestAbort = controller;
+            this.isCompanySuggesting = true;
+            try {
+                const resp = await fetch(`/api/dadata/party/?q=${encodeURIComponent(query)}`, {
+                    signal: controller.signal,
+                });
+                if (!resp.ok) {
+                    this.companySuggestions = [];
+                    return;
+                }
+                const data = await resp.json();
+                this.companySuggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+            } catch (e) {
+                if (e && e.name !== 'AbortError') {
+                    this.companySuggestions = [];
+                }
+            } finally {
+                this.isCompanySuggesting = false;
+            }
+          },
     
         
         async submitHeroForm() {
+            if (this.isSending || this.sent) return;
+            this.heroTriedSubmit = true;
+            if (!this.isHeroFormValid) {
+                return;
+            }
+            const name = this.name.trim();
+            const phone = this.phone.trim();
+            const company = this.company.trim();
+            const direction = (this.direction || '').trim();
             this.isSending = true;
             try {
                 // здесь будет реальный POST на Django
                 console.log('Отправка:', {
-                    name: this.name,
-                    phone: this.phone,
-                    company: this.company,
-                    direction: this.direction,
+                    name,
+                    phone,
+                    company,
+                    direction,
                 });
                 // имитация задержки
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 1000));
                 this.sent = true;
             } finally {
                 this.isSending = false;
+            }
+        },
+        async submitQuiz() {
+            if (this.isSendingQuiz || this.quizSent) return;
+            this.quizTriedSubmit = true;
+            if (!this.isQuizFormValid) {
+                return;
+            }
+            this.isSendingQuiz = true;
+            try {
+                console.log('Quiz form payload:', {
+                    ...this.quizForm,
+                });
+                await new Promise(r => setTimeout(r, 1000));
+                this.quizSent = true;
+            } finally {
+                this.isSendingQuiz = false;
             }
         },
         openDiscuss(topic) {

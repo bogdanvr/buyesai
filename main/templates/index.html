@@ -74,20 +74,26 @@
 
                 <div class="hero-form-card">
                     <div class="hero-form-title">Получите бесплатный AI-аудит процессов и прогноз экономии</div>
-                    <form class="hero-form" @submit.prevent="submitHeroForm">
-                        <div class="field">
+                    <form class="hero-form" @submit.prevent="submitHeroForm" ref="heroForm" novalidate>
+                        <div class="field" :class="{ 'field-invalid': heroTriedSubmit && !isHeroNameValid }">
                             <label>Имя</label>
-                            <input v-model="name" type="text" placeholder="Как к вам обращаться?">
+                            <input v-model="name" type="text" placeholder="Как к вам обращаться?" required>
+                            <div class="field-hint" v-if="heroTriedSubmit && !isHeroNameValid">Заполните поле</div>
                         </div>
-                        <div class="field">
+                        <div class="field" :class="{ 'field-invalid': heroTriedSubmit && !isHeroPhoneValid }">
                             <label>Телефон или WhatsApp</label>
-                            <input @focus="onPhoneFocus('phone')" @input="onPhoneInput('phone', $event)" v-model="phone" type="tel" placeholder="+7 ...">
+                            <input @focus="onPhoneFocus('phone')" @input="onPhoneInput('phone', $event)" v-model="phone" type="tel" placeholder="+7 ..." required pattern="\+7\s\(\d{3}\)\s\d{3}-\d{2}-\d{2}">
+                            <div class="field-hint" v-if="heroTriedSubmit && !isHeroPhoneValid">Введите телефон в формате +7 (999) 999-99-99</div>
                         </div>
-                        <div class="field">
+                        <div class="field" :class="{ 'field-invalid': heroTriedSubmit && !isHeroCompanyValid }">
                             <label>Компания</label>
-                            <input v-model="company" type="text" placeholder="Название или ниша">
+                            <input v-model="company" type="text" placeholder="Название или ИНН" required list="hero-company-suggestions" @input="onCompanyInput">
+                            <datalist id="hero-company-suggestions">
+                                <option v-for="item in companySuggestions" :key="item.value + ':' + item.inn" :value="item.value" :label="item.inn ? ('ИНН ' + item.inn) : ''"></option>
+                            </datalist>
+                            <div class="field-hint" v-if="heroTriedSubmit && !isHeroCompanyValid">Заполните поле</div>
                         </div>
-                        <div class="field">
+                        <div class="field" :class="{ 'field-invalid': heroTriedSubmit && !isHeroDirectionValid }">
                             <label>Направление</label>
                             <select v-model="direction">
                                 <option>Отдел продаж</option>
@@ -96,10 +102,11 @@
                                 <option>Маркетинг</option>
                                 <option>Пока не знаю, хочу консультацию</option>
                             </select>
+                            <div class="field-hint" v-if="heroTriedSubmit && !isHeroDirectionValid">Выберите вариант</div>
                         </div>
                         <div class="hero-form-row-full hero-form-footer">
-                            <button type="submit" class="btn btn-primary" :disabled="isSending">
-                                [[ isSending ? 'Отправляем...' : 'Получить AI-стратегию' ]]
+                            <button type="submit" class="btn btn-primary" :disabled="isSending || sent">
+                                [[ sent ? 'Отправлено' : (isSending ? 'Отправляем...' : 'Получить AI-стратегию') ]]
                             </button>
                             <div class="hero-form-note">
                                 За 3–5 дней разберём 1–2 ключевых процесса, посчитаем эффект и пришлём PDF с планом внедрения.
@@ -299,42 +306,50 @@
             </div>
 
             <div class="quiz-wrapper">
-                <section class="quiz-card">
+                <form class="quiz-card" @submit.prevent="submitQuiz" ref="quizForm" novalidate>
                     <h3 style="margin-bottom:10px;font-size:15px;">Расскажите немного о бизнесе</h3>
                     <div class="quiz-grid">
-                        <div class="field field-full">
+                        <div class="field field-full" :class="{ 'field-invalid': quizTriedSubmit && !isQuizIndustryValid }">
                             <label>Отрасль</label>
-                            <input type="text" placeholder="Производство, дистрибуция, услуги, e-commerce...">
+                            <input type="text" placeholder="Производство, дистрибуция, услуги, e-commerce..." v-model="quizForm.industry" required>
+                            <div class="field-hint" v-if="quizTriedSubmit && !isQuizIndustryValid">Заполните поле</div>
                         </div>
-                        <div class="field">
+                        <div class="field" :class="{ 'field-invalid': quizTriedSubmit && !isQuizTeamSizeValid }">
                             <label>Размер команды</label>
-                            <input type="number" placeholder="Сколько сотрудников в отделе?">
+                            <input type="number" min="1" placeholder="Сколько сотрудников в отделе?" v-model="quizForm.teamSize" required>
+                            <div class="field-hint" v-if="quizTriedSubmit && !isQuizTeamSizeValid">Укажите число больше 0</div>
                         </div>
-                        <div class="field">
+                        <div class="field" :class="{ 'field-invalid': quizTriedSubmit && !isQuizDepartmentValid }">
                             <label>Тип отдела</label>
-                            <select>
+                            <select v-model="quizForm.department" required>
+                                <option disabled value="">Выберите вариант</option>
                                 <option>Продажи</option>
                                 <option>Снабжение / закупки</option>
                                 <option>Сервис / поддержка</option>
                                 <option>Комбинация отделов</option>
                             </select>
+                            <div class="field-hint" v-if="quizTriedSubmit && !isQuizDepartmentValid">Выберите вариант</div>
                         </div>
-                        <div class="field field-full">
+                        <div class="field field-full" :class="{ 'field-invalid': quizTriedSubmit && !isQuizPainValid }">
                             <label>Главная боль</label>
-                            <select>
+                            <select v-model="quizForm.pain" required>
+                                <option disabled value="">Выберите вариант</option>
                                 <option>Много рутины и ручного ввода</option>
                                 <option>Падает качество обслуживания</option>
                                 <option>Не хватает аналитики и контроля</option>
                                 <option>Нужно увеличить продажи без расширения штата</option>
                             </select>
+                            <div class="field-hint" v-if="quizTriedSubmit && !isQuizPainValid">Выберите вариант</div>
                         </div>
                         <div class="field field-full">
                             <label>Оборот / количество заявок в месяц (по желанию)</label>
-                            <input type="text" placeholder="Например: 20 млн ₽ или 1500 заявок">
+                            <input type="text" placeholder="Например: 20 млн ₽ или 1500 заявок" v-model="quizForm.turnover">
                         </div>
                     </div>
-                    <button class="btn btn-primary" style="margin-top:12px;">Получить расчёт и дорожную карту</button>
-                </section>
+                    <button type="submit" class="btn btn-primary" style="margin-top:12px;" :disabled="isSendingQuiz || quizSent">
+                        [[ quizSent ? 'Отправлено' : (isSendingQuiz ? 'Отправляем...' : 'Получить расчёт и дорожную карту') ]]
+                    </button>
+                </form>
 
                 <aside class="impact-card">
                     <h3 style="margin-bottom:8px;font-size:15px;">Предварительная оценка эффекта</h3>
@@ -757,10 +772,10 @@
                 </div>
 
                 <div class="field">
-                    <label>Компания / ниша</label>
+                    <label>Компания / ИНН</label>
                     <input
                         type="text"
-                        placeholder="Например: оптовая торговля металлом"
+                        placeholder="Введите название или ИНН"
                         v-model="discussForm.company"
                     >
                 </div>

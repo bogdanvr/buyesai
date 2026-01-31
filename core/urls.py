@@ -15,10 +15,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from main.views import mainview
+from main.views import mainview, dadata_party
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', mainview, name='main'),
+    path('api/dadata/party/', dadata_party, name='dadata_party'),
 
 ]

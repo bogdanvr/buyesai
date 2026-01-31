@@ -375,6 +375,19 @@ img {
     position: relative;
 }
 
+.field-invalid input,
+.field-invalid select,
+.field-invalid textarea {
+    border-color: rgba(255, 106, 26, 0.85);
+    box-shadow: 0 0 0 1px rgba(255, 106, 26, 0.35);
+}
+
+.field-hint {
+    margin-top: 4px;
+    font-size: 11px;
+    color: rgba(255, 154, 88, 0.95);
+}
+
 .field label {
     display: block;
     font-size: 11px;

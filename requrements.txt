@@ -1,4 +1,12 @@
+anyio==4.12.1
 asgiref==3.11.0
+certifi==2026.1.4
+dadata==25.10.0
 Django==5.2.8
 django-environ==0.12.0
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.11
 sqlparse==0.5.4
+typing_extensions==4.15.0
