@@ -4,6 +4,7 @@ from django.views.decorators.http import require_GET
 from django.conf import settings
 from dadata import Dadata
 from main.services import get_client_ip
+import ipaddress
 
 
 def mainview(request):
@@ -14,7 +15,6 @@ def mainview(request):
 @require_GET
 def dadata_party(request):
     ip = get_client_ip(request)
-    print('ip', ip)
     query = (request.GET.get('q') or '').strip()
     if len(query) < 2:
         return JsonResponse({"suggestions": []})
@@ -25,7 +25,18 @@ def dadata_party(request):
 
     try:
         dadata = Dadata(token)
-        result = dadata.suggest("party", query)
+        locations_boost = None
+        if ip:
+            try:
+                ip_obj = ipaddress.ip_address(ip)
+                if not (ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_reserved or ip_obj.is_unspecified):
+                    locations_boost = [{"ip": ip}]
+            except ValueError:
+                locations_boost = None
+        if locations_boost:
+            result = dadata.suggest("party", query, locations_boost=locations_boost)
+        else:
+            result = dadata.suggest("party", query)
     except Exception:
         return JsonResponse({"suggestions": []}, status=502)
 
