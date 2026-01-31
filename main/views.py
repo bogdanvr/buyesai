@@ -59,11 +59,16 @@ def dadata_party(request):
     suggestions = []
     for item in result or []:
         data = item.get('data') or {}
+        address_value = ''
+        address = data.get('address')
+        if isinstance(address, dict):
+            address_value = address.get('value') or ''
         suggestions.append({
             "value": item.get('value') or '',
             "inn": data.get('inn') or '',
             "kpp": data.get('kpp') or '',
             "ogrn": data.get('ogrn') or '',
+            "address": address_value,
         })
 
     return JsonResponse({"suggestions": suggestions})

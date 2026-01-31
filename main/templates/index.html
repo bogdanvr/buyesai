@@ -87,10 +87,32 @@
                         </div>
                         <div class="field" :class="{ 'field-invalid': heroTriedSubmit && !isHeroCompanyValid }">
                             <label>Компания</label>
-                            <input v-model="company" type="text" placeholder="Название или ИНН" required list="hero-company-suggestions" @input="onCompanyInput">
-                            <datalist id="hero-company-suggestions">
-                                <option v-for="item in companySuggestions" :key="item.value + ':' + item.inn" :value="item.value" :label="item.inn ? ('ИНН ' + item.inn) : ''"></option>
-                            </datalist>
+                            <div class="suggestions-wrapper">
+                                <input
+                                    v-model="company"
+                                    type="text"
+                                    placeholder="Название или ИНН"
+                                    required
+                                    @input="onCompanyInput"
+                                    @focus="onCompanyFocus"
+                                    @blur="onCompanyBlur"
+                                >
+                                <div class="suggestions" v-if="companySuggestionsOpen && companySuggestions.length">
+                                    <button
+                                        type="button"
+                                        class="suggestion-item"
+                                        v-for="item in companySuggestions"
+                                        :key="item.value + ':' + item.inn"
+                                        @mousedown.prevent="selectCompanySuggestion(item)"
+                                    >
+                                        <div class="suggestion-title">[[ item.value ]]</div>
+                                        <div class="suggestion-meta">
+                                            <span v-if="item.inn">ИНН [[ item.inn ]]</span>
+                                            <span v-if="item.address">[[ item.address ]]</span>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
                             <div class="field-hint" v-if="heroTriedSubmit && !isHeroCompanyValid">Заполните поле</div>
                         </div>
                         <div class="field" :class="{ 'field-invalid': heroTriedSubmit && !isHeroDirectionValid }">

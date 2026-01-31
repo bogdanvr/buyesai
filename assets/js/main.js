@@ -16,6 +16,8 @@ createApp({
             isCompanySuggesting: false,
             companySuggestTimer: null,
             companySuggestAbort: null,
+            companySuggestionsOpen: false,
+            companyBlurTimer: null,
             quizForm: {
                 industry: '',
                 teamSize: '',
@@ -127,7 +129,30 @@ createApp({
 
           onCompanyInput(e) {
             const query = (e && e.target && e.target.value) ? e.target.value : this.company;
+            this.companySuggestionsOpen = true;
             this.fetchCompanySuggestions(query);
+          },
+
+          onCompanyFocus() {
+            if (this.companySuggestions.length > 0) {
+                this.companySuggestionsOpen = true;
+            }
+          },
+
+          onCompanyBlur() {
+            if (this.companyBlurTimer) {
+                clearTimeout(this.companyBlurTimer);
+            }
+            this.companyBlurTimer = setTimeout(() => {
+                this.companySuggestionsOpen = false;
+            }, 150);
+          },
+
+          selectCompanySuggestion(item) {
+            if (!item) return;
+            this.company = item.value || '';
+            this.companySuggestionsOpen = false;
+            this.companySuggestions = [];
           },
 
           fetchCompanySuggestions(query) {
@@ -137,6 +162,7 @@ createApp({
             }
             if (value.length < 2) {
                 this.companySuggestions = [];
+                this.companySuggestionsOpen = false;
                 return;
             }
             this.companySuggestTimer = setTimeout(() => {
@@ -161,6 +187,7 @@ createApp({
                 }
                 const data = await resp.json();
                 this.companySuggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+                this.companySuggestionsOpen = this.companySuggestions.length > 0;
             } catch (e) {
                 if (e && e.name !== 'AbortError') {
                     this.companySuggestions = [];
