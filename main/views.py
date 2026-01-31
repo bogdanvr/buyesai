@@ -36,6 +36,7 @@ def dadata_party(request):
                 locations_boost = None
         if locations_boost:
             result = dadata.suggest("party", query, locations_boost=locations_boost)
+            print('locations_boost', locations_boost)
         else:
             result = dadata.suggest("party", query)
     except Exception:
