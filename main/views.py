@@ -15,6 +15,7 @@ def mainview(request):
 @require_GET
 def dadata_party(request):
     ip = get_client_ip(request)
+    print('ip', ip)
     query = (request.GET.get('q') or '').strip()
     if len(query) < 2:
         return JsonResponse({"suggestions": []})
