@@ -1,0 +1,80 @@
+# --- Django / Python ---
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.py[cod]
+
+# C extensions
+*.so
+
+# Django stuff
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+!.env.template
+!.env.sample
+
+# Static files (обычно генерируются)
+staticfiles/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Unit test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.pytest_cache/
+
+# mypy / type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Virtualenvs
+.venv/
+venv/
+ENV/
+env/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# dotenv backups / temp
+*.swp
+*.swo
+*.tmp
+
