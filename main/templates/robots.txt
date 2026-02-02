@@ -1,0 +1,5 @@
+User-Agent: *
+
+Disallow: /admin
+
+Sitemap: https://buyes.pro/sitemap.xml

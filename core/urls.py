@@ -15,10 +15,20 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from main.views import mainview, dadata_party
+from main.views import mainview, dadata_party, RobotsTxtView
+from django.contrib.sitemaps.views import sitemap
+
+from .sitemaps import StaticViewSitemap
+
+sitemaps = {
+    "static": StaticViewSitemap,
+}
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path("sitemap.xml", sitemap, {"sitemaps": sitemaps}, name="django.contrib.sitemaps.views.sitemap"),
+    path("robots.txt", RobotsTxtView.as_view(content_type="text/plain"), name="robots"),
+
     path('', mainview, name='main'),
     path('api/dadata/party/', dadata_party, name='dadata_party'),
 

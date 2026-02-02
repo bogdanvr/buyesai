@@ -795,11 +795,31 @@
 
                 <div class="field">
                     <label>Компания / ИНН</label>
-                    <input
-                        type="text"
-                        placeholder="Введите название или ИНН"
-                        v-model="discussForm.company"
-                    >
+                    <div class="suggestions-wrapper">
+                        <input
+                            type="text"
+                            placeholder="Введите название или ИНН"
+                            v-model="discussForm.company"
+                            @input="onDiscussCompanyInput"
+                            @focus="onDiscussCompanyFocus"
+                            @blur="onDiscussCompanyBlur"
+                        >
+                        <div class="suggestions" v-if="discussCompanySuggestionsOpen && discussCompanySuggestions.length">
+                            <button
+                                type="button"
+                                class="suggestion-item"
+                                v-for="item in discussCompanySuggestions"
+                                :key="item.value + ':' + item.inn"
+                                @mousedown.prevent="selectDiscussCompanySuggestion(item)"
+                            >
+                                <div class="suggestion-title">[[ item.value ]]</div>
+                                <div class="suggestion-meta">
+                                    <span v-if="item.inn">ИНН [[ item.inn ]]</span>
+                                    <span v-if="item.address">[[ item.address ]]</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="field">

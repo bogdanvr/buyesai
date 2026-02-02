@@ -42,6 +42,12 @@ createApp({
                 company: '',
                 comment: '',
             },
+            discussCompanySuggestions: [],
+            isDiscussCompanySuggesting: false,
+            discussCompanySuggestTimer: null,
+            discussCompanySuggestAbort: null,
+            discussCompanySuggestionsOpen: false,
+            discussCompanyBlurTimer: null,
             isSendingDiscuss: false,
             discussSent: false,
 
@@ -194,6 +200,76 @@ createApp({
                 }
             } finally {
                 this.isCompanySuggesting = false;
+            }
+          },
+
+          onDiscussCompanyInput(e) {
+            const query = (e && e.target && e.target.value) ? e.target.value : this.discussForm.company;
+            this.discussCompanySuggestionsOpen = true;
+            this.fetchDiscussCompanySuggestions(query);
+          },
+
+          onDiscussCompanyFocus() {
+            if (this.discussCompanySuggestions.length > 0) {
+                this.discussCompanySuggestionsOpen = true;
+            }
+          },
+
+          onDiscussCompanyBlur() {
+            if (this.discussCompanyBlurTimer) {
+                clearTimeout(this.discussCompanyBlurTimer);
+            }
+            this.discussCompanyBlurTimer = setTimeout(() => {
+                this.discussCompanySuggestionsOpen = false;
+            }, 150);
+          },
+
+          selectDiscussCompanySuggestion(item) {
+            if (!item) return;
+            this.discussForm.company = item.value || '';
+            this.discussCompanySuggestionsOpen = false;
+            this.discussCompanySuggestions = [];
+          },
+
+          fetchDiscussCompanySuggestions(query) {
+            const value = (query || '').trim();
+            if (this.discussCompanySuggestTimer) {
+                clearTimeout(this.discussCompanySuggestTimer);
+            }
+            if (value.length < 2) {
+                this.discussCompanySuggestions = [];
+                this.discussCompanySuggestionsOpen = false;
+                return;
+            }
+            this.discussCompanySuggestTimer = setTimeout(() => {
+                this.requestDiscussCompanySuggestions(value);
+            }, 250);
+          },
+
+          async requestDiscussCompanySuggestions(query) {
+            if (this.discussCompanySuggestAbort) {
+                this.discussCompanySuggestAbort.abort();
+            }
+            const controller = new AbortController();
+            this.discussCompanySuggestAbort = controller;
+            this.isDiscussCompanySuggesting = true;
+            try {
+                const resp = await fetch(`/api/dadata/party/?q=${encodeURIComponent(query)}`, {
+                    signal: controller.signal,
+                });
+                if (!resp.ok) {
+                    this.discussCompanySuggestions = [];
+                    return;
+                }
+                const data = await resp.json();
+                this.discussCompanySuggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+                this.discussCompanySuggestionsOpen = this.discussCompanySuggestions.length > 0;
+            } catch (e) {
+                if (e && e.name !== 'AbortError') {
+                    this.discussCompanySuggestions = [];
+                }
+            } finally {
+                this.isDiscussCompanySuggesting = false;
             }
           },
     

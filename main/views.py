@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from django.conf import settings
+from django.views.generic import TemplateView
 from dadata import Dadata
 from main.services import get_client_ip
 import ipaddress
@@ -10,6 +11,10 @@ import ipaddress
 def mainview(request):
     # request_context = RequestContext(request.get_host)
     return render(request, 'index.html')
+
+
+class RobotsTxtView(TemplateView):
+    template_name = "robots.txt"
 
 
 @require_GET
