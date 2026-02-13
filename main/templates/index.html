@@ -128,7 +128,7 @@
                         </div>
                         <div class="hero-form-row-full hero-form-footer">
                             <button type="submit" class="btn btn-primary" :disabled="isSending || sent">
-                                [[ sent ? 'Отправлено' : (isSending ? 'Отправляем...' : 'Получить AI-стратегию') ]]
+                                [[ heroSubmitLabel ]]
                             </button>
                             <div class="hero-form-note">
                                 За 3–5 дней разберём 1–2 ключевых процесса, посчитаем эффект и пришлём PDF с планом внедрения.
@@ -155,7 +155,7 @@
 
             <div class="hero-visual-wrapper">
                 <div class="hero-visual-card">
-                    <div class="hero-logo-big" data-tilt></div>
+                    <div class="hero-logo-big" data-tilt data-tilt-gyroscope="false" data-tilt-glare="false" data-tilt-max="8"></div>
                     <div class="hero-3d-logo"></div>
                     <div class="hero-metrics">
                         <div class="hero-metric-card">
@@ -369,7 +369,7 @@
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary" style="margin-top:12px;" :disabled="isSendingQuiz || quizSent">
-                        [[ quizSent ? 'Отправлено' : (isSendingQuiz ? 'Отправляем...' : 'Получить расчёт и дорожную карту') ]]
+                        [[ quizSubmitLabel ]]
                     </button>
                 </form>
 
@@ -764,7 +764,7 @@
                     Обсудить проект с BUYES AI
                 </div>
                 <h3 class="discuss-modal-title">
-                    [[ discussTopic || 'Внедрение AI под вашу задачу' ]]
+                    [[ discussModalTitle ]]
                 </h3>
                 <p class="discuss-modal-subtitle">
                     Оставьте контакты, и мы предложим 1–2 варианта решения
@@ -837,7 +837,7 @@
                         class="btn btn-primary"
                         :disabled="isSendingDiscuss"
                     >
-                        [[ isSendingDiscuss ? 'Отправляем...' : 'Обсудить проект' ]]
+                        [[ discussSubmitLabel ]]
                     </button>
 
                     <div class="discuss-modal-note" v-if="!discussSent">

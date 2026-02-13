@@ -72,6 +72,10 @@ createApp({
         isHeroFormValid() {
             return !!(this.isHeroNameValid && this.isHeroCompanyValid && this.isHeroDirectionValid && this.isHeroPhoneValid);
         },
+        heroSubmitLabel() {
+            if (this.sent) return 'Отправлено';
+            return this.isSending ? 'Отправляем...' : 'Получить AI-стратегию';
+        },
         isQuizIndustryValid() {
             return !!(this.quizForm.industry || '').trim();
         },
@@ -88,6 +92,16 @@ createApp({
         },
         isQuizFormValid() {
             return !!(this.isQuizIndustryValid && this.isQuizTeamSizeValid && this.isQuizDepartmentValid && this.isQuizPainValid);
+        },
+        quizSubmitLabel() {
+            if (this.quizSent) return 'Отправлено';
+            return this.isSendingQuiz ? 'Отправляем...' : 'Получить расчёт и дорожную карту';
+        },
+        discussModalTitle() {
+            return this.discussTopic || 'Внедрение AI под вашу задачу';
+        },
+        discussSubmitLabel() {
+            return this.isSendingDiscuss ? 'Отправляем...' : 'Обсудить проект';
         },
     },
     methods: {
