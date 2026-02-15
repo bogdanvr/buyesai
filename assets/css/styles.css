@@ -221,6 +221,9 @@ img {
     gap: 8px;
     background: rgba(5, 8, 24, 0.9);  /* тёмная «панель», как фон шапки */
     backdrop-filter: blur(14px);
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
     transition:
         transform var(--transition-fast),
         box-shadow var(--transition-fast),
@@ -231,7 +234,8 @@ img {
 
 /* основная кнопка – связана по цвету и свечению с логотипом */
 .btn-primary {
-    background: radial-gradient(circle at 30% 0, #ffd3a1 0, #ff6a1a 40%, #a4380f 100%);
+    background-color: #ff7a2a;
+    background-image: radial-gradient(circle at 30% 0, #ffd3a1 0, #ff6a1a 40%, #a4380f 100%);
     color: #130a05;
     box-shadow: 0 10px 26px rgba(255, 106, 26, 0.45);
     border-color: rgba(255, 207, 136, 0.85);
@@ -1531,6 +1535,377 @@ section {
 
     .discuss-modal-title {
         font-size: 18px;
+    }
+}
+
+/* CONSULTANT */
+
+#consultant[v-cloak] {
+    display: none;
+}
+
+.consultant {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 70;
+    font-size: 13px;
+    color: var(--text-main);
+}
+
+.consultant-fab {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.consultant-fab-btn {
+    width: 58px;
+    height: 58px;
+    border-radius: 18px;
+    background: #0b1021;
+    border: 1px solid rgba(255, 106, 26, 0.45);
+    box-shadow: 0 18px 30px rgba(0, 0, 0, 0.35);
+    display: grid;
+    place-items: center;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.consultant-fab:hover .consultant-fab-btn {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 20px 36px rgba(0, 0, 0, 0.45);
+}
+
+.consultant-fab-logo {
+    width: 30px;
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 4px 10px rgba(255, 106, 26, 0.35));
+}
+
+.consultant-fab-hint {
+    background: rgba(7, 11, 30, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+    box-shadow: var(--shadow-chip);
+}
+
+.consultant-fab-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #ff3b3b;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    padding: 0 6px;
+    border: 2px solid #111729;
+}
+
+.consultant-panel {
+    position: absolute;
+    right: 0;
+    bottom: 78px;
+    width: 360px;
+    background: rgba(7, 11, 30, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.consultant-panel-enter-active,
+.consultant-panel-leave-active {
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.consultant-panel-enter-from,
+.consultant-panel-leave-to {
+    transform: translateY(12px) scale(0.98);
+    opacity: 0;
+}
+
+.consultant-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 16px 12px;
+    background: linear-gradient(135deg, rgba(17, 23, 41, 0.95), rgba(8, 12, 26, 0.98));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.consultant-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+
+.consultant-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.consultant-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #35d48f;
+    box-shadow: 0 0 8px rgba(53, 212, 143, 0.65);
+}
+
+.consultant-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px 6px;
+    line-height: 1;
+}
+
+.consultant-body {
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.consultant-msg {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.consultant-msg.bot {
+    align-items: flex-start;
+}
+
+.consultant-msg.user {
+    align-items: flex-end;
+}
+
+.consultant-msg-bubble {
+    max-width: 85%;
+    padding: 10px 12px;
+    border-radius: 14px;
+    font-size: 13px;
+    line-height: 1.35;
+    background: rgba(14, 19, 40, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.consultant-msg.user .consultant-msg-bubble {
+    background: rgba(255, 106, 26, 0.18);
+    border-color: rgba(255, 106, 26, 0.35);
+    color: #fff7f0;
+}
+
+.consultant-msg-time {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.consultant-typing {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.consultant-typing-dots span {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.7);
+    animation: consultantTyping 1s infinite ease-in-out;
+}
+
+.consultant-typing-dots span:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.consultant-typing-dots span:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+@keyframes consultantTyping {
+    0%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.6;
+    }
+    50% {
+        transform: translateY(-3px);
+        opacity: 1;
+    }
+}
+
+.consultant-quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.consultant-quick-btn {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(12, 16, 36, 0.85);
+    color: var(--text-main);
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.consultant-quick-btn:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(18, 24, 48, 0.9);
+}
+
+.consultant-lead {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 14px;
+    background: rgba(9, 13, 30, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.consultant-lead-title {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.consultant-lead textarea {
+    width: 100%;
+    padding: 9px 11px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(2, 4, 12, 0.8);
+    color: var(--text-main);
+    font-size: 12px;
+    outline: none;
+    resize: vertical;
+}
+
+.consultant-lead textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(255, 106, 26, 0.35);
+}
+
+.consultant-lead-btn {
+    width: 100%;
+    border: none;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #101010;
+    font-weight: 600;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.consultant-lead-btn:disabled {
+    cursor: not-allowed;
+    background: rgba(255, 106, 26, 0.5);
+    color: rgba(16, 16, 16, 0.7);
+}
+
+.consultant-lead-note {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.consultant-input {
+    display: flex;
+    gap: 8px;
+    padding: 12px 14px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(7, 11, 30, 0.98);
+}
+
+.consultant-input input {
+    flex: 1;
+    padding: 9px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(2, 4, 12, 0.85);
+    color: var(--text-main);
+    font-size: 12px;
+    outline: none;
+}
+
+.consultant-input input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(255, 106, 26, 0.35);
+}
+
+.consultant-input button {
+    border: none;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--text-main);
+    padding: 9px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.consultant-input button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.consultant-input button:not(:disabled):hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.consultant-footer {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.45);
+    text-align: center;
+    padding: 0 14px 12px;
+    background: rgba(7, 11, 30, 0.98);
+}
+
+@media (max-width: 680px) {
+    .consultant {
+        right: 12px;
+        left: 12px;
+        bottom: 16px;
+    }
+
+    .consultant-panel {
+        width: 100%;
+        right: 0;
+        left: 0;
+        bottom: 86px;
+    }
+
+    .consultant-fab {
+        align-items: flex-end;
     }
 }
 

@@ -879,10 +879,94 @@
         </div>
 
     </div> <!-- /#app -->
-    <!-- Плавающая кнопка AI-чата (здесь можно подключить ваш виджет) -->
-    <div class="chat-fab">
-        <button class="chat-fab-btn"></button>
-        <div class="chat-fab-hint">Спросить у AI-консультанта</div>
+
+    <!-- Онлайн-консультант (отдельный Vue-модуль) -->
+    <div id="consultant" class="consultant" v-cloak>
+        <div class="consultant-fab" @click="toggleOpen" :class="{ 'is-open': isOpen }">
+            <div class="consultant-fab-btn">
+                <img class="consultant-fab-logo" src="{% static 'img/consultant-logo.png' %}" alt="BUYES">
+            </div>
+            <div class="consultant-fab-hint">Онлайн-консультант</div>
+            <div class="consultant-fab-badge" v-if="unreadCount > 0">[[ unreadCount ]]</div>
+        </div>
+
+        <transition name="consultant-panel">
+            <div class="consultant-panel" v-show="isOpen">
+                <div class="consultant-header">
+                    <div>
+                        <div class="consultant-title">AI-консультант BUYES</div>
+                        <div class="consultant-status">
+                            <span class="consultant-status-dot"></span>
+                            Онлайн · отвечаем в течение 5 минут
+                        </div>
+                    </div>
+                    <button class="consultant-close" @click="close">×</button>
+                </div>
+
+                <div class="consultant-body" ref="body">
+                    <div class="consultant-msg" v-for="message in messages" :key="message.id"
+                        :class="message.from">
+                        <div class="consultant-msg-bubble">[[ message.text ]]</div>
+                        <div class="consultant-msg-time">[[ message.time ]]</div>
+                    </div>
+
+                    <div class="consultant-typing" v-if="isTyping">
+                        <span class="consultant-typing-label">Консультант печатает</span>
+                        <span class="consultant-typing-dots">
+                            <span></span><span></span><span></span>
+                        </span>
+                    </div>
+
+                    <div class="consultant-quick" v-if="quickReplies.length && !showLeadForm">
+                        <button type="button" class="consultant-quick-btn" v-for="item in quickReplies"
+                            :key="item" @click="sendQuick(item)">
+                            [[ item ]]
+                        </button>
+                    </div>
+
+                    <div class="consultant-lead" v-if="showLeadForm">
+                        <div class="consultant-lead-title">Оставьте контакты</div>
+                        <div class="field" :class="{ 'field-invalid': leadTriedSubmit && !isLeadNameValid }">
+                            <label>Имя</label>
+                            <input type="text" placeholder="Как к вам обращаться?" v-model="leadForm.name">
+                            <div class="field-hint" v-if="leadTriedSubmit && !isLeadNameValid">
+                                Укажите имя
+                            </div>
+                        </div>
+                        <div class="field" :class="{ 'field-invalid': leadTriedSubmit && !isLeadPhoneValid }">
+                            <label>Телефон / мессенджер</label>
+                            <input type="tel" placeholder="+7 ..." v-model="leadForm.phone"
+                                @focus="onLeadPhoneFocus" @input="onLeadPhoneInput">
+                            <div class="field-hint" v-if="leadTriedSubmit && !isLeadPhoneValid">
+                                Нужен номер в формате +7
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label>Компания</label>
+                            <input type="text" placeholder="Название компании" v-model="leadForm.company">
+                        </div>
+                        <div class="field">
+                            <label>Коротко о задаче</label>
+                            <textarea rows="2" placeholder="Например: лиды, поддержка, склад"
+                                v-model="leadForm.comment"></textarea>
+                        </div>
+                        <button type="button" class="consultant-lead-btn" @click="submitLead"
+                            :disabled="leadSending">
+                            [[ leadSubmitLabel ]]
+                        </button>
+                        <div class="consultant-lead-note">
+                            Нажимая на кнопку, вы соглашаетесь с обработкой персональных данных.
+                        </div>
+                    </div>
+                </div>
+
+                <form class="consultant-input" @submit.prevent="sendMessage">
+                    <input type="text" placeholder="Опишите задачу в двух словах" v-model="input">
+                    <button type="submit" :disabled="!input.trim()">Отправить</button>
+                </form>
+                <div class="consultant-footer">Мы на связи с 10:00 до 19:00 МСК</div>
+            </div>
+        </transition>
     </div>
     <script defer src="{% static '/js/vanilla-tilt.min.js' %}"></script>
     <script defer src="{% static '/js/tilt-auto.js' %}"></script>
@@ -890,6 +974,7 @@
     <script defer src="{% static '/js/particles-app.js' %}"></script>
     <script defer src="{% static '/js/nav.js' %}"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script defer src="{% static '/js/consultant.js' %}"></script>
     <script defer src="{% static '/js/main.js' %}"></script>
 </body>
 
