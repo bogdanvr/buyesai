@@ -22,6 +22,7 @@
     margin: 0;
     padding: 0;
 }
+
 body {
     margin: 0;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -31,7 +32,8 @@ body {
     position: relative;
     overflow-x: hidden;
 
-    padding-top: 64px; /* примерно высота хедера, подгони при необходимости */
+    padding-top: 64px;
+    /* примерно высота хедера, подгони при необходимости */
 }
 
 /* анимированное «облако» на фоне */
@@ -53,9 +55,11 @@ body::before {
     0% {
         transform: translate3d(-40px, 0, 0) scale(1);
     }
+
     50% {
         transform: translate3d(20px, -30px, 0) scale(1.05);
     }
+
     100% {
         transform: translate3d(40px, 25px, 0) scale(1.08);
     }
@@ -85,7 +89,8 @@ img {
 /* HEADER */
 
 .header {
-    position: fixed;      /* было sticky */
+    position: fixed;
+    /* было sticky */
     top: 0;
     left: 0;
     right: 0;
@@ -98,16 +103,19 @@ img {
 
 .header-inner {
     display: grid;
-    grid-template-columns: auto auto auto; /* слева: логотип+меню, центр: телефон, справа: кнопка */
+    grid-template-columns: auto auto auto;
+    /* слева: логотип+меню, центр: телефон, справа: кнопка */
     align-items: center;
     justify-content: space-between;
     column-gap: 32px;
     padding: 14px 0;
 }
+
 .header-left {
     display: flex;
     align-items: center;
-    gap: 32px; /* расстояние между логотипом и меню */
+    gap: 32px;
+    /* расстояние между логотипом и меню */
 }
 
 .logo-block {
@@ -209,8 +217,10 @@ img {
 
 /* базовая кнопка – прямоугольник с мягкими углами */
 .btn {
-    border-radius: 10px; /* вместо 999px */
-    border: 1px solid rgba(255, 255, 255, 0.16); /* толщина близка к рамке логотипа */
+    border-radius: 10px;
+    /* вместо 999px */
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    /* толщина близка к рамке логотипа */
     cursor: pointer;
     font-size: 14px;
     font-weight: 500;
@@ -219,7 +229,8 @@ img {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    background: rgba(5, 8, 24, 0.9);  /* тёмная «панель», как фон шапки */
+    background: rgba(5, 8, 24, 0.9);
+    /* тёмная «панель», как фон шапки */
     backdrop-filter: blur(14px);
     appearance: none;
     -webkit-appearance: none;
@@ -258,6 +269,7 @@ img {
     box-shadow: 0 0 18px rgba(255, 106, 26, 0.45);
     background: rgba(8, 10, 24, 0.9);
 }
+
 /* 
 .btn-outline {
     background: transparent;
@@ -300,7 +312,7 @@ img {
     padding: 52px 0 60px;
     position: relative;
     background-image: linear-gradient(to bottom, #1F203D, transparent),
-     url(../img/home-new-bg2.png);
+        url(../img/home-new-bg2.png);
     /* z-index: 100; */
     background-size: cover;
 }
@@ -310,16 +322,15 @@ img {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: -10px;           /* насколько «заползёт» под следующий блок */
+    bottom: -10px;
+    /* насколько «заползёт» под следующий блок */
     height: 160px;
-    background: linear-gradient(
-        to bottom,
-        rgba(5, 8, 24, 0) 0%,
-        #050818 100%
-    );
+    background: linear-gradient(to bottom,
+            rgba(5, 8, 24, 0) 0%,
+            #050818 100%);
     pointer-events: none;
     z-index: 1;
-}   
+}
 
 .hero-inner {
     position: relative;
@@ -530,6 +541,7 @@ img {
     border: 1px solid rgba(255, 255, 255, 0.05);
     color: var(--text-muted);
 }
+
 .hero-visual-wrapper {
     position: absolute;
     right: 5%;
@@ -544,7 +556,8 @@ img {
     position: relative;
     width: 100%;
     height: 100%;
-    overflow: visible; /* чтобы метрики не обрезались */
+    overflow: visible;
+    /* чтобы метрики не обрезались */
 }
 
 /* фон-квадрат — еле заметное свечение */
@@ -553,7 +566,8 @@ img {
     inset: 0;
     border-radius: 34px;
     background: radial-gradient(circle at 30% 0%, #ffb47a, #ff6f37 40%, #b02b7b 100%);
-    opacity: 0.05;         /* было ~0.85, сильно уменьшаем */
+    opacity: 0.05;
+    /* было ~0.85, сильно уменьшаем */
     filter: blur(1.5px);
     z-index: 1;
 }
@@ -561,7 +575,8 @@ img {
 /* логотип — тоже очень мягкий, как водяной знак */
 .hero-logo-big {
     position: absolute;
-    inset: 0;                 /* тот же размер, что у квадрата */
+    inset: 0;
+    /* тот же размер, что у квадрата */
     border-radius: 34px;
 
     background-image: url("../img/logo_glass.png");
@@ -569,7 +584,8 @@ img {
     background-repeat: no-repeat;
 
     /* вот это главное: */
-    background-size: cover;   /* вместо contain */
+    background-size: cover;
+    /* вместо contain */
 }
 
 
@@ -627,9 +643,12 @@ img {
 
 /* плавное подпрыгивание логотипа */
 @keyframes floatLogo {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: translateY(0) scale(1);
     }
+
     50% {
         transform: translateY(-6px) scale(1.03);
     }
@@ -637,10 +656,13 @@ img {
 
 /* лёгкое пульсирующее свечение фона */
 @keyframes logoGlow {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 0.06;
         filter: blur(1px);
     }
+
     50% {
         opacity: 0.13;
         filter: blur(0.4px);
@@ -1192,27 +1214,27 @@ section {
     .hero-metrics {
         display: none;
     }
-  
+
     /* сама секция героя компактнее */
     .hero-section {
         min-height: auto;
         padding-top: 80px;
         padding-bottom: 40px;
     }
-  
+
     /* заголовок и подзаголовок */
     .hero-title {
         font-size: 26px;
         line-height: 1.25;
         margin-bottom: 16px;
     }
-  
+
     .hero-subtitle {
         font-size: 14px;
         line-height: 1.5;
         margin-bottom: 24px;
     }
-  
+
     /* контейнер героя / общий контейнер */
     .container,
     .hero-container,
@@ -1225,7 +1247,7 @@ section {
         padding-right: 16px;
         box-sizing: border-box;
     }
-  
+
     /* форма */
     .hero-form-card {
         width: 100%;
@@ -1234,13 +1256,13 @@ section {
         padding: 20px 16px;
         border-radius: 24px;
     }
-  
+
     .hero-form-card input,
     .hero-form-card select,
     .hero-form-card textarea {
         width: 100%;
     }
-  
+
     .hero-form-card button,
     .hero-form-card .btn-primary {
         width: 100%;
@@ -1248,25 +1270,29 @@ section {
         text-align: center;
         margin-top: 12px;
     }
-  
+
     /* подстраховка от горизонтального скролла */
-    html, body {
+    html,
+    body {
         max-width: 100%;
         overflow-x: hidden;
     }
-  }
-  
+}
+
 
 @media (max-width: 1024px) {
     .hero-inner {
         grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
     }
+
     .solutions-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
     .steps-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
     .cases-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -1274,7 +1300,8 @@ section {
 
 @media (max-width: 840px) {
     .header-inner {
-        grid-template-columns: auto auto; /* слева логотип, справа кнопка+бургер */
+        grid-template-columns: auto auto;
+        /* слева логотип, справа кнопка+бургер */
     }
 
     .nav {
@@ -1288,37 +1315,48 @@ section {
     .hero-inner {
         grid-template-columns: 1fr;
     }
+
     .phone-link {
         display: none;
     }
+
     .hero {
         padding-top: 32px;
     }
+
     .hero-visual-wrapper {
         order: -1;
     }
+
     .who-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
     .solutions-grid {
         grid-template-columns: 1fr;
     }
+
     .quiz-wrapper {
         grid-template-columns: 1fr;
     }
+
     .cases-grid {
         grid-template-columns: 1fr;
     }
+
     .steps-grid {
         grid-template-columns: 1fr 1fr;
     }
+
     .tech-grid,
     .about-grid {
         grid-template-columns: 1fr;
     }
+
     .team-list {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
     .cta-card {
         grid-template-columns: 1fr;
     }
@@ -1328,23 +1366,28 @@ section {
     .hero-title {
         font-size: 30px;
     }
+
     .hero-form {
         grid-template-columns: 1fr;
     }
+
     .hero-form-footer {
         flex-direction: column;
         align-items: stretch;
     }
+
     .hero-form-footer .btn-primary {
         width: 100%;
         flex: 0 0 auto;
     }
+
     .who-grid,
     .steps-grid,
     .team-list,
     .faq-grid {
         grid-template-columns: 1fr;
     }
+
     .section-header {
         flex-direction: column;
         align-items: flex-start;
@@ -1359,7 +1402,7 @@ section {
         display: flex;
         align-items: center;
         gap: 12px;
-    } 
+    }
 
     .phone-link {
         font-size: 11px;
@@ -1370,18 +1413,19 @@ section {
         font-size: 12px;
     }
 }
+
 .mobile-nav {
     display: none;
     flex-direction: column;
     gap: 18px;
     padding: 20px 16px;
-    background: rgba(10,12,32,0.98);
+    background: rgba(10, 12, 32, 0.98);
     position: fixed;
     top: 68px;
     right: 0;
     left: 0;
     z-index: 9999;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .mobile-nav a {
@@ -1395,14 +1439,14 @@ section {
 
 #particles-js {
     /* background: rgba(255,0,0,0.2) !important; */
-	position: absolute;
-	z-index: 0;
+    position: absolute;
+    z-index: 0;
     inset: 0;
-	/* top: 0; */
-	/* left: 0; */
-	width: 100%;
-	height: 100vh;
-	pointer-events: none;
+    /* top: 0; */
+    /* left: 0; */
+    width: 100%;
+    height: 100vh;
+    pointer-events: none;
 }
 
 /* DISCUSS MODAL */
@@ -1456,7 +1500,8 @@ section {
 
 .discuss-modal-header {
     margin-bottom: 16px;
-    padding-right: 28px; /* под крестик */
+    padding-right: 28px;
+    /* под крестик */
 }
 
 .discuss-modal-eyebrow {
@@ -1581,7 +1626,7 @@ section {
 }
 
 .consultant-fab-logo {
-    width: 30px;
+    width: 60px;
     height: auto;
     display: block;
     filter: drop-shadow(0 4px 10px rgba(255, 106, 26, 0.35));
@@ -1750,11 +1795,13 @@ section {
 }
 
 @keyframes consultantTyping {
+
     0%,
     100% {
         transform: translateY(0);
         opacity: 0.6;
     }
+
     50% {
         transform: translateY(-3px);
         opacity: 1;
