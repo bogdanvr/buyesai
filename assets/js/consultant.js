@@ -6,6 +6,20 @@
         return;
     }
 
+    const getCookie = (name) => {
+        if (!document.cookie) return '';
+        const cookies = document.cookie.split(';');
+        for (const cookie of cookies) {
+            const [key, ...valueParts] = cookie.trim().split('=');
+            if (key === name) {
+                return decodeURIComponent(valueParts.join('='));
+            }
+        }
+        return '';
+    };
+
+    const apiUrl = root.dataset.apiUrl || '/api/consultant/chat/';
+
     createApp({
         delimiters: ['[[', ']]'],
         data() {
@@ -34,6 +48,7 @@
                 showLeadForm: false,
                 messageCounter: 0,
                 nudgeTimer: null,
+                apiUrl,
             };
         },
         computed: {
@@ -141,11 +156,30 @@
                 }
                 this.handleBotReply(messageText);
             },
-            handleBotReply(text) {
+            async handleBotReply(text) {
                 const lower = text.toLowerCase();
+                const wantsContact =
+                    lower.includes('контакт') || lower.includes('заявк') || lower.includes('связ');
 
-                if (lower.includes('контакт') || lower.includes('заявк') || lower.includes('связ')) {
+                if (wantsContact) {
                     this.showLeadForm = true;
+                }
+
+                this.isTyping = true;
+                try {
+                    const reply = await this.fetchBotReply(text);
+                    this.isTyping = false;
+                    if (reply) {
+                        this.pushMessage('bot', reply);
+                        return;
+                    }
+                } catch (error) {
+                    // eslint-disable-next-line no-console
+                    console.error(error);
+                    this.isTyping = false;
+                }
+
+                if (wantsContact) {
                     this.replyWithDelay('Оставьте контакты — я передам менеджеру, и мы предложим 1–2 сценария внедрения.');
                     return;
                 }
@@ -171,6 +205,44 @@
                 }
 
                 this.replyWithDelay('Спасибо за вопрос! Чтобы подсказать точнее, расскажите, какой процесс хотите улучшить и сколько людей вовлечено.');
+            },
+            buildHistory() {
+                const historySource = this.messages.slice(0, -1).slice(-12);
+                return historySource
+                    .filter(item => item && item.text)
+                    .map(item => ({
+                        role: item.from === 'bot' ? 'assistant' : 'user',
+                        content: item.text,
+                    }));
+            },
+            async fetchBotReply(text) {
+                const csrfToken = getCookie('csrftoken');
+                const response = await fetch(this.apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        message: text,
+                        history: this.buildHistory(),
+                    }),
+                });
+
+                if (!response.ok) {
+                    let errorCode = '';
+                    try {
+                        const data = await response.json();
+                        errorCode = data.error || '';
+                    } catch (e) {
+                        errorCode = '';
+                    }
+                    throw new Error(errorCode || 'Consultant API error');
+                }
+
+                const data = await response.json();
+                return (data.reply || '').trim();
             },
             replyWithDelay(text) {
                 this.isTyping = true;
