@@ -6,19 +6,7 @@
         return;
     }
 
-    const getCookie = (name) => {
-        if (!document.cookie) return '';
-        const cookies = document.cookie.split(';');
-        for (const cookie of cookies) {
-            const [key, ...valueParts] = cookie.trim().split('=');
-            if (key === name) {
-                return decodeURIComponent(valueParts.join('='));
-            }
-        }
-        return '';
-    };
-
-    const apiUrl = root.dataset.apiUrl || '/api/consultant/chat/';
+    const tokenUrl = root.dataset.tokenUrl || '/api/chat/token';
 
     createApp({
         delimiters: ['[[', ']]'],
@@ -48,7 +36,13 @@
                 showLeadForm: false,
                 messageCounter: 0,
                 nudgeTimer: null,
-                apiUrl,
+                ws: null,
+                wsConnected: false,
+                wsConnecting: false,
+                wsConnectingPromise: null,
+                wsQueue: [],
+                pendingBotReplies: 0,
+                tokenUrl,
             };
         },
         computed: {
@@ -160,89 +154,105 @@
                 const lower = text.toLowerCase();
                 const wantsContact =
                     lower.includes('контакт') || lower.includes('заявк') || lower.includes('связ');
-
                 if (wantsContact) {
                     this.showLeadForm = true;
                 }
-
                 this.isTyping = true;
                 try {
-                    const reply = await this.fetchBotReply(text);
-                    this.isTyping = false;
-                    if (reply) {
-                        this.pushMessage('bot', reply);
-                        return;
-                    }
+                    await this.sendWsMessage(text);
                 } catch (error) {
                     // eslint-disable-next-line no-console
                     console.error(error);
                     this.isTyping = false;
+                    this.replyWithDelay('Сейчас не получается подключиться к консультанту. Попробуйте чуть позже.');
                 }
-
-                if (wantsContact) {
-                    this.replyWithDelay('Оставьте контакты — я передам менеджеру, и мы предложим 1–2 сценария внедрения.');
-                    return;
-                }
-
-                if (lower.includes('цена') || lower.includes('стоим') || lower.includes('бюджет')) {
-                    this.replyWithDelay('Стоимость зависит от объёма данных и сценария. Обычно начинаем с пилота на 2–4 недели и фиксируем ROI. Что именно хотите автоматизировать?');
-                    return;
-                }
-
-                if (lower.includes('поддерж') || lower.includes('чат')) {
-                    this.replyWithDelay('Для поддержки часто внедряем AI-оператора: разгружает до 60% обращений и поднимает SLA. Можете описать текущий объём обращений?');
-                    return;
-                }
-
-                if (lower.includes('продаж') || lower.includes('лид')) {
-                    this.replyWithDelay('В продажах обычно даём скоринг лидов, рекомендации по следующему шагу и автоматизацию рутины. Какие каналы сейчас ключевые?');
-                    return;
-                }
-
-                if (lower.includes('аудит') || lower.includes('данн')) {
-                    this.replyWithDelay('Аудит занимает 3–5 рабочих дней: смотрим источники данных, качество и гипотезы по эффекту. Хотите, пришлю чек-лист подготовки?');
-                    return;
-                }
-
-                this.replyWithDelay('Спасибо за вопрос! Чтобы подсказать точнее, расскажите, какой процесс хотите улучшить и сколько людей вовлечено.');
             },
-            buildHistory() {
-                const historySource = this.messages.slice(0, -1).slice(-12);
-                return historySource
-                    .filter(item => item && item.text)
-                    .map(item => ({
-                        role: item.from === 'bot' ? 'assistant' : 'user',
-                        content: item.text,
-                    }));
-            },
-            async fetchBotReply(text) {
-                const csrfToken = getCookie('csrftoken');
-                const response = await fetch(this.apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({
-                        message: text,
-                        history: this.buildHistory(),
-                    }),
-                });
-
-                if (!response.ok) {
-                    let errorCode = '';
-                    try {
-                        const data = await response.json();
-                        errorCode = data.error || '';
-                    } catch (e) {
-                        errorCode = '';
+            async ensureSocket() {
+                if (this.wsConnected) return;
+                if (this.wsConnectingPromise) {
+                    return this.wsConnectingPromise;
+                }
+                this.wsConnecting = true;
+                this.wsConnectingPromise = (async () => {
+                    const response = await fetch(this.tokenUrl, {
+                        method: 'GET',
+                        credentials: 'same-origin',
+                    });
+                    if (!response.ok) {
+                        throw new Error('token_request_failed');
                     }
-                    throw new Error(errorCode || 'Consultant API error');
+                    const data = await response.json();
+                    const wsUrl = data.ws_url;
+                    const token = data.token;
+                    if (!wsUrl || !token) {
+                        throw new Error('token_missing');
+                    }
+                    const url = wsUrl.includes('?')
+                        ? `${wsUrl}&token=${encodeURIComponent(token)}`
+                        : `${wsUrl}?token=${encodeURIComponent(token)}`;
+                    await new Promise((resolve, reject) => {
+                        const ws = new WebSocket(url);
+                        this.ws = ws;
+                        ws.onopen = () => {
+                            this.wsConnected = true;
+                            this.wsConnecting = false;
+                            resolve();
+                            this.flushWsQueue();
+                        };
+                        ws.onmessage = (event) => this.handleWsMessage(event);
+                        ws.onerror = () => {
+                            this.wsConnecting = false;
+                            reject(new Error('ws_error'));
+                        };
+                        ws.onclose = () => {
+                            this.wsConnected = false;
+                            this.wsConnecting = false;
+                            this.wsConnectingPromise = null;
+                            this.ws = null;
+                        };
+                    });
+                })();
+                return this.wsConnectingPromise;
+            },
+            flushWsQueue() {
+                while (this.wsConnected && this.wsQueue.length) {
+                    const payload = this.wsQueue.shift();
+                    this.ws.send(payload);
                 }
-
-                const data = await response.json();
-                return (data.reply || '').trim();
+            },
+            handleWsMessage(event) {
+                let reply = '';
+                if (typeof event.data === 'string') {
+                    try {
+                        const parsed = JSON.parse(event.data);
+                        if (parsed && typeof parsed.text === 'string') {
+                            reply = parsed.text;
+                        } else if (parsed && typeof parsed.message === 'string') {
+                            reply = parsed.message;
+                        } else if (typeof parsed === 'string') {
+                            reply = parsed;
+                        }
+                    } catch (e) {
+                        reply = event.data;
+                    }
+                }
+                if (reply) {
+                    this.pushMessage('bot', reply);
+                }
+                this.pendingBotReplies = Math.max(0, this.pendingBotReplies - 1);
+                if (this.pendingBotReplies === 0) {
+                    this.isTyping = false;
+                }
+            },
+            async sendWsMessage(text) {
+                await this.ensureSocket();
+                const payload = JSON.stringify({ text });
+                this.pendingBotReplies += 1;
+                if (this.wsConnected && this.ws) {
+                    this.ws.send(payload);
+                } else {
+                    this.wsQueue.push(payload);
+                }
             },
             replyWithDelay(text) {
                 this.isTyping = true;
