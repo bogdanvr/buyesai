@@ -42,6 +42,8 @@
                 wsConnectingPromise: null,
                 wsQueue: [],
                 pendingBotReplies: 0,
+                pendingLocalMessages: [],
+                historyLoaded: false,
                 tokenUrl,
             };
         },
@@ -142,6 +144,9 @@
                 if (!messageText) return;
 
                 this.pushMessage('user', messageText);
+                if (!this.historyLoaded) {
+                    this.pendingLocalMessages.push(messageText);
+                }
                 if (!options.fromQuick) {
                     this.input = '';
                 }
@@ -220,11 +225,50 @@
                     this.ws.send(payload);
                 }
             },
+            restoreHistory(items) {
+                const restored = [];
+                let counter = 0;
+                items.forEach(item => {
+                    if (!item || typeof item.text !== 'string') return;
+                    const text = item.text.trim();
+                    if (!text) return;
+                    const role = item.role === 'assistant' ? 'bot' : 'user';
+                    counter += 1;
+                    restored.push({
+                        id: counter,
+                        from: role,
+                        text,
+                        time: this.getTimeLabel(),
+                    });
+                });
+
+                this.messages = restored;
+                this.messageCounter = counter;
+                this.unreadCount = 0;
+                this.historyLoaded = true;
+
+                if (this.pendingLocalMessages.length) {
+                    this.pendingLocalMessages.forEach(text => {
+                        const last = this.messages[this.messages.length - 1];
+                        if (last && last.from === 'user' && last.text === text) {
+                            return;
+                        }
+                        this.pushMessage('user', text, { silent: true });
+                    });
+                    this.pendingLocalMessages = [];
+                }
+
+                this.scrollToBottom();
+            },
             handleWsMessage(event) {
                 let reply = '';
                 if (typeof event.data === 'string') {
                     try {
                         const parsed = JSON.parse(event.data);
+                        if (parsed && parsed.type === 'history' && Array.isArray(parsed.messages)) {
+                            this.restoreHistory(parsed.messages);
+                            return;
+                        }
                         if (parsed && typeof parsed.text === 'string') {
                             reply = parsed.text;
                         } else if (parsed && typeof parsed.message === 'string') {
