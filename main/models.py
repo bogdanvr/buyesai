@@ -74,6 +74,7 @@ class FormSubmission(models.Model):
     company = models.CharField(max_length=255, blank=True, default="", verbose_name="Компания")
     message = models.TextField(blank=True, default="", verbose_name="Сообщение")
     payload = models.JSONField(default=dict, blank=True, verbose_name="Полезная нагрузка")
+    utm_data = models.JSONField(default=dict, blank=True, verbose_name="UTM-метки")
     telegram_sent = models.BooleanField(default=False, verbose_name="Отправлено в Telegram")
     telegram_sent_count = models.PositiveIntegerField(default=0, verbose_name="Успешных отправок Telegram")
     telegram_total_targets = models.PositiveIntegerField(default=0, verbose_name="Всего Telegram-чатов")
@@ -87,5 +88,4 @@ class FormSubmission(models.Model):
 
     def __str__(self):
         return f"{self.form_type} #{self.pk}"
-
 

@@ -162,7 +162,26 @@ createApp({
             return '';
           },
 
+          getUtmData() {
+            const params = new URLSearchParams(window.location.search || '');
+            const utmData = {};
+            for (const [key, value] of params.entries()) {
+                if (!key.startsWith('utm_')) continue;
+                const normalizedValue = (value || '').trim();
+                if (!normalizedValue) continue;
+                utmData[key] = normalizedValue;
+            }
+            return utmData;
+          },
+
           async submitFormPayload(formType, payload) {
+            const enrichedPayload = {
+                ...payload,
+                page_url: payload && payload.page_url ? payload.page_url : window.location.href,
+            };
+            if (!enrichedPayload.utm_data) {
+                enrichedPayload.utm_data = this.getUtmData();
+            }
             const response = await fetch('/send_form', {
                 method: 'POST',
                 headers: {
@@ -172,7 +191,7 @@ createApp({
                 credentials: 'same-origin',
                 body: JSON.stringify({
                     form_type: formType,
-                    payload,
+                    payload: enrichedPayload,
                 }),
             });
             if (!response.ok) {

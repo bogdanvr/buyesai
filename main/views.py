@@ -11,9 +11,65 @@ import ipaddress
 import json
 import logging
 import requests
+from urllib.parse import parse_qs, urlparse
 from requests import RequestException
 
 logger = logging.getLogger(__name__)
+UTM_KEYS = (
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_content",
+    "utm_term",
+    "utm_id",
+    "utm_source_platform",
+    "utm_creative_format",
+    "utm_marketing_tactic",
+)
+
+
+def _extract_utm_from_url(url):
+    if not isinstance(url, str):
+        return {}
+    source = url.strip()
+    if not source:
+        return {}
+    try:
+        query = urlparse(source).query if "?" in source or "://" in source else source
+        parsed = parse_qs(query, keep_blank_values=True)
+    except Exception:
+        return {}
+
+    utm_data = {}
+    for key in UTM_KEYS:
+        values = parsed.get(key) or []
+        if not values:
+            continue
+        value = str(values[-1]).strip()
+        if value:
+            utm_data[key] = value
+    return utm_data
+
+
+def _extract_utm_data(request, payload):
+    result = {}
+
+    payload_utm = payload.get("utm_data")
+    if isinstance(payload_utm, dict):
+        for key, value in payload_utm.items():
+            key_text = str(key).strip()
+            if key_text.startswith("utm_") and value not in (None, ""):
+                result[key_text] = str(value).strip()
+
+    page_url = payload.get("page_url")
+    if isinstance(page_url, str):
+        result.update(_extract_utm_from_url(page_url))
+
+    referer = request.META.get("HTTP_REFERER", "")
+    if referer:
+        result.update(_extract_utm_from_url(referer))
+
+    return result
 
 
 @ensure_csrf_cookie
@@ -124,6 +180,7 @@ def sendform_view(request):
         company=str(clean_payload.get("company") or ""),
         message=str(clean_payload.get("message") or clean_payload.get("comment") or ""),
         payload=clean_payload,
+        utm_data=_extract_utm_data(request, clean_payload),
     )
 
     try:

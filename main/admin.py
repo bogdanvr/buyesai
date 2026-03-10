@@ -33,6 +33,7 @@ class FormSubmissionAdmin(admin.ModelAdmin):
     search_fields = ("name", "phone", "company", "message")
     readonly_fields = (
         "created_at",
+        "utm_data",
         "telegram_sent",
         "telegram_sent_count",
         "telegram_total_targets",
