@@ -9,8 +9,11 @@ from main.services import get_client_ip, send_form_to_telegram
 from main.models import FormSubmission
 import ipaddress
 import json
+import logging
 import requests
 from requests import RequestException
+
+logger = logging.getLogger(__name__)
 
 
 @ensure_csrf_cookie
@@ -123,8 +126,26 @@ def sendform_view(request):
         payload=clean_payload,
     )
 
-    telegram_result = send_form_to_telegram(form_type=form_type, payload=clean_payload)
+    try:
+        telegram_result = send_form_to_telegram(form_type=form_type, payload=clean_payload)
+    except Exception as exc:
+        logger.exception("Unexpected telegram send error for submission_id=%s", form_submission.id)
+        telegram_result = {"sent": 0, "total": 0, "errors": [f"unexpected_error:{type(exc).__name__}:{exc}"]}
+
     telegram_ok = telegram_result.get("sent", 0) > 0
+    telegram_errors = telegram_result.get("errors") or []
+    form_submission.telegram_sent = telegram_ok
+    form_submission.telegram_sent_count = int(telegram_result.get("sent") or 0)
+    form_submission.telegram_total_targets = int(telegram_result.get("total") or 0)
+    form_submission.telegram_errors = "\n".join(str(item) for item in telegram_errors)
+    form_submission.save(
+        update_fields=[
+            "telegram_sent",
+            "telegram_sent_count",
+            "telegram_total_targets",
+            "telegram_errors",
+        ]
+    )
 
     return JsonResponse(
         {

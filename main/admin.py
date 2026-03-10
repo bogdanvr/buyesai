@@ -19,7 +19,22 @@ class DepartmentAdmin(admin.ModelAdmin):
 
 @admin.register(FormSubmission)
 class FormSubmissionAdmin(admin.ModelAdmin):
-    list_display = ("created_at", "form_type", "name", "phone", "company")
-    list_filter = ("form_type", "created_at")
+    list_display = (
+        "created_at",
+        "form_type",
+        "name",
+        "phone",
+        "company",
+        "telegram_sent",
+        "telegram_sent_count",
+        "telegram_total_targets",
+    )
+    list_filter = ("form_type", "created_at", "telegram_sent")
     search_fields = ("name", "phone", "company", "message")
-    readonly_fields = ("created_at",)
+    readonly_fields = (
+        "created_at",
+        "telegram_sent",
+        "telegram_sent_count",
+        "telegram_total_targets",
+        "telegram_errors",
+    )

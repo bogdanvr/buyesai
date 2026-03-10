@@ -2,6 +2,10 @@ from django.conf import settings
 import requests
 from requests import RequestException
 from html import escape
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_client_ip(request):
@@ -11,14 +15,25 @@ def get_client_ip(request):
     return request.META.get("REMOTE_ADDR")
 
 
+def _normalize_chat_id(value, assume_group=False):
+    chat_id = str(value or "").strip()
+    if not chat_id:
+        return ""
+    if chat_id.startswith("@"):
+        return chat_id
+    if assume_group and chat_id.isdigit() and chat_id.startswith("100"):
+        return f"-{chat_id}"
+    return chat_id
+
+
 def _get_telegram_chat_ids():
     chat_candidates = [
-        getattr(settings, "TELEGRAM_CHAT_CHANNEL", ""),
-        getattr(settings, "TELEGRAM_SUPER_GROUP", ""),
-        getattr(settings, "TELEGRAM_CHAT_ID", ""),
+        (_normalize_chat_id(getattr(settings, "TELEGRAM_CHAT_CHANNEL", ""), assume_group=True), True),
+        (_normalize_chat_id(getattr(settings, "TELEGRAM_SUPER_GROUP", ""), assume_group=True), True),
+        (_normalize_chat_id(getattr(settings, "TELEGRAM_CHAT_ID", ""), assume_group=False), False),
     ]
     chat_ids = []
-    for value in chat_candidates:
+    for value, _ in chat_candidates:
         chat_id = str(value or "").strip()
         if chat_id and chat_id not in chat_ids:
             chat_ids.append(chat_id)
@@ -61,9 +76,24 @@ def send_form_to_telegram(form_type, payload):
             if response.ok:
                 sent += 1
             else:
-                errors.append(f"{chat_id}:{response.status_code}")
+                detail = ""
+                try:
+                    resp_data = response.json()
+                    detail = str(resp_data.get("description") or resp_data)
+                except ValueError:
+                    detail = response.text
+                detail = (detail or "").replace("\n", " ").strip()[:300]
+                errors.append(f"{chat_id}:{response.status_code}:{detail}")
+                logger.warning(
+                    "Telegram send failed. chat_id=%s status=%s detail=%s",
+                    chat_id,
+                    response.status_code,
+                    detail,
+                )
         except RequestException as exc:
-            errors.append(f"{chat_id}:{exc}")
+            error_text = f"{type(exc).__name__}: {exc}"
+            errors.append(f"{chat_id}:{error_text}")
+            logger.exception("Telegram request exception. chat_id=%s", chat_id)
 
     return {"sent": sent, "total": len(chat_ids), "errors": errors}
 

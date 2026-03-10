@@ -74,6 +74,10 @@ class FormSubmission(models.Model):
     company = models.CharField(max_length=255, blank=True, default="", verbose_name="Компания")
     message = models.TextField(blank=True, default="", verbose_name="Сообщение")
     payload = models.JSONField(default=dict, blank=True, verbose_name="Полезная нагрузка")
+    telegram_sent = models.BooleanField(default=False, verbose_name="Отправлено в Telegram")
+    telegram_sent_count = models.PositiveIntegerField(default=0, verbose_name="Успешных отправок Telegram")
+    telegram_total_targets = models.PositiveIntegerField(default=0, verbose_name="Всего Telegram-чатов")
+    telegram_errors = models.TextField(blank=True, default="", verbose_name="Ошибки Telegram")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
 
     class Meta:
@@ -83,6 +87,5 @@ class FormSubmission(models.Model):
 
     def __str__(self):
         return f"{self.form_type} #{self.pk}"
-
 
 
