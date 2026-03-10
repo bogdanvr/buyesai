@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from main.models import Implementation, Case, Department
+from main.models import Implementation, Case, Department, FormSubmission
 
 @admin.register(Implementation)
 class ImplementationAdmin(admin.ModelAdmin):
@@ -15,3 +15,11 @@ class CaseAdmin(admin.ModelAdmin):
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
     list_display = ('title',)
+
+
+@admin.register(FormSubmission)
+class FormSubmissionAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "form_type", "name", "phone", "company")
+    list_filter = ("form_type", "created_at")
+    search_fields = ("name", "phone", "company", "message")
+    readonly_fields = ("created_at",)

@@ -770,7 +770,7 @@
                             </ul>
                         </div>
                         <div>
-                            <form>
+                            <form @submit.prevent="submitPlanForm">
                                 <div class="field">
                                     <label>Имя</label>
                                     <input v-model="PlanForm.name" type="text" placeholder="Ваше имя">
@@ -786,8 +786,10 @@
                                     <input v-model="PlanForm.company" type="text"
                                         placeholder="Например: склад, много мёртвых остатков">
                                 </div>
-                                <button class="btn btn-primary" style="margin-top:12px;width:100%;">Запросить
-                                    AI-аудит</button>
+                                <button type="submit" class="btn btn-primary" style="margin-top:12px;width:100%;"
+                                    :disabled="isSendingPlan || planSent">
+                                    [[ planSent ? 'Отправлено' : (isSendingPlan ? 'Отправляем...' : 'Запросить AI-аудит') ]]
+                                </button>
                                 <p style="font-size:11px;color:var(--text-muted);margin-top:6px;">
                                     Нажимая на кнопку, вы соглашаетесь с обработкой персональных данных.
                                 </p>

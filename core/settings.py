@@ -150,8 +150,10 @@ DADATA_KEY = env("DADATA_KEY", default="")
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-TELEGRAM_CHAT_ID = env("TELEGRAM_CHAT_ID")
-BOT_TOKEN = env("BOT_TOKEN")
+TELEGRAM_CHAT_ID = env("TELEGRAM_CHAT_ID", default="")
+TELEGRAM_CHAT_CHANNEL = env("TELEGRAM_CHAT_CHANNEL", default="")
+TELEGRAM_SUPER_GROUP = env("TELEGRAM_SUPER_GROUP", default="")
+BOT_TOKEN = env("BOT_TOKEN", default="")
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
 OPENAI_MODEL = env("OPENAI_MODEL", default="gpt-4o-mini")
 OPENAI_ORG = env("OPENAI_ORG", default="")

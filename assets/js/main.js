@@ -36,6 +36,8 @@ createApp({
                 company: '',
                 comment: '',
             },
+            isSendingPlan: false,
+            planSent: false,
             discussForm: {
                 name: '',
                 phone: '',
@@ -145,6 +147,45 @@ createApp({
           onPhoneInput(path, e) {
             const formatted = this.formatPhone(e.target.value);
             this.setByPath(path, formatted);
+          },
+
+          getCsrfToken() {
+            const name = 'csrftoken=';
+            const decoded = decodeURIComponent(document.cookie || '');
+            const parts = decoded.split(';');
+            for (let i = 0; i < parts.length; i++) {
+                const item = parts[i].trim();
+                if (item.startsWith(name)) {
+                    return item.substring(name.length);
+                }
+            }
+            return '';
+          },
+
+          async submitFormPayload(formType, payload) {
+            const response = await fetch('/send_form', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCsrfToken(),
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    form_type: formType,
+                    payload,
+                }),
+            });
+            if (!response.ok) {
+                let details = '';
+                try {
+                    const err = await response.json();
+                    details = err && err.error ? `: ${err.error}` : '';
+                } catch (_) {
+                    details = '';
+                }
+                throw new Error(`submit_failed${details}`);
+            }
+            return response.json();
           },
 
           onCompanyInput(e) {
@@ -300,16 +341,16 @@ createApp({
             const direction = (this.direction || '').trim();
             this.isSending = true;
             try {
-                // здесь будет реальный POST на Django
-                console.log('Отправка:', {
+                await this.submitFormPayload('hero', {
                     name,
                     phone,
                     company,
                     direction,
+                    page: window.location.pathname,
                 });
-                // имитация задержки
-                await new Promise(r => setTimeout(r, 1000));
                 this.sent = true;
+            } catch (e) {
+                console.error(e);
             } finally {
                 this.isSending = false;
             }
@@ -322,13 +363,32 @@ createApp({
             }
             this.isSendingQuiz = true;
             try {
-                console.log('Quiz form payload:', {
+                await this.submitFormPayload('quiz', {
                     ...this.quizForm,
+                    page: window.location.pathname,
                 });
-                await new Promise(r => setTimeout(r, 1000));
                 this.quizSent = true;
+            } catch (e) {
+                console.error(e);
             } finally {
                 this.isSendingQuiz = false;
+            }
+        },
+        async submitPlanForm() {
+            if (this.isSendingPlan || this.planSent) return;
+            this.isSendingPlan = true;
+            try {
+                await this.submitFormPayload('plan', {
+                    ...this.PlanForm,
+                    message: this.PlanForm.comment || '',
+                    page: window.location.pathname,
+                });
+                this.planSent = true;
+                this.PlanForm = { name: '', phone: '', company: '', comment: '' };
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.isSendingPlan = false;
             }
         },
         openDiscuss(topic) {
@@ -345,22 +405,13 @@ createApp({
             if (this.isSendingDiscuss) return;
             this.isSendingDiscuss = true;
             try {
-                // TODO: здесь реальный POST на backend (Django view / API)
-                // Пример:
-                // await fetch('{% url "lead_discuss" %}', {
-                //   method: 'POST',
-                //   headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-                //   body: JSON.stringify({ ...this.discussForm, topic: this.discussTopic }),
-                // });
-
-                console.log('Discuss form payload:', {
+                await this.submitFormPayload('discuss', {
                     ...this.discussForm,
                     topic: this.discussTopic,
+                    message: this.discussForm.comment || '',
+                    page: window.location.pathname,
                 });
-
-                await new Promise(r => setTimeout(r, 500)); // имитация задержки
                 this.discussSent = true;
-                // Если надо чистить поля:
                 this.discussForm = { name: '', phone: '', company: '', comment: '' };
             } catch (e) {
                 console.error(e);

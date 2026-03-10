@@ -106,6 +106,36 @@
             onLeadPhoneInput(e) {
                 this.leadForm.phone = this.formatPhone(e.target.value);
             },
+            getCsrfToken() {
+                const name = 'csrftoken=';
+                const decoded = decodeURIComponent(document.cookie || '');
+                const parts = decoded.split(';');
+                for (let i = 0; i < parts.length; i++) {
+                    const item = parts[i].trim();
+                    if (item.startsWith(name)) {
+                        return item.substring(name.length);
+                    }
+                }
+                return '';
+            },
+            async submitFormPayload(formType, payload) {
+                const response = await fetch('/send_form', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCsrfToken(),
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        form_type: formType,
+                        payload,
+                    }),
+                });
+                if (!response.ok) {
+                    throw new Error('submit_failed');
+                }
+                return response.json();
+            },
             createMessage(from, text) {
                 this.messageCounter += 1;
                 return {
@@ -313,10 +343,17 @@
                 }
                 this.leadSending = true;
                 try {
-                    await new Promise(resolve => setTimeout(resolve, 900));
+                    await this.submitFormPayload('consultant_lead', {
+                        ...this.leadForm,
+                        message: this.leadForm.comment || '',
+                        page: window.location.pathname,
+                    });
                     this.leadSent = true;
                     this.pushMessage('bot', 'Спасибо! Мы получили заявку и свяжемся с вами в ближайшее рабочее время.');
                     this.showLeadForm = false;
+                } catch (error) {
+                    // eslint-disable-next-line no-console
+                    console.error(error);
                 } finally {
                     this.leadSending = false;
                 }

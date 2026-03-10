@@ -5,7 +5,8 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.conf import settings
 from django.views.generic import TemplateView
 from dadata import Dadata
-from main.services import get_client_ip
+from main.services import get_client_ip, send_form_to_telegram
+from main.models import FormSubmission
 import ipaddress
 import json
 import requests
@@ -93,9 +94,46 @@ def dadata_party(request):
     return JsonResponse({"suggestions": suggestions})
 
 
+@require_POST
 def sendform_view(request):
-    print("send")
-    return JsonResponse({"response": "ok"})
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "invalid_json"}, status=400)
+
+    form_type = str(body.get("form_type") or "").strip()
+    payload = body.get("payload") or {}
+    if not form_type:
+        return JsonResponse({"error": "form_type_required"}, status=400)
+    if not isinstance(payload, dict):
+        return JsonResponse({"error": "payload_must_be_object"}, status=400)
+
+    clean_payload = {}
+    for key, value in payload.items():
+        if value is None:
+            continue
+        clean_payload[str(key)] = str(value).strip() if isinstance(value, str) else value
+
+    form_submission = FormSubmission.objects.create(
+        form_type=form_type,
+        name=str(clean_payload.get("name") or ""),
+        phone=str(clean_payload.get("phone") or ""),
+        company=str(clean_payload.get("company") or ""),
+        message=str(clean_payload.get("message") or clean_payload.get("comment") or ""),
+        payload=clean_payload,
+    )
+
+    telegram_result = send_form_to_telegram(form_type=form_type, payload=clean_payload)
+    telegram_ok = telegram_result.get("sent", 0) > 0
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "id": form_submission.id,
+            "telegram_sent": telegram_ok,
+            "telegram_result": telegram_result if settings.DEBUG else None,
+        }
+    )
 
 
 @require_POST
