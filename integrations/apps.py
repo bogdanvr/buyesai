@@ -5,3 +5,6 @@ class IntegrationsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "integrations"
     verbose_name = "Интеграции"
+
+    def ready(self):
+        import integrations.signals  # noqa: F401

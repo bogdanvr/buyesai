@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 
 
 class IntegrationWebhookEvent(models.Model):
@@ -23,3 +24,28 @@ class IntegrationWebhookEvent(models.Model):
 
     def __str__(self):
         return f"{self.source}:{self.event_type}"
+
+
+class UserIntegrationProfile(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        related_name="integration_profile",
+        on_delete=models.CASCADE,
+        verbose_name="Пользователь",
+    )
+    phone = models.CharField(max_length=64, blank=True, default="", verbose_name="Телефон")
+    telegram_chat_id = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        verbose_name="Telegram chat ID",
+        help_text="Личный chat_id, куда бот будет отправлять уведомления",
+    )
+
+    class Meta:
+        verbose_name = "Интеграционный профиль пользователя"
+        verbose_name_plural = "Интеграционные профили пользователей"
+
+    def __str__(self):
+        username = getattr(self.user, "username", "") or f"user-{self.user_id}"
+        return f"Профиль интеграций: {username}"

@@ -379,7 +379,19 @@
             </label>
             <label class="block">
               <span class="text-sm text-crm-muted">Телефон</span>
-              <input v-model="forms.leads.phone" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+              <div class="relative mt-2">
+                <input v-model="forms.leads.phone" @focus="ensurePhonePrefix(forms.leads, 'phone')" type="text" class="w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] pl-4 pr-12 outline-none focus:border-crm-accent" />
+                <a
+                  v-if="phoneHref(forms.leads.phone)"
+                  :href="phoneHref(forms.leads.phone)"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                  title="Позвонить"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                  </svg>
+                </a>
+              </div>
             </label>
             <label class="block">
               <span class="text-sm text-crm-muted">Email</span>
@@ -458,7 +470,19 @@
                 </label>
                 <label class="block">
                   <span class="text-sm text-crm-muted">Телефон компании</span>
-                  <input v-model="dealCompanyForm.phone" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  <div class="relative mt-1">
+                    <input v-model="dealCompanyForm.phone" @focus="ensurePhonePrefix(dealCompanyForm, 'phone')" type="text" class="w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] pl-3 pr-11 outline-none focus:border-crm-accent" />
+                    <a
+                      v-if="phoneHref(dealCompanyForm.phone)"
+                      :href="phoneHref(dealCompanyForm.phone)"
+                      class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                      title="Позвонить"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                      </svg>
+                    </a>
+                  </div>
                 </label>
                 <label class="block">
                   <span class="text-sm text-crm-muted">Email компании</span>
@@ -478,7 +502,19 @@
                 </label>
                 <label class="block">
                   <span class="text-sm text-crm-muted">Телефон контакта</span>
-                  <input v-model="dealCompanyContactForm.phone" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  <div class="relative mt-1">
+                    <input v-model="dealCompanyContactForm.phone" @focus="ensurePhonePrefix(dealCompanyContactForm, 'phone')" type="text" class="w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] pl-3 pr-11 outline-none focus:border-crm-accent" />
+                    <a
+                      v-if="phoneHref(dealCompanyContactForm.phone)"
+                      :href="phoneHref(dealCompanyContactForm.phone)"
+                      class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                      title="Позвонить"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                      </svg>
+                    </a>
+                  </div>
                 </label>
                 <label class="block md:col-span-2">
                   <span class="text-sm text-crm-muted">Email контакта</span>
@@ -598,7 +634,19 @@
             </label>
             <label class="block">
               <span class="text-sm text-crm-muted">Телефон</span>
-              <input v-model="forms.contacts.phone" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+              <div class="relative mt-2">
+                <input v-model="forms.contacts.phone" @focus="ensurePhonePrefix(forms.contacts, 'phone')" type="text" class="w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] pl-4 pr-12 outline-none focus:border-crm-accent" />
+                <a
+                  v-if="phoneHref(forms.contacts.phone)"
+                  :href="phoneHref(forms.contacts.phone)"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                  title="Позвонить"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                  </svg>
+                </a>
+              </div>
             </label>
             <label class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Email</span>
@@ -666,7 +714,19 @@
             </label>
             <label class="block">
               <span class="text-sm text-crm-muted">Телефон</span>
-              <input v-model="forms.companies.phone" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+              <div class="relative mt-2">
+                <input v-model="forms.companies.phone" @focus="ensurePhonePrefix(forms.companies, 'phone')" type="text" class="w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] pl-4 pr-12 outline-none focus:border-crm-accent" />
+                <a
+                  v-if="phoneHref(forms.companies.phone)"
+                  :href="phoneHref(forms.companies.phone)"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                  title="Позвонить"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                  </svg>
+                </a>
+              </div>
             </label>
             <label class="block">
               <span class="text-sm text-crm-muted">Email</span>
@@ -701,7 +761,19 @@
                 </label>
                 <label class="block">
                   <span class="text-sm text-crm-muted">Телефон</span>
-                  <input v-model="companyContactForm.phone" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  <div class="relative mt-1">
+                    <input v-model="companyContactForm.phone" @focus="ensurePhonePrefix(companyContactForm, 'phone')" type="text" class="w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] pl-3 pr-11 outline-none focus:border-crm-accent" />
+                    <a
+                      v-if="phoneHref(companyContactForm.phone)"
+                      :href="phoneHref(companyContactForm.phone)"
+                      class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                      title="Позвонить"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                      </svg>
+                    </a>
+                  </div>
                 </label>
                 <label class="block md:col-span-2">
                   <span class="text-sm text-crm-muted">Email</span>
@@ -1096,6 +1168,17 @@
           const parts = cookie.split(";").map((x) => x.trim());
           const target = parts.find((x) => x.startsWith("csrftoken="));
           return target ? decodeURIComponent(target.split("=")[1]) : "";
+        },
+        ensurePhonePrefix(target, field = "phone") {
+          if (!target || typeof target !== "object") return;
+          const current = String(target[field] || "").trim();
+          if (!current) {
+            target[field] = "+7";
+          }
+        },
+        phoneHref(value) {
+          const normalized = String(value || "").trim().replace(/[^\d+]/g, "");
+          return normalized ? `tel:${normalized}` : "";
         },
         normalizePaginatedResponse(data) {
           if (Array.isArray(data)) return data;
