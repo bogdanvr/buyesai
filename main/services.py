@@ -47,8 +47,21 @@ def _flatten_payload(payload):
     for key, value in payload.items():
         if value in (None, "", [], {}):
             continue
+        if key == "company_data":
+            continue
         key_label = str(key).replace("_", " ").strip().capitalize()
-        value_text = escape(str(value))
+        if isinstance(value, dict):
+            chunks = []
+            for nested_key, nested_value in value.items():
+                if nested_value in (None, "", [], {}):
+                    continue
+                nested_label = str(nested_key).replace("_", " ").strip()
+                chunks.append(f"{nested_label}: {nested_value}")
+            if not chunks:
+                continue
+            value_text = escape(", ".join(chunks))
+        else:
+            value_text = escape(str(value))
         lines.append(f"<b>{escape(key_label)}:</b> {value_text}")
     return lines
 

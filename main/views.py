@@ -394,9 +394,22 @@ def sendform_view(request):
             lead_payload["company_name"] = str(merged_company_data.get("name") or "").strip()
             lead_payload["company_legal_name"] = str(merged_company_data.get("legal_name") or "").strip()
             lead_payload["company_inn"] = str(merged_company_data.get("inn") or "").strip()
+            lead_payload["company_kpp"] = str(merged_company_data.get("kpp") or "").strip()
+            lead_payload["company_ogrn"] = str(merged_company_data.get("ogrn") or "").strip()
             lead_payload["company_address"] = str(merged_company_data.get("address") or "").strip()
             lead_payload["company_industry"] = str(merged_company_data.get("industry") or "").strip()
             lead_payload["company_okved"] = str(merged_company_data.get("okved") or "").strip()
+            director = merged_company_data.get("director") if isinstance(merged_company_data.get("director"), dict) else {}
+            lead_payload["company_director_name"] = str(director.get("name") or "").strip()
+            lead_payload["company_director_position"] = str(director.get("position") or "").strip()
+            lead_payload["company_director_phone"] = str(director.get("phone") or "").strip()
+            lead_payload["company_director_email"] = str(director.get("email") or "").strip()
+
+            persisted_payload = dict(lead_payload)
+            persisted_payload.pop("form_submission_id", None)
+            form_submission.payload = persisted_payload
+            form_submission.company = str(lead_payload.get("company") or form_submission.company or "").strip()
+            form_submission.save(update_fields=["payload", "company"])
 
         source = _get_or_create_form_lead_source(form_type)
         crm_lead = create_lead_from_payload(
@@ -412,7 +425,9 @@ def sendform_view(request):
         )
 
     try:
-        telegram_result = send_form_to_telegram(form_type=form_type, payload=clean_payload)
+        telegram_payload = dict(lead_payload)
+        telegram_payload.pop("form_submission_id", None)
+        telegram_result = send_form_to_telegram(form_type=form_type, payload=telegram_payload)
     except Exception as exc:
         logger.exception("Unexpected telegram send error for submission_id=%s", form_submission.id)
         telegram_result = {"sent": 0, "total": 0, "errors": [f"unexpected_error:{type(exc).__name__}:{exc}"]}

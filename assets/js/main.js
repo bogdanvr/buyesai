@@ -247,16 +247,22 @@ createApp({
             }
             const name = String(item.name || item.value || fallbackName || '').trim();
             const inn = String(item.inn || '').trim();
+            const kpp = String(item.kpp || '').trim();
+            const ogrn = String(item.ogrn || '').trim();
             const address = String(item.address || '').trim();
             const industry = String(item.industry || '').trim();
             const okved = String(item.okved || '').trim();
             const legalName = String(item.legal_name || '').trim();
             const normalized = { name };
             if (inn) normalized.inn = inn;
+            if (kpp) normalized.kpp = kpp;
+            if (ogrn) normalized.ogrn = ogrn;
             if (address) normalized.address = address;
             if (industry) normalized.industry = industry;
             if (okved) normalized.okved = okved;
             if (legalName) normalized.legal_name = legalName;
+            if (Array.isArray(item.okveds) && item.okveds.length) normalized.okveds = item.okveds;
+            if (item.director && typeof item.director === 'object') normalized.director = item.director;
             return normalized;
           },
 
@@ -270,11 +276,42 @@ createApp({
               company_data: selected,
               company_name: selected.name,
               company_inn: selected.inn || '',
+              company_kpp: selected.kpp || '',
+              company_ogrn: selected.ogrn || '',
               company_address: selected.address || '',
               company_industry: selected.industry || '',
               company_okved: selected.okved || '',
               company_legal_name: selected.legal_name || '',
             };
+          },
+
+          async enrichCompanySelection(selectedCompanyData) {
+            const normalized = this.normalizeSelectedCompanyData(selectedCompanyData);
+            if (!normalized || !normalized.inn) {
+              return normalized;
+            }
+            try {
+              const response = await fetch(`/api/dadata/party/by-inn/?inn=${encodeURIComponent(normalized.inn)}`, {
+                credentials: 'same-origin',
+              });
+              if (!response.ok) {
+                return normalized;
+              }
+              const data = await response.json();
+              if (!data || !data.profile || typeof data.profile !== 'object') {
+                return normalized;
+              }
+              return {
+                ...normalized,
+                ...this.normalizeSelectedCompanyData(data.profile, normalized.name),
+                okveds: Array.isArray(data.profile.okveds) ? data.profile.okveds : normalized.okveds,
+                director: data.profile.director && typeof data.profile.director === 'object'
+                  ? data.profile.director
+                  : normalized.director,
+              };
+            } catch (_) {
+              return normalized;
+            }
           },
 
           onCompanyInput(e) {
@@ -319,11 +356,11 @@ createApp({
             this.isCompanySuggestionInteracting = true;
           },
 
-          selectCompanySuggestion(item) {
+          async selectCompanySuggestion(item) {
             if (!item) return;
             this.isCompanySuggestionInteracting = false;
             this.company = item.value || '';
-            this.selectedCompanyData = this.normalizeSelectedCompanyData(item, this.company);
+            this.selectedCompanyData = await this.enrichCompanySelection(item);
             this.companySuggestionsOpen = false;
             this.companySuggestions = [];
           },
@@ -412,11 +449,11 @@ createApp({
             this.isDiscussCompanySuggestionInteracting = true;
           },
 
-          selectDiscussCompanySuggestion(item) {
+          async selectDiscussCompanySuggestion(item) {
             if (!item) return;
             this.isDiscussCompanySuggestionInteracting = false;
             this.discussForm.company = item.value || '';
-            this.selectedDiscussCompanyData = this.normalizeSelectedCompanyData(item, this.discussForm.company);
+            this.selectedDiscussCompanyData = await this.enrichCompanySelection(item);
             this.discussCompanySuggestionsOpen = false;
             this.discussCompanySuggestions = [];
           },

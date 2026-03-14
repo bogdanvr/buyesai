@@ -205,6 +205,78 @@ class SendFormViewTests(TestCase):
         self.assertEqual(director.phone, "+7 905 9405785")
 
     @override_settings(DADATA_KEY="test-token")
+    @patch("main.views.send_form_to_telegram")
+    @patch("main.views.Dadata")
+    def test_telegram_and_submission_receive_enriched_company_payload(self, dadata_cls, send_telegram_mock):
+        dadata_instance = dadata_cls.return_value
+        dadata_instance.find_by_id.return_value = {
+            "suggestions": [
+                {
+                    "value": 'ООО "ЭНЕРГОЭКСПЕРТ"',
+                    "data": {
+                        "inn": "5503190710",
+                        "kpp": "550301001",
+                        "ogrn": "1205500003763",
+                        "okved": "25.99",
+                        "okveds": [
+                            {
+                                "main": True,
+                                "code": "25.99",
+                                "name": "Производство прочих готовых металлических изделий",
+                            },
+                        ],
+                        "management": {
+                            "name": "Верхоланцев Никита Валерьевич",
+                            "post": "ДИРЕКТОР",
+                        },
+                        "phones": [{"value": "+7 905 9405785"}],
+                        "address": {"value": "г Омск, ул 22 Партсъезда, д 51Г, офис 4"},
+                        "name": {
+                            "full_with_opf": 'ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ "ЭНЕРГОЭКСПЕРТ"',
+                            "short_with_opf": 'ООО "ЭНЕРГОЭКСПЕРТ"',
+                        },
+                    },
+                }
+            ]
+        }
+        send_telegram_mock.return_value = {"sent": 1, "total": 1, "errors": []}
+
+        response = self.client.post(
+            reverse("send_form"),
+            data=json.dumps(
+                {
+                    "form_type": "hero",
+                    "payload": {
+                        "name": "Иван",
+                        "phone": "+79990000000",
+                        "company": "Энергоэксперт",
+                        "company_inn": "5503190710",
+                    },
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        form_submission = FormSubmission.objects.get()
+        self.assertEqual(form_submission.payload["company_inn"], "5503190710")
+        self.assertEqual(form_submission.payload["company_kpp"], "550301001")
+        self.assertEqual(form_submission.payload["company_address"], "г Омск, ул 22 Партсъезда, д 51Г, офис 4")
+        self.assertEqual(
+            form_submission.payload["company_industry"],
+            "Производство прочих готовых металлических изделий",
+        )
+
+        send_telegram_mock.assert_called_once()
+        telegram_payload = send_telegram_mock.call_args.kwargs["payload"]
+        self.assertEqual(telegram_payload["company_inn"], "5503190710")
+        self.assertEqual(telegram_payload["company_kpp"], "550301001")
+        self.assertEqual(telegram_payload["company_ogrn"], "1205500003763")
+        self.assertEqual(telegram_payload["company_okved"], "25.99")
+        self.assertEqual(telegram_payload["company_director_name"], "Верхоланцев Никита Валерьевич")
+        self.assertEqual(telegram_payload["company_director_phone"], "+7 905 9405785")
+
+    @override_settings(DADATA_KEY="test-token")
     @patch("main.views.Dadata")
     def test_dadata_party_by_inn_endpoint_returns_profile(self, dadata_cls):
         dadata_instance = dadata_cls.return_value
