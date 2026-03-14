@@ -1,0 +1,101 @@
+from rest_framework import serializers
+
+from crm.models import Client, Lead
+
+
+LEAD_STATUS_TRANSITIONS = {
+    "new": {"in_progress", "attempting_contact", "unqualified", "lost", "spam"},
+    "attempting_contact": {"in_progress", "unqualified", "lost", "spam"},
+    "in_progress": {"qualified", "attempting_contact", "unqualified", "lost"},
+    "qualified": {"converted", "lost"},
+    "converted": {"archived"},
+    "unqualified": {"archived"},
+    "lost": {"archived"},
+    "spam": {"archived"},
+    "archived": set(),
+}
+
+
+class LeadSerializer(serializers.ModelSerializer):
+    source_name = serializers.CharField(source="source.name", read_only=True)
+    source_code = serializers.CharField(source="source.code", read_only=True)
+    status_name = serializers.CharField(source="status.name", read_only=True)
+    status_code = serializers.CharField(source="status.code", read_only=True)
+    client_name = serializers.CharField(source="client.name", read_only=True)
+
+    class Meta:
+        model = Lead
+        fields = [
+            "id",
+            "external_id",
+            "title",
+            "name",
+            "phone",
+            "email",
+            "company",
+            "source",
+            "source_name",
+            "source_code",
+            "status",
+            "status_name",
+            "status_code",
+            "client",
+            "client_name",
+            "payload",
+            "utm_data",
+            "priority",
+            "expected_value",
+            "last_contact_at",
+            "converted_at",
+            "assigned_to",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ("created_at", "updated_at", "converted_at")
+
+    def validate(self, attrs):
+        if "company" in attrs and isinstance(attrs["company"], str):
+            attrs["company"] = attrs["company"].strip()
+
+        instance = getattr(self, "instance", None)
+        new_status = attrs.get("status")
+        if instance is None or new_status is None:
+            return attrs
+
+        current_status = instance.status
+        if current_status is None or current_status_id_equals(current_status, new_status):
+            return attrs
+
+        current_code = (current_status.code or "").strip()
+        target_code = (new_status.code or "").strip()
+        if not current_code or not target_code:
+            return attrs
+
+        allowed_targets = LEAD_STATUS_TRANSITIONS.get(current_code, set())
+        if target_code not in allowed_targets:
+            raise serializers.ValidationError(
+                {
+                    "status": (
+                        f"Недопустимый переход статуса: {current_code} -> {target_code}. "
+                        f"Разрешено: {', '.join(sorted(allowed_targets)) or 'нет'}."
+                    )
+                }
+            )
+        return attrs
+
+    def create(self, validated_data):
+        company_name = (validated_data.get("company") or "").strip()
+        if company_name and not validated_data.get("client"):
+            existing_client = (
+                Client.objects.filter(name__iexact=company_name).order_by("id").first()
+            )
+            validated_data["client"] = (
+                existing_client or Client.objects.create(name=company_name)
+            )
+            validated_data["company"] = company_name
+        return super().create(validated_data)
+
+
+def current_status_id_equals(current_status, new_status) -> bool:
+    return getattr(current_status, "id", None) == getattr(new_status, "id", None)

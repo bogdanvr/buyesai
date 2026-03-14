@@ -15,7 +15,7 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 from main.views import (
     mainview,
     dadata_party,
@@ -43,7 +43,9 @@ urlpatterns = [
     path("robots.txt", RobotsTxtView.as_view(content_type="text/plain"), name="robots"),
     path("", mainview, name="main"),
     path("send_form", sendform_view, name="send_form"),
+    path("crm/", include("crm.urls")),
     path("api/dadata/party/", dadata_party, name="dadata_party"),
     path("api/chat/token", chat_token),
     path("api/consultant/chat/", consultant_chat, name="consultant_chat"),
+    path("api/v1/", include("api.v1.urls")),
 ]

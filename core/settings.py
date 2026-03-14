@@ -49,9 +49,14 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sitemaps",
+    "rest_framework",
     "main",
     "about",
     "chat",
+    "crm.apps.CrmConfig",
+    "integrations.apps.IntegrationsConfig",
+    "audit.apps.AuditConfig",
+    "api.apps.ApiConfig",
 ]
 
 MIDDLEWARE = [
@@ -162,3 +167,11 @@ OPENAI_PROJECT = env("OPENAI_PROJECT", default="")
 CHAT_WS_JWT_SECRET = env("CHAT_WS_JWT_SECRET")
 CHAT_WS_JWT_TTL_SECONDS = env("CHAT_WS_JWT_TTL_SECONDS")
 CHAT_WS_URL = env("CHAT_WS_URL")
+
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "api.v1.permissions.IsStaffOrReadOnly",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "api.v1.pagination.StandardResultsSetPagination",
+    "PAGE_SIZE": 20,
+}
