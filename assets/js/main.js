@@ -15,6 +15,7 @@ createApp({
             companySuggestions: [],
             isCompanySuggesting: false,
             companySuggestTimer: null,
+            companyAutoBlurTimer: null,
             companySuggestAbort: null,
             companySuggestionsOpen: false,
             companyBlurTimer: null,
@@ -67,6 +68,7 @@ createApp({
             discussCompanySuggestions: [],
             isDiscussCompanySuggesting: false,
             discussCompanySuggestTimer: null,
+            discussCompanyAutoBlurTimer: null,
             discussCompanySuggestAbort: null,
             discussCompanySuggestionsOpen: false,
             discussCompanyBlurTimer: null,
@@ -99,8 +101,14 @@ createApp({
         if (this.companyBlurTimer) {
             clearTimeout(this.companyBlurTimer);
         }
+        if (this.companyAutoBlurTimer) {
+            clearTimeout(this.companyAutoBlurTimer);
+        }
         if (this.discussCompanySuggestTimer) {
             clearTimeout(this.discussCompanySuggestTimer);
+        }
+        if (this.discussCompanyAutoBlurTimer) {
+            clearTimeout(this.discussCompanyAutoBlurTimer);
         }
         if (this.discussCompanyBlurTimer) {
             clearTimeout(this.discussCompanyBlurTimer);
@@ -487,6 +495,36 @@ createApp({
             return !!(element && document.activeElement === element);
           },
 
+          isTouchLikeDevice() {
+            if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+              return false;
+            }
+            if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+              return true;
+            }
+            return navigator.maxTouchPoints > 0;
+          },
+
+          scheduleCompanyInputBlur(refName) {
+            if (!this.isTouchLikeDevice()) {
+              return;
+            }
+            const input = this.$refs[refName];
+            if (!this.isFocusedElement(input)) {
+              return;
+            }
+            const timerKey = refName === 'heroCompanyInput' ? 'companyAutoBlurTimer' : 'discussCompanyAutoBlurTimer';
+            if (this[timerKey]) {
+              clearTimeout(this[timerKey]);
+            }
+            this[timerKey] = setTimeout(() => {
+              const currentInput = this.$refs[refName];
+              if (this.isFocusedElement(currentInput) && currentInput && typeof currentInput.blur === 'function') {
+                currentInput.blur();
+              }
+            }, 120);
+          },
+
           async handleCompanySuggestionPointerDown(event, item) {
             this.startCompanySuggestionPointer(event, item);
             const input = this.$refs.heroCompanyInput;
@@ -653,6 +691,9 @@ createApp({
                 const data = await resp.json();
                 this.companySuggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
                 this.companySuggestionsOpen = this.companySuggestions.length > 0;
+                if (this.companySuggestionsOpen) {
+                  this.scheduleCompanyInputBlur('heroCompanyInput');
+                }
             } catch (e) {
                 if (e && e.name !== 'AbortError') {
                     this.companySuggestions = [];
@@ -882,6 +923,9 @@ createApp({
                 const data = await resp.json();
                 this.discussCompanySuggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
                 this.discussCompanySuggestionsOpen = this.discussCompanySuggestions.length > 0;
+                if (this.discussCompanySuggestionsOpen) {
+                  this.scheduleCompanyInputBlur('discussCompanyInput');
+                }
             } catch (e) {
                 if (e && e.name !== 'AbortError') {
                     this.discussCompanySuggestions = [];
