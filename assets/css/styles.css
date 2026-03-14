@@ -406,10 +406,13 @@ img {
     z-index: 20;
     max-height: 260px;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
     padding: 6px;
 }
 
 .suggestion-item {
+    display: block;
     width: 100%;
     text-align: left;
     background: transparent;
@@ -418,6 +421,9 @@ img {
     padding: 8px 10px;
     border-radius: 10px;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    user-select: none;
 }
 
 .suggestion-item:hover {

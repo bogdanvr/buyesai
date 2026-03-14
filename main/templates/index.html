@@ -124,18 +124,23 @@
                                             @input="onCompanyInput" @focus="onCompanyFocus" @blur="onCompanyBlur">
                                         <div class="suggestions"
                                             v-if="companySuggestionsOpen && companySuggestions.length">
-                                            <button type="button" class="suggestion-item"
+                                            <div class="suggestion-item" role="button" tabindex="0"
                                                 v-for="item in companySuggestions" :key="item.value + ':' + item.inn"
                                                 @pointerdown="startCompanySuggestionInteraction"
-                                                @touchstart="startCompanySuggestionInteraction"
                                                 @mousedown="startCompanySuggestionInteraction"
-                                                @click.prevent="selectCompanySuggestion(item)">
+                                                @touchstart="startCompanySuggestionTouch"
+                                                @touchmove="moveCompanySuggestionTouch"
+                                                @touchend.prevent.stop="endCompanySuggestionTouch(item)"
+                                                @touchcancel="cancelCompanySuggestionTouch"
+                                                @click.prevent.stop="selectCompanySuggestion(item)"
+                                                @keydown.enter.prevent="selectCompanySuggestion(item)"
+                                                @keydown.space.prevent="selectCompanySuggestion(item)">
                                                 <div class="suggestion-title">[[ item.value ]]</div>
                                                 <div class="suggestion-meta">
                                                     <span v-if="item.inn">ИНН [[ item.inn ]]</span>
                                                     <span v-if="item.address">[[ item.address ]]</span>
                                                 </div>
-                                            </button>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="field-hint" v-if="heroTriedSubmit && !isHeroCompanyValid">Заполните поле
@@ -852,18 +857,23 @@
                                 @blur="onDiscussCompanyBlur">
                             <div class="suggestions"
                                 v-if="discussCompanySuggestionsOpen && discussCompanySuggestions.length">
-                                <button type="button" class="suggestion-item" v-for="item in discussCompanySuggestions"
+                                <div class="suggestion-item" role="button" tabindex="0" v-for="item in discussCompanySuggestions"
                                     :key="item.value + ':' + item.inn"
                                     @pointerdown="startDiscussCompanySuggestionInteraction"
-                                    @touchstart="startDiscussCompanySuggestionInteraction"
                                     @mousedown="startDiscussCompanySuggestionInteraction"
-                                    @click.prevent="selectDiscussCompanySuggestion(item)">
+                                    @touchstart="startDiscussCompanySuggestionTouch"
+                                    @touchmove="moveDiscussCompanySuggestionTouch"
+                                    @touchend.prevent.stop="endDiscussCompanySuggestionTouch(item)"
+                                    @touchcancel="cancelDiscussCompanySuggestionTouch"
+                                    @click.prevent.stop="selectDiscussCompanySuggestion(item)"
+                                    @keydown.enter.prevent="selectDiscussCompanySuggestion(item)"
+                                    @keydown.space.prevent="selectDiscussCompanySuggestion(item)">
                                     <div class="suggestion-title">[[ item.value ]]</div>
                                     <div class="suggestion-meta">
                                         <span v-if="item.inn">ИНН [[ item.inn ]]</span>
                                         <span v-if="item.address">[[ item.address ]]</span>
                                     </div>
-                                </button>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -19,6 +19,8 @@ createApp({
             companySuggestionsOpen: false,
             companyBlurTimer: null,
             isCompanySuggestionInteracting: false,
+            companySuggestionTouchStartY: null,
+            companySuggestionTouchMoved: false,
             selectedCompanyData: null,
             quizForm: {
                 industry: '',
@@ -53,6 +55,8 @@ createApp({
             discussCompanySuggestionsOpen: false,
             discussCompanyBlurTimer: null,
             isDiscussCompanySuggestionInteracting: false,
+            discussCompanySuggestionTouchStartY: null,
+            discussCompanySuggestionTouchMoved: false,
             selectedDiscussCompanyData: null,
             isSendingDiscuss: false,
             discussSent: false,
@@ -378,6 +382,41 @@ createApp({
             this.isCompanySuggestionInteracting = true;
           },
 
+          startCompanySuggestionTouch(event) {
+            this.startCompanySuggestionInteraction();
+            const touch = event && event.changedTouches ? event.changedTouches[0] : null;
+            this.companySuggestionTouchStartY = touch ? touch.clientY : null;
+            this.companySuggestionTouchMoved = false;
+          },
+
+          moveCompanySuggestionTouch(event) {
+            const touch = event && event.changedTouches ? event.changedTouches[0] : null;
+            if (!touch || this.companySuggestionTouchStartY === null) {
+              return;
+            }
+            if (Math.abs(touch.clientY - this.companySuggestionTouchStartY) > 8) {
+              this.companySuggestionTouchMoved = true;
+            }
+          },
+
+          async endCompanySuggestionTouch(item) {
+            if (this.companySuggestionTouchMoved) {
+              this.isCompanySuggestionInteracting = false;
+              this.companySuggestionTouchStartY = null;
+              this.companySuggestionTouchMoved = false;
+              return;
+            }
+            this.companySuggestionTouchStartY = null;
+            this.companySuggestionTouchMoved = false;
+            await this.selectCompanySuggestion(item);
+          },
+
+          cancelCompanySuggestionTouch() {
+            this.isCompanySuggestionInteracting = false;
+            this.companySuggestionTouchStartY = null;
+            this.companySuggestionTouchMoved = false;
+          },
+
           async selectCompanySuggestion(item) {
             if (!item) return;
             this.isCompanySuggestionInteracting = false;
@@ -478,6 +517,41 @@ createApp({
                 clearTimeout(this.discussCompanyBlurTimer);
             }
             this.isDiscussCompanySuggestionInteracting = true;
+          },
+
+          startDiscussCompanySuggestionTouch(event) {
+            this.startDiscussCompanySuggestionInteraction();
+            const touch = event && event.changedTouches ? event.changedTouches[0] : null;
+            this.discussCompanySuggestionTouchStartY = touch ? touch.clientY : null;
+            this.discussCompanySuggestionTouchMoved = false;
+          },
+
+          moveDiscussCompanySuggestionTouch(event) {
+            const touch = event && event.changedTouches ? event.changedTouches[0] : null;
+            if (!touch || this.discussCompanySuggestionTouchStartY === null) {
+              return;
+            }
+            if (Math.abs(touch.clientY - this.discussCompanySuggestionTouchStartY) > 8) {
+              this.discussCompanySuggestionTouchMoved = true;
+            }
+          },
+
+          async endDiscussCompanySuggestionTouch(item) {
+            if (this.discussCompanySuggestionTouchMoved) {
+              this.isDiscussCompanySuggestionInteracting = false;
+              this.discussCompanySuggestionTouchStartY = null;
+              this.discussCompanySuggestionTouchMoved = false;
+              return;
+            }
+            this.discussCompanySuggestionTouchStartY = null;
+            this.discussCompanySuggestionTouchMoved = false;
+            await this.selectDiscussCompanySuggestion(item);
+          },
+
+          cancelDiscussCompanySuggestionTouch() {
+            this.isDiscussCompanySuggestionInteracting = false;
+            this.discussCompanySuggestionTouchStartY = null;
+            this.discussCompanySuggestionTouchMoved = false;
           },
 
           async selectDiscussCompanySuggestion(item) {
