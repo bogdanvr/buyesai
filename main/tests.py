@@ -102,3 +102,27 @@ class SendFormViewTests(TestCase):
         self.assertEqual(Client.objects.filter(name__iexact="acme").count(), 1)
         self.assertEqual(Lead.objects.count(), 2)
         self.assertEqual(Lead.objects.filter(client=existing).count(), 2)
+
+    def test_falls_back_to_okved_when_industry_missing(self):
+        response = self.client.post(
+            reverse("send_form"),
+            data=json.dumps(
+                {
+                    "form_type": "hero",
+                    "payload": {
+                        "name": "Мария",
+                        "phone": "+79993334455",
+                        "company_data": {
+                            "name": "ООО Тест",
+                            "inn": "7707654321",
+                            "okved": "46.90",
+                        },
+                    },
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        client = Client.objects.get(inn="7707654321")
+        self.assertEqual(client.industry, "ОКВЭД 46.90")

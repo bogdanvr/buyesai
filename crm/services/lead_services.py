@@ -22,8 +22,14 @@ def _extract_company_profile(payload: dict) -> dict:
     legal_name = _text_or_empty(profile.get("legal_name")) or _text_or_empty(payload.get("company_legal_name"))
     inn = _text_or_empty(profile.get("inn")) or _text_or_empty(payload.get("company_inn"))
     address = _text_or_empty(profile.get("address")) or _text_or_empty(payload.get("company_address"))
-    industry = _text_or_empty(profile.get("industry")) or _text_or_empty(payload.get("company_industry"))
+    industry = (
+        _text_or_empty(profile.get("industry"))
+        or _text_or_empty(payload.get("company_industry"))
+        or _text_or_empty(payload.get("industry"))
+    )
     okved = _text_or_empty(profile.get("okved")) or _text_or_empty(payload.get("company_okved"))
+    if not industry and okved:
+        industry = f"ОКВЭД {okved}"
 
     return {
         "name": name,

@@ -64,6 +64,9 @@ def _extract_party_suggestion(item: dict) -> dict:
             if not industry:
                 industry = str(main_item.get("name") or main_item.get("title") or "").strip()
 
+    if not industry and okved:
+        industry = f"ОКВЭД {okved}"
+
     return {
         "value": str(value or "").strip(),
         "name": str(value or "").strip(),
