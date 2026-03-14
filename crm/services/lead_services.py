@@ -6,20 +6,91 @@ from django.utils import timezone
 from crm.models import Client, Deal, Lead
 
 
+def _text_or_empty(value) -> str:
+    return str(value or "").strip()
+
+
+def _extract_company_profile(payload: dict) -> dict:
+    company_data = payload.get("company_data")
+    profile = company_data if isinstance(company_data, dict) else {}
+
+    name = (
+        _text_or_empty(profile.get("name"))
+        or _text_or_empty(payload.get("company_name"))
+        or _text_or_empty(payload.get("company"))
+    )
+    legal_name = _text_or_empty(profile.get("legal_name")) or _text_or_empty(payload.get("company_legal_name"))
+    inn = _text_or_empty(profile.get("inn")) or _text_or_empty(payload.get("company_inn"))
+    address = _text_or_empty(profile.get("address")) or _text_or_empty(payload.get("company_address"))
+    industry = _text_or_empty(profile.get("industry")) or _text_or_empty(payload.get("company_industry"))
+    okved = _text_or_empty(profile.get("okved")) or _text_or_empty(payload.get("company_okved"))
+
+    return {
+        "name": name,
+        "legal_name": legal_name,
+        "inn": inn,
+        "address": address,
+        "industry": industry,
+        "okved": okved,
+    }
+
+
 @transaction.atomic
 def create_lead_from_payload(*, form_type: str, payload: dict, source=None, created_by=None) -> Lead:
-    company_name = str(payload.get("company") or "").strip()
+    company_profile = _extract_company_profile(payload)
+    company_name = company_profile["name"]
+    company_inn = company_profile["inn"]
+
     client = None
-    if company_name:
+    if company_inn:
+        client = Client.objects.filter(inn=company_inn).order_by("id").first()
+    if client is None and company_name:
         client = Client.objects.filter(name__iexact=company_name).order_by("id").first()
-        if client is None:
-            client = Client.objects.create(name=company_name, source=source)
+
+    if client is None and company_name:
+        client = Client.objects.create(
+            name=company_name,
+            legal_name=company_profile["legal_name"],
+            inn=company_inn or None,
+            address=company_profile["address"],
+            industry=company_profile["industry"],
+            okved=company_profile["okved"],
+            source=source,
+        )
+    elif client is not None:
+        update_fields = []
+        if source and client.source_id is None:
+            client.source = source
+            update_fields.append("source")
+        if company_name and client.name != company_name:
+            client.name = company_name
+            update_fields.append("name")
+        if company_profile["legal_name"] and client.legal_name != company_profile["legal_name"]:
+            client.legal_name = company_profile["legal_name"]
+            update_fields.append("legal_name")
+        if company_inn and client.inn != company_inn:
+            inn_taken = Client.objects.filter(inn=company_inn).exclude(pk=client.pk).exists()
+            if not inn_taken:
+                client.inn = company_inn
+                update_fields.append("inn")
+        if company_profile["address"] and client.address != company_profile["address"]:
+            client.address = company_profile["address"]
+            update_fields.append("address")
+        if company_profile["industry"] and client.industry != company_profile["industry"]:
+            client.industry = company_profile["industry"]
+            update_fields.append("industry")
+        if company_profile["okved"] and client.okved != company_profile["okved"]:
+            client.okved = company_profile["okved"]
+            update_fields.append("okved")
+        if update_fields:
+            update_fields.append("updated_at")
+            client.save(update_fields=update_fields)
 
     lead = Lead.objects.create(
         title=f"Лид из формы {form_type}",
-        name=str(payload.get("name") or ""),
-        phone=str(payload.get("phone") or ""),
-        email=str(payload.get("email") or ""),
+        name=_text_or_empty(payload.get("name")),
+        phone=_text_or_empty(payload.get("phone")),
+        email=_text_or_empty(payload.get("email")),
         company=company_name,
         client=client,
         source=source,

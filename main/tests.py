@@ -24,6 +24,13 @@ class SendFormViewTests(TestCase):
                         "name": "Иван",
                         "phone": "+79990000000",
                         "company": "Acme",
+                        "company_data": {
+                            "name": "ООО «Акме»",
+                            "inn": "7701234567",
+                            "address": "г. Москва, ул. Тестовая, д. 1",
+                            "industry": "Разработка ПО",
+                            "okved": "62.01",
+                        },
                         "message": "Нужна автоматизация",
                         "utm_data": {"utm_source": "google"},
                     },
@@ -40,16 +47,23 @@ class SendFormViewTests(TestCase):
         form_submission = FormSubmission.objects.get()
         lead = Lead.objects.get()
         source = LeadSource.objects.get()
+        client = Client.objects.get()
 
         self.assertEqual(form_submission.form_type, "hero")
         self.assertEqual(lead.name, "Иван")
         self.assertEqual(lead.phone, "+79990000000")
-        self.assertEqual(lead.company, "Acme")
+        self.assertEqual(lead.company, "ООО «Акме»")
         self.assertEqual(lead.source_id, source.id)
+        self.assertEqual(lead.client_id, client.id)
         self.assertEqual(source.code, "site-hero")
         self.assertEqual(lead.payload.get("form_submission_id"), form_submission.id)
         self.assertEqual(lead.utm_data.get("utm_source"), "google")
         self.assertEqual(response.json().get("crm_lead_id"), lead.id)
+        self.assertEqual(client.name, "ООО «Акме»")
+        self.assertEqual(client.inn, "7701234567")
+        self.assertEqual(client.address, "г. Москва, ул. Тестовая, д. 1")
+        self.assertEqual(client.industry, "Разработка ПО")
+        self.assertEqual(client.okved, "62.01")
 
     def test_reuses_existing_company_for_form_lead(self):
         existing = Client.objects.create(name="Acme")

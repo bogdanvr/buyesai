@@ -18,6 +18,7 @@ createApp({
             companySuggestAbort: null,
             companySuggestionsOpen: false,
             companyBlurTimer: null,
+            selectedCompanyData: null,
             quizForm: {
                 industry: '',
                 teamSize: '',
@@ -50,6 +51,7 @@ createApp({
             discussCompanySuggestAbort: null,
             discussCompanySuggestionsOpen: false,
             discussCompanyBlurTimer: null,
+            selectedDiscussCompanyData: null,
             isSendingDiscuss: false,
             discussSent: false,
 
@@ -207,8 +209,51 @@ createApp({
             return response.json();
           },
 
+          normalizeSelectedCompanyData(item, fallbackName = '') {
+            if (!item || typeof item !== 'object') {
+              return fallbackName ? { name: fallbackName } : null;
+            }
+            const name = String(item.name || item.value || fallbackName || '').trim();
+            const inn = String(item.inn || '').trim();
+            const address = String(item.address || '').trim();
+            const industry = String(item.industry || '').trim();
+            const okved = String(item.okved || '').trim();
+            const legalName = String(item.legal_name || '').trim();
+            const normalized = { name };
+            if (inn) normalized.inn = inn;
+            if (address) normalized.address = address;
+            if (industry) normalized.industry = industry;
+            if (okved) normalized.okved = okved;
+            if (legalName) normalized.legal_name = legalName;
+            return normalized;
+          },
+
+          buildCompanyPayload(companyName, selectedCompanyData) {
+            const normalizedName = String(companyName || '').trim();
+            const selected = this.normalizeSelectedCompanyData(selectedCompanyData, normalizedName);
+            if (!selected || !selected.name) {
+              return {};
+            }
+            return {
+              company_data: selected,
+              company_name: selected.name,
+              company_inn: selected.inn || '',
+              company_address: selected.address || '',
+              company_industry: selected.industry || '',
+              company_okved: selected.okved || '',
+              company_legal_name: selected.legal_name || '',
+            };
+          },
+
           onCompanyInput(e) {
             const query = (e && e.target && e.target.value) ? e.target.value : this.company;
+            if (
+              this.selectedCompanyData &&
+              String(this.selectedCompanyData.name || '').trim() &&
+              String(query || '').trim() !== String(this.selectedCompanyData.name || '').trim()
+            ) {
+              this.selectedCompanyData = null;
+            }
             this.companySuggestionsOpen = true;
             this.fetchCompanySuggestions(query);
           },
@@ -231,6 +276,7 @@ createApp({
           selectCompanySuggestion(item) {
             if (!item) return;
             this.company = item.value || '';
+            this.selectedCompanyData = this.normalizeSelectedCompanyData(item, this.company);
             this.companySuggestionsOpen = false;
             this.companySuggestions = [];
           },
@@ -279,6 +325,13 @@ createApp({
 
           onDiscussCompanyInput(e) {
             const query = (e && e.target && e.target.value) ? e.target.value : this.discussForm.company;
+            if (
+              this.selectedDiscussCompanyData &&
+              String(this.selectedDiscussCompanyData.name || '').trim() &&
+              String(query || '').trim() !== String(this.selectedDiscussCompanyData.name || '').trim()
+            ) {
+              this.selectedDiscussCompanyData = null;
+            }
             this.discussCompanySuggestionsOpen = true;
             this.fetchDiscussCompanySuggestions(query);
           },
@@ -301,6 +354,7 @@ createApp({
           selectDiscussCompanySuggestion(item) {
             if (!item) return;
             this.discussForm.company = item.value || '';
+            this.selectedDiscussCompanyData = this.normalizeSelectedCompanyData(item, this.discussForm.company);
             this.discussCompanySuggestionsOpen = false;
             this.discussCompanySuggestions = [];
           },
@@ -357,6 +411,7 @@ createApp({
             const name = this.name.trim();
             const phone = this.phone.trim();
             const company = this.company.trim();
+            const companyPayload = this.buildCompanyPayload(company, this.selectedCompanyData);
             const direction = (this.direction || '').trim();
             this.isSending = true;
             try {
@@ -364,6 +419,7 @@ createApp({
                     name,
                     phone,
                     company,
+                    ...companyPayload,
                     direction,
                     page: window.location.pathname,
                 });
@@ -399,6 +455,7 @@ createApp({
             try {
                 await this.submitFormPayload('plan', {
                     ...this.PlanForm,
+                    ...this.buildCompanyPayload(this.PlanForm.company, null),
                     message: this.PlanForm.comment || '',
                     page: window.location.pathname,
                 });
@@ -426,12 +483,14 @@ createApp({
             try {
                 await this.submitFormPayload('discuss', {
                     ...this.discussForm,
+                    ...this.buildCompanyPayload(this.discussForm.company, this.selectedDiscussCompanyData),
                     topic: this.discussTopic,
                     message: this.discussForm.comment || '',
                     page: window.location.pathname,
                 });
                 this.discussSent = true;
                 this.discussForm = { name: '', phone: '', company: '', comment: '' };
+                this.selectedDiscussCompanyData = null;
             } catch (e) {
                 console.error(e);
             } finally {

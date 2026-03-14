@@ -21,6 +21,9 @@ class Client(TimestampedModel):
     phone = models.CharField(max_length=64, blank=True, default="", verbose_name="Телефон")
     email = models.EmailField(blank=True, default="", verbose_name="Email")
     website = models.URLField(blank=True, default="", verbose_name="Сайт")
+    address = models.CharField(max_length=512, blank=True, default="", verbose_name="Адрес")
+    industry = models.CharField(max_length=255, blank=True, default="", verbose_name="Сфера деятельности")
+    okved = models.CharField(max_length=64, blank=True, default="", verbose_name="ОКВЭД")
     source = models.ForeignKey(
         "crm.LeadSource",
         related_name="clients",

@@ -31,6 +31,52 @@ UTM_KEYS = (
 )
 
 
+def _extract_party_suggestion(item: dict) -> dict:
+    data = item.get("data") or {}
+    name_data = data.get("name") or {}
+
+    short_with_opf = name_data.get("short_with_opf") if isinstance(name_data, dict) else ""
+    value = item.get("value") or short_with_opf or ""
+    legal_name = ""
+    if isinstance(name_data, dict):
+        legal_name = name_data.get("full_with_opf") or name_data.get("full") or ""
+
+    address_value = ""
+    address = data.get("address")
+    if isinstance(address, dict):
+        address_value = address.get("value") or ""
+
+    okved = str(data.get("okved") or "").strip()
+    industry = str(data.get("activity") or data.get("okved_name") or data.get("industry") or "").strip()
+
+    okveds = data.get("okveds")
+    if isinstance(okveds, list) and okveds:
+        main_item = None
+        for candidate in okveds:
+            if isinstance(candidate, dict) and candidate.get("main"):
+                main_item = candidate
+                break
+        if main_item is None:
+            main_item = okveds[0] if isinstance(okveds[0], dict) else None
+        if isinstance(main_item, dict):
+            if not okved:
+                okved = str(main_item.get("code") or main_item.get("okved") or "").strip()
+            if not industry:
+                industry = str(main_item.get("name") or main_item.get("title") or "").strip()
+
+    return {
+        "value": str(value or "").strip(),
+        "name": str(value or "").strip(),
+        "legal_name": str(legal_name or "").strip(),
+        "inn": str(data.get("inn") or "").strip(),
+        "kpp": str(data.get("kpp") or "").strip(),
+        "ogrn": str(data.get("ogrn") or "").strip(),
+        "address": str(address_value or "").strip(),
+        "industry": industry,
+        "okved": okved,
+    }
+
+
 def _get_or_create_form_lead_source(form_type: str) -> LeadSource:
     normalized_form_type = str(form_type or "").strip() or "unknown"
     code_suffix = slugify(normalized_form_type.replace("_", "-")) or "unknown"
@@ -151,22 +197,7 @@ def dadata_party(request):
     except Exception:
         return JsonResponse({"suggestions": []}, status=502)
 
-    suggestions = []
-    for item in result or []:
-        data = item.get("data") or {}
-        address_value = ""
-        address = data.get("address")
-        if isinstance(address, dict):
-            address_value = address.get("value") or ""
-        suggestions.append(
-            {
-                "value": item.get("value") or "",
-                "inn": data.get("inn") or "",
-                "kpp": data.get("kpp") or "",
-                "ogrn": data.get("ogrn") or "",
-                "address": address_value,
-            }
-        )
+    suggestions = [_extract_party_suggestion(item) for item in (result or [])]
 
     return JsonResponse({"suggestions": suggestions})
 

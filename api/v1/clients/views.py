@@ -14,5 +14,9 @@ class ClientViewSet(ModelViewSet):
         search_query = self.request.query_params.get("q")
         if is_active in {"true", "false"}:
             queryset = queryset.filter(is_active=is_active == "true")
-        queryset = apply_text_search(queryset, search_query, ["name", "legal_name", "inn", "phone", "email"])
+        queryset = apply_text_search(
+            queryset,
+            search_query,
+            ["name", "legal_name", "inn", "phone", "email", "address", "industry", "okved"],
+        )
         return queryset

@@ -445,6 +445,18 @@
                   <input v-model="dealCompanyForm.inn" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                 </label>
                 <label class="block">
+                  <span class="text-sm text-crm-muted">ОКВЭД</span>
+                  <input v-model="dealCompanyForm.okved" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <label class="block md:col-span-2">
+                  <span class="text-sm text-crm-muted">Сфера деятельности</span>
+                  <input v-model="dealCompanyForm.industry" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <label class="block md:col-span-2">
+                  <span class="text-sm text-crm-muted">Адрес</span>
+                  <input v-model="dealCompanyForm.address" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <label class="block">
                   <span class="text-sm text-crm-muted">Телефон компании</span>
                   <input v-model="dealCompanyForm.phone" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                 </label>
@@ -610,6 +622,18 @@
             <label class="block">
               <span class="text-sm text-crm-muted">ИНН</span>
               <input v-model="forms.companies.inn" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">ОКВЭД</span>
+              <input v-model="forms.companies.okved" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+            </label>
+            <label class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Сфера деятельности</span>
+              <input v-model="forms.companies.industry" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+            </label>
+            <label class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Адрес</span>
+              <input v-model="forms.companies.address" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
             <label class="block">
               <span class="text-sm text-crm-muted">Сайт</span>
@@ -826,6 +850,9 @@
               name: "",
               legalName: "",
               inn: "",
+              address: "",
+              industry: "",
+              okved: "",
               phone: "",
               email: "",
               website: "",
@@ -848,6 +875,9 @@
           dealCompanyForm: {
             name: "",
             inn: "",
+            address: "",
+            industry: "",
+            okved: "",
             phone: "",
             email: "",
             website: ""
@@ -1316,6 +1346,9 @@
             name: item.name || "",
             legalName: item.legalName || "",
             inn: item.inn || "",
+            address: item.address || "",
+            industry: item.industry || "",
+            okved: item.okved || "",
             phone: item.phone || "",
             email: item.email || "",
             website: item.website || "",
@@ -1359,6 +1392,9 @@
           this.dealCompanyForm = {
             name: "",
             inn: "",
+            address: "",
+            industry: "",
+            okved: "",
             phone: "",
             email: "",
             website: ""
@@ -1543,6 +1579,9 @@
             statusLabel: normalized.label,
             legalName: item.legal_name || "",
             inn: item.inn || "",
+            address: item.address || "",
+            industry: item.industry || "",
+            okved: item.okved || "",
             website: item.website || "",
             notes: item.notes || "",
             isActive: item.is_active !== false
@@ -1700,6 +1739,9 @@
               name: "",
               legalName: "",
               inn: "",
+              address: "",
+              industry: "",
+              okved: "",
               phone: "",
               email: "",
               website: "",
@@ -1909,6 +1951,9 @@
               body: {
                 name: companyName,
                 inn: this.dealCompanyForm.inn.trim() || null,
+                address: this.dealCompanyForm.address.trim(),
+                industry: this.dealCompanyForm.industry.trim(),
+                okved: this.dealCompanyForm.okved.trim(),
                 phone: this.dealCompanyForm.phone.trim(),
                 email: this.dealCompanyForm.email.trim(),
                 website: this.dealCompanyForm.website.trim(),
@@ -2009,6 +2054,9 @@
               name: form.name.trim(),
               legal_name: form.legalName.trim(),
               inn: form.inn.trim() || null,
+              address: form.address.trim(),
+              industry: form.industry.trim(),
+              okved: form.okved.trim(),
               phone: form.phone.trim(),
               email: form.email.trim(),
               website: form.website.trim(),
@@ -2031,6 +2079,9 @@
               name: form.name.trim(),
               legal_name: form.legalName.trim(),
               inn: form.inn.trim() || null,
+              address: form.address.trim(),
+              industry: form.industry.trim(),
+              okved: form.okved.trim(),
               phone: form.phone.trim(),
               email: form.email.trim(),
               website: form.website.trim(),
