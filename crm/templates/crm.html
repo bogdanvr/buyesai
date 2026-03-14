@@ -161,24 +161,25 @@
             </label>
           </div>
 
-          <div class="flex items-center justify-between xl:justify-end gap-3 xl:gap-4">
-            <div class="text-sm text-crm-muted whitespace-nowrap">
+          <div class="flex items-center justify-between xl:justify-end gap-2 xl:gap-4">
+            <div class="text-xs md:text-sm text-crm-muted whitespace-nowrap">
               [[ filteredItems.length ]] элементов
             </div>
 
             <button
               @click="reloadActiveSection"
-              class="h-11 px-4 rounded-xl border border-crm-border bg-[#13314e] text-sm font-medium hover:border-crm-accent hover:text-white transition"
+              class="h-10 md:h-11 px-3 md:px-4 rounded-xl border border-crm-border bg-[#13314e] text-sm font-medium hover:border-crm-accent hover:text-white transition whitespace-nowrap"
             >
               Обновить
             </button>
 
             <button
               @click="openCreateModal"
-              class="h-11 px-5 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+              class="h-10 md:h-11 px-4 md:px-5 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
               :disabled="isSaving"
             >
-              + ДОБАВИТЬ [[ createButtonLabel.toUpperCase() ]]
+              <span class="md:hidden">+ Добавить</span>
+              <span class="hidden md:inline">+ ДОБАВИТЬ [[ createButtonLabel.toUpperCase() ]]</span>
             </button>
           </div>
         </div>
@@ -188,7 +189,7 @@
         <div v-if="errorMessage" class="mb-4 rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-red-200 text-sm">
           [[ errorMessage ]]
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div class="hidden md:grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
             <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">Всего</div>
             <div class="mt-3 text-3xl font-semibold">[[ filteredItems.length ]]</div>
