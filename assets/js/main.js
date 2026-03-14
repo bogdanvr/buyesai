@@ -19,8 +19,8 @@ createApp({
             companySuggestionsOpen: false,
             companyBlurTimer: null,
             isCompanySuggestionInteracting: false,
-            companySuggestionTouchStartY: null,
-            companySuggestionTouchMoved: false,
+            companySuggestionPointerStartY: null,
+            companySuggestionPointerMoved: false,
             selectedCompanyData: null,
             quizForm: {
                 industry: '',
@@ -55,8 +55,8 @@ createApp({
             discussCompanySuggestionsOpen: false,
             discussCompanyBlurTimer: null,
             isDiscussCompanySuggestionInteracting: false,
-            discussCompanySuggestionTouchStartY: null,
-            discussCompanySuggestionTouchMoved: false,
+            discussCompanySuggestionPointerStartY: null,
+            discussCompanySuggestionPointerMoved: false,
             selectedDiscussCompanyData: null,
             isSendingDiscuss: false,
             discussSent: false,
@@ -382,39 +382,43 @@ createApp({
             this.isCompanySuggestionInteracting = true;
           },
 
-          startCompanySuggestionTouch(event) {
+          startCompanySuggestionPointer(event) {
             this.startCompanySuggestionInteraction();
-            const touch = event && event.changedTouches ? event.changedTouches[0] : null;
-            this.companySuggestionTouchStartY = touch ? touch.clientY : null;
-            this.companySuggestionTouchMoved = false;
+            const clientY = typeof event?.clientY === 'number'
+              ? event.clientY
+              : (event?.changedTouches?.[0]?.clientY ?? null);
+            this.companySuggestionPointerStartY = clientY;
+            this.companySuggestionPointerMoved = false;
           },
 
-          moveCompanySuggestionTouch(event) {
-            const touch = event && event.changedTouches ? event.changedTouches[0] : null;
-            if (!touch || this.companySuggestionTouchStartY === null) {
+          moveCompanySuggestionPointer(event) {
+            const clientY = typeof event?.clientY === 'number'
+              ? event.clientY
+              : (event?.changedTouches?.[0]?.clientY ?? null);
+            if (clientY === null || this.companySuggestionPointerStartY === null) {
               return;
             }
-            if (Math.abs(touch.clientY - this.companySuggestionTouchStartY) > 8) {
-              this.companySuggestionTouchMoved = true;
+            if (Math.abs(clientY - this.companySuggestionPointerStartY) > 12) {
+              this.companySuggestionPointerMoved = true;
             }
           },
 
-          async endCompanySuggestionTouch(item) {
-            if (this.companySuggestionTouchMoved) {
+          async endCompanySuggestionPointer(item) {
+            if (this.companySuggestionPointerMoved) {
               this.isCompanySuggestionInteracting = false;
-              this.companySuggestionTouchStartY = null;
-              this.companySuggestionTouchMoved = false;
+              this.companySuggestionPointerStartY = null;
+              this.companySuggestionPointerMoved = false;
               return;
             }
-            this.companySuggestionTouchStartY = null;
-            this.companySuggestionTouchMoved = false;
+            this.companySuggestionPointerStartY = null;
+            this.companySuggestionPointerMoved = false;
             await this.selectCompanySuggestion(item);
           },
 
-          cancelCompanySuggestionTouch() {
+          cancelCompanySuggestionPointer() {
             this.isCompanySuggestionInteracting = false;
-            this.companySuggestionTouchStartY = null;
-            this.companySuggestionTouchMoved = false;
+            this.companySuggestionPointerStartY = null;
+            this.companySuggestionPointerMoved = false;
           },
 
           async selectCompanySuggestion(item) {
@@ -519,39 +523,43 @@ createApp({
             this.isDiscussCompanySuggestionInteracting = true;
           },
 
-          startDiscussCompanySuggestionTouch(event) {
+          startDiscussCompanySuggestionPointer(event) {
             this.startDiscussCompanySuggestionInteraction();
-            const touch = event && event.changedTouches ? event.changedTouches[0] : null;
-            this.discussCompanySuggestionTouchStartY = touch ? touch.clientY : null;
-            this.discussCompanySuggestionTouchMoved = false;
+            const clientY = typeof event?.clientY === 'number'
+              ? event.clientY
+              : (event?.changedTouches?.[0]?.clientY ?? null);
+            this.discussCompanySuggestionPointerStartY = clientY;
+            this.discussCompanySuggestionPointerMoved = false;
           },
 
-          moveDiscussCompanySuggestionTouch(event) {
-            const touch = event && event.changedTouches ? event.changedTouches[0] : null;
-            if (!touch || this.discussCompanySuggestionTouchStartY === null) {
+          moveDiscussCompanySuggestionPointer(event) {
+            const clientY = typeof event?.clientY === 'number'
+              ? event.clientY
+              : (event?.changedTouches?.[0]?.clientY ?? null);
+            if (clientY === null || this.discussCompanySuggestionPointerStartY === null) {
               return;
             }
-            if (Math.abs(touch.clientY - this.discussCompanySuggestionTouchStartY) > 8) {
-              this.discussCompanySuggestionTouchMoved = true;
+            if (Math.abs(clientY - this.discussCompanySuggestionPointerStartY) > 12) {
+              this.discussCompanySuggestionPointerMoved = true;
             }
           },
 
-          async endDiscussCompanySuggestionTouch(item) {
-            if (this.discussCompanySuggestionTouchMoved) {
+          async endDiscussCompanySuggestionPointer(item) {
+            if (this.discussCompanySuggestionPointerMoved) {
               this.isDiscussCompanySuggestionInteracting = false;
-              this.discussCompanySuggestionTouchStartY = null;
-              this.discussCompanySuggestionTouchMoved = false;
+              this.discussCompanySuggestionPointerStartY = null;
+              this.discussCompanySuggestionPointerMoved = false;
               return;
             }
-            this.discussCompanySuggestionTouchStartY = null;
-            this.discussCompanySuggestionTouchMoved = false;
+            this.discussCompanySuggestionPointerStartY = null;
+            this.discussCompanySuggestionPointerMoved = false;
             await this.selectDiscussCompanySuggestion(item);
           },
 
-          cancelDiscussCompanySuggestionTouch() {
+          cancelDiscussCompanySuggestionPointer() {
             this.isDiscussCompanySuggestionInteracting = false;
-            this.discussCompanySuggestionTouchStartY = null;
-            this.discussCompanySuggestionTouchMoved = false;
+            this.discussCompanySuggestionPointerStartY = null;
+            this.discussCompanySuggestionPointerMoved = false;
           },
 
           async selectDiscussCompanySuggestion(item) {

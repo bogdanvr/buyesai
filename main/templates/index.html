@@ -122,17 +122,14 @@
                                     <div class="suggestions-wrapper" ref="heroCompanySuggestionsWrapper">
                                         <input v-model="company" type="text" placeholder="Название или ИНН" required
                                             @input="onCompanyInput" @focus="onCompanyFocus" @blur="onCompanyBlur">
-                                        <div class="suggestions"
+                                            <div class="suggestions"
                                             v-if="companySuggestionsOpen && companySuggestions.length">
                                             <div class="suggestion-item" role="button" tabindex="0"
                                                 v-for="item in companySuggestions" :key="item.value + ':' + item.inn"
-                                                @pointerdown="startCompanySuggestionInteraction"
-                                                @mousedown="startCompanySuggestionInteraction"
-                                                @touchstart="startCompanySuggestionTouch"
-                                                @touchmove="moveCompanySuggestionTouch"
-                                                @touchend.prevent.stop="endCompanySuggestionTouch(item)"
-                                                @touchcancel="cancelCompanySuggestionTouch"
-                                                @click.prevent.stop="selectCompanySuggestion(item)"
+                                                @pointerdown="startCompanySuggestionPointer"
+                                                @pointermove="moveCompanySuggestionPointer"
+                                                @pointerup.prevent.stop="endCompanySuggestionPointer(item)"
+                                                @pointercancel="cancelCompanySuggestionPointer"
                                                 @keydown.enter.prevent="selectCompanySuggestion(item)"
                                                 @keydown.space.prevent="selectCompanySuggestion(item)">
                                                 <div class="suggestion-title">[[ item.value ]]</div>
@@ -859,13 +856,10 @@
                                 v-if="discussCompanySuggestionsOpen && discussCompanySuggestions.length">
                                 <div class="suggestion-item" role="button" tabindex="0" v-for="item in discussCompanySuggestions"
                                     :key="item.value + ':' + item.inn"
-                                    @pointerdown="startDiscussCompanySuggestionInteraction"
-                                    @mousedown="startDiscussCompanySuggestionInteraction"
-                                    @touchstart="startDiscussCompanySuggestionTouch"
-                                    @touchmove="moveDiscussCompanySuggestionTouch"
-                                    @touchend.prevent.stop="endDiscussCompanySuggestionTouch(item)"
-                                    @touchcancel="cancelDiscussCompanySuggestionTouch"
-                                    @click.prevent.stop="selectDiscussCompanySuggestion(item)"
+                                    @pointerdown="startDiscussCompanySuggestionPointer"
+                                    @pointermove="moveDiscussCompanySuggestionPointer"
+                                    @pointerup.prevent.stop="endDiscussCompanySuggestionPointer(item)"
+                                    @pointercancel="cancelDiscussCompanySuggestionPointer"
                                     @keydown.enter.prevent="selectDiscussCompanySuggestion(item)"
                                     @keydown.space.prevent="selectDiscussCompanySuggestion(item)">
                                     <div class="suggestion-title">[[ item.value ]]</div>
