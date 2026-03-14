@@ -121,14 +121,15 @@
                                     <label>Компания</label>
                                     <div class="suggestions-wrapper" ref="heroCompanySuggestionsWrapper">
                                         <input v-model="company" type="text" placeholder="Название или ИНН" required
-                                            @input="onCompanyInput" @focus="onCompanyFocus">
+                                            @input="onCompanyInput" @focus="onCompanyFocus" @blur="onCompanyBlur">
                                         <div class="suggestions"
                                             v-if="companySuggestionsOpen && companySuggestions.length">
                                             <button type="button" class="suggestion-item"
                                                 v-for="item in companySuggestions" :key="item.value + ':' + item.inn"
-                                                @pointerdown.prevent="selectCompanySuggestion(item)"
-                                                @touchstart.prevent="selectCompanySuggestion(item)"
-                                                @mousedown.prevent="selectCompanySuggestion(item)">
+                                                @pointerdown="startCompanySuggestionInteraction"
+                                                @touchstart="startCompanySuggestionInteraction"
+                                                @mousedown="startCompanySuggestionInteraction"
+                                                @click.prevent="selectCompanySuggestion(item)">
                                                 <div class="suggestion-title">[[ item.value ]]</div>
                                                 <div class="suggestion-meta">
                                                     <span v-if="item.inn">ИНН [[ item.inn ]]</span>
@@ -847,14 +848,16 @@
                         <label>Компания / ИНН</label>
                         <div class="suggestions-wrapper" ref="discussCompanySuggestionsWrapper">
                             <input type="text" placeholder="Введите название или ИНН" v-model="discussForm.company"
-                                @input="onDiscussCompanyInput" @focus="onDiscussCompanyFocus">
+                                @input="onDiscussCompanyInput" @focus="onDiscussCompanyFocus"
+                                @blur="onDiscussCompanyBlur">
                             <div class="suggestions"
                                 v-if="discussCompanySuggestionsOpen && discussCompanySuggestions.length">
                                 <button type="button" class="suggestion-item" v-for="item in discussCompanySuggestions"
                                     :key="item.value + ':' + item.inn"
-                                    @pointerdown.prevent="selectDiscussCompanySuggestion(item)"
-                                    @touchstart.prevent="selectDiscussCompanySuggestion(item)"
-                                    @mousedown.prevent="selectDiscussCompanySuggestion(item)">
+                                    @pointerdown="startDiscussCompanySuggestionInteraction"
+                                    @touchstart="startDiscussCompanySuggestionInteraction"
+                                    @mousedown="startDiscussCompanySuggestionInteraction"
+                                    @click.prevent="selectDiscussCompanySuggestion(item)">
                                     <div class="suggestion-title">[[ item.value ]]</div>
                                     <div class="suggestion-meta">
                                         <span v-if="item.inn">ИНН [[ item.inn ]]</span>

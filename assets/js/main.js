@@ -17,6 +17,8 @@ createApp({
             companySuggestTimer: null,
             companySuggestAbort: null,
             companySuggestionsOpen: false,
+            companyBlurTimer: null,
+            isCompanySuggestionInteracting: false,
             selectedCompanyData: null,
             quizForm: {
                 industry: '',
@@ -49,28 +51,36 @@ createApp({
             discussCompanySuggestTimer: null,
             discussCompanySuggestAbort: null,
             discussCompanySuggestionsOpen: false,
+            discussCompanyBlurTimer: null,
+            isDiscussCompanySuggestionInteracting: false,
             selectedDiscussCompanyData: null,
             isSendingDiscuss: false,
             discussSent: false,
-            outsidePointerHandler: null,
+            outsideClickHandler: null,
 
         };
     },
     mounted() {
-        this.outsidePointerHandler = (event) => {
-            this.handleOutsidePointer(event);
+        this.outsideClickHandler = (event) => {
+            this.handleOutsideClick(event);
         };
-        document.addEventListener('pointerdown', this.outsidePointerHandler, true);
+        document.addEventListener('click', this.outsideClickHandler);
     },
     beforeUnmount() {
-        if (this.outsidePointerHandler) {
-            document.removeEventListener('pointerdown', this.outsidePointerHandler, true);
+        if (this.outsideClickHandler) {
+            document.removeEventListener('click', this.outsideClickHandler);
         }
         if (this.companySuggestTimer) {
             clearTimeout(this.companySuggestTimer);
         }
+        if (this.companyBlurTimer) {
+            clearTimeout(this.companyBlurTimer);
+        }
         if (this.discussCompanySuggestTimer) {
             clearTimeout(this.discussCompanySuggestTimer);
+        }
+        if (this.discussCompanyBlurTimer) {
+            clearTimeout(this.discussCompanyBlurTimer);
         }
         if (this.companySuggestAbort) {
             this.companySuggestAbort.abort();
@@ -281,13 +291,37 @@ createApp({
           },
 
           onCompanyFocus() {
+            if (this.companyBlurTimer) {
+                clearTimeout(this.companyBlurTimer);
+            }
             if (this.companySuggestions.length > 0) {
                 this.companySuggestionsOpen = true;
             }
           },
 
+          onCompanyBlur() {
+            if (this.companyBlurTimer) {
+                clearTimeout(this.companyBlurTimer);
+            }
+            if (this.isCompanySuggestionInteracting) {
+                this.isCompanySuggestionInteracting = false;
+                return;
+            }
+            this.companyBlurTimer = setTimeout(() => {
+                this.companySuggestionsOpen = false;
+            }, 180);
+          },
+
+          startCompanySuggestionInteraction() {
+            if (this.companyBlurTimer) {
+                clearTimeout(this.companyBlurTimer);
+            }
+            this.isCompanySuggestionInteracting = true;
+          },
+
           selectCompanySuggestion(item) {
             if (!item) return;
+            this.isCompanySuggestionInteracting = false;
             this.company = item.value || '';
             this.selectedCompanyData = this.normalizeSelectedCompanyData(item, this.company);
             this.companySuggestionsOpen = false;
@@ -350,13 +384,37 @@ createApp({
           },
 
           onDiscussCompanyFocus() {
+            if (this.discussCompanyBlurTimer) {
+                clearTimeout(this.discussCompanyBlurTimer);
+            }
             if (this.discussCompanySuggestions.length > 0) {
                 this.discussCompanySuggestionsOpen = true;
             }
           },
 
+          onDiscussCompanyBlur() {
+            if (this.discussCompanyBlurTimer) {
+                clearTimeout(this.discussCompanyBlurTimer);
+            }
+            if (this.isDiscussCompanySuggestionInteracting) {
+                this.isDiscussCompanySuggestionInteracting = false;
+                return;
+            }
+            this.discussCompanyBlurTimer = setTimeout(() => {
+                this.discussCompanySuggestionsOpen = false;
+            }, 180);
+          },
+
+          startDiscussCompanySuggestionInteraction() {
+            if (this.discussCompanyBlurTimer) {
+                clearTimeout(this.discussCompanyBlurTimer);
+            }
+            this.isDiscussCompanySuggestionInteracting = true;
+          },
+
           selectDiscussCompanySuggestion(item) {
             if (!item) return;
+            this.isDiscussCompanySuggestionInteracting = false;
             this.discussForm.company = item.value || '';
             this.selectedDiscussCompanyData = this.normalizeSelectedCompanyData(item, this.discussForm.company);
             this.discussCompanySuggestionsOpen = false;
@@ -377,17 +435,19 @@ createApp({
             return element.contains(event.target);
           },
 
-          handleOutsidePointer(event) {
+          handleOutsideClick(event) {
             if (
                 this.companySuggestionsOpen &&
                 !this.isEventInsideRef(event, 'heroCompanySuggestionsWrapper')
             ) {
+                this.isCompanySuggestionInteracting = false;
                 this.companySuggestionsOpen = false;
             }
             if (
                 this.discussCompanySuggestionsOpen &&
                 !this.isEventInsideRef(event, 'discussCompanySuggestionsWrapper')
             ) {
+                this.isDiscussCompanySuggestionInteracting = false;
                 this.discussCompanySuggestionsOpen = false;
             }
           },
