@@ -1,7 +1,11 @@
+from datetime import timedelta
+from io import StringIO
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import TestCase
+from django.utils import timezone
 
 from crm.models import Activity
 from crm.models.activity import ActivityType
@@ -20,54 +24,66 @@ class UserIntegrationProfileTests(TestCase):
         self.assertEqual(profile.telegram_chat_id, "")
 
 
-class TaskTelegramNotificationTests(TestCase):
+class TaskDeadlineReminderCommandTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="anna", password="secret")
         profile = self.user.integration_profile
         profile.telegram_chat_id = "123456789"
         profile.save(update_fields=["telegram_chat_id"])
 
-    @patch("crm.signals.send_telegram_chat_message")
-    def test_task_creation_sends_telegram_notification(self, send_message_mock):
+    @patch("integrations.management.commands.send_task_deadline_reminders.send_telegram_chat_message")
+    def test_sends_reminder_for_task_inside_30_minutes_window(self, send_message_mock):
         send_message_mock.return_value = {"ok": True}
-
         task = Activity.objects.create(
             type=ActivityType.TASK,
             subject="Подготовить КП",
             description="Нужно отправить коммерческое предложение",
+            due_at=timezone.now() + timedelta(minutes=20),
             created_by=self.user,
         )
 
-        send_message_mock.assert_called_once()
+        out = StringIO()
+        call_command("send_task_deadline_reminders", stdout=out)
+
+        task.refresh_from_db()
+        self.assertEqual(send_message_mock.call_count, 1)
         kwargs = send_message_mock.call_args.kwargs
         self.assertEqual(kwargs["chat_id"], "123456789")
         self.assertIn("Подготовить КП", kwargs["text"])
-        self.assertEqual(task.created_by, self.user)
+        self.assertIn("До дедлайна", kwargs["text"])
+        self.assertIsNotNone(task.deadline_reminder_sent_at)
+        self.assertIn("Sent deadline reminders: 1", out.getvalue())
 
-    @patch("crm.signals.send_telegram_chat_message")
-    def test_non_task_activity_does_not_send_telegram_notification(self, send_message_mock):
-        Activity.objects.create(
-            type=ActivityType.NOTE,
-            subject="Обычная заметка",
-            created_by=self.user,
-        )
-
-        send_message_mock.assert_not_called()
-
-    @patch("crm.signals.send_telegram_chat_message")
-    def test_task_update_sends_notification_only_on_meaningful_change(self, send_message_mock):
-        send_message_mock.return_value = {"ok": True}
+    @patch("integrations.management.commands.send_task_deadline_reminders.send_telegram_chat_message")
+    def test_does_not_send_reminder_for_task_outside_window(self, send_message_mock):
         task = Activity.objects.create(
             type=ActivityType.TASK,
             subject="Позвонить клиенту",
+            due_at=timezone.now() + timedelta(minutes=45),
             created_by=self.user,
         )
+
+        call_command("send_task_deadline_reminders")
+
+        task.refresh_from_db()
+        send_message_mock.assert_not_called()
+        self.assertIsNone(task.deadline_reminder_sent_at)
+
+    @patch("integrations.management.commands.send_task_deadline_reminders.send_telegram_chat_message")
+    def test_does_not_send_twice_for_same_task(self, send_message_mock):
+        send_message_mock.return_value = {"ok": True}
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Проверить договор",
+            due_at=timezone.now() + timedelta(minutes=10),
+            created_by=self.user,
+        )
+
+        call_command("send_task_deadline_reminders")
         send_message_mock.reset_mock()
 
-        task.save()
-        send_message_mock.assert_not_called()
+        call_command("send_task_deadline_reminders")
 
-        task.is_done = True
-        task.save()
-        send_message_mock.assert_called_once()
-        self.assertIn("Задача обновлена", send_message_mock.call_args.kwargs["text"])
+        task.refresh_from_db()
+        send_message_mock.assert_not_called()
+        self.assertIsNotNone(task.deadline_reminder_sent_at)

@@ -1,8 +1,10 @@
 import logging
+import math
 from html import escape
 
 import requests
 from django.conf import settings
+from django.utils import timezone
 from requests import RequestException
 
 
@@ -49,19 +51,43 @@ def send_telegram_chat_message(*, chat_id: str, text: str) -> dict:
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
 
-def build_task_notification_message(*, task, created: bool) -> str:
-    title = "Новая задача" if created else "Задача обновлена"
-    lines = [f"<b>{escape(title)}</b>", f"<b>Тема:</b> {escape(task.subject)}"]
+def format_deadline_minutes(minutes_left: int) -> str:
+    total_minutes = max(1, int(minutes_left))
+    if total_minutes < 60:
+        return f"{total_minutes} мин"
+
+    hours, minutes = divmod(total_minutes, 60)
+    if hours < 24:
+        if minutes:
+            return f"{hours} ч {minutes} мин"
+        return f"{hours} ч"
+
+    days, rem_hours = divmod(hours, 24)
+    chunks = [f"{days} д"]
+    if rem_hours:
+        chunks.append(f"{rem_hours} ч")
+    if minutes:
+        chunks.append(f"{minutes} мин")
+    return " ".join(chunks)
+
+
+def build_task_deadline_reminder_message(*, task, minutes_left: int | None = None) -> str:
+    if minutes_left is None:
+        if task.due_at is None:
+            minutes_left = 30
+        else:
+            delta_seconds = max(0, (task.due_at - timezone.now()).total_seconds())
+            minutes_left = max(1, math.ceil(delta_seconds / 60))
+
+    lines = ["<b>Напоминание о дедлайне задачи</b>", f"<b>Тема:</b> {escape(task.subject)}"]
     if task.description:
         lines.append(f"<b>Описание:</b> {escape(task.description)}")
     if task.due_at:
         lines.append(f"<b>Срок:</b> {escape(task.due_at.strftime('%d.%m.%Y %H:%M'))}")
+    lines.append(f"<b>До дедлайна:</b> {escape(format_deadline_minutes(minutes_left))}")
     if task.deal_id and task.deal:
         lines.append(f"<b>Сделка:</b> {escape(task.deal.title)}")
     if task.client_id and task.client:
         lines.append(f"<b>Компания:</b> {escape(task.client.name)}")
-    if task.is_done:
-        lines.append("<b>Статус:</b> Выполнена")
-    else:
-        lines.append("<b>Статус:</b> Открыта")
+    lines.append("<b>Статус:</b> Открыта")
     return "\n".join(lines)

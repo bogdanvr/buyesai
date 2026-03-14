@@ -23,6 +23,11 @@ class Activity(TimestampedModel):
     subject = models.CharField(max_length=255, verbose_name="Тема")
     description = models.TextField(blank=True, default="", verbose_name="Описание")
     due_at = models.DateTimeField(blank=True, null=True, verbose_name="Срок")
+    deadline_reminder_sent_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Напоминание о дедлайне отправлено",
+    )
     completed_at = models.DateTimeField(blank=True, null=True, verbose_name="Выполнено")
     is_done = models.BooleanField(default=False, verbose_name="Завершено")
     lead = models.ForeignKey(

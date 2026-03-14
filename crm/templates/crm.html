@@ -303,7 +303,11 @@
                   </div>
                   <div class="px-4 py-4 text-sm text-crm-text truncate">[[ item.company || '—' ]]</div>
                   <div class="px-4 py-4 text-sm text-crm-text truncate">[[ activeSection === 'tasks' ? (item.deal || '—') : (item.phone || '—') ]]</div>
-                  <div class="px-4 py-4 text-sm text-crm-text truncate">[[ activeSection === 'tasks' ? (item.dueLabel || '—') : (item.email || '—') ]]</div>
+                  <div v-if="activeSection !== 'tasks'" class="px-4 py-4 text-sm text-crm-text truncate">[[ item.email || '—' ]]</div>
+                  <div v-else class="px-4 py-4 text-sm text-crm-text min-w-0">
+                    <div class="truncate">[[ item.dueLabel || '—' ]]</div>
+                    <div v-if="item.remainingLabel" class="text-xs text-crm-muted mt-1 truncate">[[ item.remainingLabel ]]</div>
+                  </div>
                   <div class="px-4 py-4">
                     <span
                       class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border"
@@ -605,6 +609,7 @@
                         <div class="text-sm font-medium text-white truncate">[[ task.subject ]]</div>
                         <div v-if="task.description" class="text-xs text-crm-muted mt-1 break-words">[[ task.description ]]</div>
                         <div class="text-xs text-crm-muted mt-1">Срок: [[ task.dueLabel ]]</div>
+                        <div v-if="task.remainingLabel" class="text-xs text-crm-muted mt-1">[[ task.remainingLabel ]]</div>
                       </div>
                       <span class="inline-flex items-center rounded-full px-2 py-1 text-[11px] font-medium border" :class="task.isDone ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-sky-400/30 bg-sky-400/10 text-sky-300'">
                         [[ task.isDone ? 'Выполнена' : 'Открыта' ]]
@@ -835,6 +840,7 @@
             <label class="block">
               <span class="text-sm text-crm-muted">Срок</span>
               <input v-model="forms.tasks.dueAt" type="datetime-local" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+              <div v-if="taskFormRemainingLabel" class="mt-2 text-xs text-crm-muted">[[ taskFormRemainingLabel ]]</div>
             </label>
             <label class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Описание</span>
@@ -1160,6 +1166,9 @@
             inProgressCount: this.filteredItems.filter((item) => this.getStatusBucket(item.status) === "progress").length,
             doneCount: this.filteredItems.filter((item) => this.getStatusBucket(item.status) === "done").length
           };
+        },
+        taskFormRemainingLabel() {
+          return this.formatTaskRemainingLabel(this.forms.tasks.dueAt, this.forms.tasks.isDone);
         }
       },
       methods: {
@@ -1534,6 +1543,39 @@
             minute: "2-digit",
           });
         },
+        formatRemainingDuration(totalMinutes) {
+          const minutes = Math.max(1, Math.ceil(Number(totalMinutes) || 0));
+          if (minutes < 60) {
+            return `${minutes} мин`;
+          }
+
+          const hours = Math.floor(minutes / 60);
+          const restMinutes = minutes % 60;
+          if (hours < 24) {
+            return restMinutes ? `${hours} ч ${restMinutes} мин` : `${hours} ч`;
+          }
+
+          const days = Math.floor(hours / 24);
+          const restHours = hours % 24;
+          const chunks = [`${days} д`];
+          if (restHours) chunks.push(`${restHours} ч`);
+          if (restMinutes) chunks.push(`${restMinutes} мин`);
+          return chunks.join(" ");
+        },
+        formatTaskRemainingLabel(value, isDone = false) {
+          if (!value) return "";
+          if (isDone) return "Задача выполнена";
+
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) return "";
+
+          const diffMinutes = Math.ceil((date.getTime() - Date.now()) / 60000);
+          const absoluteLabel = this.formatRemainingDuration(Math.abs(diffMinutes));
+          if (diffMinutes >= 0) {
+            return `Осталось ${absoluteLabel}`;
+          }
+          return `Просрочено на ${absoluteLabel}`;
+        },
         normalizeCompanyOkveds(okveds, mainCode = "", mainName = "") {
           const normalized = [];
           if (Array.isArray(okveds)) {
@@ -1660,6 +1702,7 @@
               description: item.description || "",
               isDone: !!item.is_done,
               dueLabel: this.formatDueLabel(item.due_at),
+              remainingLabel: this.formatTaskRemainingLabel(item.due_at, item.is_done),
             }));
           } catch (error) {
             this.errorMessage = `Ошибка загрузки задач сделки: ${error.message}`;
@@ -1826,6 +1869,7 @@
             clientId: item.client || null,
             deal: item.deal_title || "",
             dueLabel: this.formatDueLabel(item.due_at),
+            remainingLabel: this.formatTaskRemainingLabel(item.due_at, item.is_done),
             dueAtRaw: item.due_at || null,
             isDone: !!item.is_done,
             phone: "",
