@@ -24,6 +24,7 @@ class Client(TimestampedModel):
     address = models.CharField(max_length=512, blank=True, default="", verbose_name="Адрес")
     industry = models.CharField(max_length=255, blank=True, default="", verbose_name="Сфера деятельности")
     okved = models.CharField(max_length=64, blank=True, default="", verbose_name="ОКВЭД")
+    okveds = models.JSONField(default=list, blank=True, verbose_name="ОКВЭД (все виды)")
     source = models.ForeignKey(
         "crm.LeadSource",
         related_name="clients",

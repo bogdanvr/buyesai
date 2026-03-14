@@ -34,6 +34,7 @@ class ClientSerializer(serializers.ModelSerializer):
             "address",
             "industry",
             "okved",
+            "okveds",
             "source",
             "notes",
             "is_active",

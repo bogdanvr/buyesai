@@ -1,9 +1,10 @@
 import json
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from crm.models import Client, Lead, LeadSource
+from crm.models import Client, Contact, Lead, LeadSource
 from main.models import FormSubmission
 
 
@@ -12,6 +13,7 @@ from main.models import FormSubmission
     TELEGRAM_CHAT_CHANNEL="",
     TELEGRAM_SUPER_GROUP="",
     TELEGRAM_CHAT_ID="",
+    DADATA_KEY="",
 )
 class SendFormViewTests(TestCase):
     def test_creates_form_submission_and_crm_lead(self):
@@ -126,3 +128,78 @@ class SendFormViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         client = Client.objects.get(inn="7707654321")
         self.assertEqual(client.industry, "ОКВЭД 46.90")
+
+    @override_settings(DADATA_KEY="test-token")
+    @patch("main.views.Dadata")
+    def test_enriches_company_and_creates_director_contact_from_dadata_find_by_id(self, dadata_cls):
+        dadata_instance = dadata_cls.return_value
+        dadata_instance.find_by_id.return_value = {
+            "suggestions": [
+                {
+                    "value": 'ООО "ЭНЕРГОЭКСПЕРТ"',
+                    "data": {
+                        "inn": "5503190710",
+                        "kpp": "550301001",
+                        "ogrn": "1205500003763",
+                        "okved": "25.99",
+                        "okveds": [
+                            {
+                                "main": True,
+                                "code": "25.99",
+                                "name": "Производство прочих готовых металлических изделий",
+                            },
+                            {
+                                "main": False,
+                                "code": "46.90",
+                                "name": "Торговля оптовая неспециализированная",
+                            },
+                        ],
+                        "management": {
+                            "name": "Верхоланцев Никита Валерьевич",
+                            "post": "ДИРЕКТОР",
+                        },
+                        "phones": [
+                            {"value": "+7 905 9405785"},
+                        ],
+                        "address": {
+                            "value": "г Омск, ул 22 Партсъезда, д 51Г, офис 4",
+                        },
+                        "name": {
+                            "full_with_opf": 'ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ "ЭНЕРГОЭКСПЕРТ"',
+                            "short_with_opf": 'ООО "ЭНЕРГОЭКСПЕРТ"',
+                        },
+                    },
+                }
+            ]
+        }
+
+        response = self.client.post(
+            reverse("send_form"),
+            data=json.dumps(
+                {
+                    "form_type": "hero",
+                    "payload": {
+                        "name": "Иван",
+                        "phone": "+79990000000",
+                        "company": "Энергоэксперт",
+                        "company_inn": "5503190710",
+                    },
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        dadata_instance.find_by_id.assert_called_once_with("party", "5503190710")
+
+        client = Client.objects.get(inn="5503190710")
+        self.assertEqual(client.okved, "25.99")
+        self.assertEqual(client.industry, "Производство прочих готовых металлических изделий")
+        self.assertEqual(len(client.okveds), 2)
+        self.assertEqual(client.okveds[1]["code"], "46.90")
+
+        director = Contact.objects.get(client=client)
+        self.assertEqual(director.first_name, "Верхоланцев")
+        self.assertEqual(director.last_name, "Никита Валерьевич")
+        self.assertEqual(director.position, "ДИРЕКТОР")
+        self.assertEqual(director.phone, "+7 905 9405785")

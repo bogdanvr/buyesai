@@ -80,6 +80,121 @@ def _extract_party_suggestion(item: dict) -> dict:
     }
 
 
+def _extract_party_profile(item: dict) -> dict:
+    data = item.get("data") or {}
+    name_data = data.get("name") or {}
+    management = data.get("management") or {}
+    address_data = data.get("address") or {}
+    phones = data.get("phones") or []
+    emails = data.get("emails") or []
+    raw_okveds = data.get("okveds") or []
+
+    okveds = []
+    if isinstance(raw_okveds, list):
+        for entry in raw_okveds:
+            if not isinstance(entry, dict):
+                continue
+            code = str(entry.get("code") or entry.get("okved") or "").strip()
+            name = str(entry.get("name") or entry.get("title") or "").strip()
+            if not code and not name:
+                continue
+            okveds.append(
+                {
+                    "code": code,
+                    "name": name,
+                    "main": bool(entry.get("main")),
+                }
+            )
+
+    main_okved = str(data.get("okved") or "").strip()
+    industry = str(data.get("okved_name") or data.get("activity") or data.get("industry") or "").strip()
+    primary_okved = next((entry for entry in okveds if entry.get("main")), okveds[0] if okveds else None)
+    if not main_okved and primary_okved:
+        main_okved = primary_okved.get("code", "")
+    if not industry and primary_okved:
+        industry = primary_okved.get("name", "")
+    if not industry and main_okved:
+        industry = f"ОКВЭД {main_okved}"
+
+    phone = ""
+    if isinstance(phones, list):
+        for phone_item in phones:
+            if not isinstance(phone_item, dict):
+                continue
+            value = phone_item.get("value") or phone_item.get("unrestricted_value")
+            if value:
+                phone = str(value).strip()
+                break
+
+    email = ""
+    if isinstance(emails, list):
+        for email_item in emails:
+            if not isinstance(email_item, dict):
+                continue
+            value = email_item.get("value") or email_item.get("unrestricted_value")
+            if value:
+                email = str(value).strip()
+                break
+
+    legal_name = ""
+    short_name = ""
+    if isinstance(name_data, dict):
+        legal_name = str(name_data.get("full_with_opf") or name_data.get("full") or "").strip()
+        short_name = str(name_data.get("short_with_opf") or name_data.get("short") or "").strip()
+
+    address = ""
+    if isinstance(address_data, dict):
+        address = str(address_data.get("value") or "").strip()
+
+    director_name = str(management.get("name") or "").strip() if isinstance(management, dict) else ""
+    director_position = str(management.get("post") or "").strip() if isinstance(management, dict) else ""
+
+    return {
+        "name": short_name or str(item.get("value") or "").strip(),
+        "legal_name": legal_name,
+        "inn": str(data.get("inn") or "").strip(),
+        "kpp": str(data.get("kpp") or "").strip(),
+        "ogrn": str(data.get("ogrn") or "").strip(),
+        "address": address,
+        "okved": main_okved,
+        "industry": industry,
+        "okveds": okveds,
+        "director": {
+            "name": director_name,
+            "position": director_position,
+            "phone": phone,
+            "email": email,
+        },
+    }
+
+
+def _find_party_profile_by_inn(inn: str, token: str) -> dict | None:
+    normalized_inn = str(inn or "").strip()
+    if not normalized_inn or not token:
+        return None
+
+    try:
+        dadata = Dadata(token)
+        response = dadata.find_by_id("party", normalized_inn)
+    except Exception:
+        logger.exception("DaData find_by_id failed for inn=%s", normalized_inn)
+        return None
+
+    suggestions = []
+    if isinstance(response, dict):
+        suggestions = response.get("suggestions") or []
+    elif isinstance(response, list):
+        suggestions = response
+
+    if not suggestions:
+        return None
+
+    first = suggestions[0] if isinstance(suggestions[0], dict) else None
+    if not first:
+        return None
+    return _extract_party_profile(first)
+
+
 def _get_or_create_form_lead_source(form_type: str) -> LeadSource:
     normalized_form_type = str(form_type or "").strip() or "unknown"
     code_suffix = slugify(normalized_form_type.replace("_", "-")) or "unknown"
@@ -241,6 +356,32 @@ def sendform_view(request):
         if "utm_data" not in lead_payload:
             lead_payload["utm_data"] = form_submission.utm_data
         lead_payload["form_submission_id"] = form_submission.id
+
+        company_data = lead_payload.get("company_data")
+        merged_company_data = dict(company_data) if isinstance(company_data, dict) else {}
+        company_inn = (
+            str(merged_company_data.get("inn") or lead_payload.get("company_inn") or "").strip()
+        )
+        if company_inn:
+            dadata_profile = _find_party_profile_by_inn(
+                inn=company_inn,
+                token=getattr(settings, "DADATA_KEY", ""),
+            )
+            if dadata_profile:
+                merged_company_data.update(dadata_profile)
+
+        if merged_company_data:
+            lead_payload["company_data"] = merged_company_data
+            lead_payload["company"] = (
+                str(merged_company_data.get("name") or lead_payload.get("company") or "").strip()
+            )
+            lead_payload["company_name"] = str(merged_company_data.get("name") or "").strip()
+            lead_payload["company_legal_name"] = str(merged_company_data.get("legal_name") or "").strip()
+            lead_payload["company_inn"] = str(merged_company_data.get("inn") or "").strip()
+            lead_payload["company_address"] = str(merged_company_data.get("address") or "").strip()
+            lead_payload["company_industry"] = str(merged_company_data.get("industry") or "").strip()
+            lead_payload["company_okved"] = str(merged_company_data.get("okved") or "").strip()
+
         source = _get_or_create_form_lead_source(form_type)
         crm_lead = create_lead_from_payload(
             form_type=form_type,
