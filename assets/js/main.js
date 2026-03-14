@@ -26,19 +26,6 @@ createApp({
             lastCompanySuggestionSelectionKey: '',
             lastCompanySuggestionSelectionAt: 0,
             selectedCompanyData: null,
-            heroCompanyDebug: {
-                lastEvent: 'init',
-                lastItemValue: '',
-                lastItemInn: '',
-                selectedInn: '',
-                displayValue: '',
-                suggestionsOpen: false,
-                pointerDowns: 0,
-                pointerUps: 0,
-                clicks: 0,
-                selectCalls: 0,
-                logs: [],
-            },
             quizForm: {
                 industry: '',
                 teamSize: '',
@@ -262,21 +249,6 @@ createApp({
             return null;
           },
 
-          pushHeroCompanyDebug(eventName, extra = {}) {
-            const current = this.heroCompanyDebug || {};
-            const next = {
-              ...current,
-              ...extra,
-              lastEvent: eventName,
-              selectedInn: String((this.selectedCompanyData && this.selectedCompanyData.inn) || '').trim(),
-              displayValue: String(this.company || '').trim(),
-              suggestionsOpen: !!this.companySuggestionsOpen,
-            };
-            const stamp = `${eventName} | item="${next.lastItemValue || ''}" | inn="${next.lastItemInn || ''}" | selected="${next.selectedInn || ''}" | value="${next.displayValue || ''}" | open=${next.suggestionsOpen}`;
-            next.logs = [stamp, ...(Array.isArray(current.logs) ? current.logs : [])].slice(0, 8);
-            this.heroCompanyDebug = next;
-          },
-
           async submitFormPayload(formType, payload) {
             const enrichedPayload = {
                 ...payload,
@@ -432,10 +404,6 @@ createApp({
               this.selectedCompanyData = null;
             }
             this.companySuggestionsOpen = true;
-            this.pushHeroCompanyDebug('input', {
-              lastItemValue: '',
-              lastItemInn: '',
-            });
             this.fetchCompanySuggestions(query);
           },
 
@@ -444,13 +412,11 @@ createApp({
                 clearTimeout(this.companyBlurTimer);
             }
             if (this.selectedCompanyData && this.isMatchingSelectedCompanyLabel(this.company, this.selectedCompanyData, this.company)) {
-                this.pushHeroCompanyDebug('focus-selected');
                 return;
             }
             if (this.companySuggestions.length > 0) {
                 this.companySuggestionsOpen = true;
             }
-            this.pushHeroCompanyDebug('focus');
           },
 
           onCompanyBlur() {
@@ -464,10 +430,6 @@ createApp({
                     this.pendingCompanySuggestion = null;
                     this.companySuggestionPointerStartY = null;
                     this.companySuggestionPointerMoved = false;
-                    this.pushHeroCompanyDebug('blur-select-pending', {
-                      lastItemValue: this.getItemValue(pendingItem),
-                      lastItemInn: this.getItemInn(pendingItem),
-                    });
                     this.selectCompanySuggestion(pendingItem, 'blur');
                 }
                 return;
@@ -475,7 +437,6 @@ createApp({
             this.companyBlurTimer = setTimeout(() => {
                 this.syncHeroCompanyDisplay();
                 this.companySuggestionsOpen = false;
-                this.pushHeroCompanyDebug('blur-close');
             }, 180);
           },
 
@@ -485,10 +446,6 @@ createApp({
             }
             this.isCompanySuggestionInteracting = true;
             this.pendingCompanySuggestion = item || null;
-            this.pushHeroCompanyDebug('interact-start', {
-              lastItemValue: this.getItemValue(item),
-              lastItemInn: this.getItemInn(item),
-            });
           },
 
           isFocusedElement(element) {
@@ -548,11 +505,6 @@ createApp({
             const clientY = this.getEventClientY(event);
             this.companySuggestionPointerStartY = clientY;
             this.companySuggestionPointerMoved = false;
-            this.pushHeroCompanyDebug('pointerdown', {
-              lastItemValue: this.getItemValue(item),
-              lastItemInn: this.getItemInn(item),
-              pointerDowns: (this.heroCompanyDebug.pointerDowns || 0) + 1,
-            });
           },
 
           moveCompanySuggestionPointer(event) {
@@ -566,20 +518,11 @@ createApp({
           },
 
           async endCompanySuggestionPointer(item) {
-            this.pushHeroCompanyDebug('pointerup', {
-              lastItemValue: this.getItemValue(item),
-              lastItemInn: this.getItemInn(item),
-              pointerUps: (this.heroCompanyDebug.pointerUps || 0) + 1,
-            });
             if (this.companySuggestionPointerMoved) {
               this.isCompanySuggestionInteracting = false;
               this.pendingCompanySuggestion = null;
               this.companySuggestionPointerStartY = null;
               this.companySuggestionPointerMoved = false;
-              this.pushHeroCompanyDebug('pointerup-moved', {
-                lastItemValue: this.getItemValue(item),
-                lastItemInn: this.getItemInn(item),
-              });
               return;
             }
             this.pendingCompanySuggestion = null;
@@ -593,15 +536,9 @@ createApp({
             this.pendingCompanySuggestion = null;
             this.companySuggestionPointerStartY = null;
             this.companySuggestionPointerMoved = false;
-            this.pushHeroCompanyDebug('pointercancel');
           },
 
           async handleCompanySuggestionClick(item) {
-            this.pushHeroCompanyDebug('click', {
-              lastItemValue: this.getItemValue(item),
-              lastItemInn: this.getItemInn(item),
-              clicks: (this.heroCompanyDebug.clicks || 0) + 1,
-            });
             await this.selectCompanySuggestion(item, 'click');
           },
 
@@ -612,10 +549,6 @@ createApp({
               this.lastCompanySuggestionSelectionKey === key &&
               now - this.lastCompanySuggestionSelectionAt < 700
             ) {
-              this.pushHeroCompanyDebug('select-skip', {
-                lastItemValue: this.getItemValue(item),
-                lastItemInn: this.getItemInn(item),
-              });
               return true;
             }
             this.lastCompanySuggestionSelectionKey = key;
@@ -632,11 +565,6 @@ createApp({
             this.syncHeroCompanyDisplay();
             this.companySuggestionsOpen = false;
             this.companySuggestions = [];
-            this.pushHeroCompanyDebug(`select-${source}`, {
-              lastItemValue: this.getItemValue(item),
-              lastItemInn: this.getItemInn(item),
-              selectCalls: (this.heroCompanyDebug.selectCalls || 0) + 1,
-            });
             this.$nextTick(() => {
               const input = this.$refs.heroCompanyInput;
               if (input && typeof input.blur === 'function') {
@@ -651,10 +579,6 @@ createApp({
             ) {
               this.selectedCompanyData = enriched;
               this.syncHeroCompanyDisplay();
-              this.pushHeroCompanyDebug(`select-${source}-enriched`, {
-                lastItemValue: this.getItemValue(item),
-                lastItemInn: this.getItemInn(item),
-              });
             }
           },
 

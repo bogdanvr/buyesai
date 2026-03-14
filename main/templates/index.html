@@ -143,17 +143,6 @@
                                     </div>
                                     <div class="field-hint" v-if="heroTriedSubmit && !isHeroCompanyValid">Заполните поле
                                     </div>
-                                    <div class="company-debug">
-                                        <div>event: [[ heroCompanyDebug.lastEvent ]]</div>
-                                        <div>item: [[ heroCompanyDebug.lastItemValue || 'empty' ]]</div>
-                                        <div>item inn: [[ heroCompanyDebug.lastItemInn || 'empty' ]]</div>
-                                        <div>selected inn: [[ heroCompanyDebug.selectedInn || 'empty' ]]</div>
-                                        <div>input value: [[ heroCompanyDebug.displayValue || 'empty' ]]</div>
-                                        <div>open: [[ heroCompanyDebug.suggestionsOpen ? 'yes' : 'no' ]]</div>
-                                        <div>pointerdown/up: [[ heroCompanyDebug.pointerDowns ]]/[[ heroCompanyDebug.pointerUps ]]</div>
-                                        <div>click/select: [[ heroCompanyDebug.clicks ]]/[[ heroCompanyDebug.selectCalls ]]</div>
-                                        <div v-for="entry in heroCompanyDebug.logs" :key="entry">[[ entry ]]</div>
-                                    </div>
                                 </div>
                                 <div class="field"
                                     :class="{ 'field-invalid': heroTriedSubmit && !isHeroDirectionValid }">
