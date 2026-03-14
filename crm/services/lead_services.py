@@ -8,12 +8,20 @@ from crm.models import Client, Deal, Lead
 
 @transaction.atomic
 def create_lead_from_payload(*, form_type: str, payload: dict, source=None, created_by=None) -> Lead:
+    company_name = str(payload.get("company") or "").strip()
+    client = None
+    if company_name:
+        client = Client.objects.filter(name__iexact=company_name).order_by("id").first()
+        if client is None:
+            client = Client.objects.create(name=company_name, source=source)
+
     lead = Lead.objects.create(
         title=f"Лид из формы {form_type}",
         name=str(payload.get("name") or ""),
         phone=str(payload.get("phone") or ""),
         email=str(payload.get("email") or ""),
-        company=str(payload.get("company") or ""),
+        company=company_name,
+        client=client,
         source=source,
         payload=payload,
         utm_data=payload.get("utm_data") if isinstance(payload.get("utm_data"), dict) else {},
