@@ -130,6 +130,7 @@
                                                 @pointermove="moveCompanySuggestionPointer"
                                                 @pointerup.prevent.stop="endCompanySuggestionPointer(item)"
                                                 @pointercancel="cancelCompanySuggestionPointer"
+                                                @click.prevent.stop="selectCompanySuggestion(item)"
                                                 @keydown.enter.prevent="selectCompanySuggestion(item)"
                                                 @keydown.space.prevent="selectCompanySuggestion(item)">
                                                 <div class="suggestion-title">[[ item.value ]]</div>
@@ -860,6 +861,7 @@
                                     @pointermove="moveDiscussCompanySuggestionPointer"
                                     @pointerup.prevent.stop="endDiscussCompanySuggestionPointer(item)"
                                     @pointercancel="cancelDiscussCompanySuggestionPointer"
+                                    @click.prevent.stop="selectDiscussCompanySuggestion(item)"
                                     @keydown.enter.prevent="selectDiscussCompanySuggestion(item)"
                                     @keydown.space.prevent="selectDiscussCompanySuggestion(item)">
                                     <div class="suggestion-title">[[ item.value ]]</div>

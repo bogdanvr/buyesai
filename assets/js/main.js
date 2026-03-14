@@ -21,6 +21,8 @@ createApp({
             isCompanySuggestionInteracting: false,
             companySuggestionPointerStartY: null,
             companySuggestionPointerMoved: false,
+            lastCompanySuggestionSelectionKey: '',
+            lastCompanySuggestionSelectionAt: 0,
             selectedCompanyData: null,
             quizForm: {
                 industry: '',
@@ -57,6 +59,8 @@ createApp({
             isDiscussCompanySuggestionInteracting: false,
             discussCompanySuggestionPointerStartY: null,
             discussCompanySuggestionPointerMoved: false,
+            lastDiscussCompanySuggestionSelectionKey: '',
+            lastDiscussCompanySuggestionSelectionAt: 0,
             selectedDiscussCompanyData: null,
             isSendingDiscuss: false,
             discussSent: false,
@@ -421,8 +425,23 @@ createApp({
             this.companySuggestionPointerMoved = false;
           },
 
+          shouldSkipCompanySuggestionSelection(item) {
+            const key = `${item?.value || ''}:${item?.inn || ''}`;
+            const now = Date.now();
+            if (
+              this.lastCompanySuggestionSelectionKey === key &&
+              now - this.lastCompanySuggestionSelectionAt < 700
+            ) {
+              return true;
+            }
+            this.lastCompanySuggestionSelectionKey = key;
+            this.lastCompanySuggestionSelectionAt = now;
+            return false;
+          },
+
           async selectCompanySuggestion(item) {
             if (!item) return;
+            if (this.shouldSkipCompanySuggestionSelection(item)) return;
             this.isCompanySuggestionInteracting = false;
             const selected = this.normalizeSelectedCompanyData(item, item.value || this.company);
             this.selectedCompanyData = selected;
@@ -562,8 +581,23 @@ createApp({
             this.discussCompanySuggestionPointerMoved = false;
           },
 
+          shouldSkipDiscussCompanySuggestionSelection(item) {
+            const key = `${item?.value || ''}:${item?.inn || ''}`;
+            const now = Date.now();
+            if (
+              this.lastDiscussCompanySuggestionSelectionKey === key &&
+              now - this.lastDiscussCompanySuggestionSelectionAt < 700
+            ) {
+              return true;
+            }
+            this.lastDiscussCompanySuggestionSelectionKey = key;
+            this.lastDiscussCompanySuggestionSelectionAt = now;
+            return false;
+          },
+
           async selectDiscussCompanySuggestion(item) {
             if (!item) return;
+            if (this.shouldSkipDiscussCompanySuggestionSelection(item)) return;
             this.isDiscussCompanySuggestionInteracting = false;
             const selected = this.normalizeSelectedCompanyData(item, item.value || this.discussForm.company);
             this.selectedDiscussCompanyData = selected;
