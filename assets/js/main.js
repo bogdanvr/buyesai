@@ -285,6 +285,29 @@ createApp({
             };
           },
 
+          formatSelectedCompanyLabel(selectedCompanyData, fallbackName = '') {
+            const selected = this.normalizeSelectedCompanyData(selectedCompanyData, fallbackName);
+            if (!selected || !selected.name) {
+              return String(fallbackName || '').trim();
+            }
+            if (!selected.inn) {
+              return selected.name;
+            }
+            return `${selected.name} (ИНН ${selected.inn})`;
+          },
+
+          isMatchingSelectedCompanyLabel(query, selectedCompanyData, fallbackName = '') {
+            const normalizedQuery = String(query || '').trim();
+            if (!normalizedQuery) {
+              return false;
+            }
+            const selected = this.normalizeSelectedCompanyData(selectedCompanyData, fallbackName);
+            if (!selected || !selected.name) {
+              return false;
+            }
+            return normalizedQuery === selected.name || normalizedQuery === this.formatSelectedCompanyLabel(selected);
+          },
+
           async enrichCompanySelection(selectedCompanyData) {
             const normalized = this.normalizeSelectedCompanyData(selectedCompanyData);
             if (!normalized || !normalized.inn) {
@@ -318,8 +341,7 @@ createApp({
             const query = (e && e.target && e.target.value) ? e.target.value : this.company;
             if (
               this.selectedCompanyData &&
-              String(this.selectedCompanyData.name || '').trim() &&
-              String(query || '').trim() !== String(this.selectedCompanyData.name || '').trim()
+              !this.isMatchingSelectedCompanyLabel(query, this.selectedCompanyData, this.company)
             ) {
               this.selectedCompanyData = null;
             }
@@ -359,18 +381,19 @@ createApp({
           async selectCompanySuggestion(item) {
             if (!item) return;
             this.isCompanySuggestionInteracting = false;
-            this.company = item.value || '';
-            const selected = this.normalizeSelectedCompanyData(item, this.company);
+            const selected = this.normalizeSelectedCompanyData(item, item.value || this.company);
             this.selectedCompanyData = selected;
+            this.company = this.formatSelectedCompanyLabel(selected, item.value || this.company);
             this.companySuggestionsOpen = false;
             this.companySuggestions = [];
             const enriched = await this.enrichCompanySelection(selected);
             if (
               this.selectedCompanyData &&
               String(this.selectedCompanyData.inn || '').trim() === String(selected.inn || '').trim() &&
-              String(this.company || '').trim() === String(selected.name || this.company || '').trim()
+              this.isMatchingSelectedCompanyLabel(this.company, selected, this.company)
             ) {
               this.selectedCompanyData = enriched;
+              this.company = this.formatSelectedCompanyLabel(enriched, this.company);
             }
           },
 
@@ -420,8 +443,7 @@ createApp({
             const query = (e && e.target && e.target.value) ? e.target.value : this.discussForm.company;
             if (
               this.selectedDiscussCompanyData &&
-              String(this.selectedDiscussCompanyData.name || '').trim() &&
-              String(query || '').trim() !== String(this.selectedDiscussCompanyData.name || '').trim()
+              !this.isMatchingSelectedCompanyLabel(query, this.selectedDiscussCompanyData, this.discussForm.company)
             ) {
               this.selectedDiscussCompanyData = null;
             }
@@ -461,18 +483,19 @@ createApp({
           async selectDiscussCompanySuggestion(item) {
             if (!item) return;
             this.isDiscussCompanySuggestionInteracting = false;
-            this.discussForm.company = item.value || '';
-            const selected = this.normalizeSelectedCompanyData(item, this.discussForm.company);
+            const selected = this.normalizeSelectedCompanyData(item, item.value || this.discussForm.company);
             this.selectedDiscussCompanyData = selected;
+            this.discussForm.company = this.formatSelectedCompanyLabel(selected, item.value || this.discussForm.company);
             this.discussCompanySuggestionsOpen = false;
             this.discussCompanySuggestions = [];
             const enriched = await this.enrichCompanySelection(selected);
             if (
               this.selectedDiscussCompanyData &&
               String(this.selectedDiscussCompanyData.inn || '').trim() === String(selected.inn || '').trim() &&
-              String(this.discussForm.company || '').trim() === String(selected.name || this.discussForm.company || '').trim()
+              this.isMatchingSelectedCompanyLabel(this.discussForm.company, selected, this.discussForm.company)
             ) {
               this.selectedDiscussCompanyData = enriched;
+              this.discussForm.company = this.formatSelectedCompanyLabel(enriched, this.discussForm.company);
             }
           },
 
