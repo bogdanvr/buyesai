@@ -19,6 +19,7 @@ from django.urls import include, path
 from main.views import (
     mainview,
     dadata_party,
+    dadata_party_by_inn,
     RobotsTxtView,
     sendform_view,
     consultant_chat,
@@ -45,6 +46,7 @@ urlpatterns = [
     path("send_form", sendform_view, name="send_form"),
     path("crm/", include("crm.urls")),
     path("api/dadata/party/", dadata_party, name="dadata_party"),
+    path("api/dadata/party/by-inn/", dadata_party_by_inn, name="dadata_party_by_inn"),
     path("api/chat/token", chat_token),
     path("api/consultant/chat/", consultant_chat, name="consultant_chat"),
     path("api/v1/", include("api.v1.urls")),

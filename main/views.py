@@ -320,6 +320,22 @@ def dadata_party(request):
     return JsonResponse({"suggestions": suggestions})
 
 
+@require_GET
+def dadata_party_by_inn(request):
+    inn = str(request.GET.get("inn") or "").strip()
+    if len(inn) < 10:
+        return JsonResponse({"error": "inn_required"}, status=400)
+
+    token = getattr(settings, "DADATA_KEY", "")
+    if not token:
+        return JsonResponse({"error": "dadata_not_configured"}, status=503)
+
+    profile = _find_party_profile_by_inn(inn=inn, token=token)
+    if not profile:
+        return JsonResponse({"profile": None}, status=404)
+    return JsonResponse({"profile": profile})
+
+
 @require_POST
 def sendform_view(request):
     try:

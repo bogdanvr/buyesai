@@ -203,3 +203,44 @@ class SendFormViewTests(TestCase):
         self.assertEqual(director.last_name, "Никита Валерьевич")
         self.assertEqual(director.position, "ДИРЕКТОР")
         self.assertEqual(director.phone, "+7 905 9405785")
+
+    @override_settings(DADATA_KEY="test-token")
+    @patch("main.views.Dadata")
+    def test_dadata_party_by_inn_endpoint_returns_profile(self, dadata_cls):
+        dadata_instance = dadata_cls.return_value
+        dadata_instance.find_by_id.return_value = {
+            "suggestions": [
+                {
+                    "value": 'ООО "ЭНЕРГОЭКСПЕРТ"',
+                    "data": {
+                        "inn": "5503190710",
+                        "okved": "25.99",
+                        "okveds": [
+                            {
+                                "main": True,
+                                "code": "25.99",
+                                "name": "Производство прочих готовых металлических изделий",
+                            },
+                            {
+                                "main": False,
+                                "code": "46.90",
+                                "name": "Торговля оптовая неспециализированная",
+                            },
+                        ],
+                        "name": {
+                            "short_with_opf": 'ООО "ЭНЕРГОЭКСПЕРТ"',
+                        },
+                    },
+                }
+            ]
+        }
+
+        response = self.client.get(reverse("dadata_party_by_inn"), {"inn": "5503190710"})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["profile"]["okved"], "25.99")
+        self.assertEqual(
+            payload["profile"]["industry"],
+            "Производство прочих готовых металлических изделий",
+        )
+        self.assertEqual(len(payload["profile"]["okveds"]), 2)

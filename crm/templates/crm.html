@@ -1390,6 +1390,7 @@
           this.showCompanyContactForm = false;
           this.loadContactsForCompany();
           this.showModal = true;
+          this.enrichCompanyFromDadataByInn();
         },
         openTaskEditor(item) {
           this.editingLeadId = null;
@@ -1520,6 +1521,44 @@
             return;
           }
           this.showCompanyOkvedDetails = !this.showCompanyOkvedDetails;
+        },
+        async enrichCompanyFromDadataByInn() {
+          const inn = String(this.forms.companies.inn || "").trim();
+          if (inn.length < 10) {
+            return;
+          }
+          const hasDetailedOkveds = this.normalizeCompanyOkveds(
+            this.forms.companies.okveds,
+            this.forms.companies.okved,
+            this.forms.companies.industry
+          ).length > 1;
+          const hasReadableIndustry = !!String(this.forms.companies.industry || "").trim() && !this.isSyntheticIndustry(
+            this.forms.companies.industry,
+            this.forms.companies.okved
+          );
+          if (hasDetailedOkveds && hasReadableIndustry) {
+            return;
+          }
+          try {
+            const payload = await this.apiRequest(`/api/dadata/party/by-inn/?inn=${encodeURIComponent(inn)}`);
+            const profile = payload && payload.profile ? payload.profile : null;
+            if (!profile) {
+              return;
+            }
+            const okveds = this.normalizeCompanyOkveds(profile.okveds, profile.okved, profile.industry);
+            const resolvedIndustry = this.resolvePrimaryIndustry(profile.industry, profile.okved, okveds);
+            if (profile.okved) {
+              this.forms.companies.okved = profile.okved;
+            }
+            if (resolvedIndustry) {
+              this.forms.companies.industry = resolvedIndustry;
+            }
+            if (okveds.length) {
+              this.forms.companies.okveds = okveds;
+            }
+          } catch (error) {
+            // silent fallback: keep existing company data
+          }
         },
         async loadTasksForDeal() {
           if (!this.editingDealId) {
