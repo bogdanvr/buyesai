@@ -360,9 +360,18 @@ createApp({
             if (!item) return;
             this.isCompanySuggestionInteracting = false;
             this.company = item.value || '';
-            this.selectedCompanyData = await this.enrichCompanySelection(item);
+            const selected = this.normalizeSelectedCompanyData(item, this.company);
+            this.selectedCompanyData = selected;
             this.companySuggestionsOpen = false;
             this.companySuggestions = [];
+            const enriched = await this.enrichCompanySelection(selected);
+            if (
+              this.selectedCompanyData &&
+              String(this.selectedCompanyData.inn || '').trim() === String(selected.inn || '').trim() &&
+              String(this.company || '').trim() === String(selected.name || this.company || '').trim()
+            ) {
+              this.selectedCompanyData = enriched;
+            }
           },
 
           fetchCompanySuggestions(query) {
@@ -453,9 +462,18 @@ createApp({
             if (!item) return;
             this.isDiscussCompanySuggestionInteracting = false;
             this.discussForm.company = item.value || '';
-            this.selectedDiscussCompanyData = await this.enrichCompanySelection(item);
+            const selected = this.normalizeSelectedCompanyData(item, this.discussForm.company);
+            this.selectedDiscussCompanyData = selected;
             this.discussCompanySuggestionsOpen = false;
             this.discussCompanySuggestions = [];
+            const enriched = await this.enrichCompanySelection(selected);
+            if (
+              this.selectedDiscussCompanyData &&
+              String(this.selectedDiscussCompanyData.inn || '').trim() === String(selected.inn || '').trim() &&
+              String(this.discussForm.company || '').trim() === String(selected.name || this.discussForm.company || '').trim()
+            ) {
+              this.selectedDiscussCompanyData = enriched;
+            }
           },
 
           isEventInsideRef(event, refName) {
