@@ -138,7 +138,32 @@
               ? 'bg-crm-accent border-crm-accent text-white'
               : 'bg-crm-panel border-crm-border text-crm-muted'"
           >
-            [[ item.icon ]] [[ item.label ]]
+            <span class="inline-flex items-center gap-1.5">
+              <svg v-if="item.key === 'leads'" xmlns="http://www.w3.org/2000/svg" class="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="12" r="8"></circle>
+                <path stroke-linecap="round" d="M12 8v8M8 12h8"></path>
+              </svg>
+              <svg v-else-if="item.key === 'deals'" xmlns="http://www.w3.org/2000/svg" class="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <rect x="4" y="7" width="16" height="12" rx="2"></rect>
+                <path stroke-linecap="round" d="M9 7V5h6v2"></path>
+                <path stroke-linecap="round" d="M4 12h16"></path>
+              </svg>
+              <svg v-else-if="item.key === 'contacts'" xmlns="http://www.w3.org/2000/svg" class="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <circle cx="9" cy="9" r="3"></circle>
+                <path stroke-linecap="round" d="M4 18c0-2.5 2.2-4.5 5-4.5s5 2 5 4.5"></path>
+                <circle cx="17" cy="10" r="2"></circle>
+                <path stroke-linecap="round" d="M14.7 17.2c.6-1.6 2.1-2.7 4-2.7 1.1 0 2 .3 2.8.9"></path>
+              </svg>
+              <svg v-else-if="item.key === 'companies'" xmlns="http://www.w3.org/2000/svg" class="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+                <path stroke-linecap="round" d="M8 8h2M14 8h2M8 12h2M14 12h2M8 16h8"></path>
+              </svg>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4"></path>
+                <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+              </svg>
+              <span>[[ item.label ]]</span>
+            </span>
           </button>
         </div>
       </div>
@@ -328,8 +353,8 @@
       </section>
     </main>
 
-    <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm">
-      <div class="w-full max-w-2xl rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel overflow-hidden">
+    <div v-if="showModal" class="fixed inset-0 z-50 flex items-start md:items-center justify-center p-3 md:p-4 overflow-y-auto bg-black/55 backdrop-blur-sm">
+      <div class="w-full max-w-2xl rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel max-h-[calc(100dvh-1.5rem)] md:max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col">
         <div class="px-6 py-5 border-b border-crm-border flex items-center justify-between gap-4">
           <div>
             <h2 class="text-xl font-semibold">[[ modalTitle ]]</h2>
@@ -338,7 +363,7 @@
           <button @click="closeModal" class="w-10 h-10 rounded-xl border border-crm-border bg-crm-panel hover:border-crm-accent">✕</button>
         </div>
 
-        <form @submit.prevent="createItem" class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form @submit.prevent="createItem" class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto min-h-0">
           <template v-if="activeSection === 'leads'">
             <label class="block">
               <span class="text-sm text-crm-muted">Название лида</span>
