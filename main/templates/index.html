@@ -126,6 +126,8 @@
                                             v-if="companySuggestionsOpen && companySuggestions.length">
                                             <button type="button" class="suggestion-item"
                                                 v-for="item in companySuggestions" :key="item.value + ':' + item.inn"
+                                                @pointerdown.prevent="selectCompanySuggestion(item)"
+                                                @touchstart.prevent="selectCompanySuggestion(item)"
                                                 @mousedown.prevent="selectCompanySuggestion(item)">
                                                 <div class="suggestion-title">[[ item.value ]]</div>
                                                 <div class="suggestion-meta">
@@ -851,6 +853,8 @@
                                 v-if="discussCompanySuggestionsOpen && discussCompanySuggestions.length">
                                 <button type="button" class="suggestion-item" v-for="item in discussCompanySuggestions"
                                     :key="item.value + ':' + item.inn"
+                                    @pointerdown.prevent="selectDiscussCompanySuggestion(item)"
+                                    @touchstart.prevent="selectDiscussCompanySuggestion(item)"
                                     @mousedown.prevent="selectDiscussCompanySuggestion(item)">
                                     <div class="suggestion-title">[[ item.value ]]</div>
                                     <div class="suggestion-meta">
