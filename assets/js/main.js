@@ -483,6 +483,28 @@ createApp({
             });
           },
 
+          isFocusedElement(element) {
+            return !!(element && document.activeElement === element);
+          },
+
+          async handleCompanySuggestionPointerDown(event, item) {
+            this.startCompanySuggestionPointer(event, item);
+            const input = this.$refs.heroCompanyInput;
+            const isTouchTap = !!(event && event.pointerType === 'touch');
+            if (isTouchTap && this.isFocusedElement(input)) {
+              if (event && typeof event.preventDefault === 'function') {
+                event.preventDefault();
+              }
+              if (event && typeof event.stopPropagation === 'function') {
+                event.stopPropagation();
+              }
+              this.pendingCompanySuggestion = null;
+              this.companySuggestionPointerStartY = null;
+              this.companySuggestionPointerMoved = false;
+              await this.selectCompanySuggestion(item, 'pointerdown');
+            }
+          },
+
           startCompanySuggestionPointer(event, item) {
             this.startCompanySuggestionInteraction(item);
             const clientY = this.getEventClientY(event);
@@ -698,6 +720,24 @@ createApp({
             }
             this.isDiscussCompanySuggestionInteracting = true;
             this.pendingDiscussCompanySuggestion = item || null;
+          },
+
+          async handleDiscussCompanySuggestionPointerDown(event, item) {
+            this.startDiscussCompanySuggestionPointer(event, item);
+            const input = this.$refs.discussCompanyInput;
+            const isTouchTap = !!(event && event.pointerType === 'touch');
+            if (isTouchTap && this.isFocusedElement(input)) {
+              if (event && typeof event.preventDefault === 'function') {
+                event.preventDefault();
+              }
+              if (event && typeof event.stopPropagation === 'function') {
+                event.stopPropagation();
+              }
+              this.pendingDiscussCompanySuggestion = null;
+              this.discussCompanySuggestionPointerStartY = null;
+              this.discussCompanySuggestionPointerMoved = false;
+              await this.selectDiscussCompanySuggestion(item);
+            }
           },
 
           startDiscussCompanySuggestionPointer(event, item) {

@@ -126,7 +126,7 @@
                                             v-if="companySuggestionsOpen && companySuggestions.length">
                                             <div class="suggestion-item" role="button" tabindex="0"
                                                 v-for="item in companySuggestions" :key="item.value + ':' + item.inn"
-                                                @pointerdown="startCompanySuggestionPointer($event, item)"
+                                                @pointerdown="handleCompanySuggestionPointerDown($event, item)"
                                                 @pointermove="moveCompanySuggestionPointer"
                                                 @pointerup.prevent.stop="endCompanySuggestionPointer(item)"
                                                 @pointercancel="cancelCompanySuggestionPointer"
@@ -868,7 +868,7 @@
                                 v-if="discussCompanySuggestionsOpen && discussCompanySuggestions.length">
                                 <div class="suggestion-item" role="button" tabindex="0" v-for="item in discussCompanySuggestions"
                                     :key="item.value + ':' + item.inn"
-                                    @pointerdown="startDiscussCompanySuggestionPointer($event, item)"
+                                    @pointerdown="handleDiscussCompanySuggestionPointerDown($event, item)"
                                     @pointermove="moveDiscussCompanySuggestionPointer"
                                     @pointerup.prevent.stop="endDiscussCompanySuggestionPointer(item)"
                                     @pointercancel="cancelDiscussCompanySuggestionPointer"
