@@ -126,11 +126,11 @@
                                             v-if="companySuggestionsOpen && companySuggestions.length">
                                             <div class="suggestion-item" role="button" tabindex="0"
                                                 v-for="item in companySuggestions" :key="item.value + ':' + item.inn"
-                                                @pointerdown="startCompanySuggestionPointer"
+                                                @pointerdown="startCompanySuggestionPointer($event, item)"
                                                 @pointermove="moveCompanySuggestionPointer"
                                                 @pointerup.prevent.stop="endCompanySuggestionPointer(item)"
                                                 @pointercancel="cancelCompanySuggestionPointer"
-                                                @click.prevent.stop="selectCompanySuggestion(item)"
+                                                @click.prevent.stop="handleCompanySuggestionClick(item)"
                                                 @keydown.enter.prevent="selectCompanySuggestion(item)"
                                                 @keydown.space.prevent="selectCompanySuggestion(item)">
                                                 <div class="suggestion-title">[[ item.value ]]</div>
@@ -142,6 +142,17 @@
                                         </div>
                                     </div>
                                     <div class="field-hint" v-if="heroTriedSubmit && !isHeroCompanyValid">Заполните поле
+                                    </div>
+                                    <div class="company-debug">
+                                        <div>event: [[ heroCompanyDebug.lastEvent ]]</div>
+                                        <div>item: [[ heroCompanyDebug.lastItemValue || 'empty' ]]</div>
+                                        <div>item inn: [[ heroCompanyDebug.lastItemInn || 'empty' ]]</div>
+                                        <div>selected inn: [[ heroCompanyDebug.selectedInn || 'empty' ]]</div>
+                                        <div>input value: [[ heroCompanyDebug.displayValue || 'empty' ]]</div>
+                                        <div>open: [[ heroCompanyDebug.suggestionsOpen ? 'yes' : 'no' ]]</div>
+                                        <div>pointerdown/up: [[ heroCompanyDebug.pointerDowns ]]/[[ heroCompanyDebug.pointerUps ]]</div>
+                                        <div>click/select: [[ heroCompanyDebug.clicks ]]/[[ heroCompanyDebug.selectCalls ]]</div>
+                                        <div v-for="entry in heroCompanyDebug.logs" :key="entry">[[ entry ]]</div>
                                     </div>
                                 </div>
                                 <div class="field"

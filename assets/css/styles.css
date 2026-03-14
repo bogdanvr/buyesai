@@ -444,6 +444,18 @@ img {
     flex-wrap: wrap;
 }
 
+.company-debug {
+    margin-top: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
 .field-invalid input,
 .field-invalid select,
 .field-invalid textarea {
