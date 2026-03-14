@@ -17,7 +17,6 @@ createApp({
             companySuggestTimer: null,
             companySuggestAbort: null,
             companySuggestionsOpen: false,
-            companyBlurTimer: null,
             selectedCompanyData: null,
             quizForm: {
                 industry: '',
@@ -50,12 +49,35 @@ createApp({
             discussCompanySuggestTimer: null,
             discussCompanySuggestAbort: null,
             discussCompanySuggestionsOpen: false,
-            discussCompanyBlurTimer: null,
             selectedDiscussCompanyData: null,
             isSendingDiscuss: false,
             discussSent: false,
+            outsidePointerHandler: null,
 
         };
+    },
+    mounted() {
+        this.outsidePointerHandler = (event) => {
+            this.handleOutsidePointer(event);
+        };
+        document.addEventListener('pointerdown', this.outsidePointerHandler, true);
+    },
+    beforeUnmount() {
+        if (this.outsidePointerHandler) {
+            document.removeEventListener('pointerdown', this.outsidePointerHandler, true);
+        }
+        if (this.companySuggestTimer) {
+            clearTimeout(this.companySuggestTimer);
+        }
+        if (this.discussCompanySuggestTimer) {
+            clearTimeout(this.discussCompanySuggestTimer);
+        }
+        if (this.companySuggestAbort) {
+            this.companySuggestAbort.abort();
+        }
+        if (this.discussCompanySuggestAbort) {
+            this.discussCompanySuggestAbort.abort();
+        }
     },
     computed: {
         heroPhoneDigits() {
@@ -264,15 +286,6 @@ createApp({
             }
           },
 
-          onCompanyBlur() {
-            if (this.companyBlurTimer) {
-                clearTimeout(this.companyBlurTimer);
-            }
-            this.companyBlurTimer = setTimeout(() => {
-                this.companySuggestionsOpen = false;
-            }, 150);
-          },
-
           selectCompanySuggestion(item) {
             if (!item) return;
             this.company = item.value || '';
@@ -342,21 +355,41 @@ createApp({
             }
           },
 
-          onDiscussCompanyBlur() {
-            if (this.discussCompanyBlurTimer) {
-                clearTimeout(this.discussCompanyBlurTimer);
-            }
-            this.discussCompanyBlurTimer = setTimeout(() => {
-                this.discussCompanySuggestionsOpen = false;
-            }, 150);
-          },
-
           selectDiscussCompanySuggestion(item) {
             if (!item) return;
             this.discussForm.company = item.value || '';
             this.selectedDiscussCompanyData = this.normalizeSelectedCompanyData(item, this.discussForm.company);
             this.discussCompanySuggestionsOpen = false;
             this.discussCompanySuggestions = [];
+          },
+
+          isEventInsideRef(event, refName) {
+            const element = this.$refs[refName];
+            if (!element) {
+                return false;
+            }
+            if (typeof event.composedPath === 'function') {
+                const path = event.composedPath();
+                if (Array.isArray(path) && path.includes(element)) {
+                    return true;
+                }
+            }
+            return element.contains(event.target);
+          },
+
+          handleOutsidePointer(event) {
+            if (
+                this.companySuggestionsOpen &&
+                !this.isEventInsideRef(event, 'heroCompanySuggestionsWrapper')
+            ) {
+                this.companySuggestionsOpen = false;
+            }
+            if (
+                this.discussCompanySuggestionsOpen &&
+                !this.isEventInsideRef(event, 'discussCompanySuggestionsWrapper')
+            ) {
+                this.discussCompanySuggestionsOpen = false;
+            }
           },
 
           fetchDiscussCompanySuggestions(query) {
