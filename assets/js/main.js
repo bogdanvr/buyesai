@@ -229,13 +229,36 @@ createApp({
             return utmData;
           },
 
+          getItemValue(item) {
+            return String((item && item.value) || '').trim();
+          },
+
+          getItemInn(item) {
+            return String((item && item.inn) || '').trim();
+          },
+
+          getEventClientY(event) {
+            if (event && typeof event.clientY === 'number') {
+              return event.clientY;
+            }
+            if (
+              event &&
+              event.changedTouches &&
+              event.changedTouches[0] &&
+              typeof event.changedTouches[0].clientY === 'number'
+            ) {
+              return event.changedTouches[0].clientY;
+            }
+            return null;
+          },
+
           pushHeroCompanyDebug(eventName, extra = {}) {
             const current = this.heroCompanyDebug || {};
             const next = {
               ...current,
               ...extra,
               lastEvent: eventName,
-              selectedInn: String(this.selectedCompanyData?.inn || '').trim(),
+              selectedInn: String((this.selectedCompanyData && this.selectedCompanyData.inn) || '').trim(),
               displayValue: String(this.company || '').trim(),
               suggestionsOpen: !!this.companySuggestionsOpen,
             };
@@ -441,29 +464,25 @@ createApp({
             }
             this.isCompanySuggestionInteracting = true;
             this.pushHeroCompanyDebug('interact-start', {
-              lastItemValue: String(item?.value || '').trim(),
-              lastItemInn: String(item?.inn || '').trim(),
+              lastItemValue: this.getItemValue(item),
+              lastItemInn: this.getItemInn(item),
             });
           },
 
           startCompanySuggestionPointer(event, item) {
             this.startCompanySuggestionInteraction(item);
-            const clientY = typeof event?.clientY === 'number'
-              ? event.clientY
-              : (event?.changedTouches?.[0]?.clientY ?? null);
+            const clientY = this.getEventClientY(event);
             this.companySuggestionPointerStartY = clientY;
             this.companySuggestionPointerMoved = false;
             this.pushHeroCompanyDebug('pointerdown', {
-              lastItemValue: String(item?.value || '').trim(),
-              lastItemInn: String(item?.inn || '').trim(),
+              lastItemValue: this.getItemValue(item),
+              lastItemInn: this.getItemInn(item),
               pointerDowns: (this.heroCompanyDebug.pointerDowns || 0) + 1,
             });
           },
 
           moveCompanySuggestionPointer(event) {
-            const clientY = typeof event?.clientY === 'number'
-              ? event.clientY
-              : (event?.changedTouches?.[0]?.clientY ?? null);
+            const clientY = this.getEventClientY(event);
             if (clientY === null || this.companySuggestionPointerStartY === null) {
               return;
             }
@@ -474,8 +493,8 @@ createApp({
 
           async endCompanySuggestionPointer(item) {
             this.pushHeroCompanyDebug('pointerup', {
-              lastItemValue: String(item?.value || '').trim(),
-              lastItemInn: String(item?.inn || '').trim(),
+              lastItemValue: this.getItemValue(item),
+              lastItemInn: this.getItemInn(item),
               pointerUps: (this.heroCompanyDebug.pointerUps || 0) + 1,
             });
             if (this.companySuggestionPointerMoved) {
@@ -483,8 +502,8 @@ createApp({
               this.companySuggestionPointerStartY = null;
               this.companySuggestionPointerMoved = false;
               this.pushHeroCompanyDebug('pointerup-moved', {
-                lastItemValue: String(item?.value || '').trim(),
-                lastItemInn: String(item?.inn || '').trim(),
+                lastItemValue: this.getItemValue(item),
+                lastItemInn: this.getItemInn(item),
               });
               return;
             }
@@ -502,23 +521,23 @@ createApp({
 
           async handleCompanySuggestionClick(item) {
             this.pushHeroCompanyDebug('click', {
-              lastItemValue: String(item?.value || '').trim(),
-              lastItemInn: String(item?.inn || '').trim(),
+              lastItemValue: this.getItemValue(item),
+              lastItemInn: this.getItemInn(item),
               clicks: (this.heroCompanyDebug.clicks || 0) + 1,
             });
             await this.selectCompanySuggestion(item, 'click');
           },
 
           shouldSkipCompanySuggestionSelection(item) {
-            const key = `${item?.value || ''}:${item?.inn || ''}`;
+            const key = `${this.getItemValue(item)}:${this.getItemInn(item)}`;
             const now = Date.now();
             if (
               this.lastCompanySuggestionSelectionKey === key &&
               now - this.lastCompanySuggestionSelectionAt < 700
             ) {
               this.pushHeroCompanyDebug('select-skip', {
-                lastItemValue: String(item?.value || '').trim(),
-                lastItemInn: String(item?.inn || '').trim(),
+                lastItemValue: this.getItemValue(item),
+                lastItemInn: this.getItemInn(item),
               });
               return true;
             }
@@ -537,8 +556,8 @@ createApp({
             this.companySuggestionsOpen = false;
             this.companySuggestions = [];
             this.pushHeroCompanyDebug(`select-${source}`, {
-              lastItemValue: String(item?.value || '').trim(),
-              lastItemInn: String(item?.inn || '').trim(),
+              lastItemValue: this.getItemValue(item),
+              lastItemInn: this.getItemInn(item),
               selectCalls: (this.heroCompanyDebug.selectCalls || 0) + 1,
             });
             this.$nextTick(() => {
@@ -556,8 +575,8 @@ createApp({
               this.selectedCompanyData = enriched;
               this.syncHeroCompanyDisplay();
               this.pushHeroCompanyDebug(`select-${source}-enriched`, {
-                lastItemValue: String(item?.value || '').trim(),
-                lastItemInn: String(item?.inn || '').trim(),
+                lastItemValue: this.getItemValue(item),
+                lastItemInn: this.getItemInn(item),
               });
             }
           },
@@ -658,17 +677,13 @@ createApp({
 
           startDiscussCompanySuggestionPointer(event) {
             this.startDiscussCompanySuggestionInteraction();
-            const clientY = typeof event?.clientY === 'number'
-              ? event.clientY
-              : (event?.changedTouches?.[0]?.clientY ?? null);
+            const clientY = this.getEventClientY(event);
             this.discussCompanySuggestionPointerStartY = clientY;
             this.discussCompanySuggestionPointerMoved = false;
           },
 
           moveDiscussCompanySuggestionPointer(event) {
-            const clientY = typeof event?.clientY === 'number'
-              ? event.clientY
-              : (event?.changedTouches?.[0]?.clientY ?? null);
+            const clientY = this.getEventClientY(event);
             if (clientY === null || this.discussCompanySuggestionPointerStartY === null) {
               return;
             }
@@ -696,7 +711,7 @@ createApp({
           },
 
           shouldSkipDiscussCompanySuggestionSelection(item) {
-            const key = `${item?.value || ''}:${item?.inn || ''}`;
+            const key = `${this.getItemValue(item)}:${this.getItemInn(item)}`;
             const now = Date.now();
             if (
               this.lastDiscussCompanySuggestionSelectionKey === key &&
