@@ -868,7 +868,7 @@
                                 v-if="discussCompanySuggestionsOpen && discussCompanySuggestions.length">
                                 <div class="suggestion-item" role="button" tabindex="0" v-for="item in discussCompanySuggestions"
                                     :key="item.value + ':' + item.inn"
-                                    @pointerdown="startDiscussCompanySuggestionPointer"
+                                    @pointerdown="startDiscussCompanySuggestionPointer($event, item)"
                                     @pointermove="moveDiscussCompanySuggestionPointer"
                                     @pointerup.prevent.stop="endDiscussCompanySuggestionPointer(item)"
                                     @pointercancel="cancelDiscussCompanySuggestionPointer"

@@ -21,6 +21,7 @@ createApp({
             isCompanySuggestionInteracting: false,
             companySuggestionPointerStartY: null,
             companySuggestionPointerMoved: false,
+            pendingCompanySuggestion: null,
             lastCompanySuggestionSelectionKey: '',
             lastCompanySuggestionSelectionAt: 0,
             selectedCompanyData: null,
@@ -72,6 +73,7 @@ createApp({
             isDiscussCompanySuggestionInteracting: false,
             discussCompanySuggestionPointerStartY: null,
             discussCompanySuggestionPointerMoved: false,
+            pendingDiscussCompanySuggestion: null,
             lastDiscussCompanySuggestionSelectionKey: '',
             lastDiscussCompanySuggestionSelectionAt: 0,
             selectedDiscussCompanyData: null,
@@ -448,7 +450,18 @@ createApp({
                 clearTimeout(this.companyBlurTimer);
             }
             if (this.isCompanySuggestionInteracting) {
+                const pendingItem = this.pendingCompanySuggestion;
                 this.isCompanySuggestionInteracting = false;
+                if (pendingItem && !this.companySuggestionPointerMoved) {
+                    this.pendingCompanySuggestion = null;
+                    this.companySuggestionPointerStartY = null;
+                    this.companySuggestionPointerMoved = false;
+                    this.pushHeroCompanyDebug('blur-select-pending', {
+                      lastItemValue: this.getItemValue(pendingItem),
+                      lastItemInn: this.getItemInn(pendingItem),
+                    });
+                    this.selectCompanySuggestion(pendingItem, 'blur');
+                }
                 return;
             }
             this.companyBlurTimer = setTimeout(() => {
@@ -463,6 +476,7 @@ createApp({
                 clearTimeout(this.companyBlurTimer);
             }
             this.isCompanySuggestionInteracting = true;
+            this.pendingCompanySuggestion = item || null;
             this.pushHeroCompanyDebug('interact-start', {
               lastItemValue: this.getItemValue(item),
               lastItemInn: this.getItemInn(item),
@@ -499,6 +513,7 @@ createApp({
             });
             if (this.companySuggestionPointerMoved) {
               this.isCompanySuggestionInteracting = false;
+              this.pendingCompanySuggestion = null;
               this.companySuggestionPointerStartY = null;
               this.companySuggestionPointerMoved = false;
               this.pushHeroCompanyDebug('pointerup-moved', {
@@ -507,6 +522,7 @@ createApp({
               });
               return;
             }
+            this.pendingCompanySuggestion = null;
             this.companySuggestionPointerStartY = null;
             this.companySuggestionPointerMoved = false;
             await this.selectCompanySuggestion(item, 'pointerup');
@@ -514,6 +530,7 @@ createApp({
 
           cancelCompanySuggestionPointer() {
             this.isCompanySuggestionInteracting = false;
+            this.pendingCompanySuggestion = null;
             this.companySuggestionPointerStartY = null;
             this.companySuggestionPointerMoved = false;
             this.pushHeroCompanyDebug('pointercancel');
@@ -659,7 +676,14 @@ createApp({
                 clearTimeout(this.discussCompanyBlurTimer);
             }
             if (this.isDiscussCompanySuggestionInteracting) {
+                const pendingItem = this.pendingDiscussCompanySuggestion;
                 this.isDiscussCompanySuggestionInteracting = false;
+                if (pendingItem && !this.discussCompanySuggestionPointerMoved) {
+                    this.pendingDiscussCompanySuggestion = null;
+                    this.discussCompanySuggestionPointerStartY = null;
+                    this.discussCompanySuggestionPointerMoved = false;
+                    this.selectDiscussCompanySuggestion(pendingItem);
+                }
                 return;
             }
             this.discussCompanyBlurTimer = setTimeout(() => {
@@ -668,15 +692,16 @@ createApp({
             }, 180);
           },
 
-          startDiscussCompanySuggestionInteraction() {
+          startDiscussCompanySuggestionInteraction(item = null) {
             if (this.discussCompanyBlurTimer) {
                 clearTimeout(this.discussCompanyBlurTimer);
             }
             this.isDiscussCompanySuggestionInteracting = true;
+            this.pendingDiscussCompanySuggestion = item || null;
           },
 
-          startDiscussCompanySuggestionPointer(event) {
-            this.startDiscussCompanySuggestionInteraction();
+          startDiscussCompanySuggestionPointer(event, item) {
+            this.startDiscussCompanySuggestionInteraction(item);
             const clientY = this.getEventClientY(event);
             this.discussCompanySuggestionPointerStartY = clientY;
             this.discussCompanySuggestionPointerMoved = false;
@@ -695,10 +720,12 @@ createApp({
           async endDiscussCompanySuggestionPointer(item) {
             if (this.discussCompanySuggestionPointerMoved) {
               this.isDiscussCompanySuggestionInteracting = false;
+              this.pendingDiscussCompanySuggestion = null;
               this.discussCompanySuggestionPointerStartY = null;
               this.discussCompanySuggestionPointerMoved = false;
               return;
             }
+            this.pendingDiscussCompanySuggestion = null;
             this.discussCompanySuggestionPointerStartY = null;
             this.discussCompanySuggestionPointerMoved = false;
             await this.selectDiscussCompanySuggestion(item);
@@ -706,6 +733,7 @@ createApp({
 
           cancelDiscussCompanySuggestionPointer() {
             this.isDiscussCompanySuggestionInteracting = false;
+            this.pendingDiscussCompanySuggestion = null;
             this.discussCompanySuggestionPointerStartY = null;
             this.discussCompanySuggestionPointerMoved = false;
           },
