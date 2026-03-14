@@ -316,6 +316,23 @@ createApp({
             return normalizedQuery === selected.name || normalizedQuery === this.formatSelectedCompanyLabel(selected);
           },
 
+          syncHeroCompanyDisplay() {
+            if (!this.selectedCompanyData) {
+              return;
+            }
+            this.company = this.formatSelectedCompanyLabel(this.selectedCompanyData, this.company);
+          },
+
+          syncDiscussCompanyDisplay() {
+            if (!this.selectedDiscussCompanyData) {
+              return;
+            }
+            this.discussForm.company = this.formatSelectedCompanyLabel(
+              this.selectedDiscussCompanyData,
+              this.discussForm.company,
+            );
+          },
+
           async enrichCompanySelection(selectedCompanyData) {
             const normalized = this.normalizeSelectedCompanyData(selectedCompanyData);
             if (!normalized || !normalized.inn) {
@@ -361,6 +378,9 @@ createApp({
             if (this.companyBlurTimer) {
                 clearTimeout(this.companyBlurTimer);
             }
+            if (this.selectedCompanyData && this.isMatchingSelectedCompanyLabel(this.company, this.selectedCompanyData, this.company)) {
+                return;
+            }
             if (this.companySuggestions.length > 0) {
                 this.companySuggestionsOpen = true;
             }
@@ -375,6 +395,7 @@ createApp({
                 return;
             }
             this.companyBlurTimer = setTimeout(() => {
+                this.syncHeroCompanyDisplay();
                 this.companySuggestionsOpen = false;
             }, 180);
           },
@@ -445,9 +466,15 @@ createApp({
             this.isCompanySuggestionInteracting = false;
             const selected = this.normalizeSelectedCompanyData(item, item.value || this.company);
             this.selectedCompanyData = selected;
-            this.company = this.formatSelectedCompanyLabel(selected, item.value || this.company);
+            this.syncHeroCompanyDisplay();
             this.companySuggestionsOpen = false;
             this.companySuggestions = [];
+            this.$nextTick(() => {
+              const input = this.$refs.heroCompanyInput;
+              if (input && typeof input.blur === 'function') {
+                input.blur();
+              }
+            });
             const enriched = await this.enrichCompanySelection(selected);
             if (
               this.selectedCompanyData &&
@@ -455,7 +482,7 @@ createApp({
               this.isMatchingSelectedCompanyLabel(this.company, selected, this.company)
             ) {
               this.selectedCompanyData = enriched;
-              this.company = this.formatSelectedCompanyLabel(enriched, this.company);
+              this.syncHeroCompanyDisplay();
             }
           },
 
@@ -517,6 +544,16 @@ createApp({
             if (this.discussCompanyBlurTimer) {
                 clearTimeout(this.discussCompanyBlurTimer);
             }
+            if (
+              this.selectedDiscussCompanyData &&
+              this.isMatchingSelectedCompanyLabel(
+                this.discussForm.company,
+                this.selectedDiscussCompanyData,
+                this.discussForm.company,
+              )
+            ) {
+                return;
+            }
             if (this.discussCompanySuggestions.length > 0) {
                 this.discussCompanySuggestionsOpen = true;
             }
@@ -531,6 +568,7 @@ createApp({
                 return;
             }
             this.discussCompanyBlurTimer = setTimeout(() => {
+                this.syncDiscussCompanyDisplay();
                 this.discussCompanySuggestionsOpen = false;
             }, 180);
           },
@@ -601,9 +639,15 @@ createApp({
             this.isDiscussCompanySuggestionInteracting = false;
             const selected = this.normalizeSelectedCompanyData(item, item.value || this.discussForm.company);
             this.selectedDiscussCompanyData = selected;
-            this.discussForm.company = this.formatSelectedCompanyLabel(selected, item.value || this.discussForm.company);
+            this.syncDiscussCompanyDisplay();
             this.discussCompanySuggestionsOpen = false;
             this.discussCompanySuggestions = [];
+            this.$nextTick(() => {
+              const input = this.$refs.discussCompanyInput;
+              if (input && typeof input.blur === 'function') {
+                input.blur();
+              }
+            });
             const enriched = await this.enrichCompanySelection(selected);
             if (
               this.selectedDiscussCompanyData &&
@@ -611,7 +655,7 @@ createApp({
               this.isMatchingSelectedCompanyLabel(this.discussForm.company, selected, this.discussForm.company)
             ) {
               this.selectedDiscussCompanyData = enriched;
-              this.discussForm.company = this.formatSelectedCompanyLabel(enriched, this.discussForm.company);
+              this.syncDiscussCompanyDisplay();
             }
           },
 

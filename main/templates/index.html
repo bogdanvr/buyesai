@@ -120,7 +120,7 @@
                                 <div class="field" :class="{ 'field-invalid': heroTriedSubmit && !isHeroCompanyValid }">
                                     <label>Компания</label>
                                     <div class="suggestions-wrapper" ref="heroCompanySuggestionsWrapper">
-                                        <input v-model="company" type="text" placeholder="Название или ИНН" required
+                                        <input ref="heroCompanyInput" v-model="company" type="text" placeholder="Название или ИНН" required
                                             @input="onCompanyInput" @focus="onCompanyFocus" @blur="onCompanyBlur">
                                             <div class="suggestions"
                                             v-if="companySuggestionsOpen && companySuggestions.length">
@@ -850,7 +850,7 @@
                     <div class="field">
                         <label>Компания / ИНН</label>
                         <div class="suggestions-wrapper" ref="discussCompanySuggestionsWrapper">
-                            <input type="text" placeholder="Введите название или ИНН" v-model="discussForm.company"
+                            <input ref="discussCompanyInput" type="text" placeholder="Введите название или ИНН" v-model="discussForm.company"
                                 @input="onDiscussCompanyInput" @focus="onDiscussCompanyFocus"
                                 @blur="onDiscussCompanyBlur">
                             <div class="suggestions"
