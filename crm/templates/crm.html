@@ -631,20 +631,19 @@
               <span class="text-sm text-crm-muted">Сфера деятельности</span>
               <input v-model="forms.companies.industry" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <div class="md:col-span-2" v-if="forms.companies.okved || forms.companies.industry">
+            <div class="md:col-span-2" v-if="secondaryCompanyOkvedEntries().length">
               <button
                 type="button"
                 class="w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 text-left hover:border-crm-accent transition"
                 @click="toggleCompanyOkvedDetails"
               >
-                <div class="text-sm text-white">[[ forms.companies.okved || 'ОКВЭД не указан' ]]</div>
-                <div class="text-xs text-crm-muted mt-1">[[ forms.companies.industry || 'Вид деятельности не указан' ]]</div>
-                <div v-if="secondaryCompanyOkvedEntries().length" class="text-xs text-crm-accent mt-2">
+                <div class="text-sm text-white">Дополнительные ОКВЭД</div>
+                <div class="text-xs text-crm-accent mt-2">
                   [[ showCompanyOkvedDetails ? 'Скрыть дополнительные виды деятельности' : 'Показать все виды деятельности' ]]
                 </div>
               </button>
               <div
-                v-if="showCompanyOkvedDetails && secondaryCompanyOkvedEntries().length"
+                v-if="showCompanyOkvedDetails"
                 class="mt-2 rounded-xl border border-crm-border/80 bg-[#0f2f4a] p-3 space-y-2"
               >
                 <div
@@ -1370,14 +1369,16 @@
           this.editingContactId = null;
           this.editingTaskId = null;
           this.editingCompanyId = item.id;
+          const normalizedOkveds = this.normalizeCompanyOkveds(item.okveds, item.okved, item.industry);
+          const resolvedIndustry = this.resolvePrimaryIndustry(item.industry, item.okved, normalizedOkveds);
           this.forms.companies = {
             name: item.name || "",
             legalName: item.legalName || "",
             inn: item.inn || "",
             address: item.address || "",
-            industry: item.industry || "",
+            industry: resolvedIndustry,
             okved: item.okved || "",
-            okveds: this.normalizeCompanyOkveds(item.okveds, item.okved, item.industry),
+            okveds: normalizedOkveds,
             phone: item.phone || "",
             email: item.email || "",
             website: item.website || "",
@@ -1473,6 +1474,24 @@
             normalized.push({ code: mainCodeText, name: mainNameText, main: true });
           }
           return normalized;
+        },
+        isSyntheticIndustry(industryText, okvedCode = "") {
+          const industry = String(industryText || "").trim().toLowerCase();
+          const code = String(okvedCode || "").trim().toLowerCase();
+          if (!industry || !code) return false;
+          const normalized = industry.replace(/\s+/g, " ");
+          return normalized === `оквэд ${code}` || normalized === `оквэд: ${code}`;
+        },
+        resolvePrimaryIndustry(industryText, okvedCode = "", okvedEntries = []) {
+          const industry = String(industryText || "").trim();
+          const code = String(okvedCode || "").trim();
+          const entries = Array.isArray(okvedEntries) ? okvedEntries : [];
+          const mainEntry = entries.find((entry) => entry && entry.main) || entries[0] || null;
+          const decoded = mainEntry ? String(mainEntry.name || "").trim() : "";
+          if (decoded && (!industry || this.isSyntheticIndustry(industry, code))) {
+            return decoded;
+          }
+          return industry;
         },
         primaryCompanyOkvedEntry() {
           const entries = Array.isArray(this.forms.companies.okveds) ? this.forms.companies.okveds : [];
@@ -1654,6 +1673,7 @@
           const normalized = this.uiStatus(item.is_active ? "progress" : "done", item.is_active ? "Активный" : "Неактивный");
           const normalizedOkveds = this.normalizeCompanyOkveds(item.okveds, item.okved, item.industry);
           const primaryOkved = normalizedOkveds.find((entry) => entry.main) || normalizedOkveds[0] || { code: "", name: "" };
+          const resolvedIndustry = this.resolvePrimaryIndustry(item.industry, item.okved, normalizedOkveds);
           return {
             id: item.id,
             name: item.name || `Компания #${item.id}`,
@@ -1665,7 +1685,7 @@
             legalName: item.legal_name || "",
             inn: item.inn || "",
             address: item.address || "",
-            industry: item.industry || primaryOkved.name || "",
+            industry: resolvedIndustry || primaryOkved.name || "",
             okved: item.okved || primaryOkved.code || "",
             okveds: normalizedOkveds,
             website: item.website || "",
