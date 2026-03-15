@@ -447,15 +447,20 @@ def sendform_view(request):
             continue
         clean_payload[str(key)] = str(value).strip() if isinstance(value, str) else value
 
-    tracking_session = _get_tracking_session(request, clean_payload)
-    if tracking_session is not None:
-        clean_payload["session_id"] = tracking_session.session_id
-        record_website_event(
-            session=tracking_session,
-            event_type="form_submitted",
-            page_url=str(clean_payload.get("page_url") or "").strip(),
-            payload={"form_type": form_type},
-        )
+    tracking_session = None
+    try:
+        tracking_session = _get_tracking_session(request, clean_payload)
+        if tracking_session is not None:
+            clean_payload["session_id"] = tracking_session.session_id
+            record_website_event(
+                session=tracking_session,
+                event_type="form_submitted",
+                page_url=str(clean_payload.get("page_url") or "").strip(),
+                payload={"form_type": form_type},
+            )
+    except Exception:
+        logger.exception("Tracking failed for send_form form_type=%s", form_type)
+        tracking_session = None
 
     form_submission = FormSubmission.objects.create(
         form_type=form_type,
