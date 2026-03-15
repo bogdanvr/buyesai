@@ -4,11 +4,24 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from crm.models import Client, Contact, Deal, Lead
-from main.tracking import sync_lead_tracking_data
+from crm.models.lead import normalize_lead_phone
+from main.tracking import (
+    build_tracking_sources,
+    get_primary_tracking_source,
+    sync_lead_tracking_data,
+)
 
 
 def _text_or_empty(value) -> str:
     return str(value or "").strip()
+
+
+def _merge_dicts(base: dict | None, extra: dict | None) -> dict:
+    result = dict(base) if isinstance(base, dict) else {}
+    if isinstance(extra, dict):
+        for key, value in extra.items():
+            result[key] = value
+    return result
 
 
 def _extract_company_profile(payload: dict) -> dict:
@@ -139,6 +152,139 @@ def _upsert_director_contact(*, client: Client, director: dict) -> None:
         contact.save(update_fields=update_fields)
 
 
+def _find_duplicate_lead(*, payload: dict, website_session=None) -> Lead | None:
+    if website_session is not None:
+        existing = (
+            Lead.objects.filter(website_session=website_session)
+            .order_by("-updated_at", "-id")
+            .first()
+        )
+        if existing is not None:
+            return existing
+
+    external_id = _text_or_empty(payload.get("external_id"))
+    if external_id:
+        existing = Lead.objects.filter(external_id=external_id).order_by("-updated_at", "-id").first()
+        if existing is not None:
+            return existing
+
+    normalized_phone = normalize_lead_phone(payload.get("phone"))
+    if not normalized_phone:
+        return None
+
+    active_match = (
+        Lead.objects.filter(phone_normalized=normalized_phone)
+        .exclude(status__code__in=("converted", "archived"))
+        .order_by("-updated_at", "-id")
+        .first()
+    )
+    if active_match is not None:
+        return active_match
+
+    return (
+        Lead.objects.filter(phone_normalized=normalized_phone)
+        .order_by("-updated_at", "-id")
+        .first()
+    )
+
+
+def _merge_duplicate_lead(
+    *,
+    lead: Lead,
+    form_type: str,
+    payload: dict,
+    source=None,
+    created_by=None,
+    website_session=None,
+    client: Client | None = None,
+) -> Lead:
+    update_fields = []
+
+    external_id = _text_or_empty(payload.get("external_id"))
+    if external_id and lead.external_id != external_id:
+        lead.external_id = external_id
+        update_fields.append("external_id")
+
+    title = _text_or_empty(payload.get("title")) or f"Лид из формы {form_type}"
+    if title and not _text_or_empty(lead.title):
+        lead.title = title
+        update_fields.append("title")
+
+    name = _text_or_empty(payload.get("name"))
+    if name and not _text_or_empty(lead.name):
+        lead.name = name
+        update_fields.append("name")
+
+    phone = _text_or_empty(payload.get("phone"))
+    if phone and _text_or_empty(lead.phone) != phone:
+        lead.phone = phone
+        update_fields.append("phone")
+
+    email = _text_or_empty(payload.get("email"))
+    if email and not _text_or_empty(lead.email):
+        lead.email = email
+        update_fields.append("email")
+
+    company_name = _text_or_empty(payload.get("company"))
+    if company_name and not _text_or_empty(lead.company):
+        lead.company = company_name
+        update_fields.append("company")
+
+    if client is not None and lead.client_id != client.id:
+        lead.client = client
+        update_fields.append("client")
+
+    if created_by is not None and lead.created_by_id is None:
+        lead.created_by = created_by
+        update_fields.append("created_by")
+
+    if website_session is not None and lead.website_session_id is None:
+        lead.website_session = website_session
+        update_fields.append("website_session")
+
+    merged_payload = _merge_dicts(getattr(lead, "payload", {}), payload)
+    if lead.payload != merged_payload:
+        lead.payload = merged_payload
+        update_fields.append("payload")
+
+    incoming_utm = payload.get("utm_data") if isinstance(payload.get("utm_data"), dict) else {}
+    merged_utm = _merge_dicts(getattr(lead, "utm_data", {}), incoming_utm)
+    if lead.utm_data != merged_utm:
+        lead.utm_data = merged_utm
+        update_fields.append("utm_data")
+
+    effective_primary_source = get_primary_tracking_source(website_session, source)
+    if effective_primary_source is not None and lead.source_id is None:
+        lead.source = effective_primary_source
+        update_fields.append("source")
+
+    if update_fields:
+        update_fields.append("updated_at")
+        lead.save(update_fields=update_fields)
+
+    if website_session is not None:
+        if lead.website_session_id in (None, website_session.id):
+            sync_lead_tracking_data(lead, website_session, source)
+        else:
+            sources_to_add = build_tracking_sources(website_session)
+            if source is not None:
+                sources_to_add.append(source)
+            if effective_primary_source is not None:
+                sources_to_add.append(effective_primary_source)
+            if sources_to_add:
+                lead.sources.add(*sources_to_add)
+    elif source is not None or effective_primary_source is not None:
+        sources_to_add = []
+        if source is not None:
+            sources_to_add.append(source)
+        if effective_primary_source is not None:
+            sources_to_add.append(effective_primary_source)
+        if sources_to_add:
+            lead.sources.add(*sources_to_add)
+
+    return lead
+
+
 @transaction.atomic
 def create_lead_from_payload(
     *,
@@ -204,7 +350,20 @@ def create_lead_from_payload(
     if client is not None:
         _upsert_director_contact(client=client, director=company_profile["director"])
 
+    duplicate_lead = _find_duplicate_lead(payload=payload, website_session=website_session)
+    if duplicate_lead is not None:
+        return _merge_duplicate_lead(
+            lead=duplicate_lead,
+            form_type=form_type,
+            payload=payload,
+            source=source,
+            created_by=created_by,
+            website_session=website_session,
+            client=client,
+        )
+
     lead = Lead.objects.create(
+        external_id=_text_or_empty(payload.get("external_id")),
         title=f"Лид из формы {form_type}",
         name=_text_or_empty(payload.get("name")),
         phone=_text_or_empty(payload.get("phone")),

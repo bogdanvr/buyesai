@@ -177,6 +177,86 @@ class SendFormViewTests(TestCase):
         self.assertTrue(lead.sources.filter(name="Объявление: creative-7").exists())
         self.assertTrue(lead.sources.filter(name="Действие: Отправка формы").exists())
 
+    def test_deduplicates_lead_by_external_id(self):
+        first_response = self.client.post(
+            reverse("send_form"),
+            data=json.dumps(
+                {
+                    "form_type": "hero",
+                    "payload": {
+                        "external_id": "chat-user-123",
+                        "name": "Иван",
+                        "phone": "+79990000000",
+                    },
+                }
+            ),
+            content_type="application/json",
+        )
+        second_response = self.client.post(
+            reverse("send_form"),
+            data=json.dumps(
+                {
+                    "form_type": "consultant",
+                    "payload": {
+                        "external_id": "chat-user-123",
+                        "name": "Иван Петров",
+                        "phone": "+79990000000",
+                        "email": "ivan@example.com",
+                    },
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(Lead.objects.count(), 1)
+
+        lead = Lead.objects.get()
+        self.assertEqual(first_response.json()["crm_lead_id"], lead.id)
+        self.assertEqual(second_response.json()["crm_lead_id"], lead.id)
+        self.assertEqual(lead.external_id, "chat-user-123")
+        self.assertEqual(lead.email, "ivan@example.com")
+
+    def test_deduplicates_lead_by_normalized_phone(self):
+        first_response = self.client.post(
+            reverse("send_form"),
+            data=json.dumps(
+                {
+                    "form_type": "hero",
+                    "payload": {
+                        "name": "Иван",
+                        "phone": "+7 (999) 000-00-00",
+                    },
+                }
+            ),
+            content_type="application/json",
+        )
+        second_response = self.client.post(
+            reverse("send_form"),
+            data=json.dumps(
+                {
+                    "form_type": "hero",
+                    "payload": {
+                        "name": "Иван",
+                        "phone": "8 999 000 00 00",
+                        "email": "ivan@example.com",
+                    },
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(Lead.objects.count(), 1)
+
+        lead = Lead.objects.get()
+        self.assertEqual(first_response.json()["crm_lead_id"], lead.id)
+        self.assertEqual(second_response.json()["crm_lead_id"], lead.id)
+        self.assertEqual(lead.phone_normalized, "79990000000")
+        self.assertEqual(lead.email, "ivan@example.com")
+
     def test_reuses_existing_company_for_form_lead(self):
         existing = Client.objects.create(name="Acme")
 

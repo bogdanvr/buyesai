@@ -4,6 +4,17 @@ from django.db import models
 from crm.models.common import TimestampedModel
 
 
+def normalize_lead_phone(value: str) -> str:
+    digits = "".join(ch for ch in str(value or "") if ch.isdigit())
+    if not digits:
+        return ""
+    if len(digits) == 10:
+        digits = f"7{digits}"
+    elif len(digits) == 11 and digits.startswith("8"):
+        digits = f"7{digits[1:]}"
+    return digits[:16]
+
+
 class LeadPriority(models.TextChoices):
     LOW = "low", "Низкий"
     MEDIUM = "medium", "Средний"
@@ -21,6 +32,13 @@ class Lead(TimestampedModel):
     title = models.CharField(max_length=255, blank=True, default="", verbose_name="Заголовок")
     name = models.CharField(max_length=255, blank=True, default="", verbose_name="Имя")
     phone = models.CharField(max_length=64, blank=True, default="", verbose_name="Телефон")
+    phone_normalized = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        db_index=True,
+        verbose_name="Телефон (нормализованный)",
+    )
     email = models.EmailField(blank=True, default="", verbose_name="Email")
     company = models.CharField(max_length=255, blank=True, default="", verbose_name="Компания")
     source = models.ForeignKey(
@@ -113,3 +131,13 @@ class Lead(TimestampedModel):
         if self.company:
             return self.company
         return f"Лид #{self.pk}"
+
+    def save(self, *args, **kwargs):
+        self.phone_normalized = normalize_lead_phone(self.phone)
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            normalized_update_fields = set(update_fields)
+            if "phone" in normalized_update_fields or "phone_normalized" in normalized_update_fields:
+                normalized_update_fields.add("phone_normalized")
+            kwargs["update_fields"] = list(normalized_update_fields)
+        return super().save(*args, **kwargs)
