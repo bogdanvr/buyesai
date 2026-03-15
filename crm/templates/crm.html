@@ -1458,12 +1458,12 @@
               return leftTop ? -1 : 1;
             }
 
-            const leftBottom = this.isBottomPriorityItem(left.item);
-            const rightBottom = this.isBottomPriorityItem(right.item);
-            if (leftBottom === rightBottom) {
-              return left.index - right.index;
+            const leftRank = this.getSortRank(left.item);
+            const rightRank = this.getSortRank(right.item);
+            if (leftRank !== rightRank) {
+              return leftRank - rightRank;
             }
-            return leftBottom ? 1 : -1;
+            return left.index - right.index;
           });
           return ordered.map((entry) => entry.item);
         },
@@ -1709,23 +1709,30 @@
           }
           return this.statusClass(item.status);
         },
-        isBottomPriorityItem(item) {
-          if (this.activeSection === "leads") {
-            return item.statusCode === "converted";
-          }
-          if (this.activeSection === "deals") {
-            return item.isWon || item.status === "done";
-          }
-          if (this.activeSection === "tasks") {
-            return item.isDone || item.status === "done";
-          }
-          return false;
-        },
         isTopPriorityItem(item) {
           if (this.activeSection === "companies") {
             return this.companyHasActiveDeals(item.id);
           }
           return false;
+        },
+        getSortRank(item) {
+          if (this.activeSection === "leads") {
+            const statusCode = String(item.statusCode || "").toLowerCase();
+            if (statusCode === "lost") return 1;
+            if (statusCode === "converted") return 2;
+            if (statusCode === "spam") return 3;
+            return 0;
+          }
+          if (this.activeSection === "deals") {
+            const palette = this.dealStatusCategory(item);
+            if (palette === "won") return 1;
+            if (palette === "lost") return 2;
+            return 0;
+          }
+          if (this.activeSection === "tasks") {
+            return item.isDone || item.status === "done" ? 1 : 0;
+          }
+          return 0;
         },
         statusChipStyle(item) {
           if (this.activeSection !== "deals") {
@@ -1739,28 +1746,51 @@
             color: palette.text,
           };
         },
-        dealStatusPalette(item) {
+        dealStatusCategory(item) {
           const stage = this.metaOptions.dealStages.find(
             (candidate) => String(candidate.id) === String(item.stageId)
           );
           const token = `${stage?.code || ""} ${stage?.name || ""} ${item.stageName || ""}`.toLowerCase();
 
           if (item.isWon || /(won|success|успеш)/.test(token)) {
-            return { border: "rgba(52, 211, 153, .35)", bg: "rgba(16, 185, 129, .12)", text: "#6ee7b7" };
+            return "won";
           }
           if (/(lost|failed|not_realized|не реализ|проигр|закрыт)/.test(token)) {
-            return { border: "rgba(248, 113, 113, .35)", bg: "rgba(239, 68, 68, .12)", text: "#fca5a5" };
+            return "lost";
           }
           if (/(contract|approval|договор|согласован)/.test(token)) {
-            return { border: "rgba(129, 140, 248, .35)", bg: "rgba(99, 102, 241, .12)", text: "#c7d2fe" };
+            return "contract";
           }
           if (/(decision|решени)/.test(token)) {
-            return { border: "rgba(167, 139, 250, .35)", bg: "rgba(139, 92, 246, .12)", text: "#ddd6fe" };
+            return "decision";
           }
           if (/(negoti|переговор)/.test(token)) {
-            return { border: "rgba(56, 189, 248, .35)", bg: "rgba(14, 165, 233, .12)", text: "#bae6fd" };
+            return "negotiation";
           }
           if (/(contact|new|open|первич|нов)/.test(token)) {
+            return "new";
+          }
+          return "default";
+        },
+        dealStatusPalette(item) {
+          const category = this.dealStatusCategory(item);
+
+          if (category === "won") {
+            return { border: "rgba(52, 211, 153, .35)", bg: "rgba(16, 185, 129, .12)", text: "#6ee7b7" };
+          }
+          if (category === "lost") {
+            return { border: "rgba(248, 113, 113, .35)", bg: "rgba(239, 68, 68, .12)", text: "#fca5a5" };
+          }
+          if (category === "contract") {
+            return { border: "rgba(129, 140, 248, .35)", bg: "rgba(99, 102, 241, .12)", text: "#c7d2fe" };
+          }
+          if (category === "decision") {
+            return { border: "rgba(167, 139, 250, .35)", bg: "rgba(139, 92, 246, .12)", text: "#ddd6fe" };
+          }
+          if (category === "negotiation") {
+            return { border: "rgba(56, 189, 248, .35)", bg: "rgba(14, 165, 233, .12)", text: "#bae6fd" };
+          }
+          if (category === "new") {
             return { border: "rgba(251, 191, 36, .35)", bg: "rgba(245, 158, 11, .12)", text: "#fde68a" };
           }
 
