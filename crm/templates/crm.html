@@ -564,6 +564,44 @@
               <span class="text-sm text-crm-muted">Ожидаемая сумма</span>
               <input v-model="forms.leads.expectedValue" type="number" min="0" step="0.01" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
+            <div
+              v-if="editingLeadId && (forms.leads.websiteSessionId || forms.leads.sourceNames.length || forms.leads.history.length)"
+              class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4 space-y-4"
+            >
+              <div v-if="forms.leads.websiteSessionId">
+                <div class="text-sm text-crm-muted">Веб-сессия</div>
+                <div class="mt-2 text-sm text-white break-all">[[ forms.leads.websiteSessionId ]]</div>
+              </div>
+              <div v-if="forms.leads.sourceNames.length">
+                <div class="text-sm text-crm-muted">Источники атрибуции</div>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <span
+                    v-for="sourceName in forms.leads.sourceNames"
+                    :key="`lead-source-${editingLeadId}-${sourceName}`"
+                    class="inline-flex items-center rounded-full border border-crm-border bg-[#123753] px-3 py-1 text-xs text-crm-accent"
+                  >
+                    [[ sourceName ]]
+                  </span>
+                </div>
+              </div>
+              <div v-if="forms.leads.history.length">
+                <div class="text-sm text-crm-muted">История</div>
+                <div class="mt-2 space-y-2">
+                  <div
+                    v-for="(historyItem, historyIndex) in forms.leads.history"
+                    :key="`lead-history-${editingLeadId}-${historyIndex}`"
+                    class="rounded-xl border border-crm-border/80 bg-[#102f4a] px-3 py-2"
+                  >
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                      <span class="text-white">[[ trackingEventLabel(historyItem.event) ]]</span>
+                      <span v-if="formatHistoryTimestamp(historyItem.timestamp)" class="text-crm-muted">
+                        [[ formatHistoryTimestamp(historyItem.timestamp) ]]
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </template>
 
           <template v-if="activeSection === 'deals'">
@@ -1189,7 +1227,10 @@
               priority: "medium",
               expectedValue: "",
               statusId: "",
-              sourceId: ""
+              sourceId: "",
+              sourceNames: [],
+              history: [],
+              websiteSessionId: ""
             },
             deals: {
               title: "",
@@ -1590,6 +1631,33 @@
             })
             .filter(Boolean);
         },
+        trackingEventLabel(value) {
+          const labels = {
+            page_view: "Просмотр страницы",
+            chat_opened: "Открытие чата",
+            first_message_sent: "Первое сообщение",
+            form_submitted: "Отправка формы",
+            phone_clicked: "Клик по телефону",
+            messenger_clicked: "Клик по мессенджеру",
+          };
+          const normalized = String(value || "").trim();
+          return labels[normalized] || normalized || "Событие";
+        },
+        formatHistoryTimestamp(value) {
+          const raw = String(value || "").trim();
+          if (!raw) return "";
+          const parsed = new Date(raw);
+          if (Number.isNaN(parsed.getTime())) {
+            return raw;
+          }
+          return parsed.toLocaleString("ru-RU", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+        },
         async fetchTaskById(taskId) {
           const normalizedTaskId = this.toIntOrNull(taskId);
           if (!normalizedTaskId) {
@@ -1971,7 +2039,10 @@
             priority: item.priority || "medium",
             expectedValue: item.expectedValue || "",
             statusId: item.statusId || "",
-            sourceId: item.sourceId || ""
+            sourceId: item.sourceId || "",
+            sourceNames: Array.isArray(item.sourceNames) ? item.sourceNames : [],
+            history: Array.isArray(item.history) ? item.history : [],
+            websiteSessionId: item.websiteSessionId || ""
           };
           this.showModal = true;
         },
@@ -2384,7 +2455,10 @@
             title: item.title || "",
             contactName: item.name || "",
             priority: item.priority || "medium",
-            expectedValue: item.expected_value || ""
+            expectedValue: item.expected_value || "",
+            sourceNames: Array.isArray(item.source_names) ? item.source_names : [],
+            history: Array.isArray(item.history) ? item.history : [],
+            websiteSessionId: item.website_session_id || ""
           };
         },
         mapDeal(item) {
