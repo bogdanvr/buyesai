@@ -140,12 +140,21 @@ def build_lead_history(session: WebsiteSession | None) -> list[dict]:
 
     history = []
     for event in session.events.order_by("created_at", "id"):
-        history.append(
-            {
-                "event": event.event_type,
-                "timestamp": timezone.localtime(event.created_at).isoformat() if event.created_at else "",
-            }
-        )
+        payload = event.payload if isinstance(event.payload, dict) else {}
+        history_item = {
+            "event": event.event_type,
+            "timestamp": timezone.localtime(event.created_at).isoformat() if event.created_at else "",
+        }
+        form_type = _clean_text(payload.get("form_type"))
+        href = _clean_text(payload.get("href"))
+        label = _clean_text(payload.get("label"))
+        if form_type:
+            history_item["form_type"] = form_type
+        if href:
+            history_item["href"] = href
+        if label:
+            history_item["label"] = label
+        history.append(history_item)
     return history
 
 
@@ -197,10 +206,30 @@ def build_tracking_sources(session: WebsiteSession | None) -> list[LeadSource]:
     return sources
 
 
+def get_primary_tracking_source(
+    session: WebsiteSession | None,
+    fallback_source: LeadSource | None = None,
+) -> LeadSource | None:
+    if session is not None:
+        utm_source = _clean_text(getattr(session, "utm_source", ""))
+        if utm_source:
+            source, _ = LeadSource.objects.get_or_create(
+                code=_tracking_source_code("traffic-source", utm_source),
+                defaults={
+                    "name": f"Источник трафика: {utm_source}"[:128],
+                    "description": "Автоматически создано из utm_source",
+                    "is_active": True,
+                },
+            )
+            return source
+    return fallback_source
+
+
 def sync_lead_tracking_data(lead, session: WebsiteSession | None, primary_source: LeadSource | None = None) -> None:
     if session is None or lead is None:
         return
 
+    effective_primary_source = get_primary_tracking_source(session, primary_source)
     update_fields = []
     if getattr(lead, "website_session_id", None) != session.id:
         lead.website_session = session
@@ -211,8 +240,8 @@ def sync_lead_tracking_data(lead, session: WebsiteSession | None, primary_source
         lead.history = history
         update_fields.append("history")
 
-    if primary_source is not None and getattr(lead, "source_id", None) is None:
-        lead.source = primary_source
+    if effective_primary_source is not None and getattr(lead, "source_id", None) != effective_primary_source.id:
+        lead.source = effective_primary_source
         update_fields.append("source")
 
     if update_fields:
@@ -222,6 +251,8 @@ def sync_lead_tracking_data(lead, session: WebsiteSession | None, primary_source
     sources_to_add = build_tracking_sources(session)
     if primary_source is not None:
         sources_to_add.append(primary_source)
+    if effective_primary_source is not None:
+        sources_to_add.append(effective_primary_source)
     if sources_to_add:
         lead.sources.add(*sources_to_add)
 

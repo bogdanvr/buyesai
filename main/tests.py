@@ -165,10 +165,12 @@ class SendFormViewTests(TestCase):
         session = WebsiteSession.objects.get(session_id="session-with-lead")
 
         self.assertEqual(lead.website_session_id, session.id)
+        self.assertEqual(lead.source.name, "Источник трафика: google")
         self.assertEqual(
             [item["event"] for item in lead.history],
             ["page_view", "first_message_sent", "form_submitted"],
         )
+        self.assertEqual(lead.history[-1]["form_type"], "hero")
         self.assertTrue(lead.sources.filter(code="site-hero").exists())
         self.assertTrue(lead.sources.filter(name="Источник трафика: google").exists())
         self.assertTrue(lead.sources.filter(name="Кампания: campaign-1").exists())

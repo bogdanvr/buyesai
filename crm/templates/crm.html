@@ -559,6 +559,9 @@
                 <option value="">Не выбран</option>
                 <option v-for="source in metaOptions.leadSources" :key="source.id" :value="source.id">[[ source.name ]]</option>
               </select>
+              <div v-if="leadSourcePath(forms.leads).length" class="mt-2 text-sm text-crm-muted break-words">
+                [[ leadSourcePath(forms.leads).join(' -> ') ]]
+              </div>
             </label>
             <label class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Ожидаемая сумма</span>
@@ -1228,6 +1231,8 @@
               expectedValue: "",
               statusId: "",
               sourceId: "",
+              sourceName: "",
+              sourceCode: "",
               sourceNames: [],
               history: [],
               websiteSessionId: ""
@@ -1658,6 +1663,72 @@
             minute: "2-digit",
           });
         },
+        humanizeLeadSourceName(value) {
+          const raw = String(value || "").trim();
+          if (!raw) return "";
+          if (raw.indexOf("Источник трафика:") === 0) {
+            return raw.replace(/^Источник трафика:\s*/u, "").trim();
+          }
+          if (raw.indexOf("Форма сайта:") === 0) {
+            return `клик по форме ${raw.replace(/^Форма сайта:\s*/u, "").trim()}`;
+          }
+          if (raw.indexOf("Действие:") === 0) {
+            return raw.replace(/^Действие:\s*/u, "").trim();
+          }
+          return raw;
+        },
+        leadEventPathLabel(item) {
+          if (!item || typeof item !== "object") return "";
+          const eventCode = String(item.event || "").trim();
+          if (eventCode === "chat_opened") {
+            return "клик по чату";
+          }
+          if (eventCode === "first_message_sent") {
+            return "первое сообщение";
+          }
+          if (eventCode === "phone_clicked") {
+            return "клик по телефону";
+          }
+          if (eventCode === "messenger_clicked") {
+            return "клик по мессенджеру";
+          }
+          if (eventCode === "form_submitted") {
+            const formType = String(item.form_type || "").trim();
+            return formType ? `клик по форме ${formType}` : "отправка формы";
+          }
+          return "";
+        },
+        leadSourcePath(leadForm) {
+          const form = leadForm && typeof leadForm === "object" ? leadForm : {};
+          const path = [];
+          const pushUnique = (value) => {
+            const normalized = String(value || "").trim();
+            if (!normalized || path.includes(normalized)) return;
+            path.push(normalized);
+          };
+
+          if (form.sourceName) {
+            pushUnique(this.humanizeLeadSourceName(form.sourceName));
+          }
+
+          const history = Array.isArray(form.history) ? form.history : [];
+          history.forEach((historyItem) => {
+            const eventLabel = this.leadEventPathLabel(historyItem);
+            if (eventLabel) {
+              pushUnique(eventLabel);
+            }
+          });
+
+          const sourceNames = Array.isArray(form.sourceNames) ? form.sourceNames : [];
+          sourceNames.forEach((sourceName) => {
+            const humanized = this.humanizeLeadSourceName(sourceName);
+            if (humanized && humanized.indexOf("клик по форме ") === 0) {
+              pushUnique(humanized);
+            }
+          });
+
+          return path;
+        },
         async fetchTaskById(taskId) {
           const normalizedTaskId = this.toIntOrNull(taskId);
           if (!normalizedTaskId) {
@@ -2040,6 +2111,8 @@
             expectedValue: item.expectedValue || "",
             statusId: item.statusId || "",
             sourceId: item.sourceId || "",
+            sourceName: item.sourceName || "",
+            sourceCode: item.sourceCode || "",
             sourceNames: Array.isArray(item.sourceNames) ? item.sourceNames : [],
             history: Array.isArray(item.history) ? item.history : [],
             websiteSessionId: item.websiteSessionId || ""
@@ -2451,6 +2524,8 @@
             statusCode,
             statusId: item.status || "",
             sourceId: item.source || "",
+            sourceName: item.source_name || "",
+            sourceCode: item.source_code || "",
             statusLabel: label,
             title: item.title || "",
             contactName: item.name || "",
@@ -2679,7 +2754,12 @@
               priority: "medium",
               expectedValue: "",
               statusId: this.metaOptions.leadStatuses.length ? this.metaOptions.leadStatuses[0].id : "",
-              sourceId: this.metaOptions.leadSources.length ? this.metaOptions.leadSources[0].id : ""
+              sourceId: this.metaOptions.leadSources.length ? this.metaOptions.leadSources[0].id : "",
+              sourceName: "",
+              sourceCode: "",
+              sourceNames: [],
+              history: [],
+              websiteSessionId: ""
             };
           }
           if (section === "deals") {
