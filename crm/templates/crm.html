@@ -214,34 +214,73 @@
         <div v-if="errorMessage" class="mb-4 rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-red-200 text-sm">
           [[ errorMessage ]]
         </div>
-        <div class="hidden md:grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
-            <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">Всего</div>
-            <div class="mt-3 text-3xl font-semibold">[[ filteredItems.length ]]</div>
-          </article>
-          <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
-            <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">Новых</div>
-            <div class="mt-3 text-3xl font-semibold">[[ stats.newCount ]]</div>
-          </article>
-          <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
-            <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">В работе</div>
-            <div class="mt-3 text-3xl font-semibold">[[ stats.inProgressCount ]]</div>
-          </article>
-          <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
-            <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">Завершено</div>
-            <div class="mt-3 text-3xl font-semibold">[[ stats.doneCount ]]</div>
-          </article>
+        <div
+          v-if="activeSection === 'tasks' && taskDealFilterId"
+          class="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-crm-border bg-crm-panel px-4 py-3 text-sm"
+        >
+          <div class="min-w-0">
+            <span class="text-crm-muted">Фильтр по сделке:</span>
+            <span class="ml-2 font-medium text-white truncate">[[ taskDealFilterLabel || `Сделка #${taskDealFilterId}` ]]</span>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 rounded-lg border border-crm-border bg-[#13314e] px-3 py-1.5 text-xs font-medium hover:border-crm-accent hover:text-white transition"
+            @click="clearTaskDealFilter"
+          >
+            Сбросить
+          </button>
+        </div>
+        <div
+          class="hidden md:grid gap-4"
+          :class="activeSection === 'companies' ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4'"
+        >
+          <template v-if="activeSection === 'companies'">
+            <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
+              <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">Всего</div>
+              <div class="mt-3 text-3xl font-semibold">[[ companyStats.totalCount ]]</div>
+            </article>
+            <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
+              <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">Активных</div>
+              <div class="mt-3 text-3xl font-semibold">[[ companyStats.activeCount ]]</div>
+            </article>
+            <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
+              <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">В работе</div>
+              <div class="mt-3 text-3xl font-semibold">[[ companyStats.inProgressCount ]]</div>
+            </article>
+          </template>
+          <template v-else>
+            <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
+              <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">Всего</div>
+              <div class="mt-3 text-3xl font-semibold">[[ filteredItems.length ]]</div>
+            </article>
+            <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
+              <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">Новых</div>
+              <div class="mt-3 text-3xl font-semibold">[[ stats.newCount ]]</div>
+            </article>
+            <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
+              <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">В работе</div>
+              <div class="mt-3 text-3xl font-semibold">[[ stats.inProgressCount ]]</div>
+            </article>
+            <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
+              <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">Завершено</div>
+              <div class="mt-3 text-3xl font-semibold">[[ stats.doneCount ]]</div>
+            </article>
+          </template>
         </div>
       </section>
 
       <section class="px-4 md:px-7 py-5 flex-1 min-h-0">
         <div class="rounded-[28px] border border-crm-border bg-[#0b2740] overflow-hidden shadow-panel min-h-[540px] flex flex-col">
-          <div class="hidden lg:grid grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px] border-b border-crm-border bg-[#10314d] text-crm-muted text-xs uppercase tracking-[0.16em]">
+          <div
+            class="hidden lg:grid border-b border-crm-border bg-[#10314d] text-crm-muted text-xs uppercase tracking-[0.16em]"
+            :class="activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]'"
+          >
             <div class="px-4 py-4"></div>
             <div class="px-4 py-4">Наименование</div>
             <div class="px-4 py-4">Компания</div>
             <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Сделка' : 'Телефон' ]]</div>
             <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Срок' : 'Email' ]]</div>
+            <div v-if="activeSection === 'companies'" class="px-4 py-4">В работе</div>
             <div class="px-4 py-4 relative" data-status-filter>
               <button
                 type="button"
@@ -293,8 +332,11 @@
                 class="border-b border-crm-border/80 last:border-b-0"
               >
                 <div
-                  class="hidden lg:grid grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px] items-center hover:bg-white/5 transition"
-                  :class="(activeSection === 'leads' || activeSection === 'deals' || activeSection === 'contacts' || activeSection === 'companies' || activeSection === 'tasks') ? 'cursor-pointer' : ''"
+                  class="hidden lg:grid items-center hover:bg-white/5 transition"
+                  :class="[
+                    activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]',
+                    (activeSection === 'leads' || activeSection === 'deals' || activeSection === 'contacts' || activeSection === 'companies' || activeSection === 'tasks') ? 'cursor-pointer' : ''
+                  ]"
                   @click="onRowClick(item)"
                 >
                   <div class="px-4 py-4 text-xs text-crm-muted font-medium tabular-nums">#[[ item.id ]]</div>
@@ -307,6 +349,9 @@
                   <div v-else class="px-4 py-4 text-sm text-crm-text min-w-0">
                     <div class="truncate">[[ item.dueLabel || '—' ]]</div>
                     <div v-if="item.remainingLabel" class="text-xs text-crm-muted mt-1 truncate">[[ item.remainingLabel ]]</div>
+                  </div>
+                  <div v-if="activeSection === 'companies'" class="px-4 py-4 text-sm text-crm-text font-medium tabular-nums">
+                    [[ countCompanyActiveDeals(item.id) ]]
                   </div>
                   <div class="px-4 py-4">
                     <span
@@ -322,20 +367,112 @@
                 </div>
 
                 <div class="lg:hidden p-4 hover:bg-white/5 transition" :class="(activeSection === 'leads' || activeSection === 'deals' || activeSection === 'contacts' || activeSection === 'companies' || activeSection === 'tasks') ? 'cursor-pointer' : ''" @click="onRowClick(item)">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <div class="font-medium text-white truncate">[[ activeSection === 'leads' ? (item.company || item.name) : item.name ]]</div>
+                  <template v-if="activeSection === 'companies'">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0 flex-1">
+                        <div class="font-medium text-white truncate">[[ item.name ]]</div>
+                        <div class="mt-2 flex items-center gap-2 text-sm text-crm-text min-w-0">
+                          <span class="truncate">[[ item.phone || '—' ]]</span>
+                          <a
+                            v-if="phoneHref(item.phone)"
+                            :href="phoneHref(item.phone)"
+                            class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent"
+                            title="Позвонить"
+                            @click.stop
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                            </svg>
+                          </a>
+                        </div>
+                      </div>
+                      <span
+                        class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium border shrink-0"
+                        :class="[statusChipClass(item), canQuickChangeStatus(item) ? 'cursor-pointer hover:brightness-110' : '']"
+                        :style="statusChipStyle(item)"
+                        :title="canQuickChangeStatus(item) ? 'Клик: следующий статус' : ''"
+                        @click.stop="onStatusChipClick(item)"
+                      >
+                        [[ item.statusLabel ]]
+                      </span>
                     </div>
-                    <span
-                      class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium border shrink-0"
-                      :class="[statusChipClass(item), canQuickChangeStatus(item) ? 'cursor-pointer hover:brightness-110' : '']"
-                      :style="statusChipStyle(item)"
-                      :title="canQuickChangeStatus(item) ? 'Клик: следующий статус' : ''"
-                      @click.stop="onStatusChipClick(item)"
-                    >
-                      [[ item.statusLabel ]]
-                    </span>
-                  </div>
+                    <div class="mt-3">
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-lg border border-crm-border bg-[#123753] px-3 py-1.5 text-xs font-semibold text-white"
+                        @click.stop="toggleCompanyCardDetails(item.id)"
+                      >
+                        <span>[[ isCompanyCardExpanded(item.id) ? 'Скрыть' : 'Подробнее' ]]</span>
+                        <span class="text-[10px]">[[ isCompanyCardExpanded(item.id) ? '▲' : '▼' ]]</span>
+                      </button>
+                    </div>
+                    <div v-if="isCompanyCardExpanded(item.id)" class="mt-3 space-y-3 text-sm">
+                      <div v-if="item.legalName">
+                        <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">Юридическое название</div>
+                        <div class="mt-1 text-crm-text break-words">[[ item.legalName ]]</div>
+                      </div>
+                      <div v-if="item.inn || item.okved" class="grid grid-cols-2 gap-3">
+                        <div v-if="item.inn">
+                          <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">ИНН</div>
+                          <div class="mt-1 text-crm-text break-all">[[ item.inn ]]</div>
+                        </div>
+                        <div v-if="item.okved">
+                          <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">ОКВЭД</div>
+                          <div class="mt-1 text-crm-text break-all">[[ item.okved ]]</div>
+                        </div>
+                      </div>
+                      <div v-if="item.industry">
+                        <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">Сфера деятельности</div>
+                        <div class="mt-1 text-crm-text break-words">[[ item.industry ]]</div>
+                      </div>
+                      <div v-if="item.address">
+                        <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">Адрес</div>
+                        <div class="mt-1 text-crm-text break-words">[[ item.address ]]</div>
+                      </div>
+                      <div v-if="item.website">
+                        <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">Сайт</div>
+                        <div class="mt-1 text-crm-text break-all">[[ item.website ]]</div>
+                      </div>
+                      <div v-if="item.email">
+                        <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">Email</div>
+                        <div class="mt-1 text-crm-text break-all">[[ item.email ]]</div>
+                      </div>
+                      <div v-if="item.notes">
+                        <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">Заметки</div>
+                        <div class="mt-1 text-crm-text whitespace-pre-line break-words">[[ item.notes ]]</div>
+                      </div>
+                      <div v-if="parseEventLog(item.events).length">
+                        <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">События</div>
+                        <div class="mt-2 space-y-2">
+                          <div
+                            v-for="(eventItem, eventIndex) in parseEventLog(item.events)"
+                            :key="`company-card-event-${item.id}-${eventIndex}`"
+                            class="rounded-xl border border-crm-border/80 bg-[#0f2f4a] p-3"
+                          >
+                            <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">[[ eventItem.timestamp || 'Без даты' ]]</div>
+                            <div v-if="eventItem.result" class="mt-2 text-sm text-white whitespace-pre-line">[[ eventItem.result ]]</div>
+                            <div v-if="eventItem.extra" class="mt-2 text-sm text-crm-muted whitespace-pre-line">[[ eventItem.extra ]]</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="font-medium text-white truncate">[[ activeSection === 'leads' ? (item.company || item.name) : item.name ]]</div>
+                      </div>
+                      <span
+                        class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium border shrink-0"
+                        :class="[statusChipClass(item), canQuickChangeStatus(item) ? 'cursor-pointer hover:brightness-110' : '']"
+                        :style="statusChipStyle(item)"
+                        :title="canQuickChangeStatus(item) ? 'Клик: следующий статус' : ''"
+                        @click.stop="onStatusChipClick(item)"
+                      >
+                        [[ item.statusLabel ]]
+                      </span>
+                    </div>
+                  </template>
                 </div>
               </div>
             </div>
@@ -447,55 +584,61 @@
                 @click="toggleDealCompanyForm"
                 class="w-full h-11 px-4 rounded-xl border border-crm-border bg-[#123753] text-sm font-semibold text-white hover:border-crm-accent transition flex items-center justify-between"
               >
-                <span>Новая компания + контакт</span>
+                <span>[[ dealCompanyActionTitle ]]</span>
                 <span>[[ showDealCompanyForm ? '▲' : '▼' ]]</span>
               </button>
 
               <div v-if="showDealCompanyForm" class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label class="block">
-                  <span class="text-sm text-crm-muted">Название компании</span>
-                  <input v-model="dealCompanyForm.name" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">ИНН</span>
-                  <input v-model="dealCompanyForm.inn" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">ОКВЭД</span>
-                  <input v-model="dealCompanyForm.okved" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
-                <label class="block md:col-span-2">
-                  <span class="text-sm text-crm-muted">Сфера деятельности</span>
-                  <input v-model="dealCompanyForm.industry" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
-                <label class="block md:col-span-2">
-                  <span class="text-sm text-crm-muted">Адрес</span>
-                  <input v-model="dealCompanyForm.address" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">Телефон компании</span>
-                  <div class="relative mt-1">
-                    <input v-model="dealCompanyForm.phone" @focus="ensurePhonePrefix(dealCompanyForm, 'phone')" type="text" class="w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] pl-3 pr-11 outline-none focus:border-crm-accent" />
-                    <a
-                      v-if="phoneHref(dealCompanyForm.phone)"
-                      :href="phoneHref(dealCompanyForm.phone)"
-                      class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
-                      title="Позвонить"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
-                      </svg>
-                    </a>
-                  </div>
-                </label>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">Email компании</span>
-                  <input v-model="dealCompanyForm.email" type="email" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
-                <label class="block md:col-span-2">
-                  <span class="text-sm text-crm-muted">Сайт</span>
-                  <input v-model="dealCompanyForm.website" type="url" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
+                <div v-if="dealHasSelectedCompany" class="md:col-span-2 rounded-xl border border-crm-border/70 bg-[#102f4a] px-3 py-3 text-sm">
+                  <span class="text-crm-muted">Контакт будет добавлен в компанию:</span>
+                  <span class="ml-2 font-medium text-white">[[ dealSelectedCompanyName ]]</span>
+                </div>
+                <template v-else>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Название компании</span>
+                    <input v-model="dealCompanyForm.name" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">ИНН</span>
+                    <input v-model="dealCompanyForm.inn" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">ОКВЭД</span>
+                    <input v-model="dealCompanyForm.okved" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block md:col-span-2">
+                    <span class="text-sm text-crm-muted">Сфера деятельности</span>
+                    <input v-model="dealCompanyForm.industry" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block md:col-span-2">
+                    <span class="text-sm text-crm-muted">Адрес</span>
+                    <input v-model="dealCompanyForm.address" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Телефон компании</span>
+                    <div class="relative mt-1">
+                      <input v-model="dealCompanyForm.phone" @focus="ensurePhonePrefix(dealCompanyForm, 'phone')" type="text" class="w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] pl-3 pr-11 outline-none focus:border-crm-accent" />
+                      <a
+                        v-if="phoneHref(dealCompanyForm.phone)"
+                        :href="phoneHref(dealCompanyForm.phone)"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                        title="Позвонить"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                        </svg>
+                      </a>
+                    </div>
+                  </label>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Email компании</span>
+                    <input v-model="dealCompanyForm.email" type="email" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block md:col-span-2">
+                    <span class="text-sm text-crm-muted">Сайт</span>
+                    <input v-model="dealCompanyForm.website" type="url" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                </template>
                 <label class="block md:col-span-2">
                   <span class="text-sm text-crm-muted">Контакт (ФИО)</span>
                   <input v-model="dealCompanyContactForm.fullName" type="text" placeholder="Иван Иванов" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
@@ -532,8 +675,8 @@
                   <button type="button" @click="resetDealCompanyForm" class="h-10 px-4 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition">
                     Очистить
                   </button>
-                  <button type="button" @click="createCompanyFromDeal" :disabled="isDealCompanySaving || !dealCompanyForm.name.trim()" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
-                    [[ isDealCompanySaving ? 'Сохраняем...' : 'Создать компанию' ]]
+                  <button type="button" @click="createCompanyFromDeal" :disabled="isDealCompanySaving || !canSubmitDealCompanyAction" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
+                    [[ isDealCompanySaving ? 'Сохраняем...' : dealCompanySubmitLabel ]]
                   </button>
                 </div>
               </div>
@@ -561,9 +704,42 @@
                 <option v-for="stage in metaOptions.dealStages" :key="stage.id" :value="stage.id">[[ stage.name ]]</option>
               </select>
             </label>
-            <label class="md:col-span-2 flex items-center gap-2">
-              <input v-model="forms.deals.isWon" type="checkbox" class="w-4 h-4 rounded border-crm-border bg-transparent" />
-              <span class="text-sm text-crm-muted">Сделка уже выиграна</span>
+            <label class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">События</span>
+              <div class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                <div v-if="!parseEventLog(forms.deals.events).length" class="text-sm text-crm-muted">
+                  Событий пока нет.
+                </div>
+                <div v-else class="space-y-3">
+                  <div
+                    v-for="(eventItem, eventIndex) in parseEventLog(forms.deals.events)"
+                    :key="`deal-event-${editingDealId || 'new'}-${eventIndex}`"
+                    class="rounded-xl border border-crm-border/80 bg-[#0f2f4a] p-3"
+                  >
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                      <span class="text-[11px] uppercase tracking-[0.16em] text-crm-muted shrink-0">[[ eventItem.timestamp || 'Без даты' ]]</span>
+                      <span v-if="eventItem.result" class="text-white break-words">[[ eventItem.result ]]</span>
+                      <span v-if="eventItem.extra" class="text-crm-muted break-words">[[ eventItem.extra ]]</span>
+                      <button
+                        v-if="eventItem.taskId"
+                        type="button"
+                        @click="openTaskFromEvent(eventItem.taskId)"
+                        class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                      >
+                        Задача #[[ eventItem.taskId ]]
+                      </button>
+                      <button
+                        v-if="eventItem.dealId"
+                        type="button"
+                        @click="openDealFromEvent(eventItem.dealId)"
+                        class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                      >
+                        Сделка #[[ eventItem.dealId ]]
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </label>
             <div v-if="editingDealId" class="md:col-span-2 mt-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <button
@@ -599,11 +775,22 @@
               </div>
 
               <div class="mt-4">
-                <div class="text-sm font-semibold text-white">Задачи по сделке</div>
+                <button
+                  type="button"
+                  class="text-sm font-semibold text-white hover:text-crm-accent transition"
+                  @click="openTaskListForDeal"
+                >
+                  Задачи по сделке
+                </button>
                 <div v-if="isDealTasksLoading" class="mt-2 text-sm text-crm-muted">Загрузка задач...</div>
                 <div v-else-if="dealTasksForActiveDeal.length === 0" class="mt-2 text-sm text-crm-muted">По этой сделке задач пока нет.</div>
                 <div v-else class="mt-2 space-y-2">
-                  <div v-for="task in dealTasksForActiveDeal" :key="task.id" class="rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2">
+                  <div
+                    v-for="task in dealTasksForActiveDeal"
+                    :key="task.id"
+                    class="rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 cursor-pointer hover:border-crm-accent transition"
+                    @click="openTaskFromDeal(task)"
+                  >
                     <div class="flex items-start justify-between gap-3">
                       <div class="min-w-0">
                         <div class="text-sm font-medium text-white truncate">[[ task.subject ]]</div>
@@ -668,19 +855,19 @@
               <span class="text-sm text-crm-muted">Название</span>
               <input v-model="forms.companies.name" required type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block">
+            <label v-if="shouldShowCompanyField(forms.companies.legalName)" class="block">
               <span class="text-sm text-crm-muted">Юридическое название</span>
               <input v-model="forms.companies.legalName" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block">
+            <label v-if="shouldShowCompanyField(forms.companies.inn)" class="block">
               <span class="text-sm text-crm-muted">ИНН</span>
               <input v-model="forms.companies.inn" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block">
+            <label v-if="shouldShowCompanyField(forms.companies.okved)" class="block">
               <span class="text-sm text-crm-muted">ОКВЭД</span>
               <input v-model="forms.companies.okved" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block md:col-span-2">
+            <label v-if="shouldShowCompanyField(forms.companies.industry)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Сфера деятельности</span>
               <input v-model="forms.companies.industry" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
@@ -709,11 +896,11 @@
                 </div>
               </div>
             </div>
-            <label class="block md:col-span-2">
+            <label v-if="shouldShowCompanyField(forms.companies.address)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Адрес</span>
               <input v-model="forms.companies.address" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block">
+            <label v-if="shouldShowCompanyField(forms.companies.website)" class="block">
               <span class="text-sm text-crm-muted">Сайт</span>
               <input v-model="forms.companies.website" type="url" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
@@ -733,13 +920,47 @@
                 </a>
               </div>
             </label>
-            <label class="block">
+            <label v-if="shouldShowCompanyField(forms.companies.email)" class="block">
               <span class="text-sm text-crm-muted">Email</span>
               <input v-model="forms.companies.email" type="email" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block md:col-span-2">
+            <label v-if="shouldShowCompanyField(forms.companies.notes)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Заметки</span>
               <textarea v-model="forms.companies.notes" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+            </label>
+            <label v-if="parseEventLog(forms.companies.events).length" class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">События</span>
+              <div class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                <div class="space-y-3">
+                  <div
+                    v-for="(eventItem, eventIndex) in parseEventLog(forms.companies.events)"
+                    :key="`company-event-${editingCompanyId || 'new'}-${eventIndex}`"
+                    class="rounded-xl border border-crm-border/80 bg-[#0f2f4a] p-3"
+                  >
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                      <span class="text-[11px] uppercase tracking-[0.16em] text-crm-muted shrink-0">[[ eventItem.timestamp || 'Без даты' ]]</span>
+                      <span v-if="eventItem.result" class="text-white break-words">[[ eventItem.result ]]</span>
+                      <span v-if="eventItem.extra" class="text-crm-muted break-words">[[ eventItem.extra ]]</span>
+                      <button
+                        v-if="eventItem.taskId"
+                        type="button"
+                        @click="openTaskFromEvent(eventItem.taskId)"
+                        class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                      >
+                        Задача #[[ eventItem.taskId ]]
+                      </button>
+                      <button
+                        v-if="eventItem.dealId"
+                        type="button"
+                        @click="openDealFromEvent(eventItem.dealId)"
+                        class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                      >
+                        Сделка #[[ eventItem.dealId ]]
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </label>
             <label class="md:col-span-2 flex items-center gap-2">
               <input v-model="forms.companies.isActive" type="checkbox" class="w-4 h-4 rounded border-crm-border bg-transparent" />
@@ -846,13 +1067,46 @@
               <span class="text-sm text-crm-muted">Описание</span>
               <textarea v-model="forms.tasks.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
+            <label v-if="showTaskResultField" class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Результат</span>
+              <textarea v-model="forms.tasks.result" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+            </label>
             <label class="md:col-span-2 flex items-center gap-2">
               <input v-model="forms.tasks.isDone" type="checkbox" class="w-4 h-4 rounded border-crm-border bg-transparent" />
               <span class="text-sm text-crm-muted">Задача уже выполнена</span>
             </label>
+            <div v-if="showTaskFollowUpSuggestion" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <div class="text-sm font-semibold text-white">Следующая задача по сделке</div>
+              <div class="mt-1 text-xs text-crm-muted">Сделка: [[ taskFollowUpDealTitle ]]</div>
+              <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label class="block md:col-span-2">
+                  <span class="text-sm text-crm-muted">Название следующей задачи</span>
+                  <input v-model="taskFollowUpForm.subject" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <label class="block">
+                  <span class="text-sm text-crm-muted">Срок</span>
+                  <input v-model="taskFollowUpForm.dueAt" type="datetime-local" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <label class="block md:col-span-2">
+                  <span class="text-sm text-crm-muted">Описание</span>
+                  <textarea v-model="taskFollowUpForm.description" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
+                </label>
+              </div>
+            </div>
           </template>
 
           <div class="md:col-span-2 flex items-center justify-end gap-3 pt-2">
+            <button
+              v-if="activeSection === 'companies' && editingCompanyId"
+              type="button"
+              @click="showAllCompanyFields = !showAllCompanyFields"
+              class="h-11 px-4 rounded-xl border border-crm-border bg-[#123753] text-white font-semibold hover:border-crm-accent transition inline-flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.651-1.651a2.121 2.121 0 113 3L7.5 19.5 3 21l1.5-4.5 12.362-12.013z" />
+              </svg>
+              <span>Редактировать</span>
+            </button>
             <button type="button" @click="closeModal" class="h-11 px-5 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition">
               Отмена
             </button>
@@ -890,9 +1144,9 @@
 
     const LEAD_STATUS_MAIN_FLOW_NEXT = {
       new: "in_progress",
-      in_progress: "qualified",
-      qualified: "converted",
-      attempting_contact: "in_progress"
+      in_progress: "attempting_contact",
+      attempting_contact: "qualified",
+      qualified: "converted"
     };
 
     createApp({
@@ -920,6 +1174,10 @@
           isCompanyContactsLoading: false,
           showCompanyContactForm: false,
           showCompanyOkvedDetails: false,
+          showAllCompanyFields: false,
+          expandedCompanyCards: {},
+          taskDealFilterId: null,
+          taskDealFilterLabel: "",
           errorMessage: "",
           forms: {
             leads: {
@@ -939,8 +1197,8 @@
               amount: "0",
               currency: "RUB",
               closeDate: "",
-              isWon: false,
-              stageId: ""
+              stageId: "",
+              events: ""
             },
             contacts: {
               fullName: "",
@@ -962,17 +1220,25 @@
               email: "",
               website: "",
               notes: "",
+              events: "",
               isActive: true
             },
             tasks: {
               subject: "",
               companyId: null,
+              dealId: null,
               dueAt: "",
               description: "",
+              result: "",
               isDone: false
             }
           },
           dealTaskForm: {
+            subject: "",
+            dueAt: "",
+            description: ""
+          },
+          taskFollowUpForm: {
             subject: "",
             dueAt: "",
             description: ""
@@ -1012,7 +1278,7 @@
             { key: "leads", label: "Лиды", shortLabel: "Лиды", icon: "◎" },
             { key: "deals", label: "Сделки", shortLabel: "Сделки", icon: "◔" },
             { key: "contacts", label: "Контакты", shortLabel: "Контакты", icon: "◉" },
-            { key: "companies", label: "Компании", shortLabel: "Комп.", icon: "▣" },
+            { key: "companies", label: "Компании", shortLabel: "Компании", icon: "▣" },
             { key: "tasks", label: "Задачи", shortLabel: "Задачи", icon: "✓" }
           ],
           datasets: {
@@ -1112,6 +1378,47 @@
             name: company.name,
           }));
         },
+        isCreatingCompany() {
+          return this.activeSection === "companies" && !this.editingCompanyId;
+        },
+        dealHasSelectedCompany() {
+          return !!this.toIntOrNull(this.forms.deals.companyId);
+        },
+        dealSelectedCompanyName() {
+          const companyId = this.toIntOrNull(this.forms.deals.companyId);
+          if (!companyId) return "";
+          const selected = this.datasets.companies.find((company) => String(company.id) === String(companyId));
+          return selected ? selected.name : `Компания #${companyId}`;
+        },
+        dealCompanyActionTitle() {
+          return this.dealHasSelectedCompany ? "Новый контакт компании" : "Новая компания + контакт";
+        },
+        dealCompanySubmitLabel() {
+          return this.dealHasSelectedCompany ? "Создать контакт" : "Создать компанию";
+        },
+        canSubmitDealCompanyAction() {
+          if (this.dealHasSelectedCompany) {
+            return !!this.dealCompanyContactForm.fullName.trim();
+          }
+          return !!this.dealCompanyForm.name.trim();
+        },
+        shouldShowCompanyField() {
+          return (value) => this.isCreatingCompany || this.showAllCompanyFields || !!String(value || "").trim();
+        },
+        showTaskResultField() {
+          return !!this.forms.tasks.isDone || !!String(this.forms.tasks.result || "").trim();
+        },
+        taskActiveDeal() {
+          const dealId = this.toIntOrNull(this.forms.tasks.dealId);
+          if (!dealId) return null;
+          return this.datasets.deals.find((deal) => String(deal.id) === String(dealId)) || null;
+        },
+        showTaskFollowUpSuggestion() {
+          return !!this.editingTaskId && !!this.forms.tasks.isDone && !!this.taskActiveDeal && this.taskActiveDeal.status !== "done";
+        },
+        taskFollowUpDealTitle() {
+          return this.taskActiveDeal ? this.taskActiveDeal.title || this.taskActiveDeal.name : "";
+        },
         emptyLabel() {
           const labels = {
             leads: "лидов",
@@ -1131,16 +1438,26 @@
         filteredItems() {
           const q = this.search.trim().toLowerCase();
           const filtered = this.currentItems.filter((item) => {
+            const matchesDealFilter =
+              this.activeSection !== "tasks" ||
+              !this.taskDealFilterId ||
+              String(item.dealId || "") === String(this.taskDealFilterId);
             const matchesSearch = !q || [item.name, item.company, item.deal, item.phone, item.email, item.statusLabel]
               .filter(Boolean)
               .some((value) => String(value).toLowerCase().includes(q));
             const matchesStatus =
               !this.selectedStatusFilters.length ||
               this.selectedStatusFilters.includes(item.statusLabel);
-            return matchesSearch && matchesStatus;
+            return matchesDealFilter && matchesSearch && matchesStatus;
           });
           const ordered = filtered.map((item, index) => ({ item, index }));
           ordered.sort((left, right) => {
+            const leftTop = this.isTopPriorityItem(left.item);
+            const rightTop = this.isTopPriorityItem(right.item);
+            if (leftTop !== rightTop) {
+              return leftTop ? -1 : 1;
+            }
+
             const leftBottom = this.isBottomPriorityItem(left.item);
             const rightBottom = this.isBottomPriorityItem(right.item);
             if (leftBottom === rightBottom) {
@@ -1162,9 +1479,25 @@
         },
         stats() {
           return {
-            newCount: this.filteredItems.filter((item) => this.getStatusBucket(item.status) === "new").length,
-            inProgressCount: this.filteredItems.filter((item) => this.getStatusBucket(item.status) === "progress").length,
-            doneCount: this.filteredItems.filter((item) => this.getStatusBucket(item.status) === "done").length
+            newCount: this.filteredItems.filter((item) => this.getItemStatusBucket(item) === "new").length,
+            inProgressCount: this.filteredItems.filter((item) => this.getItemStatusBucket(item) === "progress").length,
+            doneCount: this.filteredItems.filter((item) => this.getItemStatusBucket(item) === "done").length
+          };
+        },
+        companyStats() {
+          if (this.activeSection !== "companies") {
+            return {
+              totalCount: 0,
+              activeCount: 0,
+              inProgressCount: 0,
+            };
+          }
+
+          const companies = this.filteredItems;
+          return {
+            totalCount: companies.length,
+            activeCount: companies.filter((item) => item.isActive !== false).length,
+            inProgressCount: companies.filter((item) => this.companyHasActiveDeals(item.id)).length,
           };
         },
         taskFormRemainingLabel() {
@@ -1193,6 +1526,140 @@
           if (Array.isArray(data)) return data;
           if (data && Array.isArray(data.results)) return data.results;
           return [];
+        },
+        parseEventLog(value) {
+          const raw = String(value || "").trim();
+          if (!raw) return [];
+
+          return raw
+            .split(/\n\s*\n+/)
+            .map((chunk) => String(chunk || "").trim())
+            .filter(Boolean)
+            .map((chunk) => {
+              const lines = chunk
+                .split("\n")
+                .map((line) => String(line || "").trim())
+                .filter(Boolean);
+              if (!lines.length) {
+                return null;
+              }
+
+              const firstLine = lines[0];
+              const timestampPattern = /^\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}$/;
+              const eventItem = {
+                timestamp: timestampPattern.test(firstLine) ? firstLine : "",
+                result: "",
+                taskId: null,
+                dealId: null,
+                extra: "",
+              };
+              const contentLines = eventItem.timestamp ? lines.slice(1) : lines.slice();
+              const extraLines = [];
+
+              contentLines.forEach((line) => {
+                if (!line) return;
+                if (line.indexOf("Результат:") === 0) {
+                  eventItem.result = line.replace(/^Результат:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("task_id:") === 0) {
+                  const parsedTaskId = Number.parseInt(line.replace(/^task_id:\s*/u, "").trim(), 10);
+                  eventItem.taskId = Number.isNaN(parsedTaskId) ? null : parsedTaskId;
+                  return;
+                }
+                if (line.indexOf("deal_id:") === 0) {
+                  const parsedDealId = Number.parseInt(line.replace(/^deal_id:\s*/u, "").trim(), 10);
+                  eventItem.dealId = Number.isNaN(parsedDealId) ? null : parsedDealId;
+                  return;
+                }
+                extraLines.push(line);
+              });
+
+              if (!eventItem.result && !eventItem.taskId && !eventItem.dealId) {
+                return {
+                  timestamp: eventItem.timestamp,
+                  result: contentLines.join("\n") || chunk,
+                  taskId: null,
+                  dealId: null,
+                  extra: "",
+                };
+              }
+
+              eventItem.extra = extraLines.join("\n").trim();
+              return eventItem;
+            })
+            .filter(Boolean);
+        },
+        async fetchTaskById(taskId) {
+          const normalizedTaskId = this.toIntOrNull(taskId);
+          if (!normalizedTaskId) {
+            throw new Error("Некорректный ID задачи");
+          }
+
+          const existingTask = this.datasets.tasks.find((item) => String(item.id) === String(normalizedTaskId));
+          if (existingTask) {
+            return existingTask;
+          }
+
+          const payload = await this.apiRequest(`/api/v1/activities/${normalizedTaskId}/`);
+          return this.mapTask(payload);
+        },
+        async fetchDealById(dealId) {
+          const normalizedDealId = this.toIntOrNull(dealId);
+          if (!normalizedDealId) {
+            throw new Error("Некорректный ID сделки");
+          }
+
+          const existingDeal = this.datasets.deals.find((item) => String(item.id) === String(normalizedDealId));
+          if (existingDeal) {
+            return existingDeal;
+          }
+
+          const payload = await this.apiRequest(`/api/v1/deals/${normalizedDealId}/`);
+          return this.mapDeal(payload);
+        },
+        async openTaskFromEvent(taskId) {
+          try {
+            const task = await this.fetchTaskById(taskId);
+            this.openTaskEditor(task);
+          } catch (error) {
+            this.errorMessage = `Ошибка открытия задачи: ${error.message}`;
+          }
+        },
+        async openDealFromEvent(dealId) {
+          try {
+            const deal = await this.fetchDealById(dealId);
+            this.openDealEditor(deal);
+          } catch (error) {
+            this.errorMessage = `Ошибка открытия сделки: ${error.message}`;
+          }
+        },
+        sortDealStages(stages) {
+          return [...(Array.isArray(stages) ? stages : [])].sort((left, right) => {
+            const leftOrder = Number.parseInt(left && left.order, 10);
+            const rightOrder = Number.parseInt(right && right.order, 10);
+            const safeLeftOrder = Number.isNaN(leftOrder) ? 9999 : leftOrder;
+            const safeRightOrder = Number.isNaN(rightOrder) ? 9999 : rightOrder;
+            if (safeLeftOrder !== safeRightOrder) {
+              return safeLeftOrder - safeRightOrder;
+            }
+
+            const leftFinal = !!(left && left.is_final);
+            const rightFinal = !!(right && right.is_final);
+            if (leftFinal !== rightFinal) {
+              return leftFinal ? 1 : -1;
+            }
+
+            return String((left && left.name) || "").localeCompare(String((right && right.name) || ""), "ru");
+          });
+        },
+        resolveDealWonFlag(stageId) {
+          const normalizedStageId = this.toIntOrNull(stageId);
+          if (!normalizedStageId) return false;
+          const stage = this.metaOptions.dealStages.find(
+            (candidate) => String(candidate.id) === String(normalizedStageId)
+          );
+          return String((stage && stage.code) || "").toLowerCase() === "won";
         },
         extractErrorMessage(data, fallback) {
           if (!data) return fallback;
@@ -1254,6 +1721,12 @@
           }
           return false;
         },
+        isTopPriorityItem(item) {
+          if (this.activeSection === "companies") {
+            return this.companyHasActiveDeals(item.id);
+          }
+          return false;
+        },
         statusChipStyle(item) {
           if (this.activeSection !== "deals") {
             return null;
@@ -1306,6 +1779,41 @@
         clearStatusFilter() {
           this.selectedStatusFilters = [];
         },
+        clearTaskDealFilter() {
+          this.taskDealFilterId = null;
+          this.taskDealFilterLabel = "";
+        },
+        companyHasActiveDeals(companyId) {
+          const normalizedCompanyId = this.toIntOrNull(companyId);
+          if (!normalizedCompanyId) return false;
+          return this.datasets.deals.some((deal) => {
+            if (String(deal.clientId || "") !== String(normalizedCompanyId)) {
+              return false;
+            }
+            return this.getDealStatusBucket(deal) !== "done";
+          });
+        },
+        countCompanyActiveDeals(companyId) {
+          const normalizedCompanyId = this.toIntOrNull(companyId);
+          if (!normalizedCompanyId) return 0;
+          return this.datasets.deals.filter((deal) => {
+            if (String(deal.clientId || "") !== String(normalizedCompanyId)) {
+              return false;
+            }
+            return this.getDealStatusBucket(deal) !== "done";
+          }).length;
+        },
+        toggleCompanyCardDetails(companyId) {
+          const key = String(companyId || "");
+          if (!key) return;
+          this.expandedCompanyCards = {
+            ...this.expandedCompanyCards,
+            [key]: !this.expandedCompanyCards[key],
+          };
+        },
+        isCompanyCardExpanded(companyId) {
+          return !!this.expandedCompanyCards[String(companyId || "")];
+        },
         handleDocumentClick(event) {
           if (!this.showStatusFilter) return;
           const target = event.target;
@@ -1320,6 +1828,23 @@
             return "progress";
           }
           return "new";
+        },
+        getDealStatusBucket(item) {
+          if (!item) return "new";
+          const stageCode = String(item.stageCode || "").toLowerCase();
+          if (item.isWon || item.status === "done" || stageCode === "won") {
+            return "done";
+          }
+          if (stageCode === "primary_contact") {
+            return "new";
+          }
+          return "progress";
+        },
+        getItemStatusBucket(item) {
+          if (this.activeSection === "deals") {
+            return this.getDealStatusBucket(item);
+          }
+          return this.getStatusBucket(item.status);
         },
         resolveLeadStatusLabel(code, fallback) {
           if (fallback) return fallback;
@@ -1367,8 +1892,12 @@
               }
             }
             if (this.activeSection === "tasks") {
-              await this.setTaskDone(item.id, item.status !== "done");
-              await this.loadSection("tasks");
+              if (item.status === "done") {
+                await this.setTaskDone(item.id, false);
+                await this.loadSection("tasks");
+              } else {
+                this.openTaskEditor({ ...item, isDone: true });
+              }
             }
           } catch (error) {
             this.errorMessage = `Ошибка смены статуса: ${error.message}`;
@@ -1428,10 +1957,11 @@
             amount: item.amount ?? "0",
             currency: item.currency || "RUB",
             closeDate: item.closeDate || "",
-            isWon: !!item.isWon,
-            stageId: item.stageId || ""
+            stageId: item.stageId || "",
+            events: item.events || ""
           };
           this.resetDealTaskForm();
+          this.resetTaskFollowUpForm();
           this.showDealTaskForm = false;
           this.resetDealCompanyForm();
           this.showDealCompanyForm = false;
@@ -1461,6 +1991,7 @@
           this.editingContactId = null;
           this.editingTaskId = null;
           this.editingCompanyId = item.id;
+          this.showAllCompanyFields = false;
           const normalizedOkveds = this.normalizeCompanyOkveds(item.okveds, item.okved, item.industry);
           const resolvedIndustry = this.resolvePrimaryIndustry(item.industry, item.okved, normalizedOkveds);
           this.forms.companies = {
@@ -1475,6 +2006,7 @@
             email: item.email || "",
             website: item.website || "",
             notes: item.notes || "",
+            events: item.events || "",
             isActive: item.isActive !== false
           };
           this.showCompanyOkvedDetails = false;
@@ -1485,6 +2017,7 @@
           this.enrichCompanyFromDadataByInn();
         },
         openTaskEditor(item) {
+          this.activeSection = "tasks";
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
@@ -1493,11 +2026,32 @@
           this.forms.tasks = {
             subject: item.subject || item.name || "",
             companyId: this.toIntOrNull(item.clientId),
+            dealId: this.toIntOrNull(item.dealId),
             dueAt: this.toDateTimeLocal(item.dueAtRaw),
             description: item.description || "",
+            result: item.result || "",
             isDone: !!item.isDone
           };
+          this.resetTaskFollowUpForm();
           this.showModal = true;
+        },
+        openTaskFromDeal(task) {
+          this.taskDealFilterId = task.dealId || this.editingDealId || null;
+          this.taskDealFilterLabel = task.deal || this.forms.deals.title || "";
+          this.openTaskEditor(task);
+        },
+        async openTaskListForDeal() {
+          if (!this.editingDealId) return;
+          this.taskDealFilterId = this.editingDealId;
+          this.taskDealFilterLabel = this.forms.deals.title || `Сделка #${this.editingDealId}`;
+          this.closeModal();
+          this.activeSection = "tasks";
+          this.search = "";
+          this.showStatusFilter = false;
+          this.selectedStatusFilters = [];
+          if (!this.datasets.tasks.length) {
+            await this.reloadActiveSection();
+          }
         },
         toggleDealTaskForm() {
           this.showDealTaskForm = !this.showDealTaskForm;
@@ -1507,6 +2061,13 @@
         },
         resetDealTaskForm() {
           this.dealTaskForm = {
+            subject: "",
+            dueAt: "",
+            description: ""
+          };
+        },
+        resetTaskFollowUpForm() {
+          this.taskFollowUpForm = {
             subject: "",
             dueAt: "",
             description: ""
@@ -1700,6 +2261,12 @@
               id: item.id,
               subject: item.subject || `Задача #${item.id}`,
               description: item.description || "",
+              result: item.result || "",
+              company: item.client_name || "",
+              clientId: item.client || null,
+              deal: item.deal_title || this.forms.deals.title || "",
+              dealId: item.deal || this.editingDealId || null,
+              dueAtRaw: item.due_at || null,
               isDone: !!item.is_done,
               dueLabel: this.formatDueLabel(item.due_at),
               remainingLabel: this.formatTaskRemainingLabel(item.due_at, item.is_done),
@@ -1791,10 +2358,22 @@
           };
         },
         mapDeal(item) {
+          const stage = this.metaOptions.dealStages.find(
+            (candidate) => String(candidate.id) === String(item.stage)
+          );
+          const stageCode = String((stage && stage.code) || "").toLowerCase();
+          const stageName = String(item.stage_name || "").toLowerCase();
           let normalized = this.uiStatus("progress", item.stage_name || "В работе");
-          if (item.is_won || item.closed_at) {
-            normalized = this.uiStatus("done", item.is_won ? "Выиграна" : "Закрыта");
-          } else if (item.stage_name && item.stage_name.toLowerCase().includes("нов")) {
+          if (item.is_won || item.closed_at || stageCode === "won") {
+            const doneLabel = item.is_won
+              ? "Выиграна"
+              : (stageCode === "won" ? (item.stage_name || "Won") : "Закрыта");
+            normalized = this.uiStatus("done", doneLabel);
+          } else if (
+            stageCode === "primary_contact" ||
+            stageName.includes("первич") ||
+            stageName.includes("нов")
+          ) {
             normalized = this.uiStatus("new", item.stage_name);
           }
           return {
@@ -1808,10 +2387,12 @@
             title: item.title || "",
             clientId: item.client || null,
             stageId: item.stage || "",
+            stageCode,
             stageName: item.stage_name || "",
             amount: item.amount ?? 0,
             currency: item.currency || "RUB",
             closeDate: item.close_date || "",
+            events: item.events || "",
             isWon: !!item.is_won
           };
         },
@@ -1855,6 +2436,7 @@
             okveds: normalizedOkveds,
             website: item.website || "",
             notes: item.notes || "",
+            events: item.events || "",
             isActive: item.is_active !== false
           };
         },
@@ -1865,9 +2447,11 @@
             name: item.subject || `Задача #${item.id}`,
             subject: item.subject || `Задача #${item.id}`,
             description: item.description || "",
+            result: item.result || "",
             company: item.client_name || "",
             clientId: item.client || null,
             deal: item.deal_title || "",
+            dealId: item.deal || null,
             dueLabel: this.formatDueLabel(item.due_at),
             remainingLabel: this.formatTaskRemainingLabel(item.due_at, item.is_done),
             dueAtRaw: item.due_at || null,
@@ -1918,6 +2502,7 @@
           this.search = "";
           this.showStatusFilter = false;
           this.selectedStatusFilters = [];
+          this.clearTaskDealFilter();
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
@@ -1925,6 +2510,7 @@
           this.editingTaskId = null;
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
+          this.resetTaskFollowUpForm();
           this.showDealCompanyForm = false;
           this.resetDealCompanyForm();
           this.dealTasksForActiveDeal = [];
@@ -1946,8 +2532,10 @@
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
+          this.showAllCompanyFields = false;
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
+          this.resetTaskFollowUpForm();
           this.showDealCompanyForm = false;
           this.resetDealCompanyForm();
           this.dealTasksForActiveDeal = [];
@@ -1962,9 +2550,11 @@
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
+          this.showAllCompanyFields = false;
           this.showDealTaskForm = false;
           this.forms[this.activeSection] = this.getDefaultForm(this.activeSection);
           this.resetDealTaskForm();
+          this.resetTaskFollowUpForm();
           this.showDealCompanyForm = false;
           this.resetDealCompanyForm();
           this.dealTasksForActiveDeal = [];
@@ -1995,8 +2585,8 @@
               amount: "0",
               currency: "RUB",
               closeDate: "",
-              isWon: false,
-              stageId: this.metaOptions.dealStages.length ? this.metaOptions.dealStages[0].id : ""
+              stageId: this.metaOptions.dealStages.length ? this.metaOptions.dealStages[0].id : "",
+              events: ""
             };
           }
           if (section === "contacts") {
@@ -2022,6 +2612,7 @@
               email: "",
               website: "",
               notes: "",
+              events: "",
               isActive: true
             };
           }
@@ -2029,8 +2620,10 @@
             return {
               subject: "",
               companyId: null,
+              dealId: null,
               dueAt: "",
               description: "",
+              result: "",
               isDone: false
             };
           }
@@ -2070,7 +2663,7 @@
             this.apiRequest("/api/v1/meta/lead-sources/")
           ]);
           this.metaOptions.leadStatuses = this.normalizePaginatedResponse(leadStatuses);
-          this.metaOptions.dealStages = this.normalizePaginatedResponse(dealStages);
+          this.metaOptions.dealStages = this.sortDealStages(this.normalizePaginatedResponse(dealStages));
           this.metaOptions.leadSources = this.normalizePaginatedResponse(leadSources);
         },
         async ensureClient(companyName) {
@@ -2147,7 +2740,7 @@
               currency: form.currency,
               close_date: form.closeDate || null,
               stage: this.toIntOrNull(form.stageId),
-              is_won: !!form.isWon
+              is_won: this.resolveDealWonFlag(form.stageId)
             }
           });
         },
@@ -2166,7 +2759,7 @@
               currency: form.currency,
               close_date: form.closeDate || null,
               stage: this.toIntOrNull(form.stageId),
-              is_won: !!form.isWon
+              is_won: this.resolveDealWonFlag(form.stageId)
             }
           });
         },
@@ -2203,11 +2796,8 @@
           }
         },
         async createCompanyFromDeal() {
+          const existingCompanyId = this.toIntOrNull(this.forms.deals.companyId);
           const companyName = this.dealCompanyForm.name.trim();
-          if (!companyName) {
-            throw new Error("Укажите название компании");
-          }
-
           const contactFullName = this.dealCompanyContactForm.fullName.trim();
           const hasContactDetails =
             !!contactFullName ||
@@ -2218,24 +2808,35 @@
           if (hasContactDetails && !contactFullName) {
             throw new Error("Укажите ФИО контакта");
           }
+          if (existingCompanyId && !contactFullName) {
+            throw new Error("Укажите ФИО контакта");
+          }
+          if (!existingCompanyId && !companyName) {
+            throw new Error("Укажите название компании");
+          }
 
           this.isDealCompanySaving = true;
           this.errorMessage = "";
           try {
-            const createdCompany = await this.apiRequest("/api/v1/clients/", {
-              method: "POST",
-              body: {
-                name: companyName,
-                inn: this.dealCompanyForm.inn.trim() || null,
-                address: this.dealCompanyForm.address.trim(),
-                industry: this.dealCompanyForm.industry.trim(),
-                okved: this.dealCompanyForm.okved.trim(),
-                phone: this.dealCompanyForm.phone.trim(),
-                email: this.dealCompanyForm.email.trim(),
-                website: this.dealCompanyForm.website.trim(),
-                is_active: true
-              }
-            });
+            let targetCompanyId = existingCompanyId;
+            if (!targetCompanyId) {
+              const createdCompany = await this.apiRequest("/api/v1/clients/", {
+                method: "POST",
+                body: {
+                  name: companyName,
+                  inn: this.dealCompanyForm.inn.trim() || null,
+                  address: this.dealCompanyForm.address.trim(),
+                  industry: this.dealCompanyForm.industry.trim(),
+                  okved: this.dealCompanyForm.okved.trim(),
+                  phone: this.dealCompanyForm.phone.trim(),
+                  email: this.dealCompanyForm.email.trim(),
+                  website: this.dealCompanyForm.website.trim(),
+                  is_active: true
+                }
+              });
+              targetCompanyId = createdCompany.id;
+              this.forms.deals.companyId = createdCompany.id;
+            }
 
             if (contactFullName) {
               const parts = contactFullName.split(/\s+/).filter(Boolean);
@@ -2244,7 +2845,7 @@
               await this.apiRequest("/api/v1/contacts/", {
                 method: "POST",
                 body: {
-                  client: createdCompany.id,
+                  client: targetCompanyId,
                   first_name: firstName,
                   last_name: lastName,
                   position: this.dealCompanyContactForm.position.trim(),
@@ -2256,10 +2857,11 @@
               await this.loadSection("contacts");
             }
 
-            this.forms.deals.companyId = createdCompany.id;
             this.showDealCompanyForm = false;
             this.resetDealCompanyForm();
-            await this.loadSection("companies");
+            if (!existingCompanyId) {
+              await this.loadSection("companies");
+            }
           } catch (error) {
             this.errorMessage = `Ошибка создания компании: ${error.message}`;
           } finally {
@@ -2416,8 +3018,10 @@
               type: "task",
               subject: form.subject.trim(),
               description: form.description.trim(),
+              result: form.result.trim(),
               due_at: this.toIsoDateTime(form.dueAt),
               client: clientId,
+              deal: this.toIntOrNull(form.dealId),
               is_done: !!form.isDone
             }
           });
@@ -2437,9 +3041,31 @@
               type: "task",
               subject: form.subject.trim(),
               description: form.description.trim(),
+              result: form.result.trim(),
               due_at: this.toIsoDateTime(form.dueAt),
               client: clientId,
+              deal: this.toIntOrNull(form.dealId),
               is_done: !!form.isDone
+            }
+          });
+        },
+        async createFollowUpTaskFromCurrentDeal() {
+          const followUp = this.taskFollowUpForm;
+          const subject = followUp.subject.trim();
+          const dealId = this.toIntOrNull(this.forms.tasks.dealId);
+          if (!subject || !dealId) {
+            return;
+          }
+          await this.apiRequest("/api/v1/activities/", {
+            method: "POST",
+            body: {
+              type: "task",
+              subject,
+              description: followUp.description.trim(),
+              due_at: this.toIsoDateTime(followUp.dueAt),
+              client: this.toIntOrNull(this.forms.tasks.companyId),
+              deal: dealId,
+              is_done: false
             }
           });
         },
@@ -2456,6 +3082,9 @@
             if (this.activeSection === "companies" && this.editingCompanyId) await this.updateCompany();
             if (this.activeSection === "companies" && !this.editingCompanyId) await this.createCompany();
             if (this.activeSection === "tasks" && this.editingTaskId) await this.updateTask();
+            if (this.activeSection === "tasks" && this.editingTaskId && this.showTaskFollowUpSuggestion && this.taskFollowUpForm.subject.trim()) {
+              await this.createFollowUpTaskFromCurrentDeal();
+            }
             if (this.activeSection === "tasks" && !this.editingTaskId) await this.createTask();
             this.showModal = false;
             this.editingLeadId = null;
@@ -2465,6 +3094,7 @@
             this.editingTaskId = null;
             this.showDealTaskForm = false;
             this.resetDealTaskForm();
+            this.resetTaskFollowUpForm();
             this.showDealCompanyForm = false;
             this.resetDealCompanyForm();
             this.dealTasksForActiveDeal = [];
@@ -2473,6 +3103,10 @@
             this.companyContactsForActiveCompany = [];
             if (this.activeSection === "leads") {
               await Promise.all([this.loadSection("leads"), this.loadSection("deals")]);
+            } else if (this.activeSection === "deals") {
+              await Promise.all([this.loadSection("deals"), this.loadSection("companies")]);
+            } else if (this.activeSection === "tasks") {
+              await Promise.all([this.loadSection("tasks"), this.loadSection("deals"), this.loadSection("companies")]);
             } else {
               await this.reloadActiveSection();
             }

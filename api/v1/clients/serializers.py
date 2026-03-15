@@ -37,10 +37,11 @@ class ClientSerializer(serializers.ModelSerializer):
             "okveds",
             "source",
             "notes",
+            "events",
             "is_active",
             "leads_count",
             "deals_count",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ("created_at", "updated_at")
+        read_only_fields = ("events", "created_at", "updated_at")

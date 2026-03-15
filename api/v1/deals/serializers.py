@@ -16,6 +16,13 @@ class DealSerializer(serializers.ModelSerializer):
         full_name = owner.get_full_name() if hasattr(owner, "get_full_name") else ""
         return full_name or getattr(owner, "username", "")
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        stage = attrs.get("stage", getattr(self.instance, "stage", None))
+        stage_code = str(getattr(stage, "code", "") or "").strip().lower()
+        attrs["is_won"] = stage_code == "won"
+        return attrs
+
     class Meta:
         model = Deal
         fields = [
@@ -32,10 +39,11 @@ class DealSerializer(serializers.ModelSerializer):
             "close_date",
             "closed_at",
             "is_won",
+            "events",
             "metadata",
             "owner",
             "owner_name",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ("closed_at", "created_at", "updated_at")
+        read_only_fields = ("closed_at", "events", "created_at", "updated_at")

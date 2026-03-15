@@ -35,6 +35,7 @@ class Deal(TimestampedModel):
     close_date = models.DateField(blank=True, null=True, verbose_name="Плановая дата закрытия")
     closed_at = models.DateTimeField(blank=True, null=True, verbose_name="Дата закрытия")
     is_won = models.BooleanField(default=False, verbose_name="Успешная")
+    events = models.TextField(blank=True, default="", verbose_name="События")
     metadata = models.JSONField(default=dict, blank=True, verbose_name="Метаданные")
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,

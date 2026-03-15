@@ -1,6 +1,8 @@
 from rest_framework import serializers
+from django.utils import timezone
 
 from crm.models import Activity
+from crm.models.activity import ActivityType
 
 
 class ActivitySerializer(serializers.ModelSerializer):
@@ -16,6 +18,28 @@ class ActivitySerializer(serializers.ModelSerializer):
         full_name = f"{contact.first_name} {contact.last_name}".strip()
         return full_name or contact.phone or f"Контакт #{contact.id}"
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        activity_type = attrs.get("type", getattr(self.instance, "type", None))
+        is_done = attrs.get("is_done", getattr(self.instance, "is_done", False))
+        result = attrs.get("result", getattr(self.instance, "result", ""))
+        if activity_type == ActivityType.TASK and is_done and not str(result or "").strip():
+            raise serializers.ValidationError({"result": "Укажите результат завершения задачи."})
+        return attrs
+
+    def create(self, validated_data):
+        if validated_data.get("is_done"):
+            validated_data["completed_at"] = validated_data.get("completed_at") or timezone.now()
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        is_done = validated_data.get("is_done", instance.is_done)
+        if is_done and not instance.completed_at and "completed_at" not in validated_data:
+            validated_data["completed_at"] = timezone.now()
+        if not is_done and "is_done" in validated_data:
+            validated_data["completed_at"] = None
+        return super().update(instance, validated_data)
+
     class Meta:
         model = Activity
         fields = [
@@ -23,6 +47,7 @@ class ActivitySerializer(serializers.ModelSerializer):
             "type",
             "subject",
             "description",
+            "result",
             "due_at",
             "completed_at",
             "is_done",

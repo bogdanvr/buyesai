@@ -5,11 +5,11 @@ from crm.models import Client, Lead
 
 LEAD_STATUS_TRANSITIONS = {
     "new": {"in_progress", "attempting_contact", "unqualified", "lost", "spam"},
-    "attempting_contact": {"in_progress", "unqualified", "lost", "spam"},
+    "attempting_contact": {"in_progress", "qualified", "unqualified", "lost", "spam"},
     "in_progress": {"qualified", "attempting_contact", "unqualified", "lost"},
     "qualified": {"converted", "lost"},
     "converted": {"archived"},
-    "unqualified": {"archived"},
+    "unqualified": {"qualified", "archived"},
     "lost": {"archived"},
     "spam": {"archived"},
     "archived": set(),

@@ -34,6 +34,7 @@ class Client(TimestampedModel):
         verbose_name="Источник",
     )
     notes = models.TextField(blank=True, default="", verbose_name="Заметки")
+    events = models.TextField(blank=True, default="", verbose_name="События")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
 
     class Meta:
