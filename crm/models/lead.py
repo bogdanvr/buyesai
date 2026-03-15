@@ -31,6 +31,12 @@ class Lead(TimestampedModel):
         on_delete=models.SET_NULL,
         verbose_name="Источник",
     )
+    sources = models.ManyToManyField(
+        "crm.LeadSource",
+        related_name="tracked_leads",
+        blank=True,
+        verbose_name="Источники",
+    )
     status = models.ForeignKey(
         "crm.LeadStatus",
         related_name="leads",
@@ -47,8 +53,17 @@ class Lead(TimestampedModel):
         on_delete=models.SET_NULL,
         verbose_name="Клиент",
     )
+    website_session = models.ForeignKey(
+        "main.WebsiteSession",
+        related_name="leads",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Веб-сессия",
+    )
     payload = models.JSONField(default=dict, blank=True, verbose_name="Payload")
     utm_data = models.JSONField(default=dict, blank=True, verbose_name="UTM")
+    history = models.JSONField(default=list, blank=True, verbose_name="История")
     priority = models.CharField(
         max_length=16,
         choices=LeadPriority.choices,
@@ -89,6 +104,7 @@ class Lead(TimestampedModel):
             models.Index(fields=["created_at"]),
             models.Index(fields=["status"]),
             models.Index(fields=["source"]),
+            models.Index(fields=["website_session"]),
         ]
 
     def __str__(self):

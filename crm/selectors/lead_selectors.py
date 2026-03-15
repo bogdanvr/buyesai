@@ -4,7 +4,13 @@ from crm.models import Lead
 
 
 def list_leads() -> QuerySet[Lead]:
-    return Lead.objects.select_related("status", "source", "client", "assigned_to")
+    return Lead.objects.select_related(
+        "status",
+        "source",
+        "client",
+        "assigned_to",
+        "website_session",
+    ).prefetch_related("sources")
 
 
 def leads_by_status(status_code: str) -> QuerySet[Lead]:

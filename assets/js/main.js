@@ -250,10 +250,13 @@ createApp({
           },
 
           async submitFormPayload(formType, payload) {
-            const enrichedPayload = {
+            let enrichedPayload = {
                 ...payload,
                 page_url: payload && payload.page_url ? payload.page_url : window.location.href,
             };
+            if (window.BuyesTracker && typeof window.BuyesTracker.enrichPayload === 'function') {
+                enrichedPayload = await window.BuyesTracker.enrichPayload(enrichedPayload);
+            }
             if (!enrichedPayload.utm_data) {
                 enrichedPayload.utm_data = this.getUtmData();
             }

@@ -5,7 +5,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from crm.models import Client, Contact, Lead, LeadSource
-from main.models import FormSubmission
+from main.models import FormSubmission, WebsiteSession, WebsiteSessionEvent
 
 
 @override_settings(
@@ -16,6 +16,55 @@ from main.models import FormSubmission
     DADATA_KEY="",
 )
 class SendFormViewTests(TestCase):
+    def test_tracks_website_session_and_first_message(self):
+        response = self.client.post(
+            reverse("track_website_session"),
+            data=json.dumps(
+                {
+                    "session_id": "session-123",
+                    "utm_source": "google",
+                    "utm_medium": "cpc",
+                    "utm_campaign": "spring_sale",
+                    "utm_content": "ad-1",
+                    "utm_term": "ai crm",
+                    "yclid": "yclid-test",
+                    "referer": "https://google.com/",
+                    "landing_url": "https://buyes.pro/?utm_source=google",
+                    "client_id": "12345.67890",
+                    "page_url": "https://buyes.pro/?utm_source=google",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        session = WebsiteSession.objects.get(session_id="session-123")
+        self.assertEqual(session.utm_source, "google")
+        self.assertEqual(session.utm_campaign, "spring_sale")
+        self.assertEqual(session.yclid, "yclid-test")
+        self.assertEqual(session.client_id, "12345.67890")
+        self.assertTrue(
+            WebsiteSessionEvent.objects.filter(session=session, event_type="page_view").exists()
+        )
+
+        first_message_response = self.client.post(
+            reverse("track_website_event"),
+            data=json.dumps(
+                {
+                    "session_id": "session-123",
+                    "event_type": "first_message_sent",
+                    "message": "Подскажите по AI-аудиту",
+                    "page_url": "https://buyes.pro/",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(first_message_response.status_code, 200)
+        session.refresh_from_db()
+        self.assertEqual(session.first_message, "Подскажите по AI-аудиту")
+        self.assertIsNotNone(session.first_message_at)
+
     def test_creates_form_submission_and_crm_lead(self):
         response = self.client.post(
             reverse("send_form"),
@@ -66,6 +115,65 @@ class SendFormViewTests(TestCase):
         self.assertEqual(client.address, "г. Москва, ул. Тестовая, д. 1")
         self.assertEqual(client.industry, "Разработка ПО")
         self.assertEqual(client.okved, "62.01")
+
+    def test_send_form_links_tracking_session_history_and_sources(self):
+        self.client.post(
+            reverse("track_website_session"),
+            data=json.dumps(
+                {
+                    "session_id": "session-with-lead",
+                    "utm_source": "google",
+                    "utm_campaign": "campaign-1",
+                    "utm_content": "creative-7",
+                    "landing_url": "https://buyes.pro/?utm_source=google",
+                    "page_url": "https://buyes.pro/?utm_source=google",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.client.post(
+            reverse("track_website_event"),
+            data=json.dumps(
+                {
+                    "session_id": "session-with-lead",
+                    "event_type": "first_message_sent",
+                    "message": "Нужен аудит процессов",
+                    "page_url": "https://buyes.pro/",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        response = self.client.post(
+            reverse("send_form"),
+            data=json.dumps(
+                {
+                    "form_type": "hero",
+                    "payload": {
+                        "session_id": "session-with-lead",
+                        "name": "Иван",
+                        "phone": "+79990000000",
+                        "company": "Acme",
+                    },
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        lead = Lead.objects.get()
+        session = WebsiteSession.objects.get(session_id="session-with-lead")
+
+        self.assertEqual(lead.website_session_id, session.id)
+        self.assertEqual(
+            [item["event"] for item in lead.history],
+            ["page_view", "first_message_sent", "form_submitted"],
+        )
+        self.assertTrue(lead.sources.filter(code="site-hero").exists())
+        self.assertTrue(lead.sources.filter(name="Источник трафика: google").exists())
+        self.assertTrue(lead.sources.filter(name="Кампания: campaign-1").exists())
+        self.assertTrue(lead.sources.filter(name="Объявление: creative-7").exists())
+        self.assertTrue(lead.sources.filter(name="Действие: Отправка формы").exists())
 
     def test_reuses_existing_company_for_form_lead(self):
         existing = Client.objects.create(name="Acme")

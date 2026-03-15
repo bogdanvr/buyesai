@@ -23,6 +23,8 @@ from main.views import (
     RobotsTxtView,
     sendform_view,
     consultant_chat,
+    track_website_event_view,
+    track_website_session_view,
 )
 from chat.views import chat_token
 from django.contrib.sitemaps.views import sitemap
@@ -44,6 +46,8 @@ urlpatterns = [
     path("robots.txt", RobotsTxtView.as_view(content_type="text/plain"), name="robots"),
     path("", mainview, name="main"),
     path("send_form", sendform_view, name="send_form"),
+    path("api/site-tracking/session/", track_website_session_view, name="track_website_session"),
+    path("api/site-tracking/event/", track_website_event_view, name="track_website_event"),
     path("crm/", include("crm.urls")),
     path("api/dadata/party/", dadata_party, name="dadata_party"),
     path("api/dadata/party/by-inn/", dadata_party_by_inn, name="dadata_party_by_inn"),

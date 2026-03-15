@@ -76,6 +76,11 @@
                 this.unreadCount = 0;
                 if (!this.hasOpened) {
                     this.hasOpened = true;
+                    if (window.BuyesTracker && typeof window.BuyesTracker.trackEvent === 'function') {
+                        window.BuyesTracker.trackEvent('chat_opened', {
+                            page_url: window.location.href,
+                        }).catch(function () {});
+                    }
                 }
                 this.scrollToBottom();
             },
@@ -130,10 +135,13 @@
                 return utmData;
             },
             async submitFormPayload(formType, payload) {
-                const enrichedPayload = {
+                let enrichedPayload = {
                     ...payload,
                     page_url: payload && payload.page_url ? payload.page_url : window.location.href,
                 };
+                if (window.BuyesTracker && typeof window.BuyesTracker.enrichPayload === 'function') {
+                    enrichedPayload = await window.BuyesTracker.enrichPayload(enrichedPayload);
+                }
                 if (!enrichedPayload.utm_data) {
                     enrichedPayload.utm_data = this.getUtmData();
                 }
@@ -190,6 +198,13 @@
             sendMessage(text, options = {}) {
                 const messageText = (typeof text === 'string' ? text : this.input).trim();
                 if (!messageText) return;
+
+                if (window.BuyesTracker && typeof window.BuyesTracker.trackEvent === 'function') {
+                    window.BuyesTracker.trackEvent('first_message_sent', {
+                        page_url: window.location.href,
+                        message: messageText,
+                    }).catch(function () {});
+                }
 
                 this.pushMessage('user', messageText);
                 if (!this.historyLoaded) {

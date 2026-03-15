@@ -8,6 +8,12 @@ from django.utils.text import slugify
 from dadata import Dadata
 from main.services import get_client_ip, send_form_to_telegram
 from main.models import FormSubmission
+from main.tracking import (
+    extract_tracking_session_id,
+    get_or_create_website_session,
+    normalize_session_id,
+    record_website_event,
+)
 from crm.models import LeadSource
 from crm.services.lead_services import create_lead_from_payload
 import ipaddress
@@ -254,10 +260,95 @@ def _extract_utm_data(request, payload):
     return result
 
 
+def _build_tracking_session_payload(request, payload):
+    payload = payload if isinstance(payload, dict) else {}
+    utm_data = _extract_utm_data(request, payload)
+    tracking_payload = {
+        "utm_source": str(utm_data.get("utm_source") or payload.get("utm_source") or "").strip(),
+        "utm_medium": str(utm_data.get("utm_medium") or payload.get("utm_medium") or "").strip(),
+        "utm_campaign": str(utm_data.get("utm_campaign") or payload.get("utm_campaign") or "").strip(),
+        "utm_content": str(utm_data.get("utm_content") or payload.get("utm_content") or "").strip(),
+        "utm_term": str(utm_data.get("utm_term") or payload.get("utm_term") or "").strip(),
+        "yclid": str(payload.get("yclid") or "").strip(),
+        "referer": str(payload.get("referer") or request.META.get("HTTP_REFERER") or "").strip(),
+        "landing_url": str(payload.get("landing_url") or payload.get("page_url") or "").strip(),
+        "client_id": str(payload.get("client_id") or "").strip(),
+    }
+    return tracking_payload
+
+
+def _get_tracking_session(request, payload):
+    session_id = extract_tracking_session_id(payload)
+    if not session_id:
+        return None
+    return get_or_create_website_session(
+        session_id=session_id,
+        payload=_build_tracking_session_payload(request, payload),
+    )
+
+
 @ensure_csrf_cookie
 def mainview(request):
     # request_context = RequestContext(request.get_host)
     return render(request, "index.html")
+
+
+@require_POST
+def track_website_session_view(request):
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "invalid_json"}, status=400)
+
+    session_id = normalize_session_id(payload.get("session_id"))
+    if not session_id:
+        return JsonResponse({"error": "session_id_required"}, status=400)
+
+    session = get_or_create_website_session(
+        session_id=session_id,
+        payload=_build_tracking_session_payload(request, payload),
+    )
+    record_website_event(
+        session=session,
+        event_type="page_view",
+        page_url=str(payload.get("page_url") or payload.get("landing_url") or "").strip(),
+        payload={"referrer": str(payload.get("referer") or request.META.get("HTTP_REFERER") or "").strip()},
+    )
+    return JsonResponse({"ok": True, "session_id": session.session_id})
+
+
+@require_POST
+def track_website_event_view(request):
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "invalid_json"}, status=400)
+
+    session_id = normalize_session_id(payload.get("session_id"))
+    event_type = str(payload.get("event_type") or "").strip()
+    if not session_id:
+        return JsonResponse({"error": "session_id_required"}, status=400)
+    if not event_type:
+        return JsonResponse({"error": "event_type_required"}, status=400)
+
+    session = get_or_create_website_session(
+        session_id=session_id,
+        payload=_build_tracking_session_payload(request, payload),
+    )
+    event = record_website_event(
+        session=session,
+        event_type=event_type,
+        page_url=str(payload.get("page_url") or "").strip(),
+        payload={
+            "message": str(payload.get("message") or "").strip(),
+            "href": str(payload.get("href") or "").strip(),
+            "label": str(payload.get("label") or "").strip(),
+            "form_type": str(payload.get("form_type") or "").strip(),
+        },
+    )
+    if event is None:
+        return JsonResponse({"error": "unsupported_event_type"}, status=400)
+    return JsonResponse({"ok": True, "session_id": session.session_id, "event_id": event.id})
 
 
 class RobotsTxtView(TemplateView):
@@ -356,6 +447,16 @@ def sendform_view(request):
             continue
         clean_payload[str(key)] = str(value).strip() if isinstance(value, str) else value
 
+    tracking_session = _get_tracking_session(request, clean_payload)
+    if tracking_session is not None:
+        clean_payload["session_id"] = tracking_session.session_id
+        record_website_event(
+            session=tracking_session,
+            event_type="form_submitted",
+            page_url=str(clean_payload.get("page_url") or "").strip(),
+            payload={"form_type": form_type},
+        )
+
     form_submission = FormSubmission.objects.create(
         form_type=form_type,
         name=str(clean_payload.get("name") or ""),
@@ -416,6 +517,7 @@ def sendform_view(request):
             form_type=form_type,
             payload=lead_payload,
             source=source,
+            website_session=tracking_session,
         )
         crm_lead_id = crm_lead.id
     except Exception:

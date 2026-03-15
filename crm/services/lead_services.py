@@ -4,6 +4,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from crm.models import Client, Contact, Deal, Lead
+from main.tracking import sync_lead_tracking_data
 
 
 def _text_or_empty(value) -> str:
@@ -139,7 +140,14 @@ def _upsert_director_contact(*, client: Client, director: dict) -> None:
 
 
 @transaction.atomic
-def create_lead_from_payload(*, form_type: str, payload: dict, source=None, created_by=None) -> Lead:
+def create_lead_from_payload(
+    *,
+    form_type: str,
+    payload: dict,
+    source=None,
+    created_by=None,
+    website_session=None,
+) -> Lead:
     company_profile = _extract_company_profile(payload)
     company_name = company_profile["name"]
     company_inn = company_profile["inn"]
@@ -204,10 +212,13 @@ def create_lead_from_payload(*, form_type: str, payload: dict, source=None, crea
         company=company_name,
         client=client,
         source=source,
+        website_session=website_session,
         payload=payload,
         utm_data=payload.get("utm_data") if isinstance(payload.get("utm_data"), dict) else {},
         created_by=created_by,
     )
+    if website_session is not None:
+        sync_lead_tracking_data(lead, website_session, source)
     return lead
 
 

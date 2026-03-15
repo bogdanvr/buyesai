@@ -10,7 +10,7 @@ LEAD_STATUS_TRANSITIONS = {
     "qualified": {"converted", "lost"},
     "converted": {"archived"},
     "unqualified": {"qualified", "archived"},
-    "lost": {"archived"},
+    "lost": {"new", "in_progress", "attempting_contact", "qualified", "unqualified", "converted", "spam", "archived"},
     "spam": {"archived"},
     "archived": set(),
 }
@@ -19,9 +19,11 @@ LEAD_STATUS_TRANSITIONS = {
 class LeadSerializer(serializers.ModelSerializer):
     source_name = serializers.CharField(source="source.name", read_only=True)
     source_code = serializers.CharField(source="source.code", read_only=True)
+    source_names = serializers.SerializerMethodField()
     status_name = serializers.CharField(source="status.name", read_only=True)
     status_code = serializers.CharField(source="status.code", read_only=True)
     client_name = serializers.CharField(source="client.name", read_only=True)
+    website_session_id = serializers.CharField(source="website_session.session_id", read_only=True)
 
     class Meta:
         model = Lead
@@ -36,13 +38,18 @@ class LeadSerializer(serializers.ModelSerializer):
             "source",
             "source_name",
             "source_code",
+            "sources",
+            "source_names",
             "status",
             "status_name",
             "status_code",
             "client",
             "client_name",
+            "website_session",
+            "website_session_id",
             "payload",
             "utm_data",
+            "history",
             "priority",
             "expected_value",
             "last_contact_at",
@@ -52,7 +59,18 @@ class LeadSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ("created_at", "updated_at", "converted_at")
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "converted_at",
+            "sources",
+            "website_session",
+            "website_session_id",
+            "history",
+        )
+
+    def get_source_names(self, obj):
+        return [source.name for source in obj.sources.all()]
 
     def validate(self, attrs):
         if "company" in attrs and isinstance(attrs["company"], str):
@@ -94,7 +112,16 @@ class LeadSerializer(serializers.ModelSerializer):
                 existing_client or Client.objects.create(name=company_name)
             )
             validated_data["company"] = company_name
-        return super().create(validated_data)
+        lead = super().create(validated_data)
+        if lead.source_id:
+            lead.sources.add(lead.source)
+        return lead
+
+    def update(self, instance, validated_data):
+        lead = super().update(instance, validated_data)
+        if lead.source_id:
+            lead.sources.add(lead.source)
+        return lead
 
 
 def current_status_id_equals(current_status, new_status) -> bool:

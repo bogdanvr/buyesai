@@ -89,3 +89,49 @@ class FormSubmission(models.Model):
     def __str__(self):
         return f"{self.form_type} #{self.pk}"
 
+
+class WebsiteSession(models.Model):
+    session_id = models.CharField(max_length=64, unique=True, db_index=True, verbose_name="Внутренний session_id")
+    utm_source = models.CharField(max_length=255, blank=True, default="", verbose_name="utm_source")
+    utm_medium = models.CharField(max_length=255, blank=True, default="", verbose_name="utm_medium")
+    utm_campaign = models.CharField(max_length=255, blank=True, default="", verbose_name="utm_campaign")
+    utm_content = models.CharField(max_length=255, blank=True, default="", verbose_name="utm_content")
+    utm_term = models.CharField(max_length=255, blank=True, default="", verbose_name="utm_term")
+    yclid = models.CharField(max_length=255, blank=True, default="", verbose_name="yclid")
+    referer = models.TextField(blank=True, default="", verbose_name="Referer")
+    landing_url = models.TextField(blank=True, default="", verbose_name="Landing URL")
+    client_id = models.CharField(max_length=255, blank=True, default="", verbose_name="Client ID")
+    first_visit_at = models.DateTimeField(auto_now_add=True, verbose_name="Первый визит")
+    first_message_at = models.DateTimeField(blank=True, null=True, verbose_name="Первое сообщение")
+    first_message = models.TextField(blank=True, default="", verbose_name="Первое сообщение")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        verbose_name = "Веб-сессия"
+        verbose_name_plural = "Веб-сессии"
+        ordering = ("-first_visit_at",)
+
+    def __str__(self):
+        return self.session_id
+
+
+class WebsiteSessionEvent(models.Model):
+    session = models.ForeignKey(
+        WebsiteSession,
+        related_name="events",
+        on_delete=models.CASCADE,
+        verbose_name="Веб-сессия",
+    )
+    event_type = models.CharField(max_length=64, db_index=True, verbose_name="Событие")
+    page_url = models.TextField(blank=True, default="", verbose_name="URL страницы")
+    payload = models.JSONField(default=dict, blank=True, verbose_name="Payload")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+
+    class Meta:
+        verbose_name = "Событие веб-сессии"
+        verbose_name_plural = "События веб-сессий"
+        ordering = ("created_at", "id")
+
+    def __str__(self):
+        return f"{self.session.session_id}:{self.event_type}"

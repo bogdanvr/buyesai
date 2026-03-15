@@ -21,7 +21,8 @@ class LeadStatusAdmin(admin.ModelAdmin):
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
     list_display = ("id", "title", "company", "phone", "status", "source", "assigned_to", "created_at")
-    list_filter = ("status", "source", "priority", "created_at")
+    list_filter = ("status", "source", "sources", "priority", "created_at")
     search_fields = ("title", "name", "phone", "email", "company", "external_id")
-    autocomplete_fields = ("client", "assigned_to", "created_by")
-    readonly_fields = ("created_at", "updated_at", "converted_at")
+    autocomplete_fields = ("client", "assigned_to", "created_by", "website_session")
+    filter_horizontal = ("sources",)
+    readonly_fields = ("created_at", "updated_at", "converted_at", "history")
