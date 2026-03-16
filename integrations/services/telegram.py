@@ -1,5 +1,6 @@
 import logging
 import math
+import json
 from html import escape
 
 import requests
@@ -62,7 +63,7 @@ def send_telegram_chat_message(*, chat_id: str, text: str, reply_markup: dict | 
         "parse_mode": "HTML",
     }
     if reply_markup:
-        params["reply_markup"] = reply_markup
+        params["reply_markup"] = json.dumps(reply_markup, ensure_ascii=False)
     return _telegram_api_request("sendMessage", params=params)
 
 
@@ -89,7 +90,7 @@ def edit_telegram_message_reply_markup(*, chat_id: str, message_id: int, reply_m
         "message_id": int(message_id),
     }
     if reply_markup is not None:
-        params["reply_markup"] = reply_markup
+        params["reply_markup"] = json.dumps(reply_markup, ensure_ascii=False)
     return _telegram_api_request("editMessageReplyMarkup", params=params)
 
 
