@@ -123,6 +123,8 @@ def activity_task_deadline_state_signal(sender, instance: Activity, **kwargs):
     if not instance.pk:
         if instance.is_done:
             instance.deadline_reminder_sent_at = None
+            instance.deadline_reminder_acknowledged_at = None
+            instance.deadline_reminder_email_escalated_at = None
         return
 
     previous = (
@@ -148,6 +150,8 @@ def activity_task_deadline_state_signal(sender, instance: Activity, **kwargs):
 
     if instance.is_done:
         instance.deadline_reminder_sent_at = None
+        instance.deadline_reminder_acknowledged_at = None
+        instance.deadline_reminder_email_escalated_at = None
 
     if previous is None or previous.type != ActivityType.TASK:
         return
@@ -159,6 +163,8 @@ def activity_task_deadline_state_signal(sender, instance: Activity, **kwargs):
     reopened = previous.is_done and not instance.is_done
     if due_at_changed or reminder_offset_changed or reopened:
         instance.deadline_reminder_sent_at = None
+        instance.deadline_reminder_acknowledged_at = None
+        instance.deadline_reminder_email_escalated_at = None
 
 
 @receiver(post_save, sender=Activity)

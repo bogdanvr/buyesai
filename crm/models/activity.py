@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+import uuid
 
 from crm.models.common import TimestampedModel
 
@@ -43,6 +44,23 @@ class Activity(TimestampedModel):
         blank=True,
         null=True,
         verbose_name="Напоминание о дедлайне отправлено",
+    )
+    deadline_reminder_ack_token = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        db_index=True,
+        verbose_name="Токен подтверждения напоминания",
+    )
+    deadline_reminder_acknowledged_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Напоминание подтверждено",
+    )
+    deadline_reminder_email_escalated_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Эскалация на email отправлена",
     )
     completed_at = models.DateTimeField(blank=True, null=True, verbose_name="Выполнено")
     is_done = models.BooleanField(default=False, verbose_name="Завершено")
@@ -104,3 +122,8 @@ class Activity(TimestampedModel):
         self.is_done = True
         if self.completed_at is None:
             self.completed_at = timezone.now()
+
+    def ensure_deadline_ack_token(self) -> str:
+        if not self.deadline_reminder_ack_token:
+            self.deadline_reminder_ack_token = uuid.uuid4().hex
+        return self.deadline_reminder_ack_token

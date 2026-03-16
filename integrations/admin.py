@@ -10,7 +10,7 @@ class UserIntegrationProfileInline(admin.StackedInline):
     can_delete = False
     extra = 0
     verbose_name_plural = "Интеграции"
-    fields = ("phone", "telegram_chat_id")
+    fields = ("phone", "email", "telegram_chat_id")
 
 
 User = get_user_model()

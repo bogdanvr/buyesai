@@ -34,6 +34,7 @@ class UserIntegrationProfile(models.Model):
         verbose_name="Пользователь",
     )
     phone = models.CharField(max_length=64, blank=True, default="", verbose_name="Телефон")
+    email = models.EmailField(blank=True, default="", verbose_name="Email для уведомлений")
     telegram_chat_id = models.CharField(
         max_length=64,
         blank=True,

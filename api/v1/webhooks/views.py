@@ -20,3 +20,18 @@ class WebhookReceiveAPIView(APIView):
             "result": result,
         }
         return Response(response_data, status=status.HTTP_201_CREATED)
+
+
+class TelegramWebhookReceiveAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        payload = request.data if isinstance(request.data, dict) else {}
+        event = store_webhook_event(
+            source="telegram",
+            event_type="telegram_update",
+            external_id=str(payload.get("update_id") or ""),
+            payload=payload,
+        )
+        result = process_webhook_event(event)
+        return Response({"ok": True, "result": result}, status=status.HTTP_200_OK)

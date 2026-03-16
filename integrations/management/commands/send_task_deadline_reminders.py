@@ -7,9 +7,11 @@ from django.utils import timezone
 
 from crm.models import Activity
 from crm.models.activity import ActivityType, TaskReminderOffset
+from integrations.services.email import send_task_deadline_escalation_email
 from integrations.models import UserIntegrationProfile
 from integrations.services.telegram import (
     build_task_deadline_reminder_message,
+    build_task_deadline_reminder_reply_markup,
     send_telegram_chat_message,
 )
 
@@ -36,6 +38,50 @@ def get_task_recipients(task: Activity):
 
 class Command(BaseCommand):
     help = "Отправляет Telegram-напоминания по задачам за выбранное время до дедлайна."
+
+    def _process_email_escalations(self, now):
+        escalation_threshold = now - timedelta(minutes=10)
+        tasks = (
+            Activity.objects.select_related("created_by", "deal__owner", "lead__assigned_to", "deal", "client")
+            .filter(
+                type=ActivityType.TASK,
+                is_done=False,
+                deadline_reminder_sent_at__isnull=False,
+                deadline_reminder_sent_at__lte=escalation_threshold,
+                deadline_reminder_acknowledged_at__isnull=True,
+                deadline_reminder_email_escalated_at__isnull=True,
+            )
+            .order_by("deadline_reminder_sent_at", "id")
+        )
+
+        escalated_count = 0
+        for task in tasks:
+            minutes_since_send = max(10, math.ceil((now - task.deadline_reminder_sent_at).total_seconds() / 60))
+            sent_any = False
+            for user in get_task_recipients(task):
+                profile = UserIntegrationProfile.objects.filter(user=user).only("email").first()
+                email = str(getattr(profile, "email", "") or "").strip()
+                if not email:
+                    continue
+                try:
+                    sent = send_task_deadline_escalation_email(
+                        email=email,
+                        task=task,
+                        minutes_since_send=minutes_since_send,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to send deadline escalation email. activity_id=%s user_id=%s",
+                        task.pk,
+                        user.pk,
+                    )
+                    continue
+                if sent:
+                    sent_any = True
+            if sent_any:
+                Activity.objects.filter(pk=task.pk).update(deadline_reminder_email_escalated_at=now)
+                escalated_count += 1
+        return escalated_count
 
     def handle(self, *args, **options):
         now = timezone.now()
@@ -64,6 +110,8 @@ class Command(BaseCommand):
                 continue
             minutes_left = max(1, math.ceil((task.due_at - now).total_seconds() / 60))
             message = build_task_deadline_reminder_message(task=task, minutes_left=minutes_left)
+            reply_markup = build_task_deadline_reminder_reply_markup(task=task)
+            task.ensure_deadline_ack_token()
             reminder_sent = False
 
             for user in get_task_recipients(task):
@@ -72,7 +120,7 @@ class Command(BaseCommand):
                 if not chat_id:
                     continue
                 try:
-                    result = send_telegram_chat_message(chat_id=chat_id, text=message)
+                    result = send_telegram_chat_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
                 except Exception:
                     logger.exception(
                         "Failed to send deadline reminder. activity_id=%s user_id=%s",
@@ -84,7 +132,11 @@ class Command(BaseCommand):
                     reminder_sent = True
 
             if reminder_sent:
-                Activity.objects.filter(pk=task.pk).update(deadline_reminder_sent_at=now)
+                Activity.objects.filter(pk=task.pk).update(
+                    deadline_reminder_sent_at=now,
+                    deadline_reminder_ack_token=task.deadline_reminder_ack_token,
+                )
                 sent_count += 1
 
-        self.stdout.write(self.style.SUCCESS(f"Sent deadline reminders: {sent_count}"))
+        escalated_count = self._process_email_escalations(now)
+        self.stdout.write(self.style.SUCCESS(f"Sent deadline reminders: {sent_count}; escalated emails: {escalated_count}"))
