@@ -251,19 +251,23 @@
           <template v-else>
             <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
               <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">Всего</div>
-              <div class="mt-3 text-3xl font-semibold">[[ filteredItems.length ]]</div>
+              <div class="mt-3 text-3xl font-semibold">[[ stats.totalCount ]]</div>
+              <div v-if="showStatsAmount" class="mt-2 text-sm text-crm-muted font-medium">[[ formatRubAmount(stats.totalAmountRub) ]]</div>
             </article>
             <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
               <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">Новых</div>
               <div class="mt-3 text-3xl font-semibold">[[ stats.newCount ]]</div>
+              <div v-if="showStatsAmount" class="mt-2 text-sm text-crm-muted font-medium">[[ formatRubAmount(stats.newAmountRub) ]]</div>
             </article>
             <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
               <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">В работе</div>
               <div class="mt-3 text-3xl font-semibold">[[ stats.inProgressCount ]]</div>
+              <div v-if="showStatsAmount" class="mt-2 text-sm text-crm-muted font-medium">[[ formatRubAmount(stats.inProgressAmountRub) ]]</div>
             </article>
             <article class="rounded-3xl border border-crm-border bg-crm-panel p-5 shadow-panel">
               <div class="text-crm-muted text-xs uppercase tracking-[0.2em]">Завершено</div>
               <div class="mt-3 text-3xl font-semibold">[[ stats.doneCount ]]</div>
+              <div v-if="showStatsAmount" class="mt-2 text-sm text-crm-muted font-medium">[[ formatRubAmount(stats.doneAmountRub) ]]</div>
             </article>
           </template>
         </div>
@@ -1375,7 +1379,8 @@
           metaOptions: {
             leadStatuses: [],
             dealStages: [],
-            leadSources: []
+            leadSources: [],
+            currencyRates: { RUB: 1 }
           },
           taskReminderOptions: [
             { value: 5, label: "5 минут" },
@@ -1623,10 +1628,19 @@
             .map((label) => ({ value: label, label }));
         },
         stats() {
+          const items = this.filteredItems;
+          const newItems = items.filter((item) => this.getItemStatusBucket(item) === "new");
+          const inProgressItems = items.filter((item) => this.getItemStatusBucket(item) === "progress");
+          const doneItems = items.filter((item) => this.getItemStatusBucket(item) === "done");
           return {
-            newCount: this.filteredItems.filter((item) => this.getItemStatusBucket(item) === "new").length,
-            inProgressCount: this.filteredItems.filter((item) => this.getItemStatusBucket(item) === "progress").length,
-            doneCount: this.filteredItems.filter((item) => this.getItemStatusBucket(item) === "done").length
+            totalCount: items.length,
+            totalAmountRub: this.sumItemsAmountRub(items),
+            newCount: newItems.length,
+            newAmountRub: this.sumItemsAmountRub(newItems),
+            inProgressCount: inProgressItems.length,
+            inProgressAmountRub: this.sumItemsAmountRub(inProgressItems),
+            doneCount: doneItems.length,
+            doneAmountRub: this.sumItemsAmountRub(doneItems)
           };
         },
         companyStats() {
@@ -1644,6 +1658,9 @@
             activeCount: companies.filter((item) => item.isActive !== false).length,
             inProgressCount: companies.filter((item) => this.companyHasActiveDeals(item.id)).length,
           };
+        },
+        showStatsAmount() {
+          return this.activeSection === "leads" || this.activeSection === "deals";
         },
         taskFormRemainingLabel() {
           return this.formatTaskRemainingLabel(this.forms.tasks.dueAt, this.forms.tasks.isDone);
@@ -2061,6 +2078,24 @@
             return { border: "rgba(251, 191, 36, .35)", bg: "rgba(245, 158, 11, .12)", text: "#fde68a" };
           }
 
+          const orderedStages = this.metaOptions.dealStages.filter(
+            (stage) => stage && stage.is_active !== false && !stage.is_final
+          );
+          const stageIndex = orderedStages.findIndex(
+            (stage) => String(stage.id) === String(item.stageId)
+          );
+          const stagePalette = [
+            { border: "rgba(251, 191, 36, .35)", bg: "rgba(245, 158, 11, .12)", text: "#fde68a" },
+            { border: "rgba(56, 189, 248, .35)", bg: "rgba(14, 165, 233, .12)", text: "#bae6fd" },
+            { border: "rgba(129, 140, 248, .35)", bg: "rgba(99, 102, 241, .12)", text: "#c7d2fe" },
+            { border: "rgba(167, 139, 250, .35)", bg: "rgba(139, 92, 246, .12)", text: "#ddd6fe" },
+            { border: "rgba(244, 114, 182, .35)", bg: "rgba(236, 72, 153, .12)", text: "#f9a8d4" },
+            { border: "rgba(45, 212, 191, .35)", bg: "rgba(20, 184, 166, .12)", text: "#99f6e4" },
+          ];
+          if (stageIndex >= 0) {
+            return stagePalette[stageIndex % stagePalette.length];
+          }
+
           return { border: "rgba(148, 163, 184, .35)", bg: "rgba(148, 163, 184, .10)", text: "#cbd5e1" };
         },
         toggleStatusFilter() {
@@ -2110,6 +2145,37 @@
             return !task.isDone;
           }).length;
         },
+        getCurrencyRateToRub(currency) {
+          const code = String(currency || "RUB").trim().toUpperCase() || "RUB";
+          const rates = (this.metaOptions && this.metaOptions.currencyRates) || { RUB: 1 };
+          const rate = Number(rates[code]);
+          if (code === "RUB") return 1;
+          return Number.isFinite(rate) && rate > 0 ? rate : 0;
+        },
+        convertAmountToRub(amount, currency) {
+          const numericAmount = Number(amount || 0);
+          if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+            return 0;
+          }
+          const safeCurrency = String(currency || "RUB").trim().toUpperCase() || "RUB";
+          if (safeCurrency === "RUB") {
+            return numericAmount;
+          }
+          return numericAmount * this.getCurrencyRateToRub(safeCurrency);
+        },
+        getItemAmountRub(item) {
+          if (this.activeSection === "leads") {
+            const numericValue = Number(item.expectedValue || 0);
+            return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 0;
+          }
+          if (this.activeSection === "deals") {
+            return this.convertAmountToRub(item.amount, item.currency);
+          }
+          return 0;
+        },
+        sumItemsAmountRub(items) {
+          return (items || []).reduce((sum, item) => sum + this.getItemAmountRub(item), 0);
+        },
         formatDealAmount(amount, currency) {
           const numericAmount = Number(amount || 0);
           const safeCurrency = String(currency || "RUB").trim() || "RUB";
@@ -2117,6 +2183,13 @@
             return `0 ${safeCurrency}`;
           }
           return `${numericAmount.toLocaleString("ru-RU")} ${safeCurrency}`;
+        },
+        formatRubAmount(amount) {
+          const numericAmount = Number(amount || 0);
+          if (!Number.isFinite(numericAmount)) {
+            return "0 RUB";
+          }
+          return `${Math.round(numericAmount).toLocaleString("ru-RU")} RUB`;
         },
         toggleCompanyCardDetails(companyId) {
           const key = String(companyId || "");
@@ -3012,14 +3085,19 @@
           return `${year}-${month}-${day}T${hours}:${minutes}`;
         },
         async loadMetaOptions() {
-          const [leadStatuses, dealStages, leadSources] = await Promise.all([
+          const [leadStatuses, dealStages, leadSources, currencyRates] = await Promise.all([
             this.apiRequest("/api/v1/meta/lead-statuses/"),
             this.apiRequest("/api/v1/meta/deal-stages/"),
-            this.apiRequest("/api/v1/meta/lead-sources/")
+            this.apiRequest("/api/v1/meta/lead-sources/"),
+            this.apiRequest("/api/v1/meta/currency-rates/").catch(() => ({ rates: { RUB: 1 } }))
           ]);
           this.metaOptions.leadStatuses = this.normalizePaginatedResponse(leadStatuses);
           this.metaOptions.dealStages = this.sortDealStages(this.normalizePaginatedResponse(dealStages));
           this.metaOptions.leadSources = this.normalizePaginatedResponse(leadSources);
+          this.metaOptions.currencyRates = {
+            RUB: 1,
+            ...((currencyRates && currencyRates.rates) || {})
+          };
         },
         async ensureClient(companyName) {
           const name = (companyName || "").trim();
