@@ -31,6 +31,7 @@ class LeadSerializer(serializers.ModelSerializer):
             "id",
             "external_id",
             "title",
+            "description",
             "name",
             "phone",
             "email",

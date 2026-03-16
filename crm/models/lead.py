@@ -30,6 +30,7 @@ class Lead(TimestampedModel):
         verbose_name="Внешний ID",
     )
     title = models.CharField(max_length=255, blank=True, default="", verbose_name="Заголовок")
+    description = models.TextField(blank=True, default="", verbose_name="Описание")
     name = models.CharField(max_length=255, blank=True, default="", verbose_name="Имя")
     phone = models.CharField(max_length=64, blank=True, default="", verbose_name="Телефон")
     phone_normalized = models.CharField(

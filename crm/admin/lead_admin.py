@@ -22,7 +22,7 @@ class LeadStatusAdmin(admin.ModelAdmin):
 class LeadAdmin(admin.ModelAdmin):
     list_display = ("id", "title", "company", "phone", "status", "source", "assigned_to", "created_at")
     list_filter = ("status", "source", "sources", "priority", "created_at")
-    search_fields = ("title", "name", "phone", "email", "company", "external_id")
+    search_fields = ("title", "description", "name", "phone", "email", "company", "external_id")
     autocomplete_fields = ("client", "assigned_to", "created_by", "website_session")
     filter_horizontal = ("sources",)
     readonly_fields = ("created_at", "updated_at", "converted_at", "history")

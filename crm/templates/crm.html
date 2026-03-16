@@ -598,6 +598,10 @@
               <span class="text-sm text-crm-muted">Ожидаемая сумма</span>
               <input v-model="forms.leads.expectedValue" type="number" min="0" step="0.01" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
+            <label v-if="shouldShowLeadField(forms.leads.description)" class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Описание</span>
+              <textarea v-model="forms.leads.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+            </label>
             <div
               v-if="editingLeadId && shouldShowLeadTrackingBlock"
               class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4 space-y-4"
@@ -1167,10 +1171,10 @@
               <span class="text-sm text-crm-muted">Результат</span>
               <textarea v-model="forms.tasks.result" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <label class="md:col-span-2 flex items-center gap-2">
-              <input v-model="forms.tasks.isDone" type="checkbox" class="w-4 h-4 rounded border-crm-border bg-transparent" />
-              <span class="text-sm text-crm-muted">Задача уже выполнена</span>
-            </label>
+            <div class="md:col-span-2 flex items-center gap-2">
+              <input id="task-is-done" v-model="forms.tasks.isDone" type="checkbox" class="w-4 h-4 rounded border-crm-border bg-transparent" />
+              <label for="task-is-done" class="text-sm text-crm-muted cursor-pointer">Задача уже выполнена</label>
+            </div>
             <div v-if="showTaskFollowUpSuggestion" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <div class="text-sm font-semibold text-white">Следующая задача по сделке</div>
               <div class="mt-1 text-xs text-crm-muted">Сделка: [[ taskFollowUpDealTitle ]]</div>
@@ -1210,7 +1214,7 @@
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.651-1.651a2.121 2.121 0 113 3L7.5 19.5 3 21l1.5-4.5 12.362-12.013z" />
               </svg>
-              <span class="truncate">Редактировать</span>
+              <span class="truncate">[[ fieldEditToggleLabel ]]</span>
             </button>
             <button type="button" @click="closeModal" class="h-11 w-full md:w-auto px-5 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition min-w-0">
               Отмена
@@ -1291,6 +1295,7 @@
           forms: {
             leads: {
               title: "",
+              description: "",
               name: "",
               company: "",
               phone: "",
@@ -1499,6 +1504,21 @@
             return "Сохранить задачу";
           }
           return "Сохранить";
+        },
+        fieldEditToggleLabel() {
+          if (this.activeSection === "leads") {
+            return this.showAllLeadFields ? "Скрыть" : "Редактировать";
+          }
+          if (this.activeSection === "deals") {
+            return this.showAllDealFields ? "Скрыть" : "Редактировать";
+          }
+          if (this.activeSection === "companies") {
+            return this.showAllCompanyFields ? "Скрыть" : "Редактировать";
+          }
+          if (this.activeSection === "tasks") {
+            return this.showAllTaskFields ? "Скрыть" : "Редактировать";
+          }
+          return "Редактировать";
         },
         companyOptions() {
           return this.datasets.companies.map((company) => ({
@@ -2334,6 +2354,7 @@
           this.editingLeadId = item.id;
           this.forms.leads = {
             title: item.title || "",
+            description: item.description || "",
             name: item.contactName || "",
             company: item.company || "",
             phone: item.phone || "",
@@ -2755,6 +2776,7 @@
           return {
             id: item.id,
             name: item.title || item.name || `Лид #${item.id}`,
+            description: item.description || "",
             company: item.client_name || item.company || "",
             phone: item.phone || "",
             email: item.email || "",
@@ -2999,6 +3021,7 @@
           if (section === "leads") {
             return {
               title: "",
+              description: "",
               name: "",
               company: "",
               phone: "",
@@ -3132,6 +3155,7 @@
             method: "POST",
             body: {
               title: form.title.trim() || form.name.trim(),
+              description: form.description.trim(),
               name: form.name.trim(),
               company: form.company.trim(),
               phone: form.phone.trim(),
@@ -3155,6 +3179,7 @@
             method: "PATCH",
             body: {
               title: form.title.trim() || form.name.trim(),
+              description: form.description.trim(),
               name: form.name.trim(),
               company: form.company.trim(),
               phone: form.phone.trim(),
