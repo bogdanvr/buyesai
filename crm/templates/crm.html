@@ -612,6 +612,10 @@
               <span class="text-sm text-crm-muted">Название сделки</span>
               <input v-model="forms.deals.title" required type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
+            <label class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Описание сделки</span>
+              <textarea v-model="forms.deals.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+            </label>
             <label class="block">
               <span class="text-sm text-crm-muted">Компания</span>
               <select v-model="forms.deals.companyId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
@@ -1244,6 +1248,7 @@
             },
             deals: {
               title: "",
+              description: "",
               companyId: null,
               amount: "0",
               currency: "RUB",
@@ -2132,6 +2137,7 @@
           this.editingDealId = item.id;
           this.forms.deals = {
             title: item.title || "",
+            description: item.description || "",
             companyId: this.toIntOrNull(item.clientId),
             amount: item.amount ?? "0",
             currency: item.currency || "RUB",
@@ -2563,6 +2569,7 @@
           return {
             id: item.id,
             name: item.title || `Сделка #${item.id}`,
+            description: item.description || "",
             company: item.client_name || "",
             phone: "",
             email: "",
@@ -2770,6 +2777,7 @@
           if (section === "deals") {
             return {
               title: "",
+              description: "",
               companyId: null,
               amount: "0",
               currency: "RUB",
@@ -2924,6 +2932,7 @@
             method: "PATCH",
             body: {
               title: form.title.trim(),
+              description: form.description.trim(),
               client: clientId,
               amount: Number(form.amount || 0),
               currency: form.currency,
@@ -2943,6 +2952,7 @@
             method: "POST",
             body: {
               title: form.title.trim(),
+              description: form.description.trim(),
               client: clientId,
               amount: Number(form.amount || 0),
               currency: form.currency,

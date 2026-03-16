@@ -28,6 +28,7 @@ class DealSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "title",
+            "description",
             "client",
             "client_name",
             "lead",

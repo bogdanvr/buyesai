@@ -6,6 +6,7 @@ from crm.models.common import TimestampedModel
 
 class Deal(TimestampedModel):
     title = models.CharField(max_length=255, verbose_name="Сделка")
+    description = models.TextField(blank=True, default="", verbose_name="Описание сделки")
     client = models.ForeignKey(
         "crm.Client",
         related_name="deals",

@@ -15,6 +15,6 @@ class DealStageAdmin(admin.ModelAdmin):
 class DealAdmin(admin.ModelAdmin):
     list_display = ("id", "title", "client", "stage", "amount", "currency", "is_won", "close_date")
     list_filter = ("stage", "is_won", "currency")
-    search_fields = ("title", "client__name", "lead__title")
+    search_fields = ("title", "description", "client__name", "lead__title")
     autocomplete_fields = ("client", "lead", "stage", "owner")
     readonly_fields = ("created_at", "updated_at", "closed_at")
