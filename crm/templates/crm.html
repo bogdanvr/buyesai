@@ -492,17 +492,19 @@
       </section>
     </main>
 
-    <div v-if="showModal" class="fixed inset-0 z-50 flex items-start md:items-center justify-center p-3 md:p-4 overflow-y-auto bg-black/55 backdrop-blur-sm">
-      <div class="w-full max-w-2xl rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel max-h-[calc(100dvh-1.5rem)] md:max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col">
-        <div class="px-6 py-5 border-b border-crm-border flex items-center justify-between gap-4">
-          <div>
-            <h2 class="text-xl font-semibold">[[ modalTitle ]]</h2>
-            <p class="text-sm text-crm-muted mt-1">[[ createModalSubtitle ]]</p>
+    <div v-if="showModal" class="fixed inset-0 z-50 flex items-start md:items-center justify-center p-2 md:p-4 overflow-y-auto bg-black/55 backdrop-blur-sm">
+      <div class="w-full max-w-none md:max-w-2xl rounded-[24px] md:rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel h-[calc(100dvh-1rem)] md:h-auto md:max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col">
+        <div class="px-4 md:px-6 py-4 md:py-5 border-b border-crm-border flex items-start justify-between gap-4 shrink-0">
+          <div class="min-w-0">
+            <h2 class="text-lg md:text-xl font-semibold break-words">[[ modalTitle ]]</h2>
+            <p class="text-sm text-crm-muted mt-1 break-words">[[ createModalSubtitle ]]</p>
           </div>
-          <button @click="closeModal" class="w-10 h-10 rounded-xl border border-crm-border bg-crm-panel hover:border-crm-accent">✕</button>
+          <button @click="closeModal" class="w-10 h-10 rounded-xl border border-crm-border bg-crm-panel hover:border-crm-accent shrink-0">✕</button>
         </div>
 
-        <form @submit.prevent="createItem" class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto min-h-0">
+        <form @submit.prevent="createItem" class="flex flex-1 min-h-0 flex-col">
+          <div class="flex-1 overflow-y-auto min-h-0 px-4 md:px-6 py-4 md:py-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <template v-if="activeSection === 'leads'">
             <label class="block">
               <span class="text-sm text-crm-muted">Название лида</span>
@@ -728,6 +730,7 @@
               <span class="text-sm text-crm-muted">Валюта</span>
               <select v-model="forms.deals.currency" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option value="RUB">RUB</option>
+                <option value="KZT">KZT</option>
                 <option value="USD">USD</option>
                 <option value="EUR">EUR</option>
               </select>
@@ -1133,25 +1136,29 @@
               </div>
             </div>
           </template>
+            </div>
+          </div>
 
-          <div class="md:col-span-2 flex items-center justify-end gap-3 pt-2">
+          <div class="sticky bottom-0 shrink-0 border-t border-crm-border bg-[#0b2740]/95 backdrop-blur px-4 md:px-6 py-3 md:py-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-end gap-2 md:gap-3">
             <button
               v-if="activeSection === 'companies' && editingCompanyId"
               type="button"
               @click="showAllCompanyFields = !showAllCompanyFields"
-              class="h-11 px-4 rounded-xl border border-crm-border bg-[#123753] text-white font-semibold hover:border-crm-accent transition inline-flex items-center gap-2"
+              class="h-11 w-full md:w-auto px-4 rounded-xl border border-crm-border bg-[#123753] text-white font-semibold hover:border-crm-accent transition inline-flex items-center justify-center gap-2 min-w-0"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.651-1.651a2.121 2.121 0 113 3L7.5 19.5 3 21l1.5-4.5 12.362-12.013z" />
               </svg>
-              <span>Редактировать</span>
+              <span class="truncate">Редактировать</span>
             </button>
-            <button type="button" @click="closeModal" class="h-11 px-5 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition">
+            <button type="button" @click="closeModal" class="h-11 w-full md:w-auto px-5 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition min-w-0">
               Отмена
             </button>
-            <button type="submit" :disabled="isSaving" class="h-11 px-5 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
-              [[ isSaving ? 'Сохранение...' : modalSubmitLabel ]]
+            <button type="submit" :disabled="isSaving" class="h-11 w-full md:w-auto px-5 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed min-w-0">
+              <span class="block truncate">[[ isSaving ? 'Сохранение...' : modalSubmitLabel ]]</span>
             </button>
+          </div>
           </div>
         </form>
       </div>
