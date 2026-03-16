@@ -256,28 +256,40 @@
               <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
                 <span class="text-crm-muted font-medium">Всего</span>
                 <span class="font-semibold text-white">[[ stats.totalCount ]]</span>
-                <span v-if="showStatsAmount" class="text-crm-muted text-[12px] md:text-[13px]">на сумму [[ formatRubAmount(stats.totalAmountRub) ]]</span>
+                <template v-if="showStatsAmount">
+                  <span class="text-crm-muted font-medium">на сумму</span>
+                  <span class="font-semibold text-white">[[ formatRubAmount(stats.totalAmountRub) ]]</span>
+                </template>
               </div>
             </article>
             <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
               <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
                 <span class="text-crm-muted font-medium">Новых</span>
                 <span class="font-semibold text-white">[[ stats.newCount ]]</span>
-                <span v-if="showStatsAmount" class="text-crm-muted text-[12px] md:text-[13px]">на сумму [[ formatRubAmount(stats.newAmountRub) ]]</span>
+                <template v-if="showStatsAmount">
+                  <span class="text-crm-muted font-medium">на сумму</span>
+                  <span class="font-semibold text-white">[[ formatRubAmount(stats.newAmountRub) ]]</span>
+                </template>
               </div>
             </article>
             <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
               <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
                 <span class="text-crm-muted font-medium">В работе</span>
                 <span class="font-semibold text-white">[[ stats.inProgressCount ]]</span>
-                <span v-if="showStatsAmount" class="text-crm-muted text-[12px] md:text-[13px]">на сумму [[ formatRubAmount(stats.inProgressAmountRub) ]]</span>
+                <template v-if="showStatsAmount">
+                  <span class="text-crm-muted font-medium">на сумму</span>
+                  <span class="font-semibold text-white">[[ formatRubAmount(stats.inProgressAmountRub) ]]</span>
+                </template>
               </div>
             </article>
             <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
               <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
                 <span class="text-crm-muted font-medium">Завершено</span>
                 <span class="font-semibold text-white">[[ stats.doneCount ]]</span>
-                <span v-if="showStatsAmount" class="text-crm-muted text-[12px] md:text-[13px]">на сумму [[ formatRubAmount(stats.doneAmountRub) ]]</span>
+                <template v-if="showStatsAmount">
+                  <span class="text-crm-muted font-medium">на сумму</span>
+                  <span class="font-semibold text-white">[[ formatRubAmount(stats.doneAmountRub) ]]</span>
+                </template>
               </div>
             </article>
           </template>
