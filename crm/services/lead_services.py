@@ -409,6 +409,7 @@ def convert_lead_to_deal(
     try:
         deal = Deal.objects.create(
             title=lead.title or f"Сделка из лида #{lead.id}",
+            description=lead.description or "",
             source=lead.source,
             client=target_client,
             lead=lead,
@@ -425,6 +426,7 @@ def convert_lead_to_deal(
         target_client = Client.objects.create(name=fallback_name.strip(), source=lead.source)
         deal = Deal.objects.create(
             title=lead.title or f"Сделка из лида #{lead.id}",
+            description=lead.description or "",
             source=lead.source,
             client=target_client,
             lead=lead,
