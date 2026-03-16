@@ -13,9 +13,10 @@ def handle_email_event(payload: dict) -> dict:
 
 
 def build_task_deadline_escalation_email(*, task, minutes_since_send: int) -> tuple[str, str]:
+    escalation_minutes = int(getattr(settings, "TASK_REMINDER_ESCALATION_MINUTES", 10) or 10)
     subject = f"Задача не подтверждена: {task.subject}"
     lines = [
-        "Напоминание по задаче не было подтверждено в Telegram в течение 10 минут.",
+        f"Напоминание по задаче не было подтверждено в Telegram в течение {escalation_minutes} минут.",
         "",
         f"Тема: {task.subject}",
     ]

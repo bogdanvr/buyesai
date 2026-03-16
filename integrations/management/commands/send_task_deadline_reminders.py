@@ -3,6 +3,7 @@ import math
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
+from django.conf import settings
 from django.utils import timezone
 
 from crm.models import Activity
@@ -40,7 +41,8 @@ class Command(BaseCommand):
     help = "Отправляет Telegram-напоминания по задачам за выбранное время до дедлайна."
 
     def _process_email_escalations(self, now):
-        escalation_threshold = now - timedelta(minutes=10)
+        escalation_minutes = int(getattr(settings, "TASK_REMINDER_ESCALATION_MINUTES", 10) or 10)
+        escalation_threshold = now - timedelta(minutes=escalation_minutes)
         tasks = (
             Activity.objects.select_related("created_by", "deal__owner", "lead__assigned_to", "deal", "client")
             .filter(
@@ -56,7 +58,10 @@ class Command(BaseCommand):
 
         escalated_count = 0
         for task in tasks:
-            minutes_since_send = max(10, math.ceil((now - task.deadline_reminder_sent_at).total_seconds() / 60))
+            minutes_since_send = max(
+                escalation_minutes,
+                math.ceil((now - task.deadline_reminder_sent_at).total_seconds() / 60),
+            )
             sent_any = False
             for user in get_task_recipients(task):
                 profile = UserIntegrationProfile.objects.filter(user=user).only("email").first()
