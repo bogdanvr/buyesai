@@ -510,15 +510,15 @@
               <span class="text-sm text-crm-muted">Название лида</span>
               <input v-model="forms.leads.title" required type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block">
+            <label v-if="shouldShowLeadField(forms.leads.name)" class="block">
               <span class="text-sm text-crm-muted">Контактное лицо</span>
               <input v-model="forms.leads.name" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block">
+            <label v-if="shouldShowLeadField(forms.leads.company)" class="block">
               <span class="text-sm text-crm-muted">Компания</span>
               <input v-model="forms.leads.company" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block">
+            <label v-if="shouldShowLeadField(forms.leads.phone)" class="block">
               <span class="text-sm text-crm-muted">Телефон</span>
               <div class="relative mt-2">
                 <input v-model="forms.leads.phone" @focus="ensurePhonePrefix(forms.leads, 'phone')" type="text" class="w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] pl-4 pr-12 outline-none focus:border-crm-accent" />
@@ -534,11 +534,11 @@
                 </a>
               </div>
             </label>
-            <label class="block">
+            <label v-if="shouldShowLeadField(forms.leads.email)" class="block">
               <span class="text-sm text-crm-muted">Email</span>
               <input v-model="forms.leads.email" type="email" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block">
+            <label v-if="shouldShowLeadField(forms.leads.priority)" class="block">
               <span class="text-sm text-crm-muted">Приоритет</span>
               <select v-model="forms.leads.priority" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option value="low">Низкий</option>
@@ -546,14 +546,14 @@
                 <option value="high">Высокий</option>
               </select>
             </label>
-            <label class="block">
+            <label v-if="shouldShowLeadField(forms.leads.statusId)" class="block">
               <span class="text-sm text-crm-muted">Статус лида</span>
               <select v-model="forms.leads.statusId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option value="">Не выбран</option>
                 <option v-for="status in metaOptions.leadStatuses" :key="status.id" :value="status.id">[[ status.name ]]</option>
               </select>
             </label>
-            <label class="block md:col-span-2">
+            <label v-if="shouldShowLeadField(forms.leads.sourceId)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Источник</span>
               <select v-model="forms.leads.sourceId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option value="">Не выбран</option>
@@ -563,12 +563,12 @@
                 [[ leadSourcePath(forms.leads).join(' -> ') ]]
               </div>
             </label>
-            <label class="block md:col-span-2">
+            <label v-if="shouldShowLeadField(forms.leads.expectedValue)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Ожидаемая сумма</span>
               <input v-model="forms.leads.expectedValue" type="number" min="0" step="0.01" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
             <div
-              v-if="editingLeadId && (forms.leads.websiteSessionId || forms.leads.sourceNames.length || forms.leads.history.length)"
+              v-if="editingLeadId && shouldShowLeadTrackingBlock"
               class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4 space-y-4"
             >
               <div v-if="forms.leads.websiteSessionId">
@@ -612,18 +612,18 @@
               <span class="text-sm text-crm-muted">Название сделки</span>
               <input v-model="forms.deals.title" required type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block md:col-span-2">
+            <label v-if="shouldShowDealField(forms.deals.description)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Описание сделки</span>
               <textarea v-model="forms.deals.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <label class="block">
+            <label v-if="shouldShowDealField(forms.deals.companyId)" class="block">
               <span class="text-sm text-crm-muted">Компания</span>
               <select v-model="forms.deals.companyId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option :value="null">Не выбрана</option>
                 <option v-for="company in companyOptions" :key="company.id" :value="company.id">[[ company.name ]]</option>
               </select>
             </label>
-            <div class="md:col-span-2 mt-1 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+            <div v-if="isCreatingDeal || showAllDealFields || showDealCompanyForm || dealHasSelectedCompany || dealCompanyForm.name || dealCompanyContactForm.fullName" class="md:col-span-2 mt-1 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <button
                 type="button"
                 @click="toggleDealCompanyForm"
@@ -726,11 +726,11 @@
                 </div>
               </div>
             </div>
-            <label class="block">
+            <label v-if="shouldShowDealField(forms.deals.amount)" class="block">
               <span class="text-sm text-crm-muted">Сумма</span>
               <input v-model="forms.deals.amount" type="number" min="0" step="0.01" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block">
+            <label v-if="shouldShowDealField(forms.deals.currency)" class="block">
               <span class="text-sm text-crm-muted">Валюта</span>
               <select v-model="forms.deals.currency" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option value="RUB">RUB</option>
@@ -739,18 +739,18 @@
                 <option value="EUR">EUR</option>
               </select>
             </label>
-            <label class="block md:col-span-2">
+            <label v-if="shouldShowDealField(forms.deals.closeDate)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">План закрытия</span>
               <input v-model="forms.deals.closeDate" type="date" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block md:col-span-2">
+            <label v-if="shouldShowDealField(forms.deals.stageId)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Этап сделки</span>
               <select v-model="forms.deals.stageId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option value="">Не выбран</option>
                 <option v-for="stage in metaOptions.dealStages" :key="stage.id" :value="stage.id">[[ stage.name ]]</option>
               </select>
             </label>
-            <label class="block md:col-span-2">
+            <label v-if="shouldShowDealField(forms.deals.events)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">События</span>
               <div class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
                 <div v-if="!parseEventLog(forms.deals.events).length" class="text-sm text-crm-muted">
@@ -787,7 +787,7 @@
                 </div>
               </div>
             </label>
-            <div v-if="editingDealId" class="md:col-span-2 mt-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+            <div v-if="editingDealId && (isCreatingDeal || showAllDealFields || dealTasksForActiveDeal.length || showDealTaskForm || isDealTasksLoading)" class="md:col-span-2 mt-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <button
                 type="button"
                 @click="toggleDealTaskForm"
@@ -1097,23 +1097,23 @@
               <span class="text-sm text-crm-muted">Название задачи</span>
               <input v-model="forms.tasks.subject" required type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block">
+            <label v-if="shouldShowTaskField(forms.tasks.companyId)" class="block">
               <span class="text-sm text-crm-muted">Компания</span>
               <select v-model="forms.tasks.companyId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option :value="null">Не выбрана</option>
                 <option v-for="company in companyOptions" :key="company.id" :value="company.id">[[ company.name ]]</option>
               </select>
             </label>
-            <label class="block">
+            <label v-if="shouldShowTaskField(forms.tasks.dueAt)" class="block">
               <span class="text-sm text-crm-muted">Срок</span>
               <input v-model="forms.tasks.dueAt" type="datetime-local" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
               <div v-if="taskFormRemainingLabel" class="mt-2 text-xs text-crm-muted">[[ taskFormRemainingLabel ]]</div>
             </label>
-            <label class="block md:col-span-2">
+            <label v-if="shouldShowTaskField(forms.tasks.description)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Описание</span>
               <textarea v-model="forms.tasks.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <label v-if="showTaskResultField" class="block md:col-span-2">
+            <label v-if="showTaskResultField || showAllTaskFields || isCreatingTask" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Результат</span>
               <textarea v-model="forms.tasks.result" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
@@ -1146,9 +1146,9 @@
           <div class="sticky bottom-0 shrink-0 border-t border-crm-border bg-[#0b2740]/95 backdrop-blur px-4 md:px-6 py-3 md:py-4">
             <div class="flex flex-col md:flex-row md:items-center md:justify-end gap-2 md:gap-3">
             <button
-              v-if="activeSection === 'companies' && editingCompanyId"
+              v-if="showFieldEditToggle"
               type="button"
-              @click="showAllCompanyFields = !showAllCompanyFields"
+              @click="toggleFieldEditMode"
               class="h-11 w-full md:w-auto px-4 rounded-xl border border-crm-border bg-[#123753] text-white font-semibold hover:border-crm-accent transition inline-flex items-center justify-center gap-2 min-w-0"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1215,6 +1215,8 @@
           editingContactId: null,
           editingCompanyId: null,
           editingTaskId: null,
+          showAllLeadFields: false,
+          showAllDealFields: false,
           isDealTaskSaving: false,
           isDealTasksLoading: false,
           showDealTaskForm: false,
@@ -1225,6 +1227,7 @@
           showCompanyContactForm: false,
           showCompanyOkvedDetails: false,
           showAllCompanyFields: false,
+          showAllTaskFields: false,
           expandedCompanyCards: {},
           taskDealFilterId: null,
           taskDealFilterLabel: "",
@@ -1437,6 +1440,15 @@
         isCreatingCompany() {
           return this.activeSection === "companies" && !this.editingCompanyId;
         },
+        isCreatingLead() {
+          return this.activeSection === "leads" && !this.editingLeadId;
+        },
+        isCreatingDeal() {
+          return this.activeSection === "deals" && !this.editingDealId;
+        },
+        isCreatingTask() {
+          return this.activeSection === "tasks" && !this.editingTaskId;
+        },
         dealHasSelectedCompany() {
           return !!this.toIntOrNull(this.forms.deals.companyId);
         },
@@ -1460,6 +1472,30 @@
         },
         shouldShowCompanyField() {
           return (value) => this.isCreatingCompany || this.showAllCompanyFields || !!String(value || "").trim();
+        },
+        shouldShowLeadField() {
+          return (value) => this.isCreatingLead || this.showAllLeadFields || this.hasVisibleFieldValue(value);
+        },
+        shouldShowDealField() {
+          return (value) => this.isCreatingDeal || this.showAllDealFields || this.hasVisibleFieldValue(value);
+        },
+        shouldShowTaskField() {
+          return (value) => this.isCreatingTask || this.showAllTaskFields || this.hasVisibleFieldValue(value);
+        },
+        shouldShowLeadTrackingBlock() {
+          return this.isCreatingLead
+            || this.showAllLeadFields
+            || !!this.forms.leads.websiteSessionId
+            || this.forms.leads.sourceNames.length > 0
+            || this.forms.leads.history.length > 0;
+        },
+        showFieldEditToggle() {
+          return (
+            (this.activeSection === "leads" && !!this.editingLeadId)
+            || (this.activeSection === "deals" && !!this.editingDealId)
+            || (this.activeSection === "companies" && !!this.editingCompanyId)
+            || (this.activeSection === "tasks" && !!this.editingTaskId)
+          );
         },
         showTaskResultField() {
           return !!this.forms.tasks.isDone || !!String(this.forms.tasks.result || "").trim();
@@ -1582,6 +1618,35 @@
           if (Array.isArray(data)) return data;
           if (data && Array.isArray(data.results)) return data.results;
           return [];
+        },
+        hasVisibleFieldValue(value) {
+          if (Array.isArray(value)) {
+            return value.length > 0;
+          }
+          if (value && typeof value === "object") {
+            return Object.keys(value).length > 0;
+          }
+          if (typeof value === "number") {
+            return value !== 0;
+          }
+          return !!String(value || "").trim();
+        },
+        toggleFieldEditMode() {
+          if (this.activeSection === "leads") {
+            this.showAllLeadFields = !this.showAllLeadFields;
+            return;
+          }
+          if (this.activeSection === "deals") {
+            this.showAllDealFields = !this.showAllDealFields;
+            return;
+          }
+          if (this.activeSection === "companies") {
+            this.showAllCompanyFields = !this.showAllCompanyFields;
+            return;
+          }
+          if (this.activeSection === "tasks") {
+            this.showAllTaskFields = !this.showAllTaskFields;
+          }
         },
         parseEventLog(value) {
           const raw = String(value || "").trim();
@@ -2110,6 +2175,7 @@
           this.editingCompanyId = null;
           this.editingTaskId = null;
           this.editingDealId = null;
+          this.showAllLeadFields = false;
           this.editingLeadId = item.id;
           this.forms.leads = {
             title: item.title || "",
@@ -2134,6 +2200,7 @@
           this.editingCompanyId = null;
           this.editingTaskId = null;
           this.editingLeadId = null;
+          this.showAllDealFields = false;
           this.editingDealId = item.id;
           this.forms.deals = {
             title: item.title || "",
@@ -2207,6 +2274,7 @@
           this.editingDealId = null;
           this.editingContactId = null;
           this.editingCompanyId = null;
+          this.showAllTaskFields = false;
           this.editingTaskId = item.id;
           this.forms.tasks = {
             subject: item.subject || item.name || "",
@@ -2699,6 +2767,10 @@
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
+          this.showAllLeadFields = false;
+          this.showAllDealFields = false;
+          this.showAllCompanyFields = false;
+          this.showAllTaskFields = false;
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
           this.resetTaskFollowUpForm();
@@ -2723,7 +2795,10 @@
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
+          this.showAllLeadFields = false;
+          this.showAllDealFields = false;
           this.showAllCompanyFields = false;
+          this.showAllTaskFields = false;
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
           this.resetTaskFollowUpForm();
@@ -2741,7 +2816,10 @@
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
+          this.showAllLeadFields = false;
+          this.showAllDealFields = false;
           this.showAllCompanyFields = false;
+          this.showAllTaskFields = false;
           this.showDealTaskForm = false;
           this.forms[this.activeSection] = this.getDefaultForm(this.activeSection);
           this.resetDealTaskForm();
