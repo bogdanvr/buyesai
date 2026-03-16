@@ -273,13 +273,13 @@
         <div class="rounded-[28px] border border-crm-border bg-[#0b2740] overflow-hidden shadow-panel min-h-[540px] flex flex-col">
           <div
             class="hidden lg:grid border-b border-crm-border bg-[#10314d] text-crm-muted text-xs uppercase tracking-[0.16em]"
-            :class="activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]'"
+            :class="activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : (activeSection === 'deals' ? 'grid-cols-[72px_1.3fr_1fr_160px_120px_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]')"
           >
             <div class="px-4 py-4"></div>
             <div class="px-4 py-4">Наименование</div>
             <div class="px-4 py-4">Компания</div>
-            <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Сделка' : 'Телефон' ]]</div>
-            <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Срок' : 'Email' ]]</div>
+            <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Сделка' : (activeSection === 'deals' ? 'Сумма' : 'Телефон') ]]</div>
+            <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Срок' : (activeSection === 'deals' ? 'Задачи' : 'Email') ]]</div>
             <div v-if="activeSection === 'companies'" class="px-4 py-4">В работе</div>
             <div class="px-4 py-4 relative" data-status-filter>
               <button
@@ -334,7 +334,11 @@
                 <div
                   class="hidden lg:grid items-center hover:bg-white/5 transition"
                   :class="[
-                    activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]',
+                    activeSection === 'companies'
+                      ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]'
+                      : (activeSection === 'deals'
+                        ? 'grid-cols-[72px_1.3fr_1fr_160px_120px_160px]'
+                        : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]'),
                     (activeSection === 'leads' || activeSection === 'deals' || activeSection === 'contacts' || activeSection === 'companies' || activeSection === 'tasks') ? 'cursor-pointer' : ''
                   ]"
                   @click="onRowClick(item)"
@@ -344,8 +348,13 @@
                     <div class="font-medium text-white truncate">[[ item.name ]]</div>
                   </div>
                   <div class="px-4 py-4 text-sm text-crm-text truncate">[[ item.company || '—' ]]</div>
-                  <div class="px-4 py-4 text-sm text-crm-text truncate">[[ activeSection === 'tasks' ? (item.deal || '—') : (item.phone || '—') ]]</div>
-                  <div v-if="activeSection !== 'tasks'" class="px-4 py-4 text-sm text-crm-text truncate">[[ item.email || '—' ]]</div>
+                  <div class="px-4 py-4 text-sm text-crm-text truncate">
+                    [[ activeSection === 'tasks' ? (item.deal || '—') : (activeSection === 'deals' ? formatDealAmount(item.amount, item.currency) : (item.phone || '—')) ]]
+                  </div>
+                  <div v-if="activeSection === 'deals'" class="px-4 py-4 text-sm text-crm-text font-medium tabular-nums">
+                    [[ countDealOpenTasks(item.id) ]]
+                  </div>
+                  <div v-else-if="activeSection !== 'tasks'" class="px-4 py-4 text-sm text-crm-text truncate">[[ item.email || '—' ]]</div>
                   <div v-else class="px-4 py-4 text-sm text-crm-text min-w-0">
                     <div class="truncate">[[ item.dueLabel || '—' ]]</div>
                     <div v-if="item.remainingLabel" class="text-xs text-crm-muted mt-1 truncate">[[ item.remainingLabel ]]</div>
@@ -457,8 +466,11 @@
                   </template>
                   <template v-else>
                     <div class="flex items-center justify-between gap-2 min-h-[40px]">
-                      <div class="min-w-0">
+                      <div class="min-w-0 flex-1">
                         <div class="text-sm font-medium text-white truncate leading-5">[[ activeSection === 'leads' ? (item.company || item.name) : item.name ]]</div>
+                        <div v-if="activeSection === 'deals'" class="mt-1 text-[11px] text-crm-muted truncate">
+                          [[ formatDealAmount(item.amount, item.currency) ]] • [[ countDealOpenTasks(item.id) ]] задач
+                        </div>
                       </div>
                       <span
                         class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-medium border shrink-0 leading-4"
@@ -623,7 +635,133 @@
                 <option v-for="company in companyOptions" :key="company.id" :value="company.id">[[ company.name ]]</option>
               </select>
             </label>
-            <div v-if="isCreatingDeal || showAllDealFields || showDealCompanyForm || dealHasSelectedCompany || dealCompanyForm.name || dealCompanyContactForm.fullName" class="md:col-span-2 mt-1 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+            <label v-if="shouldShowDealField(forms.deals.amount)" class="block">
+              <span class="text-sm text-crm-muted">Сумма</span>
+              <input v-model="forms.deals.amount" type="number" min="0" step="0.01" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+            </label>
+            <label v-if="shouldShowDealField(forms.deals.currency)" class="block">
+              <span class="text-sm text-crm-muted">Валюта</span>
+              <select v-model="forms.deals.currency" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option value="RUB">RUB</option>
+                <option value="KZT">KZT</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </label>
+            <label v-if="shouldShowDealField(forms.deals.closeDate)" class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">План закрытия</span>
+              <input v-model="forms.deals.closeDate" type="date" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+            </label>
+            <label v-if="shouldShowDealField(forms.deals.stageId)" class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Этап сделки</span>
+              <select v-model="forms.deals.stageId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option value="">Не выбран</option>
+                <option v-for="stage in metaOptions.dealStages" :key="stage.id" :value="stage.id">[[ stage.name ]]</option>
+              </select>
+            </label>
+            <label v-if="shouldShowDealField(forms.deals.events)" class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">События</span>
+              <div class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                <div v-if="!parseEventLog(forms.deals.events).length" class="text-sm text-crm-muted">
+                  Событий пока нет.
+                </div>
+                <div v-else class="space-y-3">
+                  <div
+                    v-for="(eventItem, eventIndex) in parseEventLog(forms.deals.events)"
+                    :key="`deal-event-${editingDealId || 'new'}-${eventIndex}`"
+                    class="rounded-xl border border-crm-border/80 bg-[#0f2f4a] p-3"
+                  >
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                      <span class="text-[11px] uppercase tracking-[0.16em] text-crm-muted shrink-0">[[ eventItem.timestamp || 'Без даты' ]]</span>
+                      <span v-if="eventItem.result" class="text-white break-words">[[ eventItem.result ]]</span>
+                      <span v-if="eventItem.extra" class="text-crm-muted break-words">[[ eventItem.extra ]]</span>
+                      <button
+                        v-if="eventItem.taskId"
+                        type="button"
+                        @click="openTaskFromEvent(eventItem.taskId)"
+                        class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                      >
+                        Задача #[[ eventItem.taskId ]]
+                      </button>
+                      <button
+                        v-if="eventItem.dealId"
+                        type="button"
+                        @click="openDealFromEvent(eventItem.dealId)"
+                        class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                      >
+                        Сделка #[[ eventItem.dealId ]]
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </label>
+            <div v-if="editingDealId" class="md:col-span-2 mt-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <button
+                type="button"
+                @click="toggleDealTaskForm"
+                class="w-full h-11 px-4 rounded-xl border border-crm-border bg-[#123753] text-sm font-semibold text-white hover:border-crm-accent transition flex items-center justify-between"
+              >
+                <span>Новая задача по сделке</span>
+                <span>[[ showDealTaskForm ? '▲' : '▼' ]]</span>
+              </button>
+
+              <div v-if="showDealTaskForm" class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label class="block md:col-span-2">
+                  <span class="text-sm text-crm-muted">Название задачи</span>
+                  <input v-model="dealTaskForm.subject" type="text" placeholder="Например: Подготовить КП" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <label class="block">
+                  <span class="text-sm text-crm-muted">Срок</span>
+                  <input v-model="dealTaskForm.dueAt" type="datetime-local" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <label class="block md:col-span-2">
+                  <span class="text-sm text-crm-muted">Описание</span>
+                  <textarea v-model="dealTaskForm.description" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
+                </label>
+                <div class="md:col-span-2 flex items-center justify-end gap-2">
+                  <button type="button" @click="resetDealTaskForm" class="h-10 px-4 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition">
+                    Очистить
+                  </button>
+                  <button type="button" @click="createTaskFromDeal" :disabled="isDealTaskSaving || !dealTaskForm.subject.trim()" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
+                    [[ isDealTaskSaving ? 'Создаём...' : 'Создать задачу' ]]
+                  </button>
+                </div>
+              </div>
+
+              <div class="mt-4">
+                <button
+                  type="button"
+                  class="text-sm font-semibold text-white hover:text-crm-accent transition"
+                  @click="openTaskListForDeal"
+                >
+                  Задачи по сделке
+                </button>
+                <div v-if="isDealTasksLoading" class="mt-2 text-sm text-crm-muted">Загрузка задач...</div>
+                <div v-else-if="dealTasksForActiveDeal.length === 0" class="mt-2 text-sm text-crm-muted">По этой сделке задач пока нет.</div>
+                <div v-else class="mt-2 space-y-2">
+                  <div
+                    v-for="task in dealTasksForActiveDeal"
+                    :key="task.id"
+                    class="rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 cursor-pointer hover:border-crm-accent transition"
+                    @click="openTaskFromDeal(task)"
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="text-sm font-medium text-white truncate">[[ task.subject ]]</div>
+                        <div v-if="task.description" class="text-xs text-crm-muted mt-1 break-words">[[ task.description ]]</div>
+                        <div class="text-xs text-crm-muted mt-1">Срок: [[ task.dueLabel ]]</div>
+                        <div v-if="task.remainingLabel" class="text-xs text-crm-muted mt-1">[[ task.remainingLabel ]]</div>
+                      </div>
+                      <span class="inline-flex items-center rounded-full px-2 py-1 text-[11px] font-medium border" :class="task.isDone ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-sky-400/30 bg-sky-400/10 text-sky-300'">
+                        [[ task.isDone ? 'Выполнена' : 'Открыта' ]]
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-if="isCreatingDeal || showAllDealFields || showDealCompanyForm || dealHasSelectedCompany || dealCompanyForm.name || dealCompanyContactForm.fullName" class="md:col-span-2 mt-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <button
                 type="button"
                 @click="toggleDealCompanyForm"
@@ -723,132 +861,6 @@
                   <button type="button" @click="createCompanyFromDeal" :disabled="isDealCompanySaving || !canSubmitDealCompanyAction" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
                     [[ isDealCompanySaving ? 'Сохраняем...' : dealCompanySubmitLabel ]]
                   </button>
-                </div>
-              </div>
-            </div>
-            <label v-if="shouldShowDealField(forms.deals.amount)" class="block">
-              <span class="text-sm text-crm-muted">Сумма</span>
-              <input v-model="forms.deals.amount" type="number" min="0" step="0.01" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-            </label>
-            <label v-if="shouldShowDealField(forms.deals.currency)" class="block">
-              <span class="text-sm text-crm-muted">Валюта</span>
-              <select v-model="forms.deals.currency" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option value="RUB">RUB</option>
-                <option value="KZT">KZT</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-              </select>
-            </label>
-            <label v-if="shouldShowDealField(forms.deals.closeDate)" class="block md:col-span-2">
-              <span class="text-sm text-crm-muted">План закрытия</span>
-              <input v-model="forms.deals.closeDate" type="date" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-            </label>
-            <label v-if="shouldShowDealField(forms.deals.stageId)" class="block md:col-span-2">
-              <span class="text-sm text-crm-muted">Этап сделки</span>
-              <select v-model="forms.deals.stageId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option value="">Не выбран</option>
-                <option v-for="stage in metaOptions.dealStages" :key="stage.id" :value="stage.id">[[ stage.name ]]</option>
-              </select>
-            </label>
-            <label v-if="shouldShowDealField(forms.deals.events)" class="block md:col-span-2">
-              <span class="text-sm text-crm-muted">События</span>
-              <div class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
-                <div v-if="!parseEventLog(forms.deals.events).length" class="text-sm text-crm-muted">
-                  Событий пока нет.
-                </div>
-                <div v-else class="space-y-3">
-                  <div
-                    v-for="(eventItem, eventIndex) in parseEventLog(forms.deals.events)"
-                    :key="`deal-event-${editingDealId || 'new'}-${eventIndex}`"
-                    class="rounded-xl border border-crm-border/80 bg-[#0f2f4a] p-3"
-                  >
-                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                      <span class="text-[11px] uppercase tracking-[0.16em] text-crm-muted shrink-0">[[ eventItem.timestamp || 'Без даты' ]]</span>
-                      <span v-if="eventItem.result" class="text-white break-words">[[ eventItem.result ]]</span>
-                      <span v-if="eventItem.extra" class="text-crm-muted break-words">[[ eventItem.extra ]]</span>
-                      <button
-                        v-if="eventItem.taskId"
-                        type="button"
-                        @click="openTaskFromEvent(eventItem.taskId)"
-                        class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
-                      >
-                        Задача #[[ eventItem.taskId ]]
-                      </button>
-                      <button
-                        v-if="eventItem.dealId"
-                        type="button"
-                        @click="openDealFromEvent(eventItem.dealId)"
-                        class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
-                      >
-                        Сделка #[[ eventItem.dealId ]]
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </label>
-            <div v-if="editingDealId && (isCreatingDeal || showAllDealFields || dealTasksForActiveDeal.length || showDealTaskForm || isDealTasksLoading)" class="md:col-span-2 mt-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
-              <button
-                type="button"
-                @click="toggleDealTaskForm"
-                class="w-full h-11 px-4 rounded-xl border border-crm-border bg-[#123753] text-sm font-semibold text-white hover:border-crm-accent transition flex items-center justify-between"
-              >
-                <span>Новая задача по сделке</span>
-                <span>[[ showDealTaskForm ? '▲' : '▼' ]]</span>
-              </button>
-
-              <div v-if="showDealTaskForm" class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label class="block md:col-span-2">
-                  <span class="text-sm text-crm-muted">Название задачи</span>
-                  <input v-model="dealTaskForm.subject" type="text" placeholder="Например: Подготовить КП" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">Срок</span>
-                  <input v-model="dealTaskForm.dueAt" type="datetime-local" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
-                <label class="block md:col-span-2">
-                  <span class="text-sm text-crm-muted">Описание</span>
-                  <textarea v-model="dealTaskForm.description" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
-                </label>
-                <div class="md:col-span-2 flex items-center justify-end gap-2">
-                  <button type="button" @click="resetDealTaskForm" class="h-10 px-4 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition">
-                    Очистить
-                  </button>
-                  <button type="button" @click="createTaskFromDeal" :disabled="isDealTaskSaving || !dealTaskForm.subject.trim()" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
-                    [[ isDealTaskSaving ? 'Создаём...' : 'Создать задачу' ]]
-                  </button>
-                </div>
-              </div>
-
-              <div class="mt-4">
-                <button
-                  type="button"
-                  class="text-sm font-semibold text-white hover:text-crm-accent transition"
-                  @click="openTaskListForDeal"
-                >
-                  Задачи по сделке
-                </button>
-                <div v-if="isDealTasksLoading" class="mt-2 text-sm text-crm-muted">Загрузка задач...</div>
-                <div v-else-if="dealTasksForActiveDeal.length === 0" class="mt-2 text-sm text-crm-muted">По этой сделке задач пока нет.</div>
-                <div v-else class="mt-2 space-y-2">
-                  <div
-                    v-for="task in dealTasksForActiveDeal"
-                    :key="task.id"
-                    class="rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 cursor-pointer hover:border-crm-accent transition"
-                    @click="openTaskFromDeal(task)"
-                  >
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="min-w-0">
-                        <div class="text-sm font-medium text-white truncate">[[ task.subject ]]</div>
-                        <div v-if="task.description" class="text-xs text-crm-muted mt-1 break-words">[[ task.description ]]</div>
-                        <div class="text-xs text-crm-muted mt-1">Срок: [[ task.dueLabel ]]</div>
-                        <div v-if="task.remainingLabel" class="text-xs text-crm-muted mt-1">[[ task.remainingLabel ]]</div>
-                      </div>
-                      <span class="inline-flex items-center rounded-full px-2 py-1 text-[11px] font-medium border" :class="task.isDone ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-sky-400/30 bg-sky-400/10 text-sky-300'">
-                        [[ task.isDone ? 'Выполнена' : 'Открыта' ]]
-                      </span>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -2046,6 +2058,24 @@
             }
             return this.getDealStatusBucket(deal) !== "done";
           }).length;
+        },
+        countDealOpenTasks(dealId) {
+          const normalizedDealId = this.toIntOrNull(dealId);
+          if (!normalizedDealId) return 0;
+          return this.datasets.tasks.filter((task) => {
+            if (String(task.dealId || "") !== String(normalizedDealId)) {
+              return false;
+            }
+            return !task.isDone;
+          }).length;
+        },
+        formatDealAmount(amount, currency) {
+          const numericAmount = Number(amount || 0);
+          const safeCurrency = String(currency || "RUB").trim() || "RUB";
+          if (!Number.isFinite(numericAmount)) {
+            return `0 ${safeCurrency}`;
+          }
+          return `${numericAmount.toLocaleString("ru-RU")} ${safeCurrency}`;
         },
         toggleCompanyCardDetails(companyId) {
           const key = String(companyId || "");
