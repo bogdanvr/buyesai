@@ -7,7 +7,7 @@ def list_clients() -> QuerySet[Client]:
     return Client.objects.prefetch_related("contacts").annotate(
         leads_count=Count("leads", distinct=True),
         deals_count=Count("deals", distinct=True),
-    )
+    ).order_by("name", "id")
 
 
 def get_client_or_none(client_id: int) -> Client | None:

@@ -39,6 +39,8 @@ def _fetch_currency_rates() -> dict:
         "date": "",
     }
 
+    stale = cache.get(CBR_RATES_CACHE_KEY)
+
     try:
         response = requests.get(CBR_DAILY_XML_URL, timeout=10)
         response.raise_for_status()
@@ -58,9 +60,12 @@ def _fetch_currency_rates() -> dict:
             except (InvalidOperation, TypeError):
                 continue
             rates[code] = float(value / nominal)
-    except Exception:
-        logger.exception("Failed to fetch CBR currency rates")
-        stale = cache.get(CBR_RATES_CACHE_KEY)
+    except requests.RequestException as error:
+        logger.warning("Failed to fetch CBR currency rates: %s", error)
+        if stale:
+            return stale
+    except ElementTree.ParseError as error:
+        logger.warning("Failed to parse CBR currency rates XML: %s", error)
         if stale:
             return stale
 
