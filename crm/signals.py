@@ -132,6 +132,7 @@ def activity_task_deadline_state_signal(sender, instance: Activity, **kwargs):
             "type",
             "subject",
             "due_at",
+            "deadline_reminder_offset_minutes",
             "is_done",
             "result",
             "client_id",
@@ -152,8 +153,11 @@ def activity_task_deadline_state_signal(sender, instance: Activity, **kwargs):
         return
 
     due_at_changed = previous.due_at != instance.due_at
+    reminder_offset_changed = (
+        previous.deadline_reminder_offset_minutes != instance.deadline_reminder_offset_minutes
+    )
     reopened = previous.is_done and not instance.is_done
-    if due_at_changed or reopened:
+    if due_at_changed or reminder_offset_changed or reopened:
         instance.deadline_reminder_sent_at = None
 
 

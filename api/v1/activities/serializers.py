@@ -49,6 +49,7 @@ class ActivitySerializer(serializers.ModelSerializer):
             "description",
             "result",
             "due_at",
+            "deadline_reminder_offset_minutes",
             "completed_at",
             "is_done",
             "lead",

@@ -13,6 +13,16 @@ class ActivityType(models.TextChoices):
     TASK = "task", "Задача"
 
 
+class TaskReminderOffset(models.IntegerChoices):
+    MINUTES_5 = 5, "5 минут"
+    MINUTES_10 = 10, "10 минут"
+    MINUTES_15 = 15, "15 минут"
+    MINUTES_30 = 30, "30 минут"
+    HOURS_1 = 60, "1 час"
+    HOURS_2 = 120, "2 часа"
+    HOURS_3 = 180, "3 часа"
+
+
 class Activity(TimestampedModel):
     type = models.CharField(
         max_length=16,
@@ -24,6 +34,11 @@ class Activity(TimestampedModel):
     description = models.TextField(blank=True, default="", verbose_name="Описание")
     result = models.TextField(blank=True, default="", verbose_name="Результат")
     due_at = models.DateTimeField(blank=True, null=True, verbose_name="Срок")
+    deadline_reminder_offset_minutes = models.PositiveSmallIntegerField(
+        choices=TaskReminderOffset.choices,
+        default=TaskReminderOffset.MINUTES_30,
+        verbose_name="Напомнить за",
+    )
     deadline_reminder_sent_at = models.DateTimeField(
         blank=True,
         null=True,

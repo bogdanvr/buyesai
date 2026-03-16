@@ -6,6 +6,8 @@ from crm.models import Deal
 class DealSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source="client.name", read_only=True)
     lead_title = serializers.CharField(source="lead.title", read_only=True)
+    source_name = serializers.CharField(source="source.name", read_only=True)
+    source_code = serializers.CharField(source="source.code", read_only=True)
     stage_name = serializers.CharField(source="stage.name", read_only=True)
     owner_name = serializers.SerializerMethodField()
 
@@ -29,6 +31,9 @@ class DealSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "description",
+            "source",
+            "source_name",
+            "source_code",
             "client",
             "client_name",
             "lead",

@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from crm.models import Activity
-from crm.models.activity import ActivityType
+from crm.models.activity import ActivityType, TaskReminderOffset
 from integrations.models import UserIntegrationProfile
 
 
@@ -60,6 +60,39 @@ class TaskDeadlineReminderCommandTests(TestCase):
             type=ActivityType.TASK,
             subject="Позвонить клиенту",
             due_at=timezone.now() + timedelta(minutes=45),
+            created_by=self.user,
+        )
+
+        call_command("send_task_deadline_reminders")
+
+        task.refresh_from_db()
+        send_message_mock.assert_not_called()
+        self.assertIsNone(task.deadline_reminder_sent_at)
+
+    @patch("integrations.management.commands.send_task_deadline_reminders.send_telegram_chat_message")
+    def test_sends_reminder_using_custom_task_offset(self, send_message_mock):
+        send_message_mock.return_value = {"ok": True}
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Подтвердить встречу",
+            due_at=timezone.now() + timedelta(hours=2, minutes=30),
+            deadline_reminder_offset_minutes=TaskReminderOffset.HOURS_3,
+            created_by=self.user,
+        )
+
+        call_command("send_task_deadline_reminders")
+
+        task.refresh_from_db()
+        self.assertEqual(send_message_mock.call_count, 1)
+        self.assertIsNotNone(task.deadline_reminder_sent_at)
+
+    @patch("integrations.management.commands.send_task_deadline_reminders.send_telegram_chat_message")
+    def test_does_not_send_before_custom_task_offset_window(self, send_message_mock):
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Проверить спецификацию",
+            due_at=timezone.now() + timedelta(minutes=20),
+            deadline_reminder_offset_minutes=TaskReminderOffset.MINUTES_10,
             created_by=self.user,
         )
 

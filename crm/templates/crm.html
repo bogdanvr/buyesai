@@ -273,13 +273,14 @@
         <div class="rounded-[28px] border border-crm-border bg-[#0b2740] overflow-hidden shadow-panel min-h-[540px] flex flex-col">
           <div
             class="hidden lg:grid border-b border-crm-border bg-[#10314d] text-crm-muted text-xs uppercase tracking-[0.16em]"
-            :class="activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : (activeSection === 'deals' ? 'grid-cols-[72px_1.3fr_1fr_160px_120px_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]')"
+            :class="activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : (activeSection === 'deals' ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_110px_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]')"
           >
             <div class="px-4 py-4"></div>
             <div class="px-4 py-4">Наименование</div>
             <div class="px-4 py-4">Компания</div>
             <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Сделка' : (activeSection === 'deals' ? 'Сумма' : 'Телефон') ]]</div>
-            <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Срок' : (activeSection === 'deals' ? 'Задачи' : 'Email') ]]</div>
+            <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Срок' : (activeSection === 'deals' ? 'План закрытия' : 'Email') ]]</div>
+            <div v-if="activeSection === 'deals'" class="px-4 py-4">Задачи</div>
             <div v-if="activeSection === 'companies'" class="px-4 py-4">В работе</div>
             <div class="px-4 py-4 relative" data-status-filter>
               <button
@@ -337,7 +338,7 @@
                     activeSection === 'companies'
                       ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]'
                       : (activeSection === 'deals'
-                        ? 'grid-cols-[72px_1.3fr_1fr_160px_120px_160px]'
+                        ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_110px_160px]'
                         : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]'),
                     (activeSection === 'leads' || activeSection === 'deals' || activeSection === 'contacts' || activeSection === 'companies' || activeSection === 'tasks') ? 'cursor-pointer' : ''
                   ]"
@@ -350,6 +351,9 @@
                   <div class="px-4 py-4 text-sm text-crm-text truncate">[[ item.company || '—' ]]</div>
                   <div class="px-4 py-4 text-sm text-crm-text truncate">
                     [[ activeSection === 'tasks' ? (item.deal || '—') : (activeSection === 'deals' ? formatDealAmount(item.amount, item.currency) : (item.phone || '—')) ]]
+                  </div>
+                  <div v-if="activeSection === 'deals'" class="px-4 py-4 text-sm text-crm-text truncate">
+                    [[ item.closeDate || '—' ]]
                   </div>
                   <div v-if="activeSection === 'deals'" class="px-4 py-4 text-sm text-crm-text font-medium tabular-nums">
                     [[ countDealOpenTasks(item.id) ]]
@@ -469,7 +473,7 @@
                       <div class="min-w-0 flex-1">
                         <div class="text-sm font-medium text-white truncate leading-5">[[ activeSection === 'leads' ? (item.company || item.name) : item.name ]]</div>
                         <div v-if="activeSection === 'deals'" class="mt-1 text-[11px] text-crm-muted truncate">
-                          [[ formatDealAmount(item.amount, item.currency) ]] • [[ countDealOpenTasks(item.id) ]] задач
+                          [[ formatDealAmount(item.amount, item.currency) ]] • [[ item.closeDate || 'Без даты' ]] • [[ countDealOpenTasks(item.id) ]] задач
                         </div>
                       </div>
                       <span
@@ -624,6 +628,13 @@
               <span class="text-sm text-crm-muted">Название сделки</span>
               <input v-model="forms.deals.title" required type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
+            <label v-if="shouldShowDealField(forms.deals.sourceId)" class="block">
+              <span class="text-sm text-crm-muted">Источник сделки</span>
+              <select v-model="forms.deals.sourceId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option value="">Не выбран</option>
+                <option v-for="source in metaOptions.leadSources" :key="source.id" :value="source.id">[[ source.name ]]</option>
+              </select>
+            </label>
             <label v-if="shouldShowDealField(forms.deals.description)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Описание сделки</span>
               <textarea v-model="forms.deals.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
@@ -714,6 +725,12 @@
                 <label class="block">
                   <span class="text-sm text-crm-muted">Срок</span>
                   <input v-model="dealTaskForm.dueAt" type="datetime-local" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <label class="block">
+                  <span class="text-sm text-crm-muted">Напомнить за</span>
+                  <select v-model="dealTaskForm.reminderOffsetMinutes" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                    <option v-for="option in taskReminderOptions" :key="`deal-task-reminder-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                  </select>
                 </label>
                 <label class="block md:col-span-2">
                   <span class="text-sm text-crm-muted">Описание</span>
@@ -1121,6 +1138,12 @@
               <input v-model="forms.tasks.dueAt" type="datetime-local" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
               <div v-if="taskFormRemainingLabel" class="mt-2 text-xs text-crm-muted">[[ taskFormRemainingLabel ]]</div>
             </label>
+            <label v-if="shouldShowTaskField(forms.tasks.reminderOffsetMinutes)" class="block">
+              <span class="text-sm text-crm-muted">Напомнить за</span>
+              <select v-model="forms.tasks.reminderOffsetMinutes" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option v-for="option in taskReminderOptions" :key="`task-reminder-${option.value}`" :value="option.value">[[ option.label ]]</option>
+              </select>
+            </label>
             <label v-if="shouldShowTaskField(forms.tasks.description)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Описание</span>
               <textarea v-model="forms.tasks.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
@@ -1144,6 +1167,12 @@
                 <label class="block">
                   <span class="text-sm text-crm-muted">Срок</span>
                   <input v-model="taskFollowUpForm.dueAt" type="datetime-local" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <label class="block">
+                  <span class="text-sm text-crm-muted">Напомнить за</span>
+                  <select v-model="taskFollowUpForm.reminderOffsetMinutes" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                    <option v-for="option in taskReminderOptions" :key="`task-followup-reminder-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                  </select>
                 </label>
                 <label class="block md:col-span-2">
                   <span class="text-sm text-crm-muted">Описание</span>
@@ -1264,6 +1293,7 @@
             deals: {
               title: "",
               description: "",
+              sourceId: "",
               companyId: null,
               amount: "0",
               currency: "RUB",
@@ -1299,6 +1329,7 @@
               companyId: null,
               dealId: null,
               dueAt: "",
+              reminderOffsetMinutes: 30,
               description: "",
               result: "",
               isDone: false
@@ -1312,6 +1343,7 @@
           taskFollowUpForm: {
             subject: "",
             dueAt: "",
+            reminderOffsetMinutes: 30,
             description: ""
           },
           dealCompanyForm: {
@@ -1345,6 +1377,15 @@
             dealStages: [],
             leadSources: []
           },
+          taskReminderOptions: [
+            { value: 5, label: "5 минут" },
+            { value: 10, label: "10 минут" },
+            { value: 15, label: "15 минут" },
+            { value: 30, label: "30 минут" },
+            { value: 60, label: "1 час" },
+            { value: 120, label: "2 часа" },
+            { value: 180, label: "3 часа" }
+          ],
           sidebarItems: [
             { key: "leads", label: "Лиды", shortLabel: "Лиды", icon: "◎" },
             { key: "deals", label: "Сделки", shortLabel: "Сделки", icon: "◔" },
@@ -2235,6 +2276,7 @@
           this.forms.deals = {
             title: item.title || "",
             description: item.description || "",
+            sourceId: item.sourceId || "",
             companyId: this.toIntOrNull(item.clientId),
             amount: item.amount ?? "0",
             currency: item.currency || "RUB",
@@ -2311,6 +2353,7 @@
             companyId: this.toIntOrNull(item.clientId),
             dealId: this.toIntOrNull(item.dealId),
             dueAt: this.toDateTimeLocal(item.dueAtRaw),
+            reminderOffsetMinutes: Number(item.reminderOffsetMinutes || 30),
             description: item.description || "",
             result: item.result || "",
             isDone: !!item.isDone
@@ -2346,6 +2389,7 @@
           this.dealTaskForm = {
             subject: "",
             dueAt: "",
+            reminderOffsetMinutes: 30,
             description: ""
           };
         },
@@ -2353,6 +2397,7 @@
           this.taskFollowUpForm = {
             subject: "",
             dueAt: "",
+            reminderOffsetMinutes: 30,
             description: ""
           };
         },
@@ -2668,6 +2713,8 @@
             id: item.id,
             name: item.title || `Сделка #${item.id}`,
             description: item.description || "",
+            sourceId: item.source || "",
+            sourceName: item.source_name || "",
             company: item.client_name || "",
             phone: "",
             email: "",
@@ -2737,6 +2784,7 @@
             subject: item.subject || `Задача #${item.id}`,
             description: item.description || "",
             result: item.result || "",
+            reminderOffsetMinutes: Number(item.deadline_reminder_offset_minutes || 30),
             company: item.client_name || "",
             clientId: item.client || null,
             deal: item.deal_title || "",
@@ -2886,6 +2934,7 @@
             return {
               title: "",
               description: "",
+              sourceId: this.metaOptions.leadSources.length ? this.metaOptions.leadSources[0].id : "",
               companyId: null,
               amount: "0",
               currency: "RUB",
@@ -2927,6 +2976,7 @@
               companyId: null,
               dealId: null,
               dueAt: "",
+              reminderOffsetMinutes: 30,
               description: "",
               result: "",
               isDone: false
@@ -3041,6 +3091,7 @@
             body: {
               title: form.title.trim(),
               description: form.description.trim(),
+              source: this.toIntOrNull(form.sourceId),
               client: clientId,
               amount: Number(form.amount || 0),
               currency: form.currency,
@@ -3061,6 +3112,7 @@
             body: {
               title: form.title.trim(),
               description: form.description.trim(),
+              source: this.toIntOrNull(form.sourceId),
               client: clientId,
               amount: Number(form.amount || 0),
               currency: form.currency,
@@ -3088,6 +3140,7 @@
                 subject,
                 description: this.dealTaskForm.description.trim(),
                 due_at: this.toIsoDateTime(this.dealTaskForm.dueAt),
+                deadline_reminder_offset_minutes: Number(this.dealTaskForm.reminderOffsetMinutes || 30),
                 deal: this.editingDealId,
                 client: this.toIntOrNull(this.forms.deals.companyId)
               }
@@ -3327,6 +3380,7 @@
               description: form.description.trim(),
               result: form.result.trim(),
               due_at: this.toIsoDateTime(form.dueAt),
+              deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
               client: clientId,
               deal: this.toIntOrNull(form.dealId),
               is_done: !!form.isDone
@@ -3350,6 +3404,7 @@
               description: form.description.trim(),
               result: form.result.trim(),
               due_at: this.toIsoDateTime(form.dueAt),
+              deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
               client: clientId,
               deal: this.toIntOrNull(form.dealId),
               is_done: !!form.isDone
@@ -3370,6 +3425,7 @@
               subject,
               description: followUp.description.trim(),
               due_at: this.toIsoDateTime(followUp.dueAt),
+              deadline_reminder_offset_minutes: Number(followUp.reminderOffsetMinutes || 30),
               client: this.toIntOrNull(this.forms.tasks.companyId),
               deal: dealId,
               is_done: false

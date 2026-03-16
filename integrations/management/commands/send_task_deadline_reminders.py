@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from crm.models import Activity
-from crm.models.activity import ActivityType
+from crm.models.activity import ActivityType, TaskReminderOffset
 from integrations.models import UserIntegrationProfile
 from integrations.services.telegram import (
     build_task_deadline_reminder_message,
@@ -35,11 +35,11 @@ def get_task_recipients(task: Activity):
 
 
 class Command(BaseCommand):
-    help = "Отправляет Telegram-напоминания по задачам за 30 минут до дедлайна."
+    help = "Отправляет Telegram-напоминания по задачам за выбранное время до дедлайна."
 
     def handle(self, *args, **options):
         now = timezone.now()
-        reminder_threshold = now + timedelta(minutes=30)
+        reminder_threshold = now + timedelta(minutes=TaskReminderOffset.HOURS_3)
         tasks = (
             Activity.objects.select_related("created_by", "deal__owner", "lead__assigned_to", "deal", "client")
             .filter(
@@ -55,6 +55,13 @@ class Command(BaseCommand):
 
         sent_count = 0
         for task in tasks:
+            reminder_offset = int(
+                getattr(task, "deadline_reminder_offset_minutes", TaskReminderOffset.MINUTES_30)
+                or TaskReminderOffset.MINUTES_30
+            )
+            reminder_at = task.due_at - timedelta(minutes=reminder_offset)
+            if reminder_at > now or task.due_at <= now:
+                continue
             minutes_left = max(1, math.ceil((task.due_at - now).total_seconds() / 60))
             message = build_task_deadline_reminder_message(task=task, minutes_left=minutes_left)
             reminder_sent = False
