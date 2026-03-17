@@ -579,7 +579,7 @@
     </main>
 
     <div v-if="showModal" class="fixed inset-0 z-50 flex items-start md:items-center justify-center p-2 md:p-4 overflow-y-auto bg-black/55 backdrop-blur-sm">
-      <div class="w-full max-w-none md:max-w-2xl rounded-[24px] md:rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel h-[calc(100dvh-1rem)] md:h-auto md:max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col">
+      <div class="w-full max-w-none md:max-w-5xl rounded-[24px] md:rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel h-[calc(100dvh-1rem)] md:h-auto md:max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col">
         <div class="px-4 md:px-6 py-4 md:py-5 border-b border-crm-border flex items-start justify-between gap-4 shrink-0">
           <div class="min-w-0">
             <h2 class="text-lg md:text-xl font-semibold break-words">[[ modalTitle ]]</h2>
@@ -722,7 +722,7 @@
               <span class="text-sm text-crm-muted">Название сделки</span>
               <input v-model="forms.deals.title" required type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label v-if="shouldShowDealField(forms.deals.sourceId)" class="block">
+            <label class="block">
               <span class="text-sm text-crm-muted">Источник сделки</span>
               <select v-model="forms.deals.sourceId" @change="handleSourceSelectChange('deals')" required class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option value="" disabled>Выберите источник</option>
