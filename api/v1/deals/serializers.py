@@ -20,8 +20,13 @@ class DealSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        source = attrs.get("source", getattr(self.instance, "source", None))
+        client = attrs.get("client", getattr(self.instance, "client", None))
         stage = attrs.get("stage", getattr(self.instance, "stage", None))
+        if source is None:
+            raise serializers.ValidationError({"source": "Источник сделки обязателен."})
         stage_code = str(getattr(stage, "code", "") or "").strip().lower()
+        attrs["currency"] = str(getattr(client, "currency", "") or "RUB").strip().upper() or "RUB"
         attrs["is_won"] = stage_code == "won"
         return attrs
 

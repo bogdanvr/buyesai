@@ -30,6 +30,7 @@ class ClientSerializer(serializers.ModelSerializer):
             "inn",
             "phone",
             "email",
+            "currency",
             "website",
             "address",
             "industry",

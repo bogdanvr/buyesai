@@ -4,6 +4,13 @@ from crm.models.common import TimestampedModel
 
 
 class Client(TimestampedModel):
+    CURRENCY_CHOICES = (
+        ("RUB", "RUB"),
+        ("KZT", "KZT"),
+        ("USD", "USD"),
+        ("EUR", "EUR"),
+    )
+
     name = models.CharField(max_length=255, verbose_name="Клиент")
     legal_name = models.CharField(
         max_length=255,
@@ -20,6 +27,12 @@ class Client(TimestampedModel):
     )
     phone = models.CharField(max_length=64, blank=True, default="", verbose_name="Телефон")
     email = models.EmailField(blank=True, default="", verbose_name="Email")
+    currency = models.CharField(
+        max_length=3,
+        choices=CURRENCY_CHOICES,
+        default="RUB",
+        verbose_name="Валюта компании",
+    )
     website = models.URLField(blank=True, default="", verbose_name="Сайт")
     address = models.CharField(max_length=512, blank=True, default="", verbose_name="Адрес")
     industry = models.CharField(max_length=255, blank=True, default="", verbose_name="Сфера деятельности")

@@ -15,13 +15,14 @@ class ClientAdmin(admin.ModelAdmin):
         "name",
         "phone",
         "email",
+        "currency",
         "inn",
         "okved",
         "source",
         "is_active",
         "created_at",
     )
-    list_filter = ("is_active", "source")
+    list_filter = ("is_active", "source", "currency")
     search_fields = ("name", "legal_name", "inn", "phone", "email", "address", "industry", "okved")
     inlines = (ContactInline,)
 

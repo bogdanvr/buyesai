@@ -21,8 +21,11 @@ class ActivitySerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
         activity_type = attrs.get("type", getattr(self.instance, "type", None))
+        due_at = attrs.get("due_at", getattr(self.instance, "due_at", None))
         is_done = attrs.get("is_done", getattr(self.instance, "is_done", False))
         result = attrs.get("result", getattr(self.instance, "result", ""))
+        if activity_type == ActivityType.TASK and not due_at:
+            raise serializers.ValidationError({"due_at": "Укажите срок задачи."})
         if activity_type == ActivityType.TASK and is_done and not str(result or "").strip():
             raise serializers.ValidationError({"result": "Укажите результат завершения задачи."})
         return attrs

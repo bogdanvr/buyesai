@@ -12,6 +12,7 @@ def create_deal(*, title: str, client, lead=None, stage=None, amount=0, owner=No
         lead=lead,
         stage=stage,
         amount=amount,
+        currency=getattr(client, "currency", "RUB") or "RUB",
         owner=owner,
     )
 

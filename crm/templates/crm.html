@@ -43,6 +43,27 @@
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
+    body.crm-startup-screen-active {
+      overflow: hidden;
+    }
+
+    #crm-startup-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(7, 31, 53, 0.42);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      opacity: 1;
+      transition: opacity 220ms ease;
+      pointer-events: all;
+    }
+
+    #crm-startup-screen.is-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
     *::-webkit-scrollbar {
       width: 10px;
       height: 10px;
@@ -70,7 +91,8 @@
     }
   </style>
 </head>
-<body>
+<body class="crm-startup-screen-active">
+  <div id="crm-startup-screen"></div>
   <div id="app" v-cloak class="crm-grid">
     <aside class="hidden md:flex flex-col items-center bg-[#041425] border-r border-crm-border py-4 gap-3">
       <div class="w-12 h-12 rounded-2xl border border-crm-border bg-crm-panel flex items-center justify-center">
@@ -593,10 +615,27 @@
             </label>
             <label v-if="shouldShowLeadField(forms.leads.sourceId)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Источник</span>
-              <select v-model="forms.leads.sourceId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+              <select v-model="forms.leads.sourceId" @change="handleSourceSelectChange('leads')" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option value="">Не выбран</option>
+                <option value="__create__">+ Добавить новый источник</option>
                 <option v-for="source in metaOptions.leadSources" :key="source.id" :value="source.id">[[ source.name ]]</option>
               </select>
+              <div v-if="showSourceCreateForm && sourceCreateTargetSection === 'leads'" class="mt-3 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Новый источник</span>
+                    <input v-model="sourceCreateForm.name" type="text" placeholder="Например: Telegram Ads" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <div class="flex items-end gap-2">
+                    <button type="button" @click="cancelSourceCreate" class="h-10 px-4 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition">
+                      Отмена
+                    </button>
+                    <button type="button" @click="createSourceFromInline('leads')" :disabled="isSourceSaving || !sourceCreateForm.name.trim()" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
+                      [[ isSourceSaving ? 'Добавляем...' : 'Добавить новый' ]]
+                    </button>
+                  </div>
+                </div>
+              </div>
               <div v-if="leadSourcePath(forms.leads).length" class="mt-2 text-sm text-crm-muted break-words">
                 [[ leadSourcePath(forms.leads).join(' -> ') ]]
               </div>
@@ -656,45 +695,218 @@
             </label>
             <label v-if="shouldShowDealField(forms.deals.sourceId)" class="block">
               <span class="text-sm text-crm-muted">Источник сделки</span>
-              <select v-model="forms.deals.sourceId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option value="">Не выбран</option>
+              <select v-model="forms.deals.sourceId" @change="handleSourceSelectChange('deals')" required class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option value="" disabled>Выберите источник</option>
+                <option value="__create__">+ Добавить новый источник</option>
                 <option v-for="source in metaOptions.leadSources" :key="source.id" :value="source.id">[[ source.name ]]</option>
               </select>
             </label>
+            <div v-if="showSourceCreateForm && sourceCreateTargetSection === 'deals'" class="block md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                <label class="block">
+                  <span class="text-sm text-crm-muted">Новый источник сделки</span>
+                  <input v-model="sourceCreateForm.name" type="text" placeholder="Например: Партнёрский канал" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <div class="flex items-end gap-2">
+                  <button type="button" @click="cancelSourceCreate" class="h-10 px-4 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition">
+                    Отмена
+                  </button>
+                  <button type="button" @click="createSourceFromInline('deals')" :disabled="isSourceSaving || !sourceCreateForm.name.trim()" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
+                    [[ isSourceSaving ? 'Добавляем...' : 'Добавить новый' ]]
+                  </button>
+                </div>
+              </div>
+            </div>
             <label v-if="shouldShowDealField(forms.deals.description)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Описание сделки</span>
               <textarea v-model="forms.deals.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <label v-if="shouldShowDealField(forms.deals.companyId)" class="block">
-              <span class="text-sm text-crm-muted">Компания</span>
-              <select v-model="forms.deals.companyId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+            <div v-if="shouldShowDealField(forms.deals.companyId)" class="block">
+              <div class="flex items-center gap-3">
+                <span class="text-sm text-crm-muted">Компания</span>
+                <button
+                  v-if="dealHasSelectedCompany"
+                  type="button"
+                  @click="toggleDealContactsPanel"
+                  class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-crm-border bg-[#123753] text-white transition hover:border-crm-accent shrink-0"
+                  title="Контакты компании"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-lines-fill text-crm-accent" viewBox="0 0 16 16">
+                    <path d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zM11 3.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5m.5 2.5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1zm2 3a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1zm0 3a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1z"/>
+                  </svg>
+                </button>
+              </div>
+              <select v-model="forms.deals.companyId" @change="handleDealCompanySelectChange" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option :value="null">Не выбрана</option>
+                <option value="__create__">+ Добавить новую компанию</option>
                 <option v-for="company in companyOptions" :key="company.id" :value="company.id">[[ company.name ]]</option>
               </select>
-            </label>
-            <label v-if="shouldShowDealField(forms.deals.amount)" class="block">
+            </div>
+
+            <div v-if="showDealCompanyForm || (dealHasSelectedCompany && showDealContactsPanel)" class="md:col-span-2">
+              <div v-if="showDealCompanyForm" class="mt-3 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+                <div class="mb-3 text-sm font-semibold text-white">Новая компания</div>
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Название компании</span>
+                    <input v-model="dealCompanyForm.name" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">ИНН</span>
+                    <input v-model="dealCompanyForm.inn" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">ОКВЭД</span>
+                    <input v-model="dealCompanyForm.okved" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Валюта компании</span>
+                    <select v-model="dealCompanyForm.currency" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                      <option value="RUB">RUB</option>
+                      <option value="KZT">KZT</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                    </select>
+                  </label>
+                  <label class="block md:col-span-2">
+                    <span class="text-sm text-crm-muted">Сфера деятельности</span>
+                    <input v-model="dealCompanyForm.industry" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block md:col-span-2">
+                    <span class="text-sm text-crm-muted">Адрес</span>
+                    <input v-model="dealCompanyForm.address" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Телефон компании</span>
+                    <div class="relative mt-1">
+                      <input v-model="dealCompanyForm.phone" @focus="ensurePhonePrefix(dealCompanyForm, 'phone')" type="text" class="w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] pl-3 pr-11 outline-none focus:border-crm-accent" />
+                      <a
+                        v-if="phoneHref(dealCompanyForm.phone)"
+                        :href="phoneHref(dealCompanyForm.phone)"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                        title="Позвонить"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                        </svg>
+                      </a>
+                    </div>
+                  </label>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Email компании</span>
+                    <input v-model="dealCompanyForm.email" type="email" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block md:col-span-2">
+                    <span class="text-sm text-crm-muted">Сайт</span>
+                    <input v-model="dealCompanyForm.website" type="url" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <div class="md:col-span-2 flex items-center justify-end gap-2">
+                    <button type="button" @click="cancelDealCompanyCreation" class="h-10 px-4 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition">
+                      Отмена
+                    </button>
+                    <button type="button" @click="createCompanyFromDeal" :disabled="isDealCompanySaving || !canSubmitDealCompanyAction" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
+                      [[ isDealCompanySaving ? 'Сохраняем...' : 'Создать компанию' ]]
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="dealHasSelectedCompany && showDealContactsPanel" class="mt-3 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="text-sm font-semibold text-white truncate">Контакты компании</div>
+                    <div class="text-xs text-crm-muted truncate">[[ dealSelectedCompanyName ]]</div>
+                  </div>
+                  <button type="button" @click="toggleDealContactForm" class="inline-flex h-9 items-center gap-1 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-crm-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M18 9v6m3-3h-6M10 7a4 4 0 100 8 4 4 0 000-8zm-7 13a7 7 0 0114 0" />
+                    </svg>
+                    <span>Добавить контакт</span>
+                  </button>
+                </div>
+
+                <div v-if="showDealContactForm" class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <label class="block md:col-span-2">
+                    <span class="text-sm text-crm-muted">ФИО</span>
+                    <input v-model="dealCompanyContactForm.fullName" type="text" placeholder="Иван Иванов" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Должность</span>
+                    <input v-model="dealCompanyContactForm.position" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Телефон контакта</span>
+                    <div class="relative mt-1">
+                      <input v-model="dealCompanyContactForm.phone" @focus="ensurePhonePrefix(dealCompanyContactForm, 'phone')" type="text" class="w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] pl-3 pr-11 outline-none focus:border-crm-accent" />
+                      <a
+                        v-if="phoneHref(dealCompanyContactForm.phone)"
+                        :href="phoneHref(dealCompanyContactForm.phone)"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                        title="Позвонить"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                        </svg>
+                      </a>
+                    </div>
+                  </label>
+                  <label class="block md:col-span-2">
+                    <span class="text-sm text-crm-muted">Email контакта</span>
+                    <input v-model="dealCompanyContactForm.email" type="email" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="md:col-span-2 flex items-center gap-2">
+                    <input v-model="dealCompanyContactForm.isPrimary" type="checkbox" class="w-4 h-4 rounded border-crm-border bg-transparent" />
+                    <span class="text-sm text-crm-muted">Основной контакт</span>
+                  </label>
+                  <div class="md:col-span-2 flex items-center justify-end gap-2">
+                    <button type="button" @click="resetDealCompanyContactForm" class="h-10 px-4 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition">
+                      Очистить
+                    </button>
+                    <button type="button" @click="createContactFromDealSelectedCompany" :disabled="isDealCompanySaving || !dealCompanyContactForm.fullName.trim()" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
+                      [[ isDealCompanySaving ? 'Создаём...' : 'Добавить контакт' ]]
+                    </button>
+                  </div>
+                </div>
+
+                <div class="mt-4">
+                  <div v-if="isDealContactsLoading" class="text-sm text-crm-muted">Загрузка контактов...</div>
+                  <div v-else-if="dealCompanyContacts.length === 0" class="text-sm text-crm-muted">У выбранной компании пока нет контактов.</div>
+                  <div v-else class="space-y-2">
+                    <div
+                      v-for="contact in dealCompanyContacts"
+                      :key="contact.id"
+                      class="rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 cursor-pointer hover:border-crm-accent transition"
+                      @click="openContactFromDealCompany(contact)"
+                    >
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <div class="text-sm font-medium text-white truncate">[[ contact.fullName ]]</div>
+                          <div v-if="contact.position" class="mt-1 text-xs text-crm-muted">[[ contact.position ]]</div>
+                          <div class="mt-1 text-xs text-crm-muted">[[ contact.phone || '—' ]] • [[ contact.email || '—' ]]</div>
+                        </div>
+                        <span class="inline-flex items-center rounded-full px-2 py-1 text-[11px] font-medium border" :class="contact.isPrimary ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-sky-400/30 bg-sky-400/10 text-sky-300'">
+                          [[ contact.isPrimary ? 'Основной' : 'Контакт' ]]
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <label class="block">
               <span class="text-sm text-crm-muted">Сумма</span>
-              <input v-model="forms.deals.amount" type="number" min="0" step="0.01" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+              <input v-model="forms.deals.amount" @focus="clearZeroOnFocus(forms.deals, 'amount')" type="number" min="0" step="0.01" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label v-if="shouldShowDealField(forms.deals.currency)" class="block">
-              <span class="text-sm text-crm-muted">Валюта</span>
-              <select v-model="forms.deals.currency" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option value="RUB">RUB</option>
-                <option value="KZT">KZT</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-              </select>
-            </label>
-            <label v-if="shouldShowDealField(forms.deals.closeDate)" class="block md:col-span-2">
-              <span class="text-sm text-crm-muted">План закрытия</span>
-              <input v-model="forms.deals.closeDate" type="date" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-            </label>
-            <label v-if="shouldShowDealField(forms.deals.stageId)" class="block md:col-span-2">
+            <label v-if="shouldShowDealField(forms.deals.stageId)" class="block">
               <span class="text-sm text-crm-muted">Этап сделки</span>
               <select v-model="forms.deals.stageId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option value="">Не выбран</option>
                 <option v-for="stage in metaOptions.dealStages" :key="stage.id" :value="stage.id">[[ stage.name ]]</option>
               </select>
+            </label>
+            <label v-if="shouldShowDealField(forms.deals.closeDate)" class="block">
+              <span class="text-sm text-crm-muted">План закрытия</span>
+              <input v-model="forms.deals.closeDate" type="date" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
             <label v-if="shouldShowDealField(forms.deals.events)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">События</span>
@@ -766,7 +978,7 @@
                   <button type="button" @click="resetDealTaskForm" class="h-10 px-4 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition">
                     Очистить
                   </button>
-                  <button type="button" @click="createTaskFromDeal" :disabled="isDealTaskSaving || !dealTaskForm.subject.trim()" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
+                  <button type="button" @click="createTaskFromDeal" :disabled="isDealTaskSaving || !dealTaskForm.subject.trim() || !dealTaskForm.dueAt" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
                     [[ isDealTaskSaving ? 'Создаём...' : 'Создать задачу' ]]
                   </button>
                 </div>
@@ -801,109 +1013,6 @@
                       </span>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-            <div v-if="isCreatingDeal || showAllDealFields || showDealCompanyForm || dealHasSelectedCompany || dealCompanyForm.name || dealCompanyContactForm.fullName" class="md:col-span-2 mt-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
-              <button
-                type="button"
-                @click="toggleDealCompanyForm"
-                class="w-full h-11 px-4 rounded-xl border border-crm-border bg-[#123753] text-sm font-semibold text-white hover:border-crm-accent transition flex items-center justify-between"
-              >
-                <span>[[ dealCompanyActionTitle ]]</span>
-                <span>[[ showDealCompanyForm ? '▲' : '▼' ]]</span>
-              </button>
-
-              <div v-if="showDealCompanyForm" class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div v-if="dealHasSelectedCompany" class="md:col-span-2 rounded-xl border border-crm-border/70 bg-[#102f4a] px-3 py-3 text-sm">
-                  <span class="text-crm-muted">Контакт будет добавлен в компанию:</span>
-                  <span class="ml-2 font-medium text-white">[[ dealSelectedCompanyName ]]</span>
-                </div>
-                <template v-else>
-                  <label class="block">
-                    <span class="text-sm text-crm-muted">Название компании</span>
-                    <input v-model="dealCompanyForm.name" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                  </label>
-                  <label class="block">
-                    <span class="text-sm text-crm-muted">ИНН</span>
-                    <input v-model="dealCompanyForm.inn" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                  </label>
-                  <label class="block">
-                    <span class="text-sm text-crm-muted">ОКВЭД</span>
-                    <input v-model="dealCompanyForm.okved" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                  </label>
-                  <label class="block md:col-span-2">
-                    <span class="text-sm text-crm-muted">Сфера деятельности</span>
-                    <input v-model="dealCompanyForm.industry" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                  </label>
-                  <label class="block md:col-span-2">
-                    <span class="text-sm text-crm-muted">Адрес</span>
-                    <input v-model="dealCompanyForm.address" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                  </label>
-                  <label class="block">
-                    <span class="text-sm text-crm-muted">Телефон компании</span>
-                    <div class="relative mt-1">
-                      <input v-model="dealCompanyForm.phone" @focus="ensurePhonePrefix(dealCompanyForm, 'phone')" type="text" class="w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] pl-3 pr-11 outline-none focus:border-crm-accent" />
-                      <a
-                        v-if="phoneHref(dealCompanyForm.phone)"
-                        :href="phoneHref(dealCompanyForm.phone)"
-                        class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
-                        title="Позвонить"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
-                        </svg>
-                      </a>
-                    </div>
-                  </label>
-                  <label class="block">
-                    <span class="text-sm text-crm-muted">Email компании</span>
-                    <input v-model="dealCompanyForm.email" type="email" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                  </label>
-                  <label class="block md:col-span-2">
-                    <span class="text-sm text-crm-muted">Сайт</span>
-                    <input v-model="dealCompanyForm.website" type="url" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                  </label>
-                </template>
-                <label class="block md:col-span-2">
-                  <span class="text-sm text-crm-muted">Контакт (ФИО)</span>
-                  <input v-model="dealCompanyContactForm.fullName" type="text" placeholder="Иван Иванов" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">Должность контакта</span>
-                  <input v-model="dealCompanyContactForm.position" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">Телефон контакта</span>
-                  <div class="relative mt-1">
-                    <input v-model="dealCompanyContactForm.phone" @focus="ensurePhonePrefix(dealCompanyContactForm, 'phone')" type="text" class="w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] pl-3 pr-11 outline-none focus:border-crm-accent" />
-                    <a
-                      v-if="phoneHref(dealCompanyContactForm.phone)"
-                      :href="phoneHref(dealCompanyContactForm.phone)"
-                      class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
-                      title="Позвонить"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
-                      </svg>
-                    </a>
-                  </div>
-                </label>
-                <label class="block md:col-span-2">
-                  <span class="text-sm text-crm-muted">Email контакта</span>
-                  <input v-model="dealCompanyContactForm.email" type="email" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
-                <label class="md:col-span-2 flex items-center gap-2">
-                  <input v-model="dealCompanyContactForm.isPrimary" type="checkbox" class="w-4 h-4 rounded border-crm-border bg-transparent" />
-                  <span class="text-sm text-crm-muted">Основной контакт</span>
-                </label>
-                <div class="md:col-span-2 flex items-center justify-end gap-2">
-                  <button type="button" @click="resetDealCompanyForm" class="h-10 px-4 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition">
-                    Очистить
-                  </button>
-                  <button type="button" @click="createCompanyFromDeal" :disabled="isDealCompanySaving || !canSubmitDealCompanyAction" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
-                    [[ isDealCompanySaving ? 'Сохраняем...' : dealCompanySubmitLabel ]]
-                  </button>
                 </div>
               </div>
             </div>
@@ -1020,6 +1129,15 @@
                   </svg>
                 </a>
               </div>
+            </label>
+            <label v-if="shouldShowCompanyField(forms.companies.currency)" class="block">
+              <span class="text-sm text-crm-muted">Валюта компании</span>
+              <select v-model="forms.companies.currency" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option value="RUB">RUB</option>
+                <option value="KZT">KZT</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+              </select>
             </label>
             <label v-if="shouldShowCompanyField(forms.companies.email)" class="block">
               <span class="text-sm text-crm-muted">Email</span>
@@ -1288,7 +1406,11 @@
           isDealTasksLoading: false,
           showDealTaskForm: false,
           isDealCompanySaving: false,
+          isSourceSaving: false,
           showDealCompanyForm: false,
+          showDealContactsPanel: false,
+          showDealContactForm: false,
+          isDealContactsLoading: false,
           isCompanyContactSaving: false,
           isCompanyContactsLoading: false,
           showCompanyContactForm: false,
@@ -1298,6 +1420,11 @@
           expandedCompanyCards: {},
           taskDealFilterId: null,
           taskDealFilterLabel: "",
+          showSourceCreateForm: false,
+          sourceCreateTargetSection: "",
+          sourceCreateForm: {
+            name: ""
+          },
           errorMessage: "",
           forms: {
             leads: {
@@ -1323,7 +1450,6 @@
               sourceId: "",
               companyId: null,
               amount: "0",
-              currency: "RUB",
               closeDate: "",
               stageId: "",
               events: ""
@@ -1346,6 +1472,7 @@
               okveds: [],
               phone: "",
               email: "",
+              currency: "RUB",
               website: "",
               notes: "",
               events: "",
@@ -1381,6 +1508,7 @@
             okved: "",
             phone: "",
             email: "",
+            currency: "RUB",
             website: ""
           },
           dealCompanyContactForm: {
@@ -1391,6 +1519,7 @@
             isPrimary: true
           },
           dealTasksForActiveDeal: [],
+          dealCompanyContacts: [],
           companyContactForm: {
             fullName: "",
             position: "",
@@ -1554,16 +1683,7 @@
           const selected = this.datasets.companies.find((company) => String(company.id) === String(companyId));
           return selected ? selected.name : `Компания #${companyId}`;
         },
-        dealCompanyActionTitle() {
-          return this.dealHasSelectedCompany ? "Новый контакт компании" : "Новая компания + контакт";
-        },
-        dealCompanySubmitLabel() {
-          return this.dealHasSelectedCompany ? "Создать контакт" : "Создать компанию";
-        },
         canSubmitDealCompanyAction() {
-          if (this.dealHasSelectedCompany) {
-            return !!this.dealCompanyContactForm.fullName.trim();
-          }
           return !!this.dealCompanyForm.name.trim();
         },
         shouldShowCompanyField() {
@@ -1716,6 +1836,13 @@
           const current = String(target[field] || "").trim();
           if (!current) {
             target[field] = "+7";
+          }
+        },
+        clearZeroOnFocus(target, field) {
+          if (!target || typeof target !== "object") return;
+          const current = String(target[field] || "").trim();
+          if (current === "0" || current === "0.0" || current === "0.00") {
+            target[field] = "";
           }
         },
         phoneHref(value) {
@@ -2456,7 +2583,6 @@
             sourceId: item.sourceId || "",
             companyId: this.toIntOrNull(item.clientId),
             amount: item.amount ?? "0",
-            currency: item.currency || "RUB",
             closeDate: item.closeDate || "",
             stageId: item.stageId || "",
             events: item.events || ""
@@ -2466,6 +2592,9 @@
           this.showDealTaskForm = false;
           this.resetDealCompanyForm();
           this.showDealCompanyForm = false;
+          this.showDealContactsPanel = false;
+          this.showDealContactForm = false;
+          this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.loadTasksForDeal();
           this.showModal = true;
@@ -2505,6 +2634,7 @@
             okveds: normalizedOkveds,
             phone: item.phone || "",
             email: item.email || "",
+            currency: item.currency || "RUB",
             website: item.website || "",
             notes: item.notes || "",
             events: item.events || "",
@@ -2559,8 +2689,42 @@
         toggleDealTaskForm() {
           this.showDealTaskForm = !this.showDealTaskForm;
         },
-        toggleDealCompanyForm() {
-          this.showDealCompanyForm = !this.showDealCompanyForm;
+        handleDealCompanySelectChange() {
+          if (this.forms.deals.companyId !== "__create__") {
+            this.showDealCompanyForm = false;
+            this.showDealContactsPanel = false;
+            this.showDealContactForm = false;
+            this.dealCompanyContacts = [];
+            this.resetDealCompanyForm();
+            return;
+          }
+          this.forms.deals.companyId = null;
+          this.resetDealCompanyForm();
+          this.showDealCompanyForm = true;
+          this.showDealContactsPanel = false;
+          this.showDealContactForm = false;
+          this.dealCompanyContacts = [];
+        },
+        cancelDealCompanyCreation() {
+          this.forms.deals.companyId = null;
+          this.showDealCompanyForm = false;
+          this.resetDealCompanyForm();
+        },
+        async toggleDealContactsPanel() {
+          if (!this.dealHasSelectedCompany) return;
+          this.showDealContactsPanel = !this.showDealContactsPanel;
+          if (this.showDealContactsPanel) {
+            await this.loadContactsForSelectedDealCompany();
+            return;
+          }
+          this.showDealContactForm = false;
+        },
+        toggleDealContactForm() {
+          if (!this.dealHasSelectedCompany) return;
+          this.showDealContactForm = !this.showDealContactForm;
+          if (!this.showDealContactForm) {
+            this.resetDealCompanyContactForm();
+          }
         },
         resetDealTaskForm() {
           this.dealTaskForm = {
@@ -2587,8 +2751,12 @@
             okved: "",
             phone: "",
             email: "",
+            currency: "RUB",
             website: ""
           };
+          this.resetDealCompanyContactForm();
+        },
+        resetDealCompanyContactForm() {
           this.dealCompanyContactForm = {
             fullName: "",
             position: "",
@@ -2789,6 +2957,43 @@
             body: { is_done: !!isDone }
           });
         },
+        async loadContactsForSelectedDealCompany() {
+          const companyId = this.toIntOrNull(this.forms.deals.companyId);
+          if (!companyId) {
+            this.dealCompanyContacts = [];
+            return;
+          }
+          this.isDealContactsLoading = true;
+          try {
+            const payload = await this.apiRequest(`/api/v1/contacts/?client=${companyId}&page_size=100`);
+            const contacts = this.normalizePaginatedResponse(payload);
+            this.dealCompanyContacts = contacts.map((item) => ({
+              id: item.id,
+              fullName: `${item.first_name || ""} ${item.last_name || ""}`.trim() || `Контакт #${item.id}`,
+              position: item.position || "",
+              phone: item.phone || "",
+              email: item.email || "",
+              isPrimary: !!item.is_primary,
+              clientId: item.client || companyId
+            }));
+          } catch (error) {
+            this.errorMessage = `Ошибка загрузки контактов компании: ${error.message}`;
+            this.dealCompanyContacts = [];
+          } finally {
+            this.isDealContactsLoading = false;
+          }
+        },
+        openContactFromDealCompany(contact) {
+          this.openContactEditor({
+            id: contact.id,
+            fullName: contact.fullName || "",
+            clientId: contact.clientId || this.toIntOrNull(this.forms.deals.companyId),
+            position: contact.position || "",
+            phone: contact.phone || "",
+            email: contact.email || "",
+            isPrimary: !!contact.isPrimary
+          });
+        },
         toggleCompanyContactForm() {
           this.showCompanyContactForm = !this.showCompanyContactForm;
         },
@@ -2951,6 +3156,7 @@
             website: item.website || "",
             notes: item.notes || "",
             events: item.events || "",
+            currency: item.currency || "RUB",
             isActive: item.is_active !== false
           };
         },
@@ -3012,8 +3218,53 @@
             this.isLoading = false;
           }
         },
+        handleSourceSelectChange(section) {
+          const field = section === "deals" ? this.forms.deals : this.forms.leads;
+          if (!field) return;
+          if (field.sourceId === "__create__") {
+            field.sourceId = "";
+            this.sourceCreateTargetSection = section;
+            this.showSourceCreateForm = true;
+            this.sourceCreateForm.name = "";
+            return;
+          }
+          if (this.sourceCreateTargetSection === section) {
+            this.cancelSourceCreate();
+          }
+        },
+        cancelSourceCreate() {
+          this.showSourceCreateForm = false;
+          this.sourceCreateTargetSection = "";
+          this.sourceCreateForm = { name: "" };
+        },
+        async createSourceFromInline(section) {
+          const name = String(this.sourceCreateForm.name || "").trim();
+          if (!name) {
+            throw new Error("Укажите название источника");
+          }
+          this.isSourceSaving = true;
+          this.errorMessage = "";
+          try {
+            const createdSource = await this.apiRequest("/api/v1/meta/lead-sources/", {
+              method: "POST",
+              body: {
+                name,
+                is_active: true
+              }
+            });
+            await this.loadMetaOptions();
+            const targetForm = section === "deals" ? this.forms.deals : this.forms.leads;
+            targetForm.sourceId = createdSource.id;
+            this.cancelSourceCreate();
+          } catch (error) {
+            this.errorMessage = `Ошибка создания источника: ${error.message}`;
+          } finally {
+            this.isSourceSaving = false;
+          }
+        },
         setSection(section) {
           this.activeSection = section;
+          window.localStorage.setItem("crm_active_section", section);
           this.search = "";
           this.showStatusFilter = false;
           this.selectedStatusFilters = [];
@@ -3030,8 +3281,12 @@
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
           this.resetTaskFollowUpForm();
+          this.cancelSourceCreate();
           this.showDealCompanyForm = false;
+          this.showDealContactsPanel = false;
+          this.showDealContactForm = false;
           this.resetDealCompanyForm();
+          this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.showCompanyContactForm = false;
           this.showCompanyOkvedDetails = false;
@@ -3046,6 +3301,7 @@
         },
         closeModal() {
           this.showModal = false;
+          this.cancelSourceCreate();
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
@@ -3058,8 +3314,12 @@
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
           this.resetTaskFollowUpForm();
+          this.cancelSourceCreate();
           this.showDealCompanyForm = false;
+          this.showDealContactsPanel = false;
+          this.showDealContactForm = false;
           this.resetDealCompanyForm();
+          this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.showCompanyContactForm = false;
           this.showCompanyOkvedDetails = false;
@@ -3080,8 +3340,12 @@
           this.forms[this.activeSection] = this.getDefaultForm(this.activeSection);
           this.resetDealTaskForm();
           this.resetTaskFollowUpForm();
+          this.cancelSourceCreate();
           this.showDealCompanyForm = false;
+          this.showDealContactsPanel = false;
+          this.showDealContactForm = false;
           this.resetDealCompanyForm();
+          this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.showCompanyContactForm = false;
           this.showCompanyOkvedDetails = false;
@@ -3116,7 +3380,6 @@
               sourceId: this.metaOptions.leadSources.length ? this.metaOptions.leadSources[0].id : "",
               companyId: null,
               amount: "0",
-              currency: "RUB",
               closeDate: "",
               stageId: this.metaOptions.dealStages.length ? this.metaOptions.dealStages[0].id : "",
               events: ""
@@ -3143,6 +3406,7 @@
               okveds: [],
               phone: "",
               email: "",
+              currency: "RUB",
               website: "",
               notes: "",
               events: "",
@@ -3271,6 +3535,9 @@
           if (!form.title.trim()) {
             throw new Error("Укажите название сделки");
           }
+          if (!this.toIntOrNull(form.sourceId)) {
+            throw new Error("Выберите источник сделки");
+          }
           const clientId = this.toIntOrNull(form.companyId);
           await this.apiRequest(`/api/v1/deals/${this.editingDealId}/`, {
             method: "PATCH",
@@ -3280,7 +3547,6 @@
               source: this.toIntOrNull(form.sourceId),
               client: clientId,
               amount: Number(form.amount || 0),
-              currency: form.currency,
               close_date: form.closeDate || null,
               stage: this.toIntOrNull(form.stageId),
               is_won: this.resolveDealWonFlag(form.stageId)
@@ -3292,6 +3558,9 @@
           if (!form.title.trim()) {
             throw new Error("Укажите название сделки");
           }
+          if (!this.toIntOrNull(form.sourceId)) {
+            throw new Error("Выберите источник сделки");
+          }
           const clientId = this.toIntOrNull(form.companyId);
           await this.apiRequest("/api/v1/deals/", {
             method: "POST",
@@ -3301,7 +3570,6 @@
               source: this.toIntOrNull(form.sourceId),
               client: clientId,
               amount: Number(form.amount || 0),
-              currency: form.currency,
               close_date: form.closeDate || null,
               stage: this.toIntOrNull(form.stageId),
               is_won: this.resolveDealWonFlag(form.stageId)
@@ -3315,6 +3583,9 @@
           const subject = this.dealTaskForm.subject.trim();
           if (!subject) {
             throw new Error("Укажите название задачи");
+          }
+          if (!this.dealTaskForm.dueAt) {
+            throw new Error("Укажите срок задачи");
           }
           this.isDealTaskSaving = true;
           this.errorMessage = "";
@@ -3342,74 +3613,75 @@
           }
         },
         async createCompanyFromDeal() {
-          const existingCompanyId = this.toIntOrNull(this.forms.deals.companyId);
           const companyName = this.dealCompanyForm.name.trim();
-          const contactFullName = this.dealCompanyContactForm.fullName.trim();
-          const hasContactDetails =
-            !!contactFullName ||
-            !!this.dealCompanyContactForm.position.trim() ||
-            !!this.dealCompanyContactForm.phone.trim() ||
-            !!this.dealCompanyContactForm.email.trim();
-
-          if (hasContactDetails && !contactFullName) {
-            throw new Error("Укажите ФИО контакта");
-          }
-          if (existingCompanyId && !contactFullName) {
-            throw new Error("Укажите ФИО контакта");
-          }
-          if (!existingCompanyId && !companyName) {
+          if (!companyName) {
             throw new Error("Укажите название компании");
           }
 
           this.isDealCompanySaving = true;
           this.errorMessage = "";
           try {
-            let targetCompanyId = existingCompanyId;
-            if (!targetCompanyId) {
-              const createdCompany = await this.apiRequest("/api/v1/clients/", {
-                method: "POST",
-                body: {
-                  name: companyName,
-                  inn: this.dealCompanyForm.inn.trim() || null,
-                  address: this.dealCompanyForm.address.trim(),
-                  industry: this.dealCompanyForm.industry.trim(),
-                  okved: this.dealCompanyForm.okved.trim(),
-                  phone: this.dealCompanyForm.phone.trim(),
-                  email: this.dealCompanyForm.email.trim(),
-                  website: this.dealCompanyForm.website.trim(),
-                  is_active: true
-                }
-              });
-              targetCompanyId = createdCompany.id;
-              this.forms.deals.companyId = createdCompany.id;
-            }
-
-            if (contactFullName) {
-              const parts = contactFullName.split(/\s+/).filter(Boolean);
-              const firstName = parts[0] || contactFullName;
-              const lastName = parts.slice(1).join(" ");
-              await this.apiRequest("/api/v1/contacts/", {
-                method: "POST",
-                body: {
-                  client: targetCompanyId,
-                  first_name: firstName,
-                  last_name: lastName,
-                  position: this.dealCompanyContactForm.position.trim(),
-                  phone: this.dealCompanyContactForm.phone.trim(),
-                  email: this.dealCompanyContactForm.email.trim(),
-                  is_primary: !!this.dealCompanyContactForm.isPrimary
-                }
-              });
-              await this.loadSection("contacts");
-            }
-
-            this.showDealCompanyForm = false;
+            const createdCompany = await this.apiRequest("/api/v1/clients/", {
+              method: "POST",
+              body: {
+                name: companyName,
+                inn: this.dealCompanyForm.inn.trim() || null,
+                address: this.dealCompanyForm.address.trim(),
+                industry: this.dealCompanyForm.industry.trim(),
+                okved: this.dealCompanyForm.okved.trim(),
+                phone: this.dealCompanyForm.phone.trim(),
+                email: this.dealCompanyForm.email.trim(),
+                currency: this.dealCompanyForm.currency || "RUB",
+                website: this.dealCompanyForm.website.trim(),
+                is_active: true
+              }
+            });
+            this.forms.deals.companyId = createdCompany.id;
             this.resetDealCompanyForm();
-            if (!existingCompanyId) {
-              await this.loadSection("companies");
-            }
+            this.showDealCompanyForm = false;
+            this.showDealContactsPanel = true;
+            this.showDealContactForm = true;
+            await this.loadSection("companies");
+            await this.loadContactsForSelectedDealCompany();
           } catch (error) {
             this.errorMessage = `Ошибка создания компании: ${error.message}`;
+          } finally {
+            this.isDealCompanySaving = false;
+          }
+        },
+        async createContactFromDealSelectedCompany() {
+          const clientId = this.toIntOrNull(this.forms.deals.companyId);
+          if (!clientId) {
+            throw new Error("Сначала выберите компанию");
+          }
+          const fullName = this.dealCompanyContactForm.fullName.trim();
+          if (!fullName) {
+            throw new Error("Укажите ФИО контакта");
+          }
+          this.isDealCompanySaving = true;
+          this.errorMessage = "";
+          try {
+            const parts = fullName.split(/\s+/).filter(Boolean);
+            const firstName = parts[0] || fullName;
+            const lastName = parts.slice(1).join(" ");
+            await this.apiRequest("/api/v1/contacts/", {
+              method: "POST",
+              body: {
+                client: clientId,
+                first_name: firstName,
+                last_name: lastName,
+                position: this.dealCompanyContactForm.position.trim(),
+                phone: this.dealCompanyContactForm.phone.trim(),
+                email: this.dealCompanyContactForm.email.trim(),
+                is_primary: !!this.dealCompanyContactForm.isPrimary
+              }
+            });
+            this.resetDealCompanyContactForm();
+            this.showDealContactForm = false;
+            await this.loadContactsForSelectedDealCompany();
+            await this.loadSection("contacts");
+          } catch (error) {
+            this.errorMessage = `Ошибка создания контакта: ${error.message}`;
           } finally {
             this.isDealCompanySaving = false;
           }
@@ -3484,6 +3756,7 @@
               okveds: this.normalizeCompanyOkveds(form.okveds, form.okved, form.industry),
               phone: form.phone.trim(),
               email: form.email.trim(),
+              currency: form.currency || "RUB",
               website: form.website.trim(),
               notes: form.notes.trim(),
               is_active: !!form.isActive
@@ -3510,6 +3783,7 @@
               okveds: this.normalizeCompanyOkveds(form.okveds, form.okved, form.industry),
               phone: form.phone.trim(),
               email: form.email.trim(),
+              currency: form.currency || "RUB",
               website: form.website.trim(),
               notes: form.notes.trim(),
               is_active: !!form.isActive
@@ -3557,6 +3831,9 @@
           if (!form.subject.trim()) {
             throw new Error("Укажите название задачи");
           }
+          if (!form.dueAt) {
+            throw new Error("Укажите срок задачи");
+          }
           const clientId = this.toIntOrNull(form.companyId);
           await this.apiRequest("/api/v1/activities/", {
             method: "POST",
@@ -3581,6 +3858,9 @@
           if (!form.subject.trim()) {
             throw new Error("Укажите название задачи");
           }
+          if (!form.dueAt) {
+            throw new Error("Укажите срок задачи");
+          }
           const clientId = this.toIntOrNull(form.companyId);
           await this.apiRequest(`/api/v1/activities/${this.editingTaskId}/`, {
             method: "PATCH",
@@ -3601,7 +3881,7 @@
           const followUp = this.taskFollowUpForm;
           const subject = followUp.subject.trim();
           const dealId = this.toIntOrNull(this.forms.tasks.dealId);
-          if (!subject || !dealId) {
+          if (!subject || !dealId || !followUp.dueAt) {
             return;
           }
           await this.apiRequest("/api/v1/activities/", {
@@ -3636,6 +3916,7 @@
             }
             if (this.activeSection === "tasks" && !this.editingTaskId) await this.createTask();
             this.showModal = false;
+            this.cancelSourceCreate();
             this.editingLeadId = null;
             this.editingDealId = null;
             this.editingContactId = null;
@@ -3676,17 +3957,31 @@
             return "border-sky-400/30 bg-sky-400/10 text-sky-300";
           }
           return "border-amber-400/30 bg-amber-400/10 text-amber-300";
+        },
+        hideStartupScreen() {
+          const overlay = document.getElementById("crm-startup-screen");
+          if (!overlay) return;
+          overlay.classList.add("is-hidden");
+          window.setTimeout(() => {
+            overlay.remove();
+            document.body.classList.remove("crm-startup-screen-active");
+          }, 240);
         }
       },
       async mounted() {
         document.addEventListener("click", this.handleDocumentClick);
         document.addEventListener("keydown", this.handleGlobalKeydown);
+        const savedSection = window.localStorage.getItem("crm_active_section");
+        if (savedSection && Object.prototype.hasOwnProperty.call(SECTION_ENDPOINTS, savedSection)) {
+          this.activeSection = savedSection;
+        }
         try {
           await this.loadMetaOptions();
         } catch (error) {
           this.errorMessage = `Ошибка загрузки справочников: ${error.message}`;
         }
-        this.loadAllSections();
+        await this.loadAllSections();
+        window.setTimeout(() => this.hideStartupScreen(), 500);
       },
       beforeUnmount() {
         document.removeEventListener("click", this.handleDocumentClick);

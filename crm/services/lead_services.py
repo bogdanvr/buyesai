@@ -415,6 +415,7 @@ def convert_lead_to_deal(
             lead=lead,
             stage=stage,
             amount=amount,
+            currency=getattr(target_client, "currency", "RUB") or "RUB",
             owner=owner,
         )
     except IntegrityError:
@@ -432,6 +433,7 @@ def convert_lead_to_deal(
             lead=lead,
             stage=stage,
             amount=amount,
+            currency=getattr(target_client, "currency", "RUB") or "RUB",
             owner=owner,
         )
     lead.client = target_client

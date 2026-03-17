@@ -4,7 +4,7 @@ from xml.etree import ElementTree
 
 import requests
 from django.core.cache import cache
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, ListCreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -89,7 +89,7 @@ class DealStageListAPIView(ListAPIView):
         return DealStage.objects.filter(is_active=True).order_by("order", "name")
 
 
-class LeadSourceListAPIView(ListAPIView):
+class LeadSourceListAPIView(ListCreateAPIView):
     serializer_class = LeadSourceSerializer
     pagination_class = None
 
