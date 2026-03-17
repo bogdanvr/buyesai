@@ -200,9 +200,33 @@ def deal_previous_state_signal(sender, instance: Deal, **kwargs):
     instance._previous_deal_state = (
         Deal.objects.filter(pk=instance.pk)
         .select_related("stage", "client")
-        .only("is_won", "title", "stage__name", "client_id")
+        .only("is_won", "title", "stage_id", "stage__name", "client_id")
         .first()
     )
+
+
+@receiver(post_save, sender=Deal)
+def deal_stage_change_events_signal(sender, instance: Deal, created, **kwargs):
+    if created:
+        return
+
+    previous = getattr(instance, "_previous_deal_state", None)
+    if previous is None:
+        return
+
+    previous_stage_id = getattr(previous, "stage_id", None)
+    current_stage_id = getattr(instance, "stage_id", None)
+    if previous_stage_id == current_stage_id:
+        return
+
+    previous_stage_name = getattr(previous.stage, "name", "") if getattr(previous, "stage", None) else ""
+    current_stage_name = getattr(instance.stage, "name", "") if getattr(instance, "stage", None) else ""
+    result_text = f"Статус сделки изменён: {previous_stage_name or 'Без этапа'} -> {current_stage_name or 'Без этапа'}"
+    entry = _format_structured_event_entry(
+        result_text=result_text,
+        deal_id=instance.pk,
+    )
+    _append_deal_event(instance.pk, entry)
 
 
 @receiver(post_save, sender=Deal)

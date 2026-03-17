@@ -83,7 +83,31 @@ class TaskResultAndEventsTests(APITestCase):
         self.company.refresh_from_db()
 
         self.assertTrue(self.deal.is_won)
+        self.assertIn("Результат: Статус сделки изменён: Первичный контакт -> Успешно реализовано", self.deal.events)
         self.assertIn("Результат: Сделка завершена", self.deal.events)
         self.assertIn(f"deal_id: {self.deal.pk}", self.deal.events)
         self.assertIn("Сделка завершена", self.company.events)
         self.assertIn("Успешно реализовано", self.company.events)
+
+    def test_deal_stage_change_writes_event_to_deal(self):
+        stage_progress = DealStage.objects.create(
+            name="Переговоры",
+            code="negotiation",
+            order=20,
+            is_active=True,
+            is_final=False,
+        )
+
+        response = self.client.patch(
+            reverse("deals-detail", kwargs={"pk": self.deal.pk}),
+            {"stage": stage_progress.pk},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.deal.refresh_from_db()
+        self.company.refresh_from_db()
+
+        self.assertIn("Результат: Статус сделки изменён: Первичный контакт -> Переговоры", self.deal.events)
+        self.assertIn(f"deal_id: {self.deal.pk}", self.deal.events)
+        self.assertNotIn("Статус сделки изменён", self.company.events)
