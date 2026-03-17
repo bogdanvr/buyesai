@@ -37,6 +37,13 @@ UTM_KEYS = (
 )
 
 
+def _normalize_phone_digits(value) -> str:
+    digits = "".join(ch for ch in str(value or "") if ch.isdigit())
+    if digits.startswith("8") and len(digits) == 11:
+        digits = "7" + digits[1:]
+    return digits
+
+
 def _extract_party_suggestion(item: dict) -> dict:
     data = item.get("data") or {}
     name_data = data.get("name") or {}
@@ -446,6 +453,10 @@ def sendform_view(request):
         if value is None:
             continue
         clean_payload[str(key)] = str(value).strip() if isinstance(value, str) else value
+
+    phone_digits = _normalize_phone_digits(clean_payload.get("phone"))
+    if len(phone_digits) != 11 or not phone_digits.startswith("7"):
+        return JsonResponse({"error": "phone_required"}, status=400)
 
     tracking_session = None
     try:

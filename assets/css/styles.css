@@ -874,6 +874,13 @@ section {
     grid-column: 1 / -1;
 }
 
+.quiz-grid .field label {
+    min-height: 34px;
+    display: flex;
+    align-items: flex-end;
+    line-height: 1.2;
+}
+
 .impact-value {
     font-size: 24px;
     font-weight: 600;
@@ -1344,6 +1351,11 @@ section {
 
     .quiz-wrapper {
         grid-template-columns: 1fr;
+    }
+
+    .quiz-grid .field label {
+        min-height: 0;
+        display: block;
     }
 
     .cases-grid {

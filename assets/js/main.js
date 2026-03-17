@@ -32,6 +32,7 @@ createApp({
                 department: '',
                 pain: '',
                 turnover: '',
+                phone: '',
             },
             isSendingQuiz: false,
             quizSent: false,
@@ -46,6 +47,7 @@ createApp({
             },
             isSendingPlan: false,
             planSent: false,
+            planTriedSubmit: false,
             discussForm: {
                 name: '',
                 phone: '',
@@ -68,6 +70,7 @@ createApp({
             selectedDiscussCompanyData: null,
             isSendingDiscuss: false,
             discussSent: false,
+            discussTriedSubmit: false,
             outsideClickHandler: null,
 
         };
@@ -144,8 +147,14 @@ createApp({
         isQuizPainValid() {
             return !!(this.quizForm.pain || '').trim();
         },
+        quizPhoneDigits() {
+            return (this.quizForm.phone || '').replace(/\D/g, '');
+        },
+        isQuizPhoneValid() {
+            return this.quizPhoneDigits.length === 11;
+        },
         isQuizFormValid() {
-            return !!(this.isQuizIndustryValid && this.isQuizTeamSizeValid && this.isQuizDepartmentValid && this.isQuizPainValid);
+            return !!(this.isQuizIndustryValid && this.isQuizTeamSizeValid && this.isQuizDepartmentValid && this.isQuizPainValid && this.isQuizPhoneValid);
         },
         quizSubmitLabel() {
             if (this.quizSent) return 'Отправлено';
@@ -156,6 +165,18 @@ createApp({
         },
         discussSubmitLabel() {
             return this.isSendingDiscuss ? 'Отправляем...' : 'Обсудить проект';
+        },
+        planPhoneDigits() {
+            return (this.PlanForm.phone || '').replace(/\D/g, '');
+        },
+        isPlanPhoneValid() {
+            return this.planPhoneDigits.length === 11;
+        },
+        discussPhoneDigits() {
+            return (this.discussForm.phone || '').replace(/\D/g, '');
+        },
+        isDiscussPhoneValid() {
+            return this.discussPhoneDigits.length === 11;
         },
     },
     methods: {
@@ -904,6 +925,7 @@ createApp({
                     page: window.location.pathname,
                 });
                 this.quizSent = true;
+                this.quizForm = { industry: '', teamSize: '', department: '', pain: '', turnover: '', phone: '' };
             } catch (e) {
                 console.error(e);
             } finally {
@@ -912,6 +934,10 @@ createApp({
         },
         async submitPlanForm() {
             if (this.isSendingPlan || this.planSent) return;
+            this.planTriedSubmit = true;
+            if (!this.isPlanPhoneValid) {
+                return;
+            }
             this.isSendingPlan = true;
             try {
                 await this.submitFormPayload('plan', {
@@ -940,6 +966,10 @@ createApp({
 
         async submitDiscuss() {
             if (this.isSendingDiscuss) return;
+            this.discussTriedSubmit = true;
+            if (!this.isDiscussPhoneValid) {
+                return;
+            }
             this.isSendingDiscuss = true;
             try {
                 await this.submitFormPayload('discuss', {

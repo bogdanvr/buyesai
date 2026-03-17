@@ -400,7 +400,7 @@
                                     <div class="field-hint" v-if="quizTriedSubmit && !isQuizDepartmentValid">Выберите
                                         вариант</div>
                                 </div>
-                                <div class="field field-full"
+                                <div class="field"
                                     :class="{ 'field-invalid': quizTriedSubmit && !isQuizPainValid }">
                                     <label>Главная боль</label>
                                     <select v-model="quizForm.pain" required>
@@ -413,10 +413,20 @@
                                     <div class="field-hint" v-if="quizTriedSubmit && !isQuizPainValid">Выберите вариант
                                     </div>
                                 </div>
-                                <div class="field field-full">
-                                    <label>Оборот / количество заявок в месяц (по желанию)</label>
+                                <div class="field">
+                                    <label>Оборот / количество заявок в месяц</label>
                                     <input type="text" placeholder="Например: 20 млн ₽ или 1500 заявок"
                                         v-model="quizForm.turnover">
+                                </div>
+                                <div class="field field-full"
+                                    :class="{ 'field-invalid': quizTriedSubmit && !isQuizPhoneValid }">
+                                    <label>Телефон / мессенджер</label>
+                                    <input type="tel" placeholder="+7 ..." v-model="quizForm.phone"
+                                        @focus="onPhoneFocus('quizForm.phone')"
+                                        @input="onPhoneInput('quizForm.phone', $event)" required>
+                                    <div class="field-hint" v-if="quizTriedSubmit && !isQuizPhoneValid">
+                                        Введите телефон в формате +7 (999) 999-99-99
+                                    </div>
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-primary" style="margin-top:12px;"
@@ -781,11 +791,14 @@
                                     <label>Имя</label>
                                     <input v-model="PlanForm.name" type="text" placeholder="Ваше имя">
                                 </div>
-                                <div class="field" style="margin-top:8px;">
+                                <div class="field" style="margin-top:8px;" :class="{ 'field-invalid': planTriedSubmit && !isPlanPhoneValid }">
                                     <label>Телефон / мессенджер</label>
                                     <input @focus="onPhoneFocus('PlanForm.phone')"
                                         @input="onPhoneInput('PlanForm.phone', $event)" v-model="PlanForm.phone"
-                                        type="tel" placeholder="+7 ...">
+                                        type="tel" placeholder="+7 ..." required>
+                                    <div class="field-hint" v-if="planTriedSubmit && !isPlanPhoneValid">
+                                        Введите телефон в формате +7 (999) 999-99-99
+                                    </div>
                                 </div>
                                 <div class="field" style="margin-top:8px;">
                                     <label>Компания и кратко задача</label>
@@ -840,11 +853,14 @@
                         <input type="text" placeholder="Как к вам обращаться?" v-model="discussForm.name">
                     </div>
 
-                    <div class="field">
+                    <div class="field" :class="{ 'field-invalid': discussTriedSubmit && !isDiscussPhoneValid }">
                         <label>Телефон или WhatsApp</label>
                         <input type="tel" placeholder="+7 ..." v-model="discussForm.phone"
                             @focus="onPhoneFocus('discussForm.phone')"
-                            @input="onPhoneInput('discussForm.phone', $event)">
+                            @input="onPhoneInput('discussForm.phone', $event)" required>
+                        <div class="field-hint" v-if="discussTriedSubmit && !isDiscussPhoneValid">
+                            Введите телефон в формате +7 (999) 999-99-99
+                        </div>
                     </div>
 
                     <div class="field">
