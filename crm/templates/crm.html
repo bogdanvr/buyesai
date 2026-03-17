@@ -977,12 +977,12 @@
                   <span class="text-sm text-crm-muted">Описание</span>
                   <textarea v-model="dealTaskForm.description" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
                 </label>
-                <div class="md:col-span-2 flex items-center justify-end gap-2">
+                <div class="md:col-span-2 flex items-center justify-between gap-2">
+                  <div class="text-xs text-crm-muted">
+                    Задача будет сохранена вместе со сделкой.
+                  </div>
                   <button type="button" @click="resetDealTaskForm" class="h-10 px-4 rounded-xl border border-crm-border bg-transparent hover:bg-white/5 transition">
                     Очистить
-                  </button>
-                  <button type="button" @click="createTaskFromDeal" :disabled="isDealTaskSaving || !dealTaskForm.subject.trim() || !dealTaskForm.dueAt" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
-                    [[ isDealTaskSaving ? 'Создаём...' : 'Создать задачу' ]]
                   </button>
                 </div>
               </div>
@@ -2745,6 +2745,24 @@
             description: ""
           };
         },
+        hasPendingDealTaskDraft() {
+          return !!(
+            this.dealTaskForm.subject.trim()
+            || this.dealTaskForm.dueAt
+            || this.dealTaskForm.description.trim()
+          );
+        },
+        validatePendingDealTaskDraft() {
+          if (!this.hasPendingDealTaskDraft()) {
+            return;
+          }
+          if (!this.dealTaskForm.subject.trim()) {
+            throw new Error("Укажите название новой задачи по сделке");
+          }
+          if (!this.dealTaskForm.dueAt) {
+            throw new Error("Укажите срок новой задачи по сделке");
+          }
+        },
         resetDealCompanyForm() {
           this.dealCompanyForm = {
             name: "",
@@ -3542,7 +3560,7 @@
             throw new Error("Выберите источник сделки");
           }
           const clientId = this.toIntOrNull(form.companyId);
-          await this.apiRequest(`/api/v1/deals/${this.editingDealId}/`, {
+          return this.apiRequest(`/api/v1/deals/${this.editingDealId}/`, {
             method: "PATCH",
             body: {
               title: form.title.trim(),
@@ -3565,7 +3583,7 @@
             throw new Error("Выберите источник сделки");
           }
           const clientId = this.toIntOrNull(form.companyId);
-          await this.apiRequest("/api/v1/deals/", {
+          return this.apiRequest("/api/v1/deals/", {
             method: "POST",
             body: {
               title: form.title.trim(),
@@ -3579,8 +3597,9 @@
             }
           });
         },
-        async createTaskFromDeal() {
-          if (!this.editingDealId) {
+        async createTaskFromDeal(dealId = null) {
+          const targetDealId = this.toIntOrNull(dealId) || this.editingDealId;
+          if (!targetDealId) {
             throw new Error("Сначала откройте сделку");
           }
           const subject = this.dealTaskForm.subject.trim();
@@ -3601,7 +3620,7 @@
                 description: this.dealTaskForm.description.trim(),
                 due_at: this.toIsoDateTime(this.dealTaskForm.dueAt),
                 deadline_reminder_offset_minutes: Number(this.dealTaskForm.reminderOffsetMinutes || 30),
-                deal: this.editingDealId,
+                deal: targetDealId,
                 client: this.toIntOrNull(this.forms.deals.companyId)
               }
             });
@@ -3905,10 +3924,17 @@
           this.isSaving = true;
           this.errorMessage = "";
           try {
+            let savedDeal = null;
             if (this.activeSection === "leads" && this.editingLeadId) await this.updateLead();
             if (this.activeSection === "leads" && !this.editingLeadId) await this.createLead();
-            if (this.activeSection === "deals" && this.editingDealId) await this.updateDeal();
-            if (this.activeSection === "deals" && !this.editingDealId) await this.createDeal();
+            if (this.activeSection === "deals") {
+              this.validatePendingDealTaskDraft();
+            }
+            if (this.activeSection === "deals" && this.editingDealId) savedDeal = await this.updateDeal();
+            if (this.activeSection === "deals" && !this.editingDealId) savedDeal = await this.createDeal();
+            if (this.activeSection === "deals" && this.hasPendingDealTaskDraft()) {
+              await this.createTaskFromDeal(savedDeal && savedDeal.id ? savedDeal.id : this.editingDealId);
+            }
             if (this.activeSection === "contacts" && this.editingContactId) await this.updateContact();
             if (this.activeSection === "contacts" && !this.editingContactId) await this.createContact();
             if (this.activeSection === "companies" && this.editingCompanyId) await this.updateCompany();
