@@ -408,7 +408,7 @@
 
                 <div class="lg:hidden px-3 py-2.5 hover:bg-white/5 transition" :class="(activeSection === 'leads' || activeSection === 'deals' || activeSection === 'contacts' || activeSection === 'companies' || activeSection === 'tasks') ? 'cursor-pointer' : ''" @click="onRowClick(item)">
                   <template v-if="activeSection === 'companies'">
-                    <div class="flex items-center justify-between gap-2 min-h-[40px]">
+                    <div class="flex items-center gap-2 min-h-[40px]">
                       <div class="min-w-0 flex flex-1 items-center gap-2">
                         <button
                           type="button"
@@ -428,21 +428,13 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                           </svg>
                         </button>
-                        <div class="min-w-0 flex-1 flex items-center gap-2 text-[13px] leading-5">
-                          <span class="truncate font-medium text-white">[[ item.name ]]</span>
-                          <span class="shrink-0 text-crm-muted">•</span>
-                          <span class="truncate text-crm-text">[[ item.phone || '—' ]]</span>
+                        <div class="min-w-0 flex-1">
+                          <div class="truncate text-[13px] font-medium text-white leading-5">[[ item.name ]]</div>
+                          <div class="mt-0.5 truncate text-[11px] text-crm-muted leading-4">
+                            [[ item.phone || '—' ]] • [[ countCompanyActiveDeals(item.id) ]] сделок • [[ countCompanyOpenTasks(item.id) ]] задач
+                          </div>
                         </div>
                       </div>
-                      <span
-                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-medium border shrink-0 leading-4"
-                        :class="[statusChipClass(item), canQuickChangeStatus(item) ? 'cursor-pointer hover:brightness-110' : '']"
-                        :style="statusChipStyle(item)"
-                        :title="canQuickChangeStatus(item) ? 'Клик: следующий статус' : ''"
-                        @click.stop="onStatusChipClick(item)"
-                      >
-                        [[ item.statusLabel ]]
-                      </span>
                     </div>
                     <div v-if="isCompanyCardExpanded(item.id)" class="mt-3 space-y-3 text-sm">
                       <div v-if="item.legalName">
@@ -501,6 +493,9 @@
                         <div class="text-sm font-medium text-white truncate leading-5">[[ activeSection === 'leads' ? (item.company || item.name) : item.name ]]</div>
                         <div v-if="activeSection === 'deals'" class="mt-1 text-[11px] text-crm-muted truncate">
                           [[ formatDealAmount(item.amount, item.currency) ]] • [[ item.closeDate || 'Без даты' ]] • [[ countDealOpenTasks(item.id) ]] задач
+                        </div>
+                        <div v-else-if="activeSection === 'tasks'" class="mt-0.5 text-[11px] text-crm-muted truncate leading-4">
+                          [[ item.company || '—' ]] • [[ item.dueLabel || 'Без срока' ]] • [[ item.deal || 'Без сделки' ]]
                         </div>
                       </div>
                       <span
@@ -1761,6 +1756,21 @@
             this.showAllTaskFields = !this.showAllTaskFields;
           }
         },
+        isFieldEditModeActive() {
+          if (this.activeSection === "leads") {
+            return this.showAllLeadFields;
+          }
+          if (this.activeSection === "deals") {
+            return this.showAllDealFields;
+          }
+          if (this.activeSection === "companies") {
+            return this.showAllCompanyFields;
+          }
+          if (this.activeSection === "tasks") {
+            return this.showAllTaskFields;
+          }
+          return false;
+        },
         parseEventLog(value) {
           const raw = String(value || "").trim();
           if (!raw) return [];
@@ -2178,6 +2188,27 @@
             return this.getDealStatusBucket(deal) !== "done";
           }).length;
         },
+        countCompanyOpenTasks(companyId) {
+          const normalizedCompanyId = this.toIntOrNull(companyId);
+          if (!normalizedCompanyId) return 0;
+          const dealIds = new Set(
+            this.datasets.deals
+              .filter((deal) => String(deal.clientId || "") === String(normalizedCompanyId))
+              .map((deal) => String(deal.id))
+          );
+          const taskIds = new Set();
+          this.datasets.tasks.forEach((task) => {
+            if (task.isDone) {
+              return;
+            }
+            const matchesClient = String(task.clientId || "") === String(normalizedCompanyId);
+            const matchesDeal = task.dealId && dealIds.has(String(task.dealId));
+            if (matchesClient || matchesDeal) {
+              taskIds.add(String(task.id));
+            }
+          });
+          return taskIds.size;
+        },
         countDealOpenTasks(dealId) {
           const normalizedDealId = this.toIntOrNull(dealId);
           if (!normalizedDealId) return 0;
@@ -2244,6 +2275,35 @@
         },
         isCompanyCardExpanded(companyId) {
           return !!this.expandedCompanyCards[String(companyId || "")];
+        },
+        async handleGlobalKeydown(event) {
+          if (!this.showModal) return;
+
+          if (event.key === "Escape") {
+            event.preventDefault();
+            this.closeModal();
+            return;
+          }
+
+          if (event.key !== "Enter" || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
+            return;
+          }
+
+          const target = event.target;
+          const tagName = String((target && target.tagName) || "").toUpperCase();
+          if (tagName === "TEXTAREA") {
+            return;
+          }
+
+          event.preventDefault();
+          if (this.showFieldEditToggle && !this.isFieldEditModeActive()) {
+            this.toggleFieldEditMode();
+            return;
+          }
+          if (this.isSaving) {
+            return;
+          }
+          await this.createItem();
         },
         handleDocumentClick(event) {
           if (!this.showStatusFilter) return;
@@ -3620,6 +3680,7 @@
       },
       async mounted() {
         document.addEventListener("click", this.handleDocumentClick);
+        document.addEventListener("keydown", this.handleGlobalKeydown);
         try {
           await this.loadMetaOptions();
         } catch (error) {
@@ -3629,6 +3690,7 @@
       },
       beforeUnmount() {
         document.removeEventListener("click", this.handleDocumentClick);
+        document.removeEventListener("keydown", this.handleGlobalKeydown);
       }
     }).mount("#app");
   </script>
