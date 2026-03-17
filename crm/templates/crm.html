@@ -524,7 +524,7 @@
                             :key="`company-card-event-${item.id}-${eventIndex}`"
                             class="rounded-xl border border-crm-border/80 bg-[#0f2f4a] p-3"
                           >
-                            <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">[[ eventItem.timestamp || 'Без даты' ]]</div>
+                            <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</div>
                             <div v-if="eventItem.result" class="mt-2 text-sm text-white whitespace-pre-line">[[ eventItem.result ]]</div>
                             <div v-if="eventItem.extra" class="mt-2 text-sm text-crm-muted whitespace-pre-line">[[ eventItem.extra ]]</div>
                           </div>
@@ -538,6 +538,9 @@
                         <div class="text-sm font-medium text-white truncate leading-5">[[ activeSection === 'leads' ? (item.company || item.name) : item.name ]]</div>
                         <div v-if="activeSection === 'deals'" class="mt-1 text-[11px] text-crm-muted truncate">
                           [[ formatDealAmount(item.amount, item.currency) ]] • [[ dealClosePrimaryLabel(item.closeDate) || 'Без даты' ]]<span v-if="dealCloseSecondaryLabel(item.closeDate)"> • <span :class="isDealOverdue(item.closeDate) ? 'text-red-300' : 'text-crm-muted'">[[ dealCloseSecondaryLabel(item.closeDate) ]]</span></span> • [[ countDealOpenTasks(item.id) ]] задач
+                        </div>
+                        <div v-else-if="activeSection === 'contacts'" class="mt-0.5 text-[11px] text-crm-muted truncate leading-4">
+                          [[ item.company || 'Без компании' ]]
                         </div>
                         <div v-else-if="activeSection === 'tasks'" class="mt-0.5 text-[11px] text-crm-muted truncate leading-4">
                           [[ item.company || '—' ]] • [[ taskDuePrimaryLabel(item.dueAtRaw, item.isDone) || 'Без срока' ]]<span v-if="taskDueSecondaryLabel(item.dueAtRaw, item.isDone)"> • <span :class="isTaskOverdue(item.dueAtRaw, item.isDone) ? 'text-red-300' : 'text-crm-muted'">[[ taskDueSecondaryLabel(item.dueAtRaw, item.isDone) ]]</span></span> • [[ item.deal || 'Без сделки' ]]
@@ -950,7 +953,7 @@
                     class="rounded-xl border border-crm-border/80 bg-[#0f2f4a] p-3"
                   >
                     <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                      <span class="text-[11px] uppercase tracking-[0.16em] text-crm-muted shrink-0">[[ eventItem.timestamp || 'Без даты' ]]</span>
+                      <span class="text-[11px] uppercase tracking-[0.16em] text-crm-muted shrink-0">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
                       <span v-if="eventItem.result" class="text-white break-words">[[ eventItem.result ]]</span>
                       <span v-if="eventItem.extra" class="text-crm-muted break-words">[[ eventItem.extra ]]</span>
                       <button
@@ -1197,7 +1200,7 @@
                     class="rounded-xl border border-crm-border/80 bg-[#0f2f4a] p-3"
                   >
                     <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                      <span class="text-[11px] uppercase tracking-[0.16em] text-crm-muted shrink-0">[[ eventItem.timestamp || 'Без даты' ]]</span>
+                      <span class="text-[11px] uppercase tracking-[0.16em] text-crm-muted shrink-0">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
                       <span v-if="eventItem.result" class="text-white break-words">[[ eventItem.result ]]</span>
                       <span v-if="eventItem.extra" class="text-crm-muted break-words">[[ eventItem.extra ]]</span>
                       <button
@@ -1812,6 +1815,13 @@
             if (leftRank !== rightRank) {
               return leftRank - rightRank;
             }
+
+            if (this.activeSection === "tasks" && leftRank === 0 && rightRank === 0) {
+              const taskOrder = this.compareActiveTasksByDueAt(left.item, right.item);
+              if (taskOrder !== 0) {
+                return taskOrder;
+              }
+            }
             return left.index - right.index;
           });
           return ordered.map((entry) => entry.item);
@@ -2045,6 +2055,24 @@
             minute: "2-digit",
           });
         },
+        formatEventTimestamp(value) {
+          const raw = String(value || "").trim();
+          if (!raw) return "";
+          if (/^\d{2}\.\d{2}\.\d{4}(\s+\d{2}:\d{2})?$/.test(raw)) {
+            return raw;
+          }
+          const parsed = new Date(raw);
+          if (Number.isNaN(parsed.getTime())) {
+            return raw;
+          }
+          return parsed.toLocaleString("ru-RU", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+        },
         humanizeLeadSourceName(value) {
           const raw = String(value || "").trim();
           if (!raw) return "";
@@ -2254,6 +2282,32 @@
             return item.isDone || item.status === "done" ? 1 : 0;
           }
           return 0;
+        },
+        compareActiveTasksByDueAt(leftItem, rightItem) {
+          const leftDueAt = this.parseTaskDueTimestamp(leftItem?.dueAtRaw);
+          const rightDueAt = this.parseTaskDueTimestamp(rightItem?.dueAtRaw);
+          const leftOverdue = leftDueAt !== null && leftDueAt < Date.now();
+          const rightOverdue = rightDueAt !== null && rightDueAt < Date.now();
+
+          if (leftOverdue !== rightOverdue) {
+            return leftOverdue ? -1 : 1;
+          }
+          if (leftDueAt === null && rightDueAt === null) {
+            return 0;
+          }
+          if (leftDueAt === null) {
+            return 1;
+          }
+          if (rightDueAt === null) {
+            return -1;
+          }
+          return leftDueAt - rightDueAt;
+        },
+        parseTaskDueTimestamp(value) {
+          if (!value) return null;
+          const parsed = new Date(value);
+          const timestamp = parsed.getTime();
+          return Number.isNaN(timestamp) ? null : timestamp;
         },
         statusChipStyle(item) {
           if (this.activeSection !== "deals") {
