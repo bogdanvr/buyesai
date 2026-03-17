@@ -64,6 +64,11 @@ class Activity(TimestampedModel):
     )
     completed_at = models.DateTimeField(blank=True, null=True, verbose_name="Выполнено")
     is_done = models.BooleanField(default=False, verbose_name="Завершено")
+    save_company_note = models.BooleanField(
+        default=False,
+        verbose_name="Сохранить значимую информацию в компании",
+    )
+    company_note = models.TextField(blank=True, default="", verbose_name="Факты о компании")
     lead = models.ForeignKey(
         "crm.Lead",
         related_name="activities",

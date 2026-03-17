@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+import re
 
 from crm.models import Activity, Client, Deal, DealStage
 from crm.models.activity import ActivityType
@@ -43,7 +44,7 @@ class TaskResultAndEventsTests(APITestCase):
             stage=self.stage_new,
         )
 
-    def test_task_completion_requires_result_and_writes_events(self):
+    def test_task_completion_requires_result_and_writes_events_to_deal_and_company(self):
         task = Activity.objects.create(
             type=ActivityType.TASK,
             subject="Отправить КП",
@@ -77,6 +78,74 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertIn(f"task_id: {task.pk}", self.deal.events)
         self.assertIn(f"deal_id: {self.deal.pk}", self.deal.events)
         self.assertIn("Коммерческое предложение отправлено клиенту", self.company.events)
+
+    def test_task_completion_can_append_company_note(self):
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Отправить КП",
+            deal=self.deal,
+            client=self.company,
+            save_company_note=True,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "result": "Коммерческое предложение отправлено клиенту",
+                "save_company_note": True,
+                "company_note": "Компания работает только по постоплате",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        task.refresh_from_db()
+        self.deal.refresh_from_db()
+        self.company.refresh_from_db()
+
+        self.assertTrue(task.save_company_note)
+        self.assertEqual(task.company_note, "Компания работает только по постоплате")
+        self.assertIn("Коммерческое предложение отправлено клиенту", self.company.events)
+        self.assertIn("Коммерческое предложение отправлено клиенту", self.deal.events)
+        self.assertRegex(self.company.notes, r"\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}")
+        self.assertIn("Добавил: staff_events", self.company.notes)
+        self.assertIn(f"Сделка #{self.deal.pk}", self.company.notes)
+        self.assertIn("Компания работает только по постоплате", self.company.notes)
+
+    def test_task_company_note_requires_text(self):
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Отправить КП",
+            deal=self.deal,
+            client=self.company,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "save_company_note": True,
+                "company_note": "",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("company_note", response.data)
+
+    def test_company_note_draft_writes_author_and_timestamp(self):
+        response = self.client.patch(
+            reverse("clients-detail", kwargs={"pk": self.company.pk}),
+            {"note_draft": "Любят общаться в Telegram"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.company.refresh_from_db()
+        self.assertRegex(self.company.notes, r"\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}")
+        self.assertIn("Добавил: staff_events", self.company.notes)
+        self.assertIn("Любят общаться в Telegram", self.company.notes)
 
     def test_deal_completion_writes_events_to_deal_and_company(self):
         response = self.client.patch(

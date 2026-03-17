@@ -968,14 +968,6 @@
                       >
                         Задача #[[ eventItem.taskId ]]
                       </button>
-                      <button
-                        v-if="eventItem.dealId"
-                        type="button"
-                        @click="openDealFromEvent(eventItem.dealId)"
-                        class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
-                      >
-                        Сделка #[[ eventItem.dealId ]]
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -1190,13 +1182,28 @@
               <span class="text-sm text-crm-muted">Email</span>
               <input v-model="forms.companies.email" type="email" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label v-if="shouldShowCompanyField(forms.companies.notes)" class="block md:col-span-2">
-              <span class="text-sm text-crm-muted">Заметки</span>
-              <textarea v-model="forms.companies.notes" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+            <label class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Внести заметку</span>
+              <textarea v-model="forms.companies.noteDraft" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <label v-if="parseEventLog(forms.companies.events).length" class="block md:col-span-2">
-              <span class="text-sm text-crm-muted">События</span>
-              <div class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
+            <label v-if="forms.companies.notes.trim()" class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Заметки</span>
+              <textarea :value="forms.companies.notes" rows="3" readonly class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none opacity-90 cursor-not-allowed"></textarea>
+            </label>
+            <div v-if="parseEventLog(forms.companies.events).length" class="block md:col-span-2">
+              <button
+                type="button"
+                @click="toggleCompanyEvents"
+                class="w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 text-left hover:border-crm-accent transition"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-sm text-crm-muted">События</span>
+                  <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent text-xs shrink-0">
+                    [[ showCompanyEvents ? '−' : '+' ]]
+                  </span>
+                </div>
+              </button>
+              <div v-if="showCompanyEvents" class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
                 <div class="space-y-3">
                   <div
                     v-for="(eventItem, eventIndex) in parseEventLog(forms.companies.events)"
@@ -1227,7 +1234,7 @@
                   </div>
                 </div>
               </div>
-            </label>
+            </div>
             <label class="md:col-span-2 flex items-center gap-2">
               <input v-model="forms.companies.isActive" type="checkbox" class="w-4 h-4 rounded border-crm-border bg-transparent" />
               <span class="text-sm text-crm-muted">Компания активна</span>
@@ -1342,6 +1349,14 @@
             <label v-if="showTaskResultField || showAllTaskFields || isCreatingTask" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Результат</span>
               <textarea v-model="forms.tasks.result" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+            </label>
+            <div v-if="showTaskResultField || showAllTaskFields || isCreatingTask" class="md:col-span-2 flex items-center gap-2">
+              <input id="task-save-company-note" v-model="forms.tasks.saveCompanyNote" type="checkbox" class="w-4 h-4 rounded border-crm-border bg-transparent" />
+              <label for="task-save-company-note" class="text-sm text-crm-muted cursor-pointer">Сохранить значимую информацию в компании</label>
+            </div>
+            <label v-if="forms.tasks.saveCompanyNote" class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Важные факты о компании</span>
+              <textarea v-model="forms.tasks.companyNote" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
             <div class="md:col-span-2 flex items-center gap-2">
               <input id="task-is-done" v-model="forms.tasks.isDone" type="checkbox" class="w-4 h-4 rounded border-crm-border bg-transparent" />
@@ -1465,6 +1480,7 @@
           showAllCompanyFields: false,
           showAllTaskFields: false,
           expandedCompanyCards: {},
+          showCompanyEvents: false,
           taskDealFilterId: null,
           taskDealFilterLabel: "",
           showSourceCreateForm: false,
@@ -1524,6 +1540,7 @@
               currency: "RUB",
               website: "",
               notes: "",
+              noteDraft: "",
               events: "",
               isActive: true
             },
@@ -1535,6 +1552,8 @@
               reminderOffsetMinutes: 30,
               description: "",
               result: "",
+              saveCompanyNote: false,
+              companyNote: "",
               isDone: false
             }
           },
@@ -2238,6 +2257,9 @@
           }
           return `${field}: ${String(value)}`;
         },
+        toggleCompanyEvents() {
+          this.showCompanyEvents = !this.showCompanyEvents;
+        },
         async apiRequest(url, options = {}) {
           const headers = { ...(options.headers || {}) };
           const hasBody = options.body !== undefined;
@@ -2753,6 +2775,7 @@
           this.editingContactId = null;
           this.editingTaskId = null;
           this.editingCompanyId = item.id;
+          this.showCompanyEvents = false;
           this.showAllCompanyFields = false;
           const normalizedOkveds = this.normalizeCompanyOkveds(item.okveds, item.okved, item.industry);
           const resolvedIndustry = this.resolvePrimaryIndustry(item.industry, item.okved, normalizedOkveds);
@@ -2769,6 +2792,7 @@
             currency: item.currency || "RUB",
             website: item.website || "",
             notes: item.notes || "",
+            noteDraft: "",
             events: item.events || "",
             isActive: item.isActive !== false
           };
@@ -2796,6 +2820,8 @@
             reminderOffsetMinutes: Number(item.reminderOffsetMinutes || 30),
             description: item.description || "",
             result: item.result || "",
+            saveCompanyNote: !!item.saveCompanyNote,
+            companyNote: item.companyNote || "",
             isDone: !!item.isDone
           };
           this.resetTaskFollowUpForm();
@@ -3167,6 +3193,8 @@
               subject: item.subject || `Задача #${item.id}`,
               description: item.description || "",
               result: item.result || "",
+              saveCompanyNote: !!item.save_company_note,
+              companyNote: item.company_note || "",
               company: item.client_name || "",
               clientId: item.client || null,
               deal: item.deal_title || this.forms.deals.title || "",
@@ -3401,6 +3429,8 @@
             subject: item.subject || `Задача #${item.id}`,
             description: item.description || "",
             result: item.result || "",
+            saveCompanyNote: !!item.save_company_note,
+            companyNote: item.company_note || "",
             reminderOffsetMinutes: Number(item.deadline_reminder_offset_minutes || 30),
             company: item.client_name || "",
             clientId: item.client || null,
@@ -3645,6 +3675,7 @@
               currency: "RUB",
               website: "",
               notes: "",
+              noteDraft: "",
               events: "",
               isActive: true
             };
@@ -3658,6 +3689,8 @@
               reminderOffsetMinutes: 30,
               description: "",
               result: "",
+              saveCompanyNote: false,
+              companyNote: "",
               isDone: false
             };
           }
@@ -3999,7 +4032,7 @@
               email: form.email.trim(),
               currency: form.currency || "RUB",
               website: form.website.trim(),
-              notes: form.notes.trim(),
+              note_draft: form.noteDraft.trim(),
               is_active: !!form.isActive
             }
           });
@@ -4026,7 +4059,7 @@
               email: form.email.trim(),
               currency: form.currency || "RUB",
               website: form.website.trim(),
-              notes: form.notes.trim(),
+              note_draft: form.noteDraft.trim(),
               is_active: !!form.isActive
             }
           });
@@ -4075,6 +4108,9 @@
           if (!form.dueAt) {
             throw new Error("Укажите срок задачи");
           }
+          if (form.saveCompanyNote && !form.companyNote.trim()) {
+            throw new Error("Укажите важные факты о компании");
+          }
           const clientId = this.toIntOrNull(form.companyId);
           await this.apiRequest("/api/v1/activities/", {
             method: "POST",
@@ -4087,6 +4123,8 @@
               deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
               client: clientId,
               deal: this.toIntOrNull(form.dealId),
+              save_company_note: !!form.saveCompanyNote,
+              company_note: form.companyNote.trim(),
               is_done: !!form.isDone
             }
           });
@@ -4102,6 +4140,9 @@
           if (!form.dueAt) {
             throw new Error("Укажите срок задачи");
           }
+          if (form.saveCompanyNote && !form.companyNote.trim()) {
+            throw new Error("Укажите важные факты о компании");
+          }
           const clientId = this.toIntOrNull(form.companyId);
           await this.apiRequest(`/api/v1/activities/${this.editingTaskId}/`, {
             method: "PATCH",
@@ -4114,6 +4155,8 @@
               deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
               client: clientId,
               deal: this.toIntOrNull(form.dealId),
+              save_company_note: !!form.saveCompanyNote,
+              company_note: form.companyNote.trim(),
               is_done: !!form.isDone
             }
           });

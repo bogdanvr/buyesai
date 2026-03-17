@@ -24,10 +24,17 @@ class ActivitySerializer(serializers.ModelSerializer):
         due_at = attrs.get("due_at", getattr(self.instance, "due_at", None))
         is_done = attrs.get("is_done", getattr(self.instance, "is_done", False))
         result = attrs.get("result", getattr(self.instance, "result", ""))
+        save_company_note = attrs.get(
+            "save_company_note",
+            getattr(self.instance, "save_company_note", False),
+        )
+        company_note = attrs.get("company_note", getattr(self.instance, "company_note", ""))
         if activity_type == ActivityType.TASK and not due_at:
             raise serializers.ValidationError({"due_at": "Укажите срок задачи."})
         if activity_type == ActivityType.TASK and is_done and not str(result or "").strip():
             raise serializers.ValidationError({"result": "Укажите результат завершения задачи."})
+        if activity_type == ActivityType.TASK and save_company_note and not str(company_note or "").strip():
+            raise serializers.ValidationError({"company_note": "Укажите важные факты о компании."})
         return attrs
 
     def create(self, validated_data):
@@ -55,6 +62,8 @@ class ActivitySerializer(serializers.ModelSerializer):
             "deadline_reminder_offset_minutes",
             "completed_at",
             "is_done",
+            "save_company_note",
+            "company_note",
             "lead",
             "lead_title",
             "deal",

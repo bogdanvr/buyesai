@@ -41,6 +41,27 @@ def _prepend_event(existing: str, entry: str) -> str:
     return entry if not current else f"{entry}\n\n{current}"
 
 
+def _prepend_note(existing: str, entry: str) -> str:
+    current = str(existing or "").strip()
+    return entry if not current else f"{entry}\n\n{current}"
+
+
+def _actor_display_name(user) -> str:
+    if user is None:
+        return "Система"
+    full_name = user.get_full_name() if hasattr(user, "get_full_name") else ""
+    return str(full_name or getattr(user, "username", "") or "Система").strip()
+
+
+def _format_company_note_entry(*, note_text: str, actor=None, deal_id: int | None = None, happened_at=None) -> str:
+    timestamp = timezone.localtime(happened_at or timezone.now()).strftime("%d.%m.%Y %H:%M")
+    lines = [timestamp, f"Добавил: {_actor_display_name(actor)}"]
+    if deal_id:
+        lines.append(f"Сделка #{deal_id}")
+    lines.append(str(note_text or "").strip())
+    return "\n".join(lines)
+
+
 def _append_client_event(client_id: int | None, entry: str) -> None:
     if not client_id:
         return
@@ -48,6 +69,15 @@ def _append_client_event(client_id: int | None, entry: str) -> None:
     if client is None:
         return
     Client.objects.filter(pk=client.pk).update(events=_prepend_event(client.events, entry))
+
+
+def _append_client_note(client_id: int | None, entry: str) -> None:
+    if not client_id:
+        return
+    client = Client.objects.filter(pk=client_id).only("id", "notes").first()
+    if client is None:
+        return
+    Client.objects.filter(pk=client.pk).update(notes=_prepend_note(client.notes, entry))
 
 
 def _append_deal_event(deal_id: int | None, entry: str) -> None:
@@ -144,6 +174,8 @@ def activity_task_deadline_state_signal(sender, instance: Activity, **kwargs):
             "deadline_reminder_offset_minutes",
             "is_done",
             "result",
+            "save_company_note",
+            "company_note",
             "client_id",
             "deal_id",
             "deal__client_id",
@@ -197,6 +229,30 @@ def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
     _append_deal_event(instance.deal_id, entry)
     for client_id in _task_related_client_ids(instance):
         _append_client_event(client_id, entry)
+
+
+@receiver(post_save, sender=Activity)
+def activity_task_company_note_signal(sender, instance: Activity, created, **kwargs):
+    if instance.type != ActivityType.TASK:
+        return
+
+    note_text = str(instance.company_note or "").strip()
+    if not instance.save_company_note or not note_text:
+        return
+
+    previous = getattr(instance, "_previous_activity_state", None)
+    previous_save_company_note = bool(getattr(previous, "save_company_note", False)) if previous else False
+    previous_note_text = str(getattr(previous, "company_note", "") or "").strip() if previous else ""
+    if not created and previous_save_company_note and previous_note_text == note_text:
+        return
+
+    note_entry = _format_company_note_entry(
+        note_text=note_text,
+        actor=instance.created_by,
+        deal_id=instance.deal_id,
+    )
+    for client_id in _task_related_client_ids(instance):
+        _append_client_note(client_id, note_entry)
 
 
 @receiver(pre_save, sender=Deal)
