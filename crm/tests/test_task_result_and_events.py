@@ -30,6 +30,13 @@ class TaskResultAndEventsTests(APITestCase):
             is_active=True,
             is_final=True,
         )
+        self.stage_failed = DealStage.objects.create(
+            name="Провален",
+            code="failed",
+            order=100,
+            is_active=True,
+            is_final=True,
+        )
         self.deal = Deal.objects.create(
             title="Сделка Acme",
             client=self.company,
@@ -111,3 +118,32 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertIn("Результат: Статус сделки изменён: Первичный контакт -> Переговоры", self.deal.events)
         self.assertIn(f"deal_id: {self.deal.pk}", self.deal.events)
         self.assertNotIn("Статус сделки изменён", self.company.events)
+
+    def test_failed_deal_requires_reason(self):
+        response = self.client.patch(
+            reverse("deals-detail", kwargs={"pk": self.deal.pk}),
+            {"stage": self.stage_failed.pk},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("failure_reason", response.data)
+
+    def test_failed_deal_reason_writes_events_to_deal_and_company(self):
+        response = self.client.patch(
+            reverse("deals-detail", kwargs={"pk": self.deal.pk}),
+            {
+                "stage": self.stage_failed.pk,
+                "failure_reason": "Клиент выбрал конкурента",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.deal.refresh_from_db()
+        self.company.refresh_from_db()
+
+        self.assertEqual(self.deal.metadata.get("failed_reason"), "Клиент выбрал конкурента")
+        self.assertIn("Результат: Статус сделки изменён: Первичный контакт -> Провален", self.deal.events)
+        self.assertIn("Результат: Сделка провалена. Причина: Клиент выбрал конкурента", self.deal.events)
+        self.assertIn("Сделка провалена. Причина: Клиент выбрал конкурента", self.company.events)

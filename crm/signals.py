@@ -13,6 +13,13 @@ from crm.services.lead_services import convert_lead_to_deal
 logger = logging.getLogger(__name__)
 
 
+def _extract_deal_failed_reason(deal: Deal | None) -> str:
+    if deal is None:
+        return ""
+    metadata = getattr(deal, "metadata", {}) or {}
+    return str(metadata.get("failed_reason", "") or "").strip()
+
+
 def _format_structured_event_entry(
     *,
     result_text: str,
@@ -200,7 +207,7 @@ def deal_previous_state_signal(sender, instance: Deal, **kwargs):
     instance._previous_deal_state = (
         Deal.objects.filter(pk=instance.pk)
         .select_related("stage", "client")
-        .only("is_won", "title", "stage_id", "stage__name", "client_id")
+        .only("is_won", "title", "stage_id", "stage__name", "client_id", "metadata")
         .first()
     )
 
@@ -227,6 +234,35 @@ def deal_stage_change_events_signal(sender, instance: Deal, created, **kwargs):
         deal_id=instance.pk,
     )
     _append_deal_event(instance.pk, entry)
+
+
+@receiver(post_save, sender=Deal)
+def deal_failed_reason_events_signal(sender, instance: Deal, created, **kwargs):
+    previous = getattr(instance, "_previous_deal_state", None)
+    current_stage_code = str(getattr(getattr(instance, "stage", None), "code", "") or "").strip().lower()
+    if current_stage_code != "failed":
+        return
+
+    current_reason = _extract_deal_failed_reason(instance)
+    if not current_reason:
+        return
+
+    previous_stage_code = str(getattr(getattr(previous, "stage", None), "code", "") or "").strip().lower()
+    previous_reason = _extract_deal_failed_reason(previous)
+
+    if created or previous is None or previous_stage_code != "failed":
+        result_text = f"Сделка провалена. Причина: {current_reason}"
+    elif previous_reason != current_reason:
+        result_text = f"Причина провала сделки обновлена: {current_reason}"
+    else:
+        return
+
+    entry = _format_structured_event_entry(
+        result_text=result_text,
+        deal_id=instance.pk,
+    )
+    _append_deal_event(instance.pk, entry)
+    _append_client_event(instance.client_id, entry)
 
 
 @receiver(post_save, sender=Deal)

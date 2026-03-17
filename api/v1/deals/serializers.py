@@ -12,6 +12,7 @@ class DealSerializer(serializers.ModelSerializer):
     stage_name = serializers.CharField(source="stage.name", read_only=True)
     owner_name = serializers.SerializerMethodField()
     has_pending_task = serializers.BooleanField(write_only=True, required=False, default=False)
+    failure_reason = serializers.CharField(write_only=True, required=False, allow_blank=True, default="")
 
     def get_owner_name(self, obj):
         owner = obj.owner
@@ -26,6 +27,8 @@ class DealSerializer(serializers.ModelSerializer):
         client = attrs.get("client", getattr(self.instance, "client", None))
         stage = attrs.get("stage", getattr(self.instance, "stage", None))
         has_pending_task = bool(attrs.pop("has_pending_task", False))
+        failure_reason = str(attrs.pop("failure_reason", "") or "").strip()
+        metadata = dict(attrs.get("metadata") or getattr(self.instance, "metadata", {}) or {})
         if source is None:
             raise serializers.ValidationError({"source": "Источник сделки обязателен."})
         stage_code = str(getattr(stage, "code", "") or "").strip().lower()
@@ -36,9 +39,23 @@ class DealSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"stage": "Сделка без задач допустима только в статусах 'Успешно' и 'Провален'."}
             )
+        if stage_code == "failed":
+            effective_failure_reason = failure_reason or str(metadata.get("failed_reason", "") or "").strip()
+            if not effective_failure_reason:
+                raise serializers.ValidationError({"failure_reason": "Укажите причину провала сделки."})
+            metadata["failed_reason"] = effective_failure_reason
+        elif failure_reason:
+            metadata["failed_reason"] = failure_reason
+        attrs["metadata"] = metadata
         attrs["currency"] = str(getattr(client, "currency", "") or "RUB").strip().upper() or "RUB"
         attrs["is_won"] = stage_code == "won"
         return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        metadata = getattr(instance, "metadata", {}) or {}
+        data["failure_reason"] = str(metadata.get("failed_reason", "") or "")
+        return data
 
     class Meta:
         model = Deal
@@ -65,6 +82,7 @@ class DealSerializer(serializers.ModelSerializer):
             "owner",
             "owner_name",
             "has_pending_task",
+            "failure_reason",
             "created_at",
             "updated_at",
         ]

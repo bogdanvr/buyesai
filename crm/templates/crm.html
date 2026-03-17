@@ -936,6 +936,10 @@
                 <option v-for="stage in metaOptions.dealStages" :key="stage.id" :value="stage.id">[[ stage.name ]]</option>
               </select>
             </label>
+            <label v-if="isDealFailedStageSelected" class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Причина провала</span>
+              <textarea v-model="forms.deals.failureReason" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+            </label>
             <label v-if="shouldShowDealField(forms.deals.closeDate)" class="block">
               <span class="text-sm text-crm-muted">План закрытия</span>
               <input v-model="forms.deals.closeDate" type="date" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
@@ -1496,6 +1500,7 @@
               amount: "0",
               closeDate: "",
               stageId: "",
+              failureReason: "",
               events: ""
             },
             contacts: {
@@ -1726,6 +1731,9 @@
           if (!companyId) return "";
           const selected = this.datasets.companies.find((company) => String(company.id) === String(companyId));
           return selected ? selected.name : `Компания #${companyId}`;
+        },
+        isDealFailedStageSelected() {
+          return this.resolveDealStageCode(this.forms.deals.stageId) === "failed";
         },
         canSubmitDealCompanyAction() {
           return !!this.dealCompanyForm.name.trim();
@@ -2209,6 +2217,14 @@
             (candidate) => String(candidate.id) === String(normalizedStageId)
           );
           return String((stage && stage.code) || "").toLowerCase() === "won";
+        },
+        resolveDealStageCode(stageId) {
+          const normalizedStageId = this.toIntOrNull(stageId);
+          if (!normalizedStageId) return "";
+          const stage = this.metaOptions.dealStages.find(
+            (candidate) => String(candidate.id) === String(normalizedStageId)
+          );
+          return String((stage && stage.code) || "").trim().toLowerCase();
         },
         extractErrorMessage(data, fallback) {
           if (!data) return fallback;
@@ -2698,6 +2714,7 @@
             amount: item.amount ?? "0",
             closeDate: item.closeDate || "",
             stageId: item.stageId || "",
+            failureReason: item.failureReason || "",
             events: item.events || ""
           };
           this.resetDealTaskForm();
@@ -2881,6 +2898,14 @@
             return;
           }
           throw new Error("Сделка без задач допустима только в статусах «Успешно» и «Провален»");
+        },
+        validateDealFailureReason() {
+          if (!this.isDealFailedStageSelected) {
+            return;
+          }
+          if (!String(this.forms.deals.failureReason || "").trim()) {
+            throw new Error("Укажите причину провала сделки");
+          }
         },
         validatePendingDealTaskDraft() {
           if (!this.hasPendingDealTaskDraft()) {
@@ -3318,6 +3343,7 @@
             amount: item.amount ?? 0,
             currency: item.currency || "RUB",
             closeDate: item.close_date || "",
+            failureReason: item.failure_reason || "",
             events: item.events || "",
             isWon: !!item.is_won
           };
@@ -3591,6 +3617,7 @@
               amount: "0",
               closeDate: "",
               stageId: this.metaOptions.dealStages.length ? this.metaOptions.dealStages[0].id : "",
+              failureReason: "",
               events: ""
             };
           }
@@ -3759,7 +3786,8 @@
               close_date: form.closeDate || null,
               stage: this.toIntOrNull(form.stageId),
               is_won: this.resolveDealWonFlag(form.stageId),
-              has_pending_task: this.hasPendingDealTaskDraft()
+              has_pending_task: this.hasPendingDealTaskDraft(),
+              failure_reason: form.failureReason.trim()
             }
           });
         },
@@ -3783,7 +3811,8 @@
               close_date: form.closeDate || null,
               stage: this.toIntOrNull(form.stageId),
               is_won: this.resolveDealWonFlag(form.stageId),
-              has_pending_task: this.hasPendingDealTaskDraft()
+              has_pending_task: this.hasPendingDealTaskDraft(),
+              failure_reason: form.failureReason.trim()
             }
           });
         },
@@ -4118,6 +4147,7 @@
             if (this.activeSection === "leads" && this.editingLeadId) await this.updateLead();
             if (this.activeSection === "leads" && !this.editingLeadId) await this.createLead();
             if (this.activeSection === "deals") {
+              this.validateDealFailureReason();
               this.validateDealTaskRequirement();
               this.validatePendingDealTaskDraft();
             }
