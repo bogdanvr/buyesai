@@ -721,26 +721,33 @@
               <span class="text-sm text-crm-muted">Описание сделки</span>
               <textarea v-model="forms.deals.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <div v-if="shouldShowDealField(forms.deals.companyId)" class="block">
-              <div class="flex items-center gap-3">
-                <span class="text-sm text-crm-muted">Компания</span>
-                <button
-                  v-if="dealHasSelectedCompany"
-                  type="button"
-                  @click="toggleDealContactsPanel"
-                  class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-crm-border bg-[#123753] text-white transition hover:border-crm-accent shrink-0"
-                  title="Контакты компании"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-lines-fill text-crm-accent" viewBox="0 0 16 16">
-                    <path d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zM11 3.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5m.5 2.5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1zm2 3a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1zm0 3a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1z"/>
-                  </svg>
-                </button>
+            <div class="block md:col-span-2">
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-end">
+                <div v-if="shouldShowDealField(forms.deals.companyId)" class="block">
+                  <span class="text-sm text-crm-muted">Компания</span>
+                  <select v-model="forms.deals.companyId" @change="handleDealCompanySelectChange" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                    <option :value="null">Не выбрана</option>
+                    <option value="__create__">+ Добавить новую компанию</option>
+                    <option v-for="company in companyOptions" :key="company.id" :value="company.id">[[ company.name ]]</option>
+                  </select>
+                </div>
+                <div v-if="dealHasSelectedCompany" class="flex items-end">
+                  <button
+                    type="button"
+                    @click="toggleDealContactsPanel"
+                    class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-crm-border bg-[#123753] text-white transition hover:border-crm-accent shrink-0"
+                    title="Контакты компании"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-lines-fill text-crm-accent" viewBox="0 0 16 16">
+                      <path d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zM11 3.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5m.5 2.5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1zm2 3a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1zm0 3a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1z"/>
+                    </svg>
+                  </button>
+                </div>
+                <label class="block">
+                  <span class="text-sm text-crm-muted">Сумма</span>
+                  <input v-model="forms.deals.amount" @focus="clearZeroOnFocus(forms.deals, 'amount')" type="number" min="0" step="0.01" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+                </label>
               </div>
-              <select v-model="forms.deals.companyId" @change="handleDealCompanySelectChange" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option :value="null">Не выбрана</option>
-                <option value="__create__">+ Добавить новую компанию</option>
-                <option v-for="company in companyOptions" :key="company.id" :value="company.id">[[ company.name ]]</option>
-              </select>
             </div>
 
             <div v-if="showDealCompanyForm || (dealHasSelectedCompany && showDealContactsPanel)" class="md:col-span-2">
@@ -893,10 +900,6 @@
                 </div>
               </div>
             </div>
-            <label class="block">
-              <span class="text-sm text-crm-muted">Сумма</span>
-              <input v-model="forms.deals.amount" @focus="clearZeroOnFocus(forms.deals, 'amount')" type="number" min="0" step="0.01" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-            </label>
             <label v-if="shouldShowDealField(forms.deals.stageId)" class="block">
               <span class="text-sm text-crm-muted">Этап сделки</span>
               <select v-model="forms.deals.stageId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
