@@ -401,16 +401,39 @@
                   <div class="px-4 py-4 text-sm text-crm-text truncate">
                     [[ activeSection === 'tasks' ? (item.deal || '—') : (activeSection === 'deals' ? formatDealAmount(item.amount, item.currency) : (item.phone || '—')) ]]
                   </div>
-                  <div v-if="activeSection === 'deals'" class="px-4 py-4 text-sm text-crm-text truncate">
-                    [[ item.closeDate || '—' ]]
+                  <div v-if="activeSection === 'deals'" class="px-4 py-4 text-sm min-w-0">
+                    <div
+                      class="truncate"
+                      :class="isDealOverdue(item.closeDate) ? 'text-red-300 font-medium' : 'text-crm-text'"
+                    >
+                      [[ dealClosePrimaryLabel(item.closeDate) ]]
+                    </div>
+                    <div
+                      v-if="dealCloseSecondaryLabel(item.closeDate)"
+                      class="mt-1 truncate text-xs"
+                      :class="isDealOverdue(item.closeDate) ? 'text-red-300' : 'text-crm-muted'"
+                    >
+                      [[ dealCloseSecondaryLabel(item.closeDate) ]]
+                    </div>
                   </div>
                   <div v-if="activeSection === 'deals'" class="px-4 py-4 text-sm text-crm-text font-medium tabular-nums">
                     [[ countDealOpenTasks(item.id) ]]
                   </div>
                   <div v-else-if="activeSection !== 'tasks'" class="px-4 py-4 text-sm text-crm-text truncate">[[ item.email || '—' ]]</div>
                   <div v-else class="px-4 py-4 text-sm text-crm-text min-w-0">
-                    <div class="truncate">[[ item.dueLabel || '—' ]]</div>
-                    <div v-if="item.remainingLabel" class="text-xs text-crm-muted mt-1 truncate">[[ item.remainingLabel ]]</div>
+                    <div
+                      class="truncate"
+                      :class="isTaskOverdue(item.dueAtRaw, item.isDone) ? 'text-red-300 font-medium' : 'text-crm-text'"
+                    >
+                      [[ taskDuePrimaryLabel(item.dueAtRaw, item.isDone) || '—' ]]
+                    </div>
+                    <div
+                      v-if="taskDueSecondaryLabel(item.dueAtRaw, item.isDone)"
+                      class="mt-1 truncate text-xs"
+                      :class="isTaskOverdue(item.dueAtRaw, item.isDone) ? 'text-red-300' : 'text-crm-muted'"
+                    >
+                      [[ taskDueSecondaryLabel(item.dueAtRaw, item.isDone) ]]
+                    </div>
                   </div>
                   <div v-if="activeSection === 'companies'" class="px-4 py-4 text-sm text-crm-text font-medium tabular-nums">
                     [[ countCompanyActiveDeals(item.id) ]]
@@ -514,10 +537,10 @@
                       <div class="min-w-0 flex-1">
                         <div class="text-sm font-medium text-white truncate leading-5">[[ activeSection === 'leads' ? (item.company || item.name) : item.name ]]</div>
                         <div v-if="activeSection === 'deals'" class="mt-1 text-[11px] text-crm-muted truncate">
-                          [[ formatDealAmount(item.amount, item.currency) ]] • [[ item.closeDate || 'Без даты' ]] • [[ countDealOpenTasks(item.id) ]] задач
+                          [[ formatDealAmount(item.amount, item.currency) ]] • [[ dealClosePrimaryLabel(item.closeDate) || 'Без даты' ]]<span v-if="dealCloseSecondaryLabel(item.closeDate)"> • <span :class="isDealOverdue(item.closeDate) ? 'text-red-300' : 'text-crm-muted'">[[ dealCloseSecondaryLabel(item.closeDate) ]]</span></span> • [[ countDealOpenTasks(item.id) ]] задач
                         </div>
                         <div v-else-if="activeSection === 'tasks'" class="mt-0.5 text-[11px] text-crm-muted truncate leading-4">
-                          [[ item.company || '—' ]] • [[ item.dueLabel || 'Без срока' ]] • [[ item.deal || 'Без сделки' ]]
+                          [[ item.company || '—' ]] • [[ taskDuePrimaryLabel(item.dueAtRaw, item.isDone) || 'Без срока' ]]<span v-if="taskDueSecondaryLabel(item.dueAtRaw, item.isDone)"> • <span :class="isTaskOverdue(item.dueAtRaw, item.isDone) ? 'text-red-300' : 'text-crm-muted'">[[ taskDueSecondaryLabel(item.dueAtRaw, item.isDone) ]]</span></span> • [[ item.deal || 'Без сделки' ]]
                         </div>
                       </div>
                       <span
@@ -564,6 +587,9 @@
 
         <form @submit.prevent="createItem" class="flex flex-1 min-h-0 flex-col">
           <div class="flex-1 overflow-y-auto min-h-0 px-4 md:px-6 py-4 md:py-6">
+            <div v-if="modalErrorMessage" class="mb-4 rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-red-200 text-sm">
+              [[ modalErrorMessage ]]
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <template v-if="activeSection === 'leads'">
             <label class="block">
@@ -1008,8 +1034,19 @@
                       <div class="min-w-0">
                         <div class="text-sm font-medium text-white truncate">[[ task.subject ]]</div>
                         <div v-if="task.description" class="text-xs text-crm-muted mt-1 break-words">[[ task.description ]]</div>
-                        <div class="text-xs text-crm-muted mt-1">Срок: [[ task.dueLabel ]]</div>
-                        <div v-if="task.remainingLabel" class="text-xs text-crm-muted mt-1">[[ task.remainingLabel ]]</div>
+                        <div
+                          class="mt-1 text-xs"
+                          :class="isTaskOverdue(task.dueAtRaw, task.isDone) ? 'text-red-300' : 'text-crm-muted'"
+                        >
+                          Срок: [[ taskDuePrimaryLabel(task.dueAtRaw, task.isDone) ]]
+                        </div>
+                        <div
+                          v-if="taskDueSecondaryLabel(task.dueAtRaw, task.isDone)"
+                          class="mt-1 text-xs"
+                          :class="isTaskOverdue(task.dueAtRaw, task.isDone) ? 'text-red-300' : 'text-crm-muted'"
+                        >
+                          [[ taskDueSecondaryLabel(task.dueAtRaw, task.isDone) ]]
+                        </div>
                       </div>
                       <span class="inline-flex items-center rounded-full px-2 py-1 text-[11px] font-medium border" :class="task.isDone ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-sky-400/30 bg-sky-400/10 text-sky-300'">
                         [[ task.isDone ? 'Выполнена' : 'Открыта' ]]
@@ -1429,6 +1466,7 @@
             name: ""
           },
           errorMessage: "",
+          modalErrorMessage: "",
           forms: {
             leads: {
               title: "",
@@ -1846,6 +1884,22 @@
           const current = String(target[field] || "").trim();
           if (current === "0" || current === "0.0" || current === "0.00") {
             target[field] = "";
+          }
+        },
+        setUiError(message, options = {}) {
+          const useModal = options.modal === true || (options.modal !== false && this.showModal);
+          if (useModal) {
+            this.modalErrorMessage = message;
+            return;
+          }
+          this.errorMessage = message;
+        },
+        clearUiErrors(options = {}) {
+          if (!options.globalOnly) {
+            this.modalErrorMessage = "";
+          }
+          if (!options.modalOnly) {
+            this.errorMessage = "";
           }
         },
         phoneHref(value) {
@@ -2548,6 +2602,7 @@
           }
         },
         openLeadEditor(item) {
+          this.clearUiErrors({ modalOnly: true });
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
@@ -2574,6 +2629,7 @@
           this.showModal = true;
         },
         openDealEditor(item) {
+          this.clearUiErrors({ modalOnly: true });
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
@@ -2603,6 +2659,7 @@
           this.showModal = true;
         },
         openContactEditor(item) {
+          this.clearUiErrors({ modalOnly: true });
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingCompanyId = null;
@@ -2619,6 +2676,7 @@
           this.showModal = true;
         },
         openCompanyEditor(item) {
+          this.clearUiErrors({ modalOnly: true });
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
@@ -2651,6 +2709,7 @@
           this.enrichCompanyFromDadataByInn();
         },
         openTaskEditor(item) {
+          this.clearUiErrors({ modalOnly: true });
           this.activeSection = "tasks";
           this.editingLeadId = null;
           this.editingDealId = null;
@@ -2830,6 +2889,62 @@
             return `Осталось ${absoluteLabel}`;
           }
           return `Просрочено на ${absoluteLabel}`;
+        },
+        parseDealCloseDate(value) {
+          if (!value) return null;
+          const normalized = String(value).trim();
+          const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+          if (match) {
+            const year = Number(match[1]);
+            const month = Number(match[2]) - 1;
+            const day = Number(match[3]);
+            return new Date(year, month, day, 23, 59, 59, 999);
+          }
+          const parsed = new Date(normalized);
+          return Number.isNaN(parsed.getTime()) ? null : parsed;
+        },
+        formatDealCloseDate(value) {
+          if (!value) return "";
+          const parsed = this.parseDealCloseDate(value);
+          if (!parsed) return String(value || "");
+          return parsed.toLocaleDateString("ru-RU");
+        },
+        isDealOverdue(value) {
+          const parsed = this.parseDealCloseDate(value);
+          if (!parsed) return false;
+          return parsed.getTime() < Date.now();
+        },
+        dealClosePrimaryLabel(value) {
+          if (!value) return "";
+          return this.isDealOverdue(value) ? "Просрочено" : this.formatDealCloseDate(value);
+        },
+        dealCloseSecondaryLabel(value) {
+          if (!value) return "";
+          if (!this.isDealOverdue(value)) return "";
+          const parsed = this.parseDealCloseDate(value);
+          if (!parsed) return "";
+          const diffMinutes = Math.ceil((Date.now() - parsed.getTime()) / 60000);
+          return this.formatRemainingDuration(diffMinutes);
+        },
+        isTaskOverdue(value, isDone = false) {
+          if (!value || isDone) return false;
+          const parsed = new Date(value);
+          if (Number.isNaN(parsed.getTime())) return false;
+          return parsed.getTime() < Date.now();
+        },
+        taskDuePrimaryLabel(value, isDone = false) {
+          if (!value) return "";
+          return this.isTaskOverdue(value, isDone) ? "Просрочено" : this.formatDueLabel(value);
+        },
+        taskDueSecondaryLabel(value, isDone = false) {
+          if (!value) return "";
+          if (this.isTaskOverdue(value, isDone)) {
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) return "";
+            const diffMinutes = Math.ceil((Date.now() - parsed.getTime()) / 60000);
+            return this.formatRemainingDuration(diffMinutes);
+          }
+          return this.formatTaskRemainingLabel(value, isDone);
         },
         normalizeCompanyOkveds(okveds, mainCode = "", mainName = "") {
           const normalized = [];
@@ -3264,7 +3379,7 @@
             throw new Error("Укажите название источника");
           }
           this.isSourceSaving = true;
-          this.errorMessage = "";
+          this.clearUiErrors({ modalOnly: true });
           try {
             const createdSource = await this.apiRequest("/api/v1/meta/lead-sources/", {
               method: "POST",
@@ -3278,7 +3393,7 @@
             targetForm.sourceId = createdSource.id;
             this.cancelSourceCreate();
           } catch (error) {
-            this.errorMessage = `Ошибка создания источника: ${error.message}`;
+            this.setUiError(`Ошибка создания источника: ${error.message}`, { modal: true });
           } finally {
             this.isSourceSaving = false;
           }
@@ -3323,6 +3438,7 @@
         closeModal() {
           this.showModal = false;
           this.cancelSourceCreate();
+          this.clearUiErrors({ globalOnly: true });
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
@@ -3348,6 +3464,7 @@
           this.companyContactsForActiveCompany = [];
         },
         openCreateModal() {
+          this.clearUiErrors({ modalOnly: true });
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
@@ -3610,7 +3727,7 @@
             throw new Error("Укажите срок задачи");
           }
           this.isDealTaskSaving = true;
-          this.errorMessage = "";
+          this.clearUiErrors({ modalOnly: true });
           try {
             await this.apiRequest("/api/v1/activities/", {
               method: "POST",
@@ -3629,7 +3746,7 @@
             await this.loadTasksForDeal();
             await this.loadSection("tasks");
           } catch (error) {
-            this.errorMessage = `Ошибка создания задачи: ${error.message}`;
+            this.setUiError(`Ошибка создания задачи: ${error.message}`, { modal: true });
           } finally {
             this.isDealTaskSaving = false;
           }
@@ -3641,7 +3758,7 @@
           }
 
           this.isDealCompanySaving = true;
-          this.errorMessage = "";
+          this.clearUiErrors({ modalOnly: true });
           try {
             const createdCompany = await this.apiRequest("/api/v1/clients/", {
               method: "POST",
@@ -3666,7 +3783,7 @@
             await this.loadSection("companies");
             await this.loadContactsForSelectedDealCompany();
           } catch (error) {
-            this.errorMessage = `Ошибка создания компании: ${error.message}`;
+            this.setUiError(`Ошибка создания компании: ${error.message}`, { modal: true });
           } finally {
             this.isDealCompanySaving = false;
           }
@@ -3681,7 +3798,7 @@
             throw new Error("Укажите ФИО контакта");
           }
           this.isDealCompanySaving = true;
-          this.errorMessage = "";
+          this.clearUiErrors({ modalOnly: true });
           try {
             const parts = fullName.split(/\s+/).filter(Boolean);
             const firstName = parts[0] || fullName;
@@ -3703,7 +3820,7 @@
             await this.loadContactsForSelectedDealCompany();
             await this.loadSection("contacts");
           } catch (error) {
-            this.errorMessage = `Ошибка создания контакта: ${error.message}`;
+            this.setUiError(`Ошибка создания контакта: ${error.message}`, { modal: true });
           } finally {
             this.isDealCompanySaving = false;
           }
@@ -3824,7 +3941,7 @@
           const firstName = parts[0] || fullName;
           const lastName = parts.slice(1).join(" ");
           this.isCompanyContactSaving = true;
-          this.errorMessage = "";
+          this.clearUiErrors({ modalOnly: true });
           try {
             await this.apiRequest("/api/v1/contacts/", {
               method: "POST",
@@ -3843,7 +3960,7 @@
             await this.loadContactsForCompany();
             await this.loadSection("contacts");
           } catch (error) {
-            this.errorMessage = `Ошибка создания контакта: ${error.message}`;
+            this.setUiError(`Ошибка создания контакта: ${error.message}`, { modal: true });
           } finally {
             this.isCompanyContactSaving = false;
           }
@@ -3922,7 +4039,7 @@
         },
         async createItem() {
           this.isSaving = true;
-          this.errorMessage = "";
+          this.clearUiErrors({ modalOnly: true });
           try {
             let savedDeal = null;
             if (this.activeSection === "leads" && this.editingLeadId) await this.updateLead();
@@ -3970,7 +4087,7 @@
               await this.reloadActiveSection();
             }
           } catch (error) {
-            this.errorMessage = `Ошибка сохранения: ${error.message}`;
+            this.setUiError(`Ошибка сохранения: ${error.message}`, { modal: true });
           } finally {
             this.isSaving = false;
           }
