@@ -906,6 +906,7 @@ createApp({
                     page: window.location.pathname,
                 });
                 this.sent = true;
+                this.heroTriedSubmit = false;
             } catch (e) {
                 console.error(e);
             } finally {
@@ -925,6 +926,7 @@ createApp({
                     page: window.location.pathname,
                 });
                 this.quizSent = true;
+                this.quizTriedSubmit = false;
                 this.quizForm = { industry: '', teamSize: '', department: '', pain: '', turnover: '', phone: '' };
             } catch (e) {
                 console.error(e);
@@ -947,6 +949,7 @@ createApp({
                     page: window.location.pathname,
                 });
                 this.planSent = true;
+                this.planTriedSubmit = false;
                 this.PlanForm = { name: '', phone: '', company: '', comment: '' };
             } catch (e) {
                 console.error(e);
@@ -959,6 +962,7 @@ createApp({
             this.isDiscussOpen = true;
             this.discussSent = false;
             this.isSendingDiscuss = false;
+            this.discussTriedSubmit = false;
         },
         closeDiscuss() {
             this.isDiscussOpen = false;
@@ -980,6 +984,7 @@ createApp({
                     page: window.location.pathname,
                 });
                 this.discussSent = true;
+                this.discussTriedSubmit = false;
                 this.discussForm = { name: '', phone: '', company: '', comment: '' };
                 this.selectedDiscussCompanyData = null;
             } catch (e) {
