@@ -14,9 +14,10 @@ from api.v1.meta.serializers import (
     DealStageSerializer,
     LeadSourceSerializer,
     LeadStatusSerializer,
+    TaskTypeSerializer,
     UserOptionSerializer,
 )
-from crm.models import CommunicationChannel, DealStage, LeadSource, LeadStatus
+from crm.models import CommunicationChannel, DealStage, LeadSource, LeadStatus, TaskType
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -110,6 +111,14 @@ class UserOptionListAPIView(ListAPIView):
 
     def get_queryset(self):
         return User.objects.filter(is_active=True, is_staff=True).order_by("first_name", "last_name", "username")
+
+
+class TaskTypeListAPIView(ListAPIView):
+    serializer_class = TaskTypeSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return TaskType.objects.filter(is_active=True).order_by("name")
 
 
 class CurrencyRatesAPIView(APIView):

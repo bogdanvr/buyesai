@@ -1,12 +1,19 @@
 from django.contrib import admin
 
-from crm.models import Activity
+from crm.models import Activity, TaskType
+
+
+@admin.register(TaskType)
+class TaskTypeAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("name",)
 
 
 @admin.register(Activity)
 class ActivityAdmin(admin.ModelAdmin):
-    list_display = ("id", "type", "subject", "client", "is_done", "due_at", "created_at")
-    list_filter = ("type", "is_done")
+    list_display = ("id", "type", "subject", "task_type", "status", "priority", "client", "due_at", "created_at")
+    list_filter = ("type", "status", "priority", "task_type")
     search_fields = ("subject", "description")
-    autocomplete_fields = ("lead", "deal", "client", "contact", "created_by")
+    autocomplete_fields = ("lead", "deal", "client", "contact", "created_by", "task_type", "related_touch")
     readonly_fields = ("created_at", "updated_at", "completed_at")

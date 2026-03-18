@@ -6,11 +6,13 @@ from django.utils import timezone
 
 from audit.services import log_model_event
 from crm.models import Activity, Client, Deal, DealStage, Lead
-from crm.models.activity import ActivityType
+from crm.models.activity import ActivityType, TaskStatus
 from crm.services.lead_services import convert_lead_to_deal
 
 
 logger = logging.getLogger(__name__)
+
+ACTIVE_TASK_STATUSES = {TaskStatus.TODO, TaskStatus.IN_PROGRESS}
 
 
 def _extract_deal_failed_reason(deal: Deal | None) -> str:
@@ -158,7 +160,7 @@ def activity_task_deadline_state_signal(sender, instance: Activity, **kwargs):
 
     instance._previous_activity_state = None
     if not instance.pk:
-        if instance.is_done:
+        if instance.status not in ACTIVE_TASK_STATUSES:
             instance.deadline_reminder_sent_at = None
             instance.deadline_reminder_acknowledged_at = None
             instance.deadline_reminder_email_escalated_at = None
@@ -173,6 +175,7 @@ def activity_task_deadline_state_signal(sender, instance: Activity, **kwargs):
             "due_at",
             "deadline_reminder_offset_minutes",
             "is_done",
+            "status",
             "result",
             "save_company_note",
             "company_note",
@@ -187,7 +190,7 @@ def activity_task_deadline_state_signal(sender, instance: Activity, **kwargs):
     )
     instance._previous_activity_state = previous
 
-    if instance.is_done:
+    if instance.status not in ACTIVE_TASK_STATUSES:
         instance.deadline_reminder_sent_at = None
         instance.deadline_reminder_acknowledged_at = None
         instance.deadline_reminder_email_escalated_at = None
@@ -199,7 +202,7 @@ def activity_task_deadline_state_signal(sender, instance: Activity, **kwargs):
     reminder_offset_changed = (
         previous.deadline_reminder_offset_minutes != instance.deadline_reminder_offset_minutes
     )
-    reopened = previous.is_done and not instance.is_done
+    reopened = previous.status not in ACTIVE_TASK_STATUSES and instance.status in ACTIVE_TASK_STATUSES
     if due_at_changed or reminder_offset_changed or reopened:
         instance.deadline_reminder_sent_at = None
         instance.deadline_reminder_acknowledged_at = None
@@ -208,11 +211,11 @@ def activity_task_deadline_state_signal(sender, instance: Activity, **kwargs):
 
 @receiver(post_save, sender=Activity)
 def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
-    if instance.type != ActivityType.TASK or not instance.is_done:
+    if instance.type != ActivityType.TASK or instance.status != TaskStatus.DONE:
         return
 
     previous = getattr(instance, "_previous_activity_state", None)
-    if previous is not None and previous.type == ActivityType.TASK and previous.is_done:
+    if previous is not None and previous.type == ActivityType.TASK and previous.status == TaskStatus.DONE:
         return
 
     result_text = str(instance.result or "").strip()

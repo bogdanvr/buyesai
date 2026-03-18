@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from crm.models import Activity, Client, Deal, DealStage, LeadSource
-from crm.models.activity import ActivityType
+from crm.models.activity import ActivityType, TaskStatus
 
 
 class DealTasksRequiredByStageTests(APITestCase):
@@ -143,11 +143,35 @@ class DealTasksRequiredByStageTests(APITestCase):
 
         response = self.client.patch(
             reverse("deals-detail", kwargs={"pk": deal.pk}),
-            {"stage": self.stage_failed.pk},
+            {"stage": self.stage_failed.pk, "failure_reason": "Неактуально"},
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_canceled_task_does_not_count_as_active_for_deal(self):
+        deal = Deal.objects.create(
+            title="Сделка с отмененной задачей",
+            source=self.source,
+            client=self.company,
+            stage=self.stage_in_progress,
+        )
+        Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Старый контакт",
+            deal=deal,
+            client=self.company,
+            status=TaskStatus.CANCELED,
+        )
+
+        response = self.client.patch(
+            reverse("deals-detail", kwargs={"pk": deal.pk}),
+            {"description": "Обновление без активных задач"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("stage", response.data)
 
     def test_cannot_create_thinking_deal_without_company(self):
         response = self.client.post(

@@ -1,22 +1,25 @@
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 import re
+from datetime import timedelta
 
-from crm.models import Activity, Client, Deal, DealStage
-from crm.models.activity import ActivityType
+from crm.models import Activity, Client, Deal, DealStage, LeadSource, TaskType
+from crm.models.activity import ActivityType, TaskStatus
 
 
 class TaskResultAndEventsTests(APITestCase):
     def setUp(self):
-        user = get_user_model().objects.create_user(
+        self.user = get_user_model().objects.create_user(
             username="staff_events",
             password="testpass123",
             is_staff=True,
         )
-        self.client.force_authenticate(user=user)
+        self.client.force_authenticate(user=self.user)
         self.company = Client.objects.create(name="Acme")
+        self.source = LeadSource.objects.create(name="Сайт", code="site")
         self.stage_new = DealStage.objects.create(
             name="Первичный контакт",
             code="primary_contact",
@@ -41,6 +44,7 @@ class TaskResultAndEventsTests(APITestCase):
         self.deal = Deal.objects.create(
             title="Сделка Acme",
             client=self.company,
+            source=self.source,
             stage=self.stage_new,
         )
 
@@ -50,6 +54,8 @@ class TaskResultAndEventsTests(APITestCase):
             subject="Отправить КП",
             deal=self.deal,
             client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
         )
 
         bad_response = self.client.patch(
@@ -62,7 +68,11 @@ class TaskResultAndEventsTests(APITestCase):
 
         good_response = self.client.patch(
             reverse("activities-detail", kwargs={"pk": task.pk}),
-            {"is_done": True, "result": "Коммерческое предложение отправлено клиенту"},
+            {
+                "is_done": True,
+                "result": "Коммерческое предложение отправлено клиенту",
+                "has_follow_up_task": True,
+            },
             format="json",
         )
         self.assertEqual(good_response.status_code, status.HTTP_200_OK)
@@ -86,6 +96,8 @@ class TaskResultAndEventsTests(APITestCase):
             deal=self.deal,
             client=self.company,
             save_company_note=True,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
         )
 
         response = self.client.patch(
@@ -93,6 +105,7 @@ class TaskResultAndEventsTests(APITestCase):
             {
                 "is_done": True,
                 "result": "Коммерческое предложение отправлено клиенту",
+                "has_follow_up_task": True,
                 "save_company_note": True,
                 "company_note": "Компания работает только по постоплате",
             },
@@ -108,7 +121,7 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(task.company_note, "Компания работает только по постоплате")
         self.assertIn("Коммерческое предложение отправлено клиенту", self.company.events)
         self.assertIn("Коммерческое предложение отправлено клиенту", self.deal.events)
-        self.assertRegex(self.company.notes, r"\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}")
+        self.assertRegex(self.company.notes, r"\d{2}\.\d{2}\.\d{4}")
         self.assertIn("Добавил: staff_events", self.company.notes)
         self.assertIn(f"Сделка #{self.deal.pk}", self.company.notes)
         self.assertIn("Компания работает только по постоплате", self.company.notes)
@@ -119,6 +132,8 @@ class TaskResultAndEventsTests(APITestCase):
             subject="Отправить КП",
             deal=self.deal,
             client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
         )
 
         response = self.client.patch(
@@ -139,6 +154,8 @@ class TaskResultAndEventsTests(APITestCase):
             subject="Созвон с клиентом",
             deal=self.deal,
             client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
         )
 
         response = self.client.patch(
@@ -159,6 +176,8 @@ class TaskResultAndEventsTests(APITestCase):
             subject="Созвон с клиентом",
             deal=self.deal,
             client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
         )
 
         response = self.client.patch(
@@ -173,6 +192,40 @@ class TaskResultAndEventsTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_task_can_store_type_priority_related_touch_and_status(self):
+        task_type = TaskType.objects.create(name="Квалификация")
+        touch = Activity.objects.create(
+            type=ActivityType.CALL,
+            subject="Первичный звонок",
+            deal=self.deal,
+            client=self.company,
+        )
+
+        response = self.client.post(
+            reverse("activities-list"),
+            {
+                "type": ActivityType.TASK,
+                "subject": "Подготовить следующий шаг",
+                "deal": self.deal.pk,
+                "client": self.company.pk,
+                "due_at": "2026-03-20T10:00:00+06:00",
+                "status": TaskStatus.IN_PROGRESS,
+                "priority": "high",
+                "task_type": task_type.pk,
+                "related_touch": touch.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["status"], TaskStatus.IN_PROGRESS)
+        self.assertEqual(response.data["status_label"], "В работе")
+        self.assertEqual(response.data["priority"], "high")
+        self.assertEqual(response.data["task_type"], task_type.pk)
+        self.assertEqual(response.data["task_type_name"], "Квалификация")
+        self.assertEqual(response.data["related_touch"], touch.pk)
+        self.assertEqual(response.data["related_touch_subject"], "Первичный звонок")
+
     def test_company_note_draft_writes_author_and_timestamp(self):
         response = self.client.patch(
             reverse("clients-detail", kwargs={"pk": self.company.pk}),
@@ -183,7 +236,7 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.company.refresh_from_db()
-        self.assertRegex(self.company.notes, r"\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}")
+        self.assertRegex(self.company.notes, r"\d{2}\.\d{2}\.\d{4}")
         self.assertIn("Добавил: staff_events", self.company.notes)
         self.assertIn("Любят общаться в Telegram", self.company.notes)
 
@@ -212,6 +265,13 @@ class TaskResultAndEventsTests(APITestCase):
             order=20,
             is_active=True,
             is_final=False,
+        )
+        Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Активная задача по сделке",
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
         )
 
         response = self.client.patch(

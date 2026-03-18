@@ -1,10 +1,11 @@
 from rest_framework import serializers
 
 from crm.models import Deal
-from crm.models.activity import ActivityType
+from crm.models.activity import ActivityType, TaskStatus
 
 
 class DealSerializer(serializers.ModelSerializer):
+    ACTIVE_TASK_STATUSES = {TaskStatus.TODO, TaskStatus.IN_PROGRESS}
     client_name = serializers.CharField(source="client.name", read_only=True)
     lead_title = serializers.CharField(source="lead.title", read_only=True)
     source_name = serializers.CharField(source="source.name", read_only=True)
@@ -43,7 +44,10 @@ class DealSerializer(serializers.ModelSerializer):
         stage_code = str(getattr(stage, "code", "") or "").strip().lower()
         has_active_tasks = False
         if self.instance is not None:
-            has_active_tasks = self.instance.activities.filter(type=ActivityType.TASK, is_done=False).exists()
+            has_active_tasks = self.instance.activities.filter(
+                type=ActivityType.TASK,
+                status__in=self.ACTIVE_TASK_STATUSES,
+            ).exists()
         if stage_code not in {"won", "failed"} and not has_active_tasks and not has_pending_task:
             raise serializers.ValidationError(
                 {"stage": "Сделка без активных задач допустима только в статусах 'Успешно' и 'Провален'."}

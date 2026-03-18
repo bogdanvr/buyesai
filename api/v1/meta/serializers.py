@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.utils.text import slugify
 from django.contrib.auth import get_user_model
 
-from crm.models import CommunicationChannel, DealStage, LeadSource, LeadStatus
+from crm.models import CommunicationChannel, DealStage, LeadSource, LeadStatus, TaskType
 
 
 User = get_user_model()
@@ -61,3 +61,9 @@ class UserOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "username", "email", "full_name"]
+
+
+class TaskTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaskType
+        fields = ["id", "name", "is_active"]

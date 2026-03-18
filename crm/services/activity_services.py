@@ -2,6 +2,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from crm.models import Activity
+from crm.models.activity import ActivityType, TaskStatus
 
 
 @transaction.atomic
@@ -32,7 +33,9 @@ def create_activity(
 
 @transaction.atomic
 def complete_activity(*, activity: Activity) -> Activity:
+    if activity.type == ActivityType.TASK:
+        activity.status = TaskStatus.DONE
     activity.is_done = True
     activity.completed_at = activity.completed_at or timezone.now()
-    activity.save(update_fields=["is_done", "completed_at", "updated_at"])
+    activity.save(update_fields=["status", "is_done", "completed_at", "updated_at"])
     return activity

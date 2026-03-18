@@ -84,6 +84,10 @@
               <rect x="4" y="4" width="16" height="16" rx="2"></rect>
               <path stroke-linecap="round" d="M8 8h2M14 8h2M8 12h2M14 12h2M8 16h8"></path>
             </svg>
+            <svg v-else-if="item.key === 'touches'" xmlns="http://www.w3.org/2000/svg" class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 5h12a2 2 0 012 2v8a2 2 0 01-2 2h-5l-4 3v-3H6a2 2 0 01-2-2V7a2 2 0 012-2z"></path>
+            </svg>
             <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4"></path>
               <rect x="4" y="4" width="16" height="16" rx="2"></rect>
@@ -125,6 +129,10 @@
               <svg v-else-if="item.key === 'companies'" xmlns="http://www.w3.org/2000/svg" class="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                 <rect x="4" y="4" width="16" height="16" rx="2"></rect>
                 <path stroke-linecap="round" d="M8 8h2M14 8h2M8 12h2M14 12h2M8 16h8"></path>
+              </svg>
+              <svg v-else-if="item.key === 'touches'" xmlns="http://www.w3.org/2000/svg" class="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 5h12a2 2 0 012 2v8a2 2 0 01-2 2h-5l-4 3v-3H6a2 2 0 01-2-2V7a2 2 0 012-2z"></path>
               </svg>
               <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4"></path>
@@ -273,8 +281,8 @@
             <div class="px-4 py-4"></div>
             <div class="px-4 py-4">Наименование</div>
             <div class="px-4 py-4">Компания</div>
-            <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Сделка' : (activeSection === 'deals' ? 'Сумма' : 'Телефон') ]]</div>
-            <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Срок' : (activeSection === 'deals' ? 'План закрытия' : 'Email') ]]</div>
+            <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Сделка' : (activeSection === 'touches' ? 'Привязка' : (activeSection === 'deals' ? 'Сумма' : 'Телефон')) ]]</div>
+            <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Срок' : (activeSection === 'touches' ? 'Дата' : (activeSection === 'deals' ? 'План закрытия' : 'Email')) ]]</div>
             <div v-if="activeSection === 'deals'" class="px-4 py-4">Ответственный</div>
             <div v-if="activeSection === 'deals'" class="px-4 py-4">Задачи</div>
             <div v-if="activeSection === 'companies'" class="px-4 py-4">В работе</div>
@@ -336,13 +344,16 @@
                       : (activeSection === 'deals'
                         ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_150px_110px_160px]'
                         : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]'),
-                    (activeSection === 'leads' || activeSection === 'deals' || activeSection === 'contacts' || activeSection === 'companies' || activeSection === 'tasks') ? 'cursor-pointer' : ''
+                    (activeSection === 'leads' || activeSection === 'deals' || activeSection === 'contacts' || activeSection === 'companies' || activeSection === 'tasks' || activeSection === 'touches') ? 'cursor-pointer' : ''
                   ]"
                   @click="onRowClick(item)"
                 >
                   <div class="px-4 py-4 text-xs text-crm-muted font-medium tabular-nums">#[[ item.id ]]</div>
                   <div class="px-4 py-4 min-w-0">
                     <div class="font-medium text-white truncate">[[ item.name ]]</div>
+                    <div v-if="activeSection === 'tasks' && item.taskTypeName" class="mt-1 truncate text-xs text-crm-muted">
+                      Тип: [[ item.taskTypeName ]]
+                    </div>
                   </div>
                   <div class="px-4 py-4 text-sm text-crm-text truncate">[[ item.company || '—' ]]</div>
                   <div class="px-4 py-4 text-sm text-crm-text truncate">
@@ -373,16 +384,16 @@
                   <div v-else class="px-4 py-4 text-sm text-crm-text min-w-0">
                     <div
                       class="truncate"
-                      :class="isTaskOverdue(item.dueAtRaw, item.isDone) ? 'text-red-300 font-medium' : 'text-crm-text'"
+                      :class="isTaskOverdue(item.dueAtRaw, item.taskStatus) ? 'text-red-300 font-medium' : 'text-crm-text'"
                     >
-                      [[ taskDuePrimaryLabel(item.dueAtRaw, item.isDone) || '—' ]]
+                      [[ taskDuePrimaryLabel(item.dueAtRaw, item.taskStatus) || '—' ]]
                     </div>
                     <div
-                      v-if="taskDueSecondaryLabel(item.dueAtRaw, item.isDone)"
+                      v-if="taskDueSecondaryLabel(item.dueAtRaw, item.taskStatus)"
                       class="mt-1 truncate text-xs"
-                      :class="isTaskOverdue(item.dueAtRaw, item.isDone) ? 'text-red-300' : 'text-crm-muted'"
+                      :class="isTaskOverdue(item.dueAtRaw, item.taskStatus) ? 'text-red-300' : 'text-crm-muted'"
                     >
-                      [[ taskDueSecondaryLabel(item.dueAtRaw, item.isDone) ]]
+                      [[ taskDueSecondaryLabel(item.dueAtRaw, item.taskStatus) ]]
                     </div>
                   </div>
                   <div v-if="activeSection === 'companies'" class="px-4 py-4 text-sm text-crm-text font-medium tabular-nums">
@@ -401,7 +412,7 @@
                   </div>
                 </div>
 
-                <div class="lg:hidden px-3 py-2.5 hover:bg-white/5 transition" :class="(activeSection === 'leads' || activeSection === 'deals' || activeSection === 'contacts' || activeSection === 'companies' || activeSection === 'tasks') ? 'cursor-pointer' : ''" @click="onRowClick(item)">
+                <div class="lg:hidden px-3 py-2.5 hover:bg-white/5 transition" :class="(activeSection === 'leads' || activeSection === 'deals' || activeSection === 'contacts' || activeSection === 'companies' || activeSection === 'tasks' || activeSection === 'touches') ? 'cursor-pointer' : ''" @click="onRowClick(item)">
                   <template v-if="activeSection === 'companies'">
                     <div class="flex items-center gap-2 min-h-[40px]">
                       <div class="min-w-0 flex flex-1 items-center gap-2">
@@ -486,6 +497,9 @@
                     <div class="flex items-center justify-between gap-2 min-h-[40px]">
                       <div class="min-w-0 flex-1">
                         <div class="text-sm font-medium text-white truncate leading-5">[[ activeSection === 'leads' ? (item.company || item.name) : item.name ]]</div>
+                        <div v-if="activeSection === 'tasks' && item.taskTypeName" class="mt-0.5 text-[11px] text-crm-muted truncate leading-4">
+                          Тип: [[ item.taskTypeName ]]
+                        </div>
                         <div v-if="activeSection === 'deals'" class="mt-1 text-[11px] text-crm-muted truncate">
                           [[ item.company || 'Без компании' ]] • [[ formatDealAmount(item.amount, item.currency) ]] • [[ dealClosePrimaryLabel(item.closeDate) || 'Без даты' ]]<span v-if="dealCloseSecondaryLabel(item.closeDate)"> • <span :class="isDealOverdue(item.closeDate) ? 'text-red-300' : 'text-crm-muted'">[[ dealCloseSecondaryLabel(item.closeDate) ]]</span></span> • [[ item.ownerName || 'Без ответственного' ]] • [[ countDealOpenTasks(item.id) ]] задач
                         </div>
@@ -494,10 +508,18 @@
                         </div>
                         <div v-else-if="activeSection === 'tasks'" class="mt-0.5 text-[11px] text-crm-muted leading-4">
                           <div class="truncate">
-                            [[ item.company || '—' ]] • [[ taskDuePrimaryLabel(item.dueAtRaw, item.isDone) || 'Без срока' ]]<span v-if="taskDueSecondaryLabel(item.dueAtRaw, item.isDone)"> • <span :class="isTaskOverdue(item.dueAtRaw, item.isDone) ? 'text-red-300' : 'text-crm-muted'">[[ taskDueSecondaryLabel(item.dueAtRaw, item.isDone) ]]</span></span>
+                            [[ item.company || '—' ]] • [[ taskDuePrimaryLabel(item.dueAtRaw, item.taskStatus) || 'Без срока' ]]<span v-if="taskDueSecondaryLabel(item.dueAtRaw, item.taskStatus)"> • <span :class="isTaskOverdue(item.dueAtRaw, item.taskStatus) ? 'text-red-300' : 'text-crm-muted'">[[ taskDueSecondaryLabel(item.dueAtRaw, item.taskStatus) ]]</span></span>
                           </div>
                           <div class="mt-0.5 truncate">
                             Сделка: [[ item.deal || 'Без сделки' ]]
+                          </div>
+                        </div>
+                        <div v-else-if="activeSection === 'touches'" class="mt-0.5 text-[11px] text-crm-muted leading-4">
+                          <div class="truncate">
+                            [[ item.company || 'Без компании' ]] • [[ item.email || 'Без даты' ]]
+                          </div>
+                          <div class="mt-0.5 truncate">
+                            [[ item.phone || 'Без привязки' ]]
                           </div>
                         </div>
                       </div>
@@ -1016,20 +1038,20 @@
                         <div v-if="task.description" class="text-xs text-crm-muted mt-1 break-words">[[ task.description ]]</div>
                         <div
                           class="mt-1 text-xs"
-                          :class="isTaskOverdue(task.dueAtRaw, task.isDone) ? 'text-red-300' : 'text-crm-muted'"
+                          :class="isTaskOverdue(task.dueAtRaw, task.taskStatus) ? 'text-red-300' : 'text-crm-muted'"
                         >
-                          Срок: [[ taskDuePrimaryLabel(task.dueAtRaw, task.isDone) ]]
+                          Срок: [[ taskDuePrimaryLabel(task.dueAtRaw, task.taskStatus) ]]
                         </div>
                         <div
-                          v-if="taskDueSecondaryLabel(task.dueAtRaw, task.isDone)"
+                          v-if="taskDueSecondaryLabel(task.dueAtRaw, task.taskStatus)"
                           class="mt-1 text-xs"
-                          :class="isTaskOverdue(task.dueAtRaw, task.isDone) ? 'text-red-300' : 'text-crm-muted'"
+                          :class="isTaskOverdue(task.dueAtRaw, task.taskStatus) ? 'text-red-300' : 'text-crm-muted'"
                         >
-                          [[ taskDueSecondaryLabel(task.dueAtRaw, task.isDone) ]]
+                          [[ taskDueSecondaryLabel(task.dueAtRaw, task.taskStatus) ]]
                         </div>
                       </div>
-                      <span class="inline-flex items-center rounded-full px-2 py-1 text-[11px] font-medium border" :class="task.isDone ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-sky-400/30 bg-sky-400/10 text-sky-300'">
-                        [[ task.isDone ? 'Выполнена' : 'Открыта' ]]
+                      <span class="inline-flex items-center rounded-full px-2 py-1 text-[11px] font-medium border" :class="isTaskActiveStatus(task.taskStatus) ? 'border-sky-400/30 bg-sky-400/10 text-sky-300' : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'">
+                        [[ task.statusLabel ]]
                       </span>
                     </div>
                   </div>
@@ -1077,6 +1099,85 @@
             <label class="md:col-span-2 flex items-center gap-2">
               <input v-model="forms.contacts.isPrimary" type="checkbox" class="w-4 h-4 rounded border-crm-border bg-transparent" />
               <span class="text-sm text-crm-muted">Основной контакт</span>
+            </label>
+          </template>
+
+          <template v-if="activeSection === 'touches'">
+            <label class="block">
+              <span class="text-sm text-crm-muted">Дата и время</span>
+              <input v-model="forms.touches.happenedAt" type="datetime-local" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">Тип канала</span>
+              <select v-model="forms.touches.channelId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбран</option>
+                <option v-for="channel in metaOptions.communicationChannels" :key="channel.id" :value="channel.id">[[ channel.name ]]</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">Направление</span>
+              <select v-model="forms.touches.direction" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option value="incoming">Входящее</option>
+                <option value="outgoing">Исходящее</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">Ответственный</span>
+              <select v-model="forms.touches.ownerId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбран</option>
+                <option v-for="user in metaOptions.users" :key="user.id" :value="user.id">[[ user.full_name || user.username ]]</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">Компания</span>
+              <select v-model="forms.touches.companyId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбрана</option>
+                <option v-for="company in companyOptions" :key="company.id" :value="company.id">[[ company.name ]]</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">Контакт</span>
+              <select v-model="forms.touches.contactId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбран</option>
+                <option v-for="contact in touchContactOptions" :key="contact.id" :value="contact.id">[[ contact.title ]]</option>
+              </select>
+            </label>
+            <label class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Результат</span>
+              <textarea v-model="forms.touches.result" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+            </label>
+            <label class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Краткое содержание</span>
+              <textarea v-model="forms.touches.summary" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+            </label>
+            <label class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Следующий шаг</span>
+              <textarea v-model="forms.touches.nextStep" rows="2" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">Дата следующего шага</span>
+              <input v-model="forms.touches.nextStepAt" type="datetime-local" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">Лид</span>
+              <select v-model="forms.touches.leadId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбран</option>
+                <option v-for="lead in touchLeadOptions" :key="lead.id" :value="lead.id">[[ lead.title ]]</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">Сделка</span>
+              <select v-model="forms.touches.dealId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбрана</option>
+                <option v-for="deal in touchDealOptions" :key="deal.id" :value="deal.id">[[ deal.title ]]</option>
+              </select>
+            </label>
+            <label class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Задача</span>
+              <select v-model="forms.touches.taskId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбрана</option>
+                <option v-for="task in touchTaskOptions" :key="task.id" :value="task.id">[[ task.title ]]</option>
+              </select>
             </label>
           </template>
 
@@ -1354,6 +1455,25 @@
               <span class="text-sm text-crm-muted">Название задачи</span>
               <input v-model="forms.tasks.subject" required type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
+            <label v-if="shouldShowTaskField(forms.tasks.taskTypeId)" class="block">
+              <span class="text-sm text-crm-muted">Тип задачи</span>
+              <select v-model="forms.tasks.taskTypeId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбран</option>
+                <option v-for="taskType in metaOptions.taskTypes" :key="taskType.id" :value="taskType.id">[[ taskType.name ]]</option>
+              </select>
+            </label>
+            <label v-if="shouldShowTaskField(forms.tasks.status)" class="block">
+              <span class="text-sm text-crm-muted">Статус</span>
+              <select v-model="forms.tasks.status" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option v-for="option in taskStatusOptions" :key="`task-status-${option.value}`" :value="option.value">[[ option.label ]]</option>
+              </select>
+            </label>
+            <label v-if="shouldShowTaskField(forms.tasks.priority)" class="block">
+              <span class="text-sm text-crm-muted">Приоритет</span>
+              <select v-model="forms.tasks.priority" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option v-for="option in taskPriorityOptions" :key="`task-priority-${option.value}`" :value="option.value">[[ option.label ]]</option>
+              </select>
+            </label>
             <label v-if="shouldShowTaskField(forms.tasks.companyId)" class="block">
               <span class="text-sm text-crm-muted">Компания</span>
               <select v-model="forms.tasks.companyId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
@@ -1376,8 +1496,17 @@
               <span class="text-sm text-crm-muted">Описание</span>
               <textarea v-model="forms.tasks.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
+            <label v-if="shouldShowTaskField(forms.tasks.relatedTouchId)" class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Связанное касание</span>
+              <select v-model="forms.tasks.relatedTouchId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбрано</option>
+                <option v-for="touch in taskTouchSelectOptions" :key="touch.id" :value="touch.id">[[ touch.label ]]</option>
+              </select>
+              <div v-if="isTaskTouchesLoading" class="mt-2 text-xs text-crm-muted">Загрузка касаний...</div>
+              <div v-else-if="!taskTouchSelectOptions.length" class="mt-2 text-xs text-crm-muted">Для выбранной компании или сделки касаний пока нет.</div>
+            </label>
             <label v-if="showTaskResultField || showAllTaskFields || isCreatingTask" class="block md:col-span-2">
-              <span class="text-sm text-crm-muted">Результат</span>
+              <span class="text-sm text-crm-muted">Результат выполнения</span>
               <textarea v-model="forms.tasks.result" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
             <div v-if="showTaskResultField || showAllTaskFields || isCreatingTask" class="md:col-span-2 flex items-center gap-2">
@@ -1388,10 +1517,6 @@
               <span class="text-sm text-crm-muted">Важные факты о компании</span>
               <textarea v-model="forms.tasks.companyNote" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <div class="md:col-span-2 flex items-center gap-2">
-              <input id="task-is-done" v-model="forms.tasks.isDone" type="checkbox" class="w-4 h-4 rounded border-crm-border bg-transparent" />
-              <label for="task-is-done" class="text-sm text-crm-muted cursor-pointer">Задача уже выполнена</label>
-            </div>
             <div v-if="showTaskFollowUpSuggestion" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <div class="text-sm font-semibold text-white">Следующая задача по сделке</div>
               <div class="mt-1 text-xs text-crm-muted">Сделка: [[ taskFollowUpDealTitle ]]</div>
