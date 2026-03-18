@@ -31,6 +31,13 @@ class DealTasksRequiredByStageTests(APITestCase):
             is_active=True,
             is_final=True,
         )
+        self.stage_thinking = DealStage.objects.create(
+            name="Думают",
+            code="thinking",
+            order=20,
+            is_active=True,
+            is_final=False,
+        )
 
     def test_cannot_create_non_final_deal_without_tasks(self):
         response = self.client.post(
@@ -141,3 +148,33 @@ class DealTasksRequiredByStageTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_cannot_create_thinking_deal_without_company(self):
+        response = self.client.post(
+            reverse("deals-list"),
+            {
+                "title": "Сделка без компании",
+                "source": self.source.pk,
+                "stage": self.stage_thinking.pk,
+                "has_pending_task": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("client", response.data)
+
+    def test_can_create_thinking_deal_with_company(self):
+        response = self.client.post(
+            reverse("deals-list"),
+            {
+                "title": "Сделка с компанией",
+                "source": self.source.pk,
+                "client": self.company.pk,
+                "stage": self.stage_thinking.pk,
+                "has_pending_task": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)

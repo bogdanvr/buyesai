@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+import uuid
 
 from crm.models.common import TimestampedModel
 
@@ -98,6 +99,28 @@ class Lead(TimestampedModel):
     )
     last_contact_at = models.DateTimeField(blank=True, null=True, verbose_name="Последний контакт")
     converted_at = models.DateTimeField(blank=True, null=True, verbose_name="Дата конверсии")
+    assignment_notification_sent_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Уведомление о новом лиде отправлено",
+    )
+    assignment_notification_token = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        db_index=True,
+        verbose_name="Токен принятия лида",
+    )
+    assignment_notification_accepted_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Уведомление о новом лиде принято",
+    )
+    assignment_notification_email_escalated_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Эскалация уведомления лида на email отправлена",
+    )
     assigned_to = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name="assigned_crm_leads",
@@ -142,3 +165,8 @@ class Lead(TimestampedModel):
                 normalized_update_fields.add("phone_normalized")
             kwargs["update_fields"] = list(normalized_update_fields)
         return super().save(*args, **kwargs)
+
+    def ensure_assignment_notification_token(self) -> str:
+        if not self.assignment_notification_token:
+            self.assignment_notification_token = uuid.uuid4().hex
+        return self.assignment_notification_token

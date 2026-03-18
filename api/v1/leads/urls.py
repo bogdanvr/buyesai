@@ -1,8 +1,13 @@
 from rest_framework.routers import DefaultRouter
 
-from api.v1.leads.views import LeadViewSet
+from django.urls import path
+
+from api.v1.leads.views import LeadAcceptByEmailAPIView, LeadViewSet
 
 router = DefaultRouter()
 router.register("", LeadViewSet, basename="leads")
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("accept/", LeadAcceptByEmailAPIView.as_view(), name="leads-accept"),
+    *router.urls,
+]

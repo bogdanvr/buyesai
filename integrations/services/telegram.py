@@ -8,7 +8,8 @@ from django.conf import settings
 from django.utils import timezone
 from requests import RequestException
 
-from crm.models import Activity
+from crm.models import Activity, Lead
+from integrations.models import UserIntegrationProfile
 
 
 logger = logging.getLogger(__name__)
@@ -150,37 +151,112 @@ def build_task_deadline_reminder_reply_markup(*, task: Activity) -> dict:
     }
 
 
+def build_lead_assignment_message(*, lead: Lead) -> str:
+    lines = ["<b>Новый лид без ответственного</b>", f"<b>Лид:</b> {escape(lead.title or lead.company or f'Лид #{lead.pk}')}"]
+    if lead.company:
+        lines.append(f"<b>Компания:</b> {escape(lead.company)}")
+    if lead.name:
+        lines.append(f"<b>Контакт:</b> {escape(lead.name)}")
+    if lead.phone:
+        lines.append(f"<b>Телефон:</b> {escape(lead.phone)}")
+    if lead.email:
+        lines.append(f"<b>Email:</b> {escape(lead.email)}")
+    lines.append("<b>Статус:</b> Ожидает ответственного")
+    return "\n".join(lines)
+
+
+def build_lead_assignment_reply_markup(*, lead: Lead) -> dict:
+    token = lead.ensure_assignment_notification_token()
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "Принять",
+                    "callback_data": f"lead_accept:{lead.pk}:{token}",
+                }
+            ]
+        ]
+    }
+
+
+def _resolve_callback_user(callback_query: dict):
+    callback_from = callback_query.get("from") or {}
+    callback_user_id = str(callback_from.get("id") or "").strip()
+    message = callback_query.get("message") or {}
+    chat = message.get("chat") or {}
+    chat_id = str(chat.get("id") or "").strip()
+    lookup_values = [value for value in [callback_user_id, chat_id] if value]
+    if not lookup_values:
+        return None
+    profile = (
+        UserIntegrationProfile.objects.select_related("user")
+        .filter(telegram_chat_id__in=lookup_values, user__is_active=True)
+        .order_by("id")
+        .first()
+    )
+    return getattr(profile, "user", None)
+
+
 def handle_telegram_callback_query(callback_query: dict) -> dict:
     callback_query_id = str(callback_query.get("id") or "").strip()
     data = str(callback_query.get("data") or "").strip()
-    if not data.startswith("task_ack:"):
+    if data.startswith("task_ack:"):
+        _, task_id_raw, token = (data.split(":", 2) + ["", ""])[:3]
+        try:
+            task_id = int(task_id_raw)
+        except (TypeError, ValueError):
+            answer_telegram_callback_query(callback_query_id=callback_query_id, text="Некорректная задача")
+            return {"ok": False, "error": "invalid_task_id"}
+
+        task = (
+            Activity.objects.select_related("deal", "client")
+            .filter(pk=task_id, deadline_reminder_ack_token=token)
+            .first()
+        )
+        if task is None:
+            answer_telegram_callback_query(callback_query_id=callback_query_id, text="Напоминание не найдено")
+            return {"ok": False, "error": "task_not_found"}
+
+        if task.deadline_reminder_acknowledged_at is None:
+            task.deadline_reminder_acknowledged_at = timezone.now()
+            task.save(update_fields=["deadline_reminder_acknowledged_at", "updated_at"])
+            callback_text = "Принято"
+        else:
+            callback_text = "Уже подтверждено"
+
+        answer_telegram_callback_query(callback_query_id=callback_query_id, text=callback_text)
+    elif data.startswith("lead_accept:"):
+        _, lead_id_raw, token = (data.split(":", 2) + ["", ""])[:3]
+        try:
+            lead_id = int(lead_id_raw)
+        except (TypeError, ValueError):
+            answer_telegram_callback_query(callback_query_id=callback_query_id, text="Некорректный лид")
+            return {"ok": False, "error": "invalid_lead_id"}
+
+        user = _resolve_callback_user(callback_query)
+        if user is None:
+            answer_telegram_callback_query(callback_query_id=callback_query_id, text="Пользователь не найден")
+            return {"ok": False, "error": "user_not_found"}
+
+        lead = Lead.objects.filter(pk=lead_id, assignment_notification_token=token).first()
+        if lead is None:
+            answer_telegram_callback_query(callback_query_id=callback_query_id, text="Уведомление не найдено")
+            return {"ok": False, "error": "lead_not_found"}
+
+        if lead.assigned_to_id is None:
+            lead.assigned_to = user
+            lead.assignment_notification_accepted_at = timezone.now()
+            lead.save(update_fields=["assigned_to", "assignment_notification_accepted_at", "updated_at"])
+            callback_text = "Лид принят"
+        elif lead.assigned_to_id == user.pk:
+            callback_text = "Вы уже ответственный"
+        else:
+            callback_text = "Лид уже принят"
+
+        answer_telegram_callback_query(callback_query_id=callback_query_id, text=callback_text)
+    else:
         answer_telegram_callback_query(callback_query_id=callback_query_id, text="Неизвестное действие")
         return {"ok": False, "error": "unsupported_callback"}
-
-    _, task_id_raw, token = (data.split(":", 2) + ["", ""])[:3]
-    try:
-        task_id = int(task_id_raw)
-    except (TypeError, ValueError):
-        answer_telegram_callback_query(callback_query_id=callback_query_id, text="Некорректная задача")
-        return {"ok": False, "error": "invalid_task_id"}
-
-    task = (
-        Activity.objects.select_related("deal", "client")
-        .filter(pk=task_id, deadline_reminder_ack_token=token)
-        .first()
-    )
-    if task is None:
-        answer_telegram_callback_query(callback_query_id=callback_query_id, text="Напоминание не найдено")
-        return {"ok": False, "error": "task_not_found"}
-
-    if task.deadline_reminder_acknowledged_at is None:
-        task.deadline_reminder_acknowledged_at = timezone.now()
-        task.save(update_fields=["deadline_reminder_acknowledged_at", "updated_at"])
-        callback_text = "Принято"
-    else:
-        callback_text = "Уже подтверждено"
-
-    answer_telegram_callback_query(callback_query_id=callback_query_id, text=callback_text)
 
     message = callback_query.get("message") or {}
     chat = message.get("chat") or {}
@@ -188,5 +264,6 @@ def handle_telegram_callback_query(callback_query: dict) -> dict:
     message_id = message.get("message_id")
     if chat_id and message_id:
         edit_telegram_message_reply_markup(chat_id=chat_id, message_id=message_id, reply_markup={"inline_keyboard": []})
-
-    return {"ok": True, "provider": "telegram", "action": "task_ack", "task_id": task.pk}
+    if data.startswith("task_ack:"):
+        return {"ok": True, "provider": "telegram", "action": "task_ack", "task_id": task.pk}
+    return {"ok": True, "provider": "telegram", "action": "lead_accept", "lead_id": lead.pk}

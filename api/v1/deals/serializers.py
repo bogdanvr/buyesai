@@ -21,6 +21,13 @@ class DealSerializer(serializers.ModelSerializer):
         full_name = owner.get_full_name() if hasattr(owner, "get_full_name") else ""
         return full_name or getattr(owner, "username", "")
 
+    def _stage_requires_company(self, stage) -> bool:
+        if stage is None:
+            return False
+        stage_code = str(getattr(stage, "code", "") or "").strip().lower()
+        stage_name = str(getattr(stage, "name", "") or "").strip().lower()
+        return stage_code == "thinking" or stage_name == "думают"
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
         source = attrs.get("source", getattr(self.instance, "source", None))
@@ -31,6 +38,8 @@ class DealSerializer(serializers.ModelSerializer):
         metadata = dict(attrs.get("metadata") or getattr(self.instance, "metadata", {}) or {})
         if source is None:
             raise serializers.ValidationError({"source": "Источник сделки обязателен."})
+        if self._stage_requires_company(stage) and client is None:
+            raise serializers.ValidationError({"client": "Для этапа 'Думают' компания обязательна."})
         stage_code = str(getattr(stage, "code", "") or "").strip().lower()
         has_active_tasks = False
         if self.instance is not None:

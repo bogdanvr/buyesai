@@ -1,7 +1,11 @@
 from rest_framework import serializers
 from django.utils.text import slugify
+from django.contrib.auth import get_user_model
 
 from crm.models import CommunicationChannel, DealStage, LeadSource, LeadStatus
+
+
+User = get_user_model()
 
 
 class LeadStatusSerializer(serializers.ModelSerializer):
@@ -45,3 +49,15 @@ class CommunicationChannelSerializer(serializers.ModelSerializer):
     class Meta:
         model = CommunicationChannel
         fields = ["id", "name", "is_active"]
+
+
+class UserOptionSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
+    def get_full_name(self, obj):
+        full_name = obj.get_full_name() if hasattr(obj, "get_full_name") else ""
+        return str(full_name or getattr(obj, "username", "") or "").strip()
+
+    class Meta:
+        model = User
+        fields = ["id", "username", "email", "full_name"]

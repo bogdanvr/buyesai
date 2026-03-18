@@ -4,10 +4,11 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.core import mail
 from django.test import TestCase
 from django.utils import timezone
 
-from crm.models import Activity
+from crm.models import Activity, Lead
 from crm.models.activity import ActivityType, TaskReminderOffset
 from integrations.models import UserIntegrationProfile
 
@@ -198,3 +199,101 @@ class TelegramTaskAckWebhookTests(TestCase):
         self.assertIsNotNone(task.deadline_reminder_acknowledged_at)
         answer_callback_mock.assert_called_once()
         edit_markup_mock.assert_called_once()
+
+
+class LeadAssignmentNotificationCommandTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="anna_lead", password="secret", is_staff=True)
+        profile = self.user.integration_profile
+        profile.telegram_chat_id = "555001"
+        profile.email = "anna_lead@example.com"
+        profile.save(update_fields=["telegram_chat_id", "email"])
+
+    @patch("integrations.management.commands.send_lead_assignment_notifications.send_telegram_chat_message")
+    def test_sends_lead_notification_to_telegram_with_accept_button(self, send_message_mock):
+        send_message_mock.return_value = {"ok": True}
+        lead = Lead.objects.create(title="Новый лид", company="Acme")
+
+        out = StringIO()
+        call_command("send_lead_assignment_notifications", stdout=out)
+
+        lead.refresh_from_db()
+        self.assertEqual(send_message_mock.call_count, 1)
+        kwargs = send_message_mock.call_args.kwargs
+        self.assertEqual(kwargs["chat_id"], "555001")
+        self.assertIn("Новый лид", kwargs["text"])
+        self.assertEqual(kwargs["reply_markup"]["inline_keyboard"][0][0]["text"], "Принять")
+        self.assertTrue(lead.assignment_notification_token)
+        self.assertIsNotNone(lead.assignment_notification_sent_at)
+        self.assertIn("Sent lead notifications: 1", out.getvalue())
+
+    def test_sends_email_if_lead_not_accepted_in_time(self):
+        lead = Lead.objects.create(
+            title="Лид без ответственного",
+            company="Beta",
+            assignment_notification_sent_at=timezone.now() - timedelta(minutes=11),
+            assignment_notification_token="leadtoken123",
+        )
+
+        call_command("send_lead_assignment_notifications")
+
+        lead.refresh_from_db()
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Принять", mail.outbox[0].alternatives[0][0])
+        self.assertIsNotNone(lead.assignment_notification_email_escalated_at)
+
+
+class LeadAcceptTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="lead_owner", password="secret", is_staff=True)
+        profile = self.user.integration_profile
+        profile.telegram_chat_id = "888999"
+        profile.email = "lead_owner@example.com"
+        profile.save(update_fields=["telegram_chat_id", "email"])
+
+    @patch("integrations.services.telegram.answer_telegram_callback_query")
+    @patch("integrations.services.telegram.edit_telegram_message_reply_markup")
+    def test_accepts_lead_from_telegram_callback(self, edit_markup_mock, answer_callback_mock):
+        lead = Lead.objects.create(
+            title="Лид из Telegram",
+            assignment_notification_token="lead123",
+        )
+
+        response = self.client.post(
+            "/api/v1/webhooks/telegram/",
+            data={
+                "update_id": 2001,
+                "callback_query": {
+                    "id": "lead-callback-1",
+                    "data": f"lead_accept:{lead.pk}:lead123",
+                    "from": {"id": "888999"},
+                    "message": {
+                        "message_id": 88,
+                        "chat": {"id": "888999"},
+                    },
+                },
+            },
+            content_type="application/json",
+        )
+
+        lead.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(lead.assigned_to, self.user)
+        self.assertIsNotNone(lead.assignment_notification_accepted_at)
+        answer_callback_mock.assert_called_once()
+        edit_markup_mock.assert_called_once()
+
+    def test_accepts_lead_from_email_link(self):
+        lead = Lead.objects.create(
+            title="Лид из Email",
+            assignment_notification_token="email123",
+        )
+
+        from integrations.services.email import build_lead_accept_email_token
+
+        token = build_lead_accept_email_token(lead=lead, user=self.user)
+        response = self.client.get(f"/api/v1/leads/accept/?token={token}")
+
+        lead.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(lead.assigned_to, self.user)

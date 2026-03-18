@@ -3,6 +3,7 @@ from decimal import Decimal, InvalidOperation
 from xml.etree import ElementTree
 
 import requests
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from rest_framework.generics import ListAPIView, ListCreateAPIView
 from rest_framework.response import Response
@@ -13,10 +14,12 @@ from api.v1.meta.serializers import (
     DealStageSerializer,
     LeadSourceSerializer,
     LeadStatusSerializer,
+    UserOptionSerializer,
 )
 from crm.models import CommunicationChannel, DealStage, LeadSource, LeadStatus
 
 logger = logging.getLogger(__name__)
+User = get_user_model()
 CBR_DAILY_XML_URL = "https://www.cbr.ru/scripts/XML_daily.asp"
 CBR_RATES_CACHE_KEY = "api:v1:meta:currency_rates_rub"
 CBR_RATES_CACHE_TIMEOUT = 60 * 60 * 6
@@ -99,6 +102,14 @@ class CommunicationChannelListAPIView(ListAPIView):
 
     def get_queryset(self):
         return CommunicationChannel.objects.filter(is_active=True).order_by("name")
+
+
+class UserOptionListAPIView(ListAPIView):
+    serializer_class = UserOptionSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return User.objects.filter(is_active=True, is_staff=True).order_by("first_name", "last_name", "username")
 
 
 class CurrencyRatesAPIView(APIView):
