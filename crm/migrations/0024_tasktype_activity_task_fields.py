@@ -74,12 +74,12 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.RunSQL(
-            sql="UPDATE crm_activity SET status = 'done' WHERE type = 'task' AND is_done = 1",
-            reverse_sql="UPDATE crm_activity SET is_done = 1 WHERE type = 'task' AND status = 'done'",
+            sql="UPDATE crm_activity SET status = 'done' WHERE type = 'task' AND is_done = TRUE",
+            reverse_sql="UPDATE crm_activity SET is_done = TRUE WHERE type = 'task' AND status = 'done'",
         ),
         migrations.RunSQL(
             sql="""UPDATE crm_activity SET status = 'in_progress'
-                   WHERE type = 'task' AND (status IS NULL OR status = '') AND is_done = 0""",
+                   WHERE type = 'task' AND (status IS NULL OR status = '') AND is_done = FALSE""",
             reverse_sql=migrations.RunSQL.noop,
         ),
         migrations.AddIndex(
