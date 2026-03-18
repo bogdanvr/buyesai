@@ -594,6 +594,13 @@
                 <option v-for="status in metaOptions.leadStatuses" :key="status.id" :value="status.id">[[ status.name ]]</option>
               </select>
             </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">Ответственный</span>
+              <select v-model="forms.leads.assignedToId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбран</option>
+                <option v-for="user in metaOptions.users" :key="`lead-owner-${user.id}`" :value="user.id">[[ user.full_name || user.username ]]</option>
+              </select>
+            </label>
             <label v-if="shouldShowLeadField(forms.leads.sourceId)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Источник</span>
               <select v-model="forms.leads.sourceId" @change="handleSourceSelectChange('leads')" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">

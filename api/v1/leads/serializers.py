@@ -24,6 +24,7 @@ class LeadSerializer(serializers.ModelSerializer):
     status_code = serializers.CharField(source="status.code", read_only=True)
     client_name = serializers.CharField(source="client.name", read_only=True)
     website_session_id = serializers.CharField(source="website_session.session_id", read_only=True)
+    assigned_to_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Lead
@@ -56,6 +57,7 @@ class LeadSerializer(serializers.ModelSerializer):
             "last_contact_at",
             "converted_at",
             "assigned_to",
+            "assigned_to_name",
             "created_by",
             "created_at",
             "updated_at",
@@ -72,6 +74,13 @@ class LeadSerializer(serializers.ModelSerializer):
 
     def get_source_names(self, obj):
         return [source.name for source in obj.sources.all()]
+
+    def get_assigned_to_name(self, obj):
+        user = getattr(obj, "assigned_to", None)
+        if user is None:
+            return ""
+        full_name = user.get_full_name() if hasattr(user, "get_full_name") else ""
+        return str(full_name or getattr(user, "username", "") or "").strip()
 
     def _default_new_status(self):
         return LeadStatus.objects.filter(code="new").order_by("id").first()
