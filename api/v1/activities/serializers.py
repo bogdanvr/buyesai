@@ -10,6 +10,7 @@ class ActivitySerializer(serializers.ModelSerializer):
     lead_title = serializers.CharField(source="lead.title", read_only=True)
     deal_title = serializers.CharField(source="deal.title", read_only=True)
     contact_name = serializers.SerializerMethodField()
+    has_follow_up_task = serializers.BooleanField(write_only=True, required=False, default=False)
 
     def get_contact_name(self, obj):
         contact = obj.contact
@@ -24,6 +25,8 @@ class ActivitySerializer(serializers.ModelSerializer):
         due_at = attrs.get("due_at", getattr(self.instance, "due_at", None))
         is_done = attrs.get("is_done", getattr(self.instance, "is_done", False))
         result = attrs.get("result", getattr(self.instance, "result", ""))
+        deal = attrs.get("deal", getattr(self.instance, "deal", None))
+        has_follow_up_task = bool(attrs.pop("has_follow_up_task", False))
         save_company_note = attrs.get(
             "save_company_note",
             getattr(self.instance, "save_company_note", False),
@@ -35,6 +38,17 @@ class ActivitySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"result": "Укажите результат завершения задачи."})
         if activity_type == ActivityType.TASK and save_company_note and not str(company_note or "").strip():
             raise serializers.ValidationError({"company_note": "Укажите важные факты о компании."})
+        if activity_type == ActivityType.TASK and is_done and deal is not None:
+            stage_code = str(getattr(getattr(deal, "stage", None), "code", "") or "").strip().lower()
+            if stage_code not in {"won", "failed"}:
+                active_tasks_qs = deal.activities.filter(type=ActivityType.TASK, is_done=False)
+                if self.instance is not None:
+                    active_tasks_qs = active_tasks_qs.exclude(pk=self.instance.pk)
+                has_other_active_tasks = active_tasks_qs.exists()
+                if not has_other_active_tasks and not has_follow_up_task:
+                    raise serializers.ValidationError(
+                        {"has_follow_up_task": "Для активной сделки укажите следующую задачу перед завершением текущей."}
+                    )
         return attrs
 
     def create(self, validated_data):
@@ -62,6 +76,7 @@ class ActivitySerializer(serializers.ModelSerializer):
             "deadline_reminder_offset_minutes",
             "completed_at",
             "is_done",
+            "has_follow_up_task",
             "save_company_note",
             "company_note",
             "lead",

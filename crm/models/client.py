@@ -46,6 +46,7 @@ class Client(TimestampedModel):
         on_delete=models.SET_NULL,
         verbose_name="Источник",
     )
+    work_rules = models.JSONField(default=dict, blank=True, verbose_name="Правила работы")
     notes = models.TextField(blank=True, default="", verbose_name="Заметки")
     events = models.TextField(blank=True, default="", verbose_name="События")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
@@ -53,6 +54,19 @@ class Client(TimestampedModel):
     class Meta:
         verbose_name = "Компания"
         verbose_name_plural = "Компании"
+        ordering = ("name",)
+
+    def __str__(self):
+        return self.name
+
+
+class CommunicationChannel(TimestampedModel):
+    name = models.CharField(max_length=128, unique=True, verbose_name="Канал связи")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
+
+    class Meta:
+        verbose_name = "Канал связи"
+        verbose_name_plural = "Каналы связи"
         ordering = ("name",)
 
     def __str__(self):

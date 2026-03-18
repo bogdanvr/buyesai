@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from crm.models import Client, Contact
+from crm.models import Client, CommunicationChannel, Contact
 
 
 class ContactInline(admin.TabularInline):
@@ -33,3 +33,10 @@ class ContactAdmin(admin.ModelAdmin):
     list_filter = ("is_primary",)
     search_fields = ("first_name", "last_name", "phone", "email", "client__name")
     autocomplete_fields = ("client",)
+
+
+@admin.register(CommunicationChannel)
+class CommunicationChannelAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("name",)

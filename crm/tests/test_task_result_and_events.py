@@ -133,6 +133,46 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("company_note", response.data)
 
+    def test_active_deal_task_completion_requires_follow_up(self):
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Созвон с клиентом",
+            deal=self.deal,
+            client=self.company,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "result": "Созвон завершён",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("has_follow_up_task", response.data)
+
+    def test_active_deal_task_completion_allows_follow_up(self):
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Созвон с клиентом",
+            deal=self.deal,
+            client=self.company,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "result": "Созвон завершён",
+                "has_follow_up_task": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     def test_company_note_draft_writes_author_and_timestamp(self):
         response = self.client.patch(
             reverse("clients-detail", kwargs={"pk": self.company.pk}),

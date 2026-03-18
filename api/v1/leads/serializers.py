@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from crm.models import Client, Lead
+from crm.models import Client, Lead, LeadStatus
 
 
 LEAD_STATUS_TRANSITIONS = {
@@ -73,6 +73,9 @@ class LeadSerializer(serializers.ModelSerializer):
     def get_source_names(self, obj):
         return [source.name for source in obj.sources.all()]
 
+    def _default_new_status(self):
+        return LeadStatus.objects.filter(code="new").order_by("id").first()
+
     def validate(self, attrs):
         if "company" in attrs and isinstance(attrs["company"], str):
             attrs["company"] = attrs["company"].strip()
@@ -104,6 +107,10 @@ class LeadSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        if not validated_data.get("status"):
+            default_status = self._default_new_status()
+            if default_status is not None:
+                validated_data["status"] = default_status
         company_name = (validated_data.get("company") or "").strip()
         if company_name and not validated_data.get("client"):
             existing_client = (

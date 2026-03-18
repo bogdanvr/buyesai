@@ -101,6 +101,31 @@ class DealTasksRequiredByStageTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_cannot_update_non_final_deal_with_only_completed_tasks(self):
+        deal = Deal.objects.create(
+            title="Сделка с завершенной задачей",
+            source=self.source,
+            client=self.company,
+            stage=self.stage_in_progress,
+        )
+        Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Перезвонить клиенту",
+            deal=deal,
+            client=self.company,
+            is_done=True,
+            result="Клиент ответил",
+        )
+
+        response = self.client.patch(
+            reverse("deals-detail", kwargs={"pk": deal.pk}),
+            {"description": "Обновление без активных задач"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("stage", response.data)
+
     def test_can_update_deal_without_tasks_to_failed_stage(self):
         deal = Deal.objects.create(
             title="Сделка без задач",

@@ -9,16 +9,18 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.meta.serializers import (
+    CommunicationChannelSerializer,
     DealStageSerializer,
     LeadSourceSerializer,
     LeadStatusSerializer,
 )
-from crm.models import DealStage, LeadSource, LeadStatus
+from crm.models import CommunicationChannel, DealStage, LeadSource, LeadStatus
 
 logger = logging.getLogger(__name__)
 CBR_DAILY_XML_URL = "https://www.cbr.ru/scripts/XML_daily.asp"
 CBR_RATES_CACHE_KEY = "api:v1:meta:currency_rates_rub"
 CBR_RATES_CACHE_TIMEOUT = 60 * 60 * 6
+CBR_RATES_REQUEST_TIMEOUT = 3
 
 
 def _parse_cbr_decimal(value: str) -> Decimal:
@@ -39,10 +41,8 @@ def _fetch_currency_rates() -> dict:
         "date": "",
     }
 
-    stale = cache.get(CBR_RATES_CACHE_KEY)
-
     try:
-        response = requests.get(CBR_DAILY_XML_URL, timeout=10)
+        response = requests.get(CBR_DAILY_XML_URL, timeout=CBR_RATES_REQUEST_TIMEOUT)
         response.raise_for_status()
         root = ElementTree.fromstring(response.content)
         payload["date"] = root.attrib.get("Date", "")
@@ -62,12 +62,8 @@ def _fetch_currency_rates() -> dict:
             rates[code] = float(value / nominal)
     except requests.RequestException as error:
         logger.warning("Failed to fetch CBR currency rates: %s", error)
-        if stale:
-            return stale
     except ElementTree.ParseError as error:
         logger.warning("Failed to parse CBR currency rates XML: %s", error)
-        if stale:
-            return stale
 
     cache.set(CBR_RATES_CACHE_KEY, payload, CBR_RATES_CACHE_TIMEOUT)
     return payload
@@ -95,6 +91,14 @@ class LeadSourceListAPIView(ListCreateAPIView):
 
     def get_queryset(self):
         return LeadSource.objects.filter(is_active=True).order_by("name")
+
+
+class CommunicationChannelListAPIView(ListAPIView):
+    serializer_class = CommunicationChannelSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return CommunicationChannel.objects.filter(is_active=True).order_by("name")
 
 
 class CurrencyRatesAPIView(APIView):

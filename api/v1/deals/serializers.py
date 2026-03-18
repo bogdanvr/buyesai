@@ -32,12 +32,12 @@ class DealSerializer(serializers.ModelSerializer):
         if source is None:
             raise serializers.ValidationError({"source": "Источник сделки обязателен."})
         stage_code = str(getattr(stage, "code", "") or "").strip().lower()
-        has_tasks = False
+        has_active_tasks = False
         if self.instance is not None:
-            has_tasks = self.instance.activities.filter(type=ActivityType.TASK).exists()
-        if stage_code not in {"won", "failed"} and not has_tasks and not has_pending_task:
+            has_active_tasks = self.instance.activities.filter(type=ActivityType.TASK, is_done=False).exists()
+        if stage_code not in {"won", "failed"} and not has_active_tasks and not has_pending_task:
             raise serializers.ValidationError(
-                {"stage": "Сделка без задач допустима только в статусах 'Успешно' и 'Провален'."}
+                {"stage": "Сделка без активных задач допустима только в статусах 'Успешно' и 'Провален'."}
             )
         if stage_code == "failed":
             effective_failure_reason = failure_reason or str(metadata.get("failed_reason", "") or "").strip()

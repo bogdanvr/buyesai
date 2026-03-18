@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.utils.text import slugify
 
-from crm.models import DealStage, LeadSource, LeadStatus
+from crm.models import CommunicationChannel, DealStage, LeadSource, LeadStatus
 
 
 class LeadStatusSerializer(serializers.ModelSerializer):
@@ -39,3 +39,9 @@ class LeadSourceSerializer(serializers.ModelSerializer):
         model = LeadSource
         fields = ["id", "name", "code", "description", "is_active"]
         read_only_fields = ("code",)
+
+
+class CommunicationChannelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CommunicationChannel
+        fields = ["id", "name", "is_active"]

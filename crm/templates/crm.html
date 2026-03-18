@@ -148,7 +148,7 @@
       </nav>
     </aside>
 
-    <main class="min-w-0 flex flex-col pb-24 md:pb-0">
+    <main class="min-w-0 flex h-[100dvh] flex-col overflow-hidden pb-24 md:pb-0">
       <div class="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-crm-border bg-[#071f35]/95 backdrop-blur">
         <div class="px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex items-center gap-2 overflow-x-auto">
           <button
@@ -232,7 +232,7 @@
         </div>
       </header>
 
-      <section class="px-4 md:px-7 pt-5">
+      <section class="shrink-0 px-4 md:px-7 pt-5">
         <div v-if="errorMessage" class="mb-4 rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-red-200 text-sm">
           [[ errorMessage ]]
         </div>
@@ -318,8 +318,8 @@
         </div>
       </section>
 
-      <section class="px-4 md:px-7 py-5 flex-1 min-h-0">
-        <div class="rounded-[28px] border border-crm-border bg-[#0b2740] overflow-hidden shadow-panel min-h-[540px] flex flex-col">
+      <section class="px-4 md:px-7 py-5 flex-1 min-h-0 overflow-hidden">
+        <div class="h-full min-h-0 rounded-[28px] border border-crm-border bg-[#0b2740] overflow-hidden shadow-panel md:min-h-[540px] flex flex-col">
           <div
             class="hidden lg:grid border-b border-crm-border bg-[#10314d] text-crm-muted text-xs uppercase tracking-[0.16em]"
             :class="activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : (activeSection === 'deals' ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_110px_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]')"
@@ -537,13 +537,18 @@
                       <div class="min-w-0 flex-1">
                         <div class="text-sm font-medium text-white truncate leading-5">[[ activeSection === 'leads' ? (item.company || item.name) : item.name ]]</div>
                         <div v-if="activeSection === 'deals'" class="mt-1 text-[11px] text-crm-muted truncate">
-                          [[ formatDealAmount(item.amount, item.currency) ]] • [[ dealClosePrimaryLabel(item.closeDate) || 'Без даты' ]]<span v-if="dealCloseSecondaryLabel(item.closeDate)"> • <span :class="isDealOverdue(item.closeDate) ? 'text-red-300' : 'text-crm-muted'">[[ dealCloseSecondaryLabel(item.closeDate) ]]</span></span> • [[ countDealOpenTasks(item.id) ]] задач
+                          [[ item.company || 'Без компании' ]] • [[ formatDealAmount(item.amount, item.currency) ]] • [[ dealClosePrimaryLabel(item.closeDate) || 'Без даты' ]]<span v-if="dealCloseSecondaryLabel(item.closeDate)"> • <span :class="isDealOverdue(item.closeDate) ? 'text-red-300' : 'text-crm-muted'">[[ dealCloseSecondaryLabel(item.closeDate) ]]</span></span> • [[ countDealOpenTasks(item.id) ]] задач
                         </div>
                         <div v-else-if="activeSection === 'contacts'" class="mt-0.5 text-[11px] text-crm-muted truncate leading-4">
                           [[ item.company || 'Без компании' ]]
                         </div>
-                        <div v-else-if="activeSection === 'tasks'" class="mt-0.5 text-[11px] text-crm-muted truncate leading-4">
-                          [[ item.company || '—' ]] • [[ taskDuePrimaryLabel(item.dueAtRaw, item.isDone) || 'Без срока' ]]<span v-if="taskDueSecondaryLabel(item.dueAtRaw, item.isDone)"> • <span :class="isTaskOverdue(item.dueAtRaw, item.isDone) ? 'text-red-300' : 'text-crm-muted'">[[ taskDueSecondaryLabel(item.dueAtRaw, item.isDone) ]]</span></span> • [[ item.deal || 'Без сделки' ]]
+                        <div v-else-if="activeSection === 'tasks'" class="mt-0.5 text-[11px] text-crm-muted leading-4">
+                          <div class="truncate">
+                            [[ item.company || '—' ]] • [[ taskDuePrimaryLabel(item.dueAtRaw, item.isDone) || 'Без срока' ]]<span v-if="taskDueSecondaryLabel(item.dueAtRaw, item.isDone)"> • <span :class="isTaskOverdue(item.dueAtRaw, item.isDone) ? 'text-red-300' : 'text-crm-muted'">[[ taskDueSecondaryLabel(item.dueAtRaw, item.isDone) ]]</span></span>
+                          </div>
+                          <div class="mt-0.5 truncate">
+                            Сделка: [[ item.deal || 'Без сделки' ]]
+                          </div>
                         </div>
                       </div>
                       <span
@@ -590,9 +595,6 @@
 
         <form @submit.prevent="createItem" class="flex flex-1 min-h-0 flex-col">
           <div class="flex-1 overflow-y-auto min-h-0 px-4 md:px-6 py-4 md:py-6">
-            <div v-if="modalErrorMessage" class="mb-4 rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-red-200 text-sm">
-              [[ modalErrorMessage ]]
-            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <template v-if="activeSection === 'leads'">
             <label class="block">
@@ -918,7 +920,22 @@
                         <div class="min-w-0">
                           <div class="text-sm font-medium text-white truncate">[[ contact.fullName ]]</div>
                           <div v-if="contact.position" class="mt-1 text-xs text-crm-muted">[[ contact.position ]]</div>
-                          <div class="mt-1 text-xs text-crm-muted">[[ contact.phone || '—' ]] • [[ contact.email || '—' ]]</div>
+                          <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-crm-muted">
+                            <span>[[ contact.phone || '—' ]]</span>
+                            <a
+                              v-if="phoneHref(contact.phone)"
+                              :href="phoneHref(contact.phone)"
+                              @click.stop
+                              class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                              title="Позвонить"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                              </svg>
+                            </a>
+                            <span>•</span>
+                            <span>[[ contact.email || '—' ]]</span>
+                          </div>
                         </div>
                         <span class="inline-flex items-center rounded-full px-2 py-1 text-[11px] font-medium border" :class="contact.isPrimary ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-sky-400/30 bg-sky-400/10 text-sky-300'">
                           [[ contact.isPrimary ? 'Основной' : 'Контакт' ]]
@@ -1182,14 +1199,63 @@
               <span class="text-sm text-crm-muted">Email</span>
               <input v-model="forms.companies.email" type="email" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label class="block md:col-span-2">
-              <span class="text-sm text-crm-muted">Внести заметку</span>
-              <textarea v-model="forms.companies.noteDraft" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
-            </label>
-            <label v-if="forms.companies.notes.trim()" class="block md:col-span-2">
-              <span class="text-sm text-crm-muted">Заметки</span>
-              <textarea :value="forms.companies.notes" rows="3" readonly class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none opacity-90 cursor-not-allowed"></textarea>
-            </label>
+            <div class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <div class="text-sm font-semibold text-white">Правила работы</div>
+              <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                <label class="block">
+                  <span class="text-sm text-crm-muted">ЛПР</span>
+                  <select v-model="forms.companies.workRules.decisionMakerId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                    <option :value="null">Не выбран</option>
+                    <option v-for="contact in companyContactsForActiveCompany" :key="`company-rule-contact-${contact.id}`" :value="contact.id">[[ contact.fullName ]]</option>
+                  </select>
+                  <div v-if="!editingCompanyId" class="mt-1 text-xs text-crm-muted">ЛПР можно выбрать после создания компании и добавления контактов.</div>
+                  <div v-else-if="!companyContactsForActiveCompany.length" class="mt-1 text-xs text-crm-muted">Сначала добавьте контакт компании, затем выберите его как ЛПР.</div>
+                </label>
+                <label class="block">
+                  <span class="text-sm text-crm-muted">Канал связи</span>
+                  <select v-model="forms.companies.workRules.communicationChannelIds" multiple class="mt-1 w-full min-h-[112px] rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent">
+                    <option v-for="channel in metaOptions.communicationChannels" :key="`company-rule-channel-${channel.id}`" :value="channel.id">[[ channel.name ]]</option>
+                  </select>
+                  <div v-if="metaOptions.communicationChannels.length" class="mt-1 text-xs text-crm-muted">Можно выбрать несколько каналов связи.</div>
+                  <div v-if="!metaOptions.communicationChannels.length" class="mt-1 text-xs text-crm-muted">Каналы связи добавляются только через Django admin.</div>
+                </label>
+                <label class="block">
+                  <span class="text-sm text-crm-muted">Условия оплаты</span>
+                  <input v-model="forms.companies.workRules.paymentTerms" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <label class="block">
+                  <span class="text-sm text-crm-muted">Требования к документам</span>
+                  <input v-model="forms.companies.workRules.documentRequirements" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <label class="block md:col-span-2">
+                  <span class="text-sm text-crm-muted">Цикл согласования</span>
+                  <textarea v-model="forms.companies.workRules.approvalCycle" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
+                </label>
+                <label class="block md:col-span-2">
+                  <span class="text-sm text-crm-muted">Риски</span>
+                  <textarea v-model="forms.companies.workRules.risks" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
+                </label>
+                <label class="block md:col-span-2">
+                  <span class="text-sm text-crm-muted">Предпочтения</span>
+                  <textarea v-model="forms.companies.workRules.preferences" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
+                </label>
+              </div>
+            </div>
+            <div class="block md:col-span-2">
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-crm-muted">Заметки</span>
+                <button
+                  type="button"
+                  @click="toggleCompanyNoteDraft"
+                  class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent shrink-0"
+                  :title="showCompanyNoteDraft ? 'Скрыть поле заметки' : 'Добавить заметку'"
+                >
+                  <span class="text-xs">[[ showCompanyNoteDraft ? '−' : '+' ]]</span>
+                </button>
+              </div>
+              <textarea v-if="showCompanyNoteDraft" v-model="forms.companies.noteDraft" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+              <textarea v-if="forms.companies.notes.trim()" :value="forms.companies.notes" rows="3" readonly class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none opacity-90 cursor-not-allowed"></textarea>
+            </div>
             <div v-if="parseEventLog(forms.companies.events).length" class="block md:col-span-2">
               <button
                 type="button"
@@ -1391,6 +1457,9 @@
           </div>
 
           <div class="sticky bottom-0 shrink-0 border-t border-crm-border bg-[#0b2740]/95 backdrop-blur px-4 md:px-6 py-3 md:py-4">
+            <div v-if="modalErrorMessage" class="mb-3 rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-red-200 text-sm">
+              [[ modalErrorMessage ]]
+            </div>
             <div class="flex flex-col md:flex-row md:items-center md:justify-end gap-2 md:gap-3">
             <button
               v-if="showFieldEditToggle"
@@ -1476,6 +1545,7 @@
           isCompanyContactSaving: false,
           isCompanyContactsLoading: false,
           showCompanyContactForm: false,
+          showCompanyNoteDraft: false,
           showCompanyOkvedDetails: false,
           showAllCompanyFields: false,
           showAllTaskFields: false,
@@ -1539,6 +1609,15 @@
               email: "",
               currency: "RUB",
               website: "",
+              workRules: {
+                decisionMakerId: null,
+                communicationChannelIds: [],
+                paymentTerms: "",
+                documentRequirements: "",
+                approvalCycle: "",
+                risks: "",
+                preferences: "",
+              },
               notes: "",
               noteDraft: "",
               events: "",
@@ -1600,6 +1679,7 @@
             leadStatuses: [],
             dealStages: [],
             leadSources: [],
+            communicationChannels: [],
             currencyRates: { RUB: 1 }
           },
           taskReminderOptions: [
@@ -1792,8 +1872,14 @@
           if (!dealId) return null;
           return this.datasets.deals.find((deal) => String(deal.id) === String(dealId)) || null;
         },
+        taskActiveDealRequiresFollowUp() {
+          const deal = this.taskActiveDeal;
+          if (!deal) return false;
+          const stageCode = String(deal.stageCode || "").trim().toLowerCase();
+          return !["won", "failed"].includes(stageCode);
+        },
         showTaskFollowUpSuggestion() {
-          return !!this.editingTaskId && !!this.forms.tasks.isDone && !!this.taskActiveDeal && this.taskActiveDeal.status !== "done";
+          return !!this.editingTaskId && !!this.forms.tasks.isDone && this.taskActiveDealRequiresFollowUp;
         },
         taskFollowUpDealTitle() {
           return this.taskActiveDeal ? this.taskActiveDeal.title || this.taskActiveDeal.name : "";
@@ -2245,6 +2331,45 @@
           );
           return String((stage && stage.code) || "").trim().toLowerCase();
         },
+        normalizeCompanyWorkRules(value = {}) {
+          const payload = value && typeof value === "object" ? value : {};
+          const rawCommunicationChannelIds = Array.isArray(payload.communication_channels)
+            ? payload.communication_channels
+            : (payload.communication_channel !== undefined && payload.communication_channel !== null
+              ? [payload.communication_channel]
+              : (Array.isArray(payload.communicationChannelIds)
+                ? payload.communicationChannelIds
+                : (payload.communicationChannelId ? [payload.communicationChannelId] : [])));
+          return {
+            decisionMakerId: this.toIntOrNull(payload.decision_maker_contact || payload.decisionMakerId),
+            communicationChannelIds: rawCommunicationChannelIds
+              .map((item) => this.toIntOrNull(item))
+              .filter((item, index, items) => item && items.indexOf(item) === index),
+            paymentTerms: String(payload.payment_terms || payload.paymentTerms || "").trim(),
+            documentRequirements: String(payload.document_requirements || payload.documentRequirements || "").trim(),
+            approvalCycle: String(payload.approval_cycle || payload.approvalCycle || "").trim(),
+            risks: String(payload.risks || "").trim(),
+            preferences: String(payload.preferences || "").trim(),
+          };
+        },
+        serializeCompanyWorkRules(value = {}) {
+          const normalized = this.normalizeCompanyWorkRules(value);
+          const result = {};
+          if (normalized.decisionMakerId) result.decision_maker_contact = normalized.decisionMakerId;
+          if (normalized.communicationChannelIds.length) result.communication_channels = normalized.communicationChannelIds;
+          if (normalized.paymentTerms) result.payment_terms = normalized.paymentTerms;
+          if (normalized.documentRequirements) result.document_requirements = normalized.documentRequirements;
+          if (normalized.approvalCycle) result.approval_cycle = normalized.approvalCycle;
+          if (normalized.risks) result.risks = normalized.risks;
+          if (normalized.preferences) result.preferences = normalized.preferences;
+          return result;
+        },
+        resolveDefaultLeadStatusId() {
+          const preferredStatus = this.metaOptions.leadStatuses.find(
+            (status) => String((status && status.code) || "").trim().toLowerCase() === "new"
+          );
+          return preferredStatus ? preferredStatus.id : (this.metaOptions.leadStatuses.length ? this.metaOptions.leadStatuses[0].id : "");
+        },
         extractErrorMessage(data, fallback) {
           if (!data) return fallback;
           if (typeof data === "string") return data;
@@ -2259,6 +2384,12 @@
         },
         toggleCompanyEvents() {
           this.showCompanyEvents = !this.showCompanyEvents;
+        },
+        toggleCompanyNoteDraft() {
+          this.showCompanyNoteDraft = !this.showCompanyNoteDraft;
+          if (!this.showCompanyNoteDraft) {
+            this.forms.companies.noteDraft = "";
+          }
         },
         async apiRequest(url, options = {}) {
           const headers = { ...(options.headers || {}) };
@@ -2628,7 +2759,7 @@
             return this.canQuickChangeLeadStatus(item);
           }
           if (this.activeSection === "tasks") {
-            return true;
+            return !item.isDone && item.status !== "done";
           }
           return false;
         },
@@ -2659,10 +2790,7 @@
               }
             }
             if (this.activeSection === "tasks") {
-              if (item.status === "done") {
-                await this.setTaskDone(item.id, false);
-                await this.loadSection("tasks");
-              } else {
+              if (!item.isDone && item.status !== "done") {
                 this.openTaskEditor({ ...item, isDone: true });
               }
             }
@@ -2776,6 +2904,7 @@
           this.editingTaskId = null;
           this.editingCompanyId = item.id;
           this.showCompanyEvents = false;
+          this.showCompanyNoteDraft = false;
           this.showAllCompanyFields = false;
           const normalizedOkveds = this.normalizeCompanyOkveds(item.okveds, item.okved, item.industry);
           const resolvedIndustry = this.resolvePrimaryIndustry(item.industry, item.okved, normalizedOkveds);
@@ -2791,6 +2920,7 @@
             email: item.email || "",
             currency: item.currency || "RUB",
             website: item.website || "",
+            workRules: this.normalizeCompanyWorkRules(item.workRules),
             notes: item.notes || "",
             noteDraft: "",
             events: item.events || "",
@@ -2919,11 +3049,12 @@
           if (this.isDealStageAllowedWithoutTasks(this.forms.deals.stageId)) {
             return;
           }
-          const hasExistingTasks = Array.isArray(this.dealTasksForActiveDeal) && this.dealTasksForActiveDeal.length > 0;
-          if (hasExistingTasks || this.hasPendingDealTaskDraft()) {
+          const hasExistingActiveTasks = Array.isArray(this.dealTasksForActiveDeal)
+            && this.dealTasksForActiveDeal.some((task) => !task.isDone);
+          if (hasExistingActiveTasks || this.hasPendingDealTaskDraft()) {
             return;
           }
-          throw new Error("Сделка без задач допустима только в статусах «Успешно» и «Провален»");
+          throw new Error("Сделка без активных задач допустима только в статусах «Успешно» и «Провален»");
         },
         validateDealFailureReason() {
           if (!this.isDealFailedStageSelected) {
@@ -2943,6 +3074,27 @@
           if (!this.dealTaskForm.dueAt) {
             throw new Error("Укажите срок новой задачи по сделке");
           }
+        },
+        hasPreparedTaskFollowUp() {
+          return !!(
+            this.taskFollowUpForm.subject.trim()
+            && this.taskFollowUpForm.dueAt
+          );
+        },
+        validateTaskFollowUpRequirement() {
+          if (!this.forms.tasks.isDone || !this.taskActiveDealRequiresFollowUp) {
+            return;
+          }
+          const hasOtherActiveTasks = Array.isArray(this.datasets.tasks)
+            && this.datasets.tasks.some((task) => (
+              String(task.id) !== String(this.editingTaskId)
+              && String(task.dealId || "") === String(this.toIntOrNull(this.forms.tasks.dealId) || "")
+              && !task.isDone
+            ));
+          if (hasOtherActiveTasks || this.hasPreparedTaskFollowUp()) {
+            return;
+          }
+          throw new Error("Для активной сделки заполните следующую задачу перед завершением текущей");
         },
         resetDealCompanyForm() {
           this.dealCompanyForm = {
@@ -3415,6 +3567,7 @@
             okved: item.okved || primaryOkved.code || "",
             okveds: normalizedOkveds,
             website: item.website || "",
+            workRules: this.normalizeCompanyWorkRules(item.work_rules),
             notes: item.notes || "",
             events: item.events || "",
             currency: item.currency || "RUB",
@@ -3586,6 +3739,7 @@
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.showCompanyContactForm = false;
+          this.showCompanyNoteDraft = false;
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
@@ -3600,6 +3754,7 @@
           this.showAllLeadFields = false;
           this.showAllDealFields = false;
           this.showAllCompanyFields = false;
+          this.showCompanyNoteDraft = false;
           this.showAllTaskFields = false;
           this.showDealTaskForm = false;
           this.forms[this.activeSection] = this.getDefaultForm(this.activeSection);
@@ -3629,7 +3784,7 @@
               email: "",
               priority: "medium",
               expectedValue: "",
-              statusId: this.metaOptions.leadStatuses.length ? this.metaOptions.leadStatuses[0].id : "",
+              statusId: this.resolveDefaultLeadStatusId(),
               sourceId: this.metaOptions.leadSources.length ? this.metaOptions.leadSources[0].id : "",
               sourceName: "",
               sourceCode: "",
@@ -3674,6 +3829,7 @@
               email: "",
               currency: "RUB",
               website: "",
+              workRules: this.normalizeCompanyWorkRules(),
               notes: "",
               noteDraft: "",
               events: "",
@@ -3724,19 +3880,28 @@
           return `${year}-${month}-${day}T${hours}:${minutes}`;
         },
         async loadMetaOptions() {
-          const [leadStatuses, dealStages, leadSources, currencyRates] = await Promise.all([
+          const [leadStatuses, dealStages, leadSources, communicationChannels] = await Promise.all([
             this.apiRequest("/api/v1/meta/lead-statuses/"),
             this.apiRequest("/api/v1/meta/deal-stages/"),
             this.apiRequest("/api/v1/meta/lead-sources/"),
-            this.apiRequest("/api/v1/meta/currency-rates/").catch(() => ({ rates: { RUB: 1 } }))
+            this.apiRequest("/api/v1/meta/communication-channels/")
           ]);
           this.metaOptions.leadStatuses = this.normalizePaginatedResponse(leadStatuses);
           this.metaOptions.dealStages = this.sortDealStages(this.normalizePaginatedResponse(dealStages));
           this.metaOptions.leadSources = this.normalizePaginatedResponse(leadSources);
-          this.metaOptions.currencyRates = {
-            RUB: 1,
-            ...((currencyRates && currencyRates.rates) || {})
-          };
+          this.metaOptions.communicationChannels = this.normalizePaginatedResponse(communicationChannels);
+          this.loadCurrencyRates();
+        },
+        async loadCurrencyRates() {
+          try {
+            const currencyRates = await this.apiRequest("/api/v1/meta/currency-rates/");
+            this.metaOptions.currencyRates = {
+              RUB: 1,
+              ...((currencyRates && currencyRates.rates) || {})
+            };
+          } catch (error) {
+            this.metaOptions.currencyRates = { RUB: 1 };
+          }
         },
         async ensureClient(companyName) {
           const name = (companyName || "").trim();
@@ -4032,6 +4197,7 @@
               email: form.email.trim(),
               currency: form.currency || "RUB",
               website: form.website.trim(),
+              work_rules: this.serializeCompanyWorkRules(form.workRules),
               note_draft: form.noteDraft.trim(),
               is_active: !!form.isActive
             }
@@ -4059,6 +4225,7 @@
               email: form.email.trim(),
               currency: form.currency || "RUB",
               website: form.website.trim(),
+              work_rules: this.serializeCompanyWorkRules(form.workRules),
               note_draft: form.noteDraft.trim(),
               is_active: !!form.isActive
             }
@@ -4111,6 +4278,7 @@
           if (form.saveCompanyNote && !form.companyNote.trim()) {
             throw new Error("Укажите важные факты о компании");
           }
+          this.validateTaskFollowUpRequirement();
           const clientId = this.toIntOrNull(form.companyId);
           await this.apiRequest("/api/v1/activities/", {
             method: "POST",
@@ -4123,6 +4291,7 @@
               deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
               client: clientId,
               deal: this.toIntOrNull(form.dealId),
+              has_follow_up_task: this.hasPreparedTaskFollowUp(),
               save_company_note: !!form.saveCompanyNote,
               company_note: form.companyNote.trim(),
               is_done: !!form.isDone
@@ -4143,6 +4312,7 @@
           if (form.saveCompanyNote && !form.companyNote.trim()) {
             throw new Error("Укажите важные факты о компании");
           }
+          this.validateTaskFollowUpRequirement();
           const clientId = this.toIntOrNull(form.companyId);
           await this.apiRequest(`/api/v1/activities/${this.editingTaskId}/`, {
             method: "PATCH",
@@ -4155,6 +4325,7 @@
               deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
               client: clientId,
               deal: this.toIntOrNull(form.dealId),
+              has_follow_up_task: this.hasPreparedTaskFollowUp(),
               save_company_note: !!form.saveCompanyNote,
               company_note: form.companyNote.trim(),
               is_done: !!form.isDone

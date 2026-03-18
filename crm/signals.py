@@ -54,8 +54,8 @@ def _actor_display_name(user) -> str:
 
 
 def _format_company_note_entry(*, note_text: str, actor=None, deal_id: int | None = None, happened_at=None) -> str:
-    timestamp = timezone.localtime(happened_at or timezone.now()).strftime("%d.%m.%Y %H:%M")
-    lines = [timestamp, f"Добавил: {_actor_display_name(actor)}"]
+    timestamp = timezone.localtime(happened_at or timezone.now()).strftime("%d.%m.%Y")
+    lines = [f"{timestamp} · Добавил: {_actor_display_name(actor)}"]
     if deal_id:
         lines.append(f"Сделка #{deal_id}")
     lines.append(str(note_text or "").strip())
