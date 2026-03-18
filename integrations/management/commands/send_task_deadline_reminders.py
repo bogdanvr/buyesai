@@ -7,7 +7,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from crm.models import Activity
-from crm.models.activity import ActivityType, TaskReminderOffset
+from crm.models.activity import ActivityType, TaskReminderOffset, TaskStatus
 from integrations.services.email import send_task_deadline_escalation_email
 from integrations.models import UserIntegrationProfile
 from integrations.services.telegram import (
@@ -18,6 +18,7 @@ from integrations.services.telegram import (
 
 
 logger = logging.getLogger(__name__)
+ACTIVE_TASK_STATUSES = [TaskStatus.TODO, TaskStatus.IN_PROGRESS]
 
 
 def get_task_recipients(task: Activity):
@@ -47,7 +48,7 @@ class Command(BaseCommand):
             Activity.objects.select_related("created_by", "deal__owner", "lead__assigned_to", "deal", "client")
             .filter(
                 type=ActivityType.TASK,
-                is_done=False,
+                status__in=ACTIVE_TASK_STATUSES,
                 deadline_reminder_sent_at__isnull=False,
                 deadline_reminder_sent_at__lte=escalation_threshold,
                 deadline_reminder_acknowledged_at__isnull=True,
@@ -95,7 +96,7 @@ class Command(BaseCommand):
             Activity.objects.select_related("created_by", "deal__owner", "lead__assigned_to", "deal", "client")
             .filter(
                 type=ActivityType.TASK,
-                is_done=False,
+                status__in=ACTIVE_TASK_STATUSES,
                 due_at__isnull=False,
                 due_at__gt=now,
                 due_at__lte=reminder_threshold,

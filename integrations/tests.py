@@ -6,10 +6,11 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core import mail
 from django.test import TestCase
+from django.test.utils import override_settings
 from django.utils import timezone
 
 from crm.models import Activity, Lead
-from crm.models.activity import ActivityType, TaskReminderOffset
+from crm.models.activity import ActivityType, TaskReminderOffset, TaskStatus
 from integrations.models import UserIntegrationProfile
 
 
@@ -126,6 +127,23 @@ class TaskDeadlineReminderCommandTests(TestCase):
         send_message_mock.assert_not_called()
         self.assertIsNotNone(task.deadline_reminder_sent_at)
 
+    @patch("integrations.management.commands.send_task_deadline_reminders.send_telegram_chat_message")
+    def test_does_not_send_reminder_for_canceled_task(self, send_message_mock):
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Отмененная задача",
+            due_at=timezone.now() + timedelta(minutes=10),
+            created_by=self.user,
+            status=TaskStatus.CANCELED,
+        )
+
+        call_command("send_task_deadline_reminders")
+
+        task.refresh_from_db()
+        send_message_mock.assert_not_called()
+        self.assertIsNone(task.deadline_reminder_sent_at)
+
+    @override_settings(TASK_REMINDER_ESCALATION_MINUTES=10)
     @patch("integrations.management.commands.send_task_deadline_reminders.send_task_deadline_escalation_email")
     def test_sends_email_if_task_not_acknowledged_in_10_minutes(self, send_email_mock):
         send_email_mock.return_value = 1

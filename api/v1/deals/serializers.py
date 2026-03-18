@@ -64,10 +64,18 @@ class DealSerializer(serializers.ModelSerializer):
         attrs["is_won"] = stage_code == "won"
         return attrs
 
+    def _resolve_currency(self, instance) -> str:
+        client = getattr(instance, "client", None)
+        client_currency = str(getattr(client, "currency", "") or "").strip().upper()
+        if client_currency:
+            return client_currency
+        return str(getattr(instance, "currency", "") or "RUB").strip().upper() or "RUB"
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         metadata = getattr(instance, "metadata", {}) or {}
         data["failure_reason"] = str(metadata.get("failed_reason", "") or "")
+        data["currency"] = self._resolve_currency(instance)
         return data
 
     class Meta:

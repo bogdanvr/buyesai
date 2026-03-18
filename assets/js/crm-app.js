@@ -5,7 +5,8 @@
       deals: "/api/v1/deals/?page_size=100",
       contacts: "/api/v1/contacts/?page_size=100",
       companies: "/api/v1/clients/?page_size=100",
-      tasks: "/api/v1/activities/?type=task&page_size=100"
+      tasks: "/api/v1/activities/?type=task&page_size=100",
+      touches: "/api/v1/touches/?page_size=100"
     };
 
     const LEAD_STATUS_LABELS = {
@@ -27,6 +28,19 @@
       qualified: "converted"
     };
 
+    const TASK_STATUS_OPTIONS = [
+      { value: "todo", label: "К выполнению" },
+      { value: "in_progress", label: "В работе" },
+      { value: "done", label: "Выполнено" },
+      { value: "canceled", label: "Отменено" }
+    ];
+
+    const TASK_PRIORITY_OPTIONS = [
+      { value: "low", label: "Низкий" },
+      { value: "medium", label: "Средний" },
+      { value: "high", label: "Высокий" }
+    ];
+
     createApp({
       delimiters: ["[[", "]]"],
       data() {
@@ -43,6 +57,7 @@
           editingContactId: null,
           editingCompanyId: null,
           editingTaskId: null,
+          editingTouchId: null,
           showAllLeadFields: false,
           showAllDealFields: false,
           isDealTaskSaving: false,
@@ -56,6 +71,7 @@
           isDealContactsLoading: false,
           isCompanyContactSaving: false,
           isCompanyContactsLoading: false,
+          isTaskTouchesLoading: false,
           showCompanyContactForm: false,
           showCompanyNoteDraft: false,
           showCompanyOkvedDetails: false,
@@ -65,6 +81,7 @@
           showCompanyEvents: false,
           taskDealFilterId: null,
           taskDealFilterLabel: "",
+          taskTouchOptions: [],
           showSourceCreateForm: false,
           sourceCreateTargetSection: "",
           sourceCreateForm: {
@@ -139,15 +156,33 @@
             },
             tasks: {
               subject: "",
+              taskTypeId: null,
+              priority: "medium",
               companyId: null,
               dealId: null,
+              relatedTouchId: null,
               dueAt: "",
               reminderOffsetMinutes: 30,
               description: "",
               result: "",
               saveCompanyNote: false,
               companyNote: "",
-              isDone: false
+              status: "todo"
+            },
+            touches: {
+              happenedAt: "",
+              channelId: null,
+              direction: "outgoing",
+              result: "",
+              summary: "",
+              nextStep: "",
+              nextStepAt: "",
+              ownerId: null,
+              companyId: null,
+              contactId: null,
+              taskId: null,
+              leadId: null,
+              dealId: null
             }
           },
           dealTaskForm: {
@@ -194,9 +229,12 @@
             dealStages: [],
             leadSources: [],
             users: [],
+            taskTypes: [],
             communicationChannels: [],
             currencyRates: { RUB: 1 }
           },
+          taskStatusOptions: TASK_STATUS_OPTIONS,
+          taskPriorityOptions: TASK_PRIORITY_OPTIONS,
           taskReminderOptions: [
             { value: 5, label: "5 минут" },
             { value: 10, label: "10 минут" },
@@ -211,14 +249,16 @@
             { key: "deals", label: "Сделки", shortLabel: "Сделки", icon: "◔" },
             { key: "contacts", label: "Контакты", shortLabel: "Контакты", icon: "◉" },
             { key: "companies", label: "Компании", shortLabel: "Компании", icon: "▣" },
-            { key: "tasks", label: "Задачи", shortLabel: "Задачи", icon: "✓" }
+            { key: "tasks", label: "Задачи", shortLabel: "Задачи", icon: "✓" },
+            { key: "touches", label: "Касания", shortLabel: "Касания", icon: "◌" }
           ],
           datasets: {
             leads: [],
             deals: [],
             contacts: [],
             companies: [],
-            tasks: []
+            tasks: [],
+            touches: []
           }
         };
       },
@@ -229,7 +269,8 @@
             deals: "Все сделки",
             contacts: "Все контакты",
             companies: "Все компании",
-            tasks: "Все задачи"
+            tasks: "Все задачи",
+            touches: "Все касания"
           };
           return titles[this.activeSection] || "CRM";
         },
@@ -239,7 +280,8 @@
             deals: "сделку",
             contacts: "контакт",
             companies: "компанию",
-            tasks: "задачу"
+            tasks: "задачу",
+            touches: "касание"
           };
           return labels[this.activeSection] || "элемент";
         },
@@ -259,12 +301,16 @@
           if (this.editingTaskId && this.activeSection === "tasks") {
             return "Редактирование задачи";
           }
+          if (this.editingTouchId && this.activeSection === "touches") {
+            return "Редактирование касания";
+          }
           const titles = {
             leads: "Создание лида",
             deals: "Создание сделки",
             contacts: "Создание контакта",
             companies: "Создание компании",
-            tasks: "Создание задачи"
+            tasks: "Создание задачи",
+            touches: "Создание касания"
           };
           return titles[this.activeSection] || "Создание элемента";
         },
@@ -284,6 +330,9 @@
           if (this.editingTaskId && this.activeSection === "tasks") {
             return "Редактировать задачу";
           }
+          if (this.editingTouchId && this.activeSection === "touches") {
+            return "Редактировать касание";
+          }
           return `Добавить ${this.createButtonLabel}`;
         },
         modalSubmitLabel() {
@@ -301,6 +350,9 @@
           }
           if (this.editingTaskId && this.activeSection === "tasks") {
             return "Сохранить задачу";
+          }
+          if (this.editingTouchId && this.activeSection === "touches") {
+            return "Сохранить касание";
           }
           return "Сохранить";
         },
@@ -336,6 +388,18 @@
         },
         isCreatingTask() {
           return this.activeSection === "tasks" && !this.editingTaskId;
+        },
+        touchLeadOptions() {
+          return this.datasets.leads.map((lead) => ({ id: lead.id, title: lead.title || lead.name }));
+        },
+        touchDealOptions() {
+          return this.datasets.deals.map((deal) => ({ id: deal.id, title: deal.title || deal.name }));
+        },
+        touchContactOptions() {
+          return this.datasets.contacts.map((contact) => ({ id: contact.id, title: contact.fullName || contact.name }));
+        },
+        touchTaskOptions() {
+          return this.datasets.tasks.map((task) => ({ id: task.id, title: task.subject || task.name }));
         },
         dealHasSelectedCompany() {
           return !!this.toIntOrNull(this.forms.deals.companyId);
@@ -380,7 +444,7 @@
           );
         },
         showTaskResultField() {
-          return !!this.forms.tasks.isDone || !!String(this.forms.tasks.result || "").trim();
+          return this.isTaskDoneStatus(this.forms.tasks.status) || !!String(this.forms.tasks.result || "").trim();
         },
         taskActiveDeal() {
           const dealId = this.toIntOrNull(this.forms.tasks.dealId);
@@ -394,7 +458,7 @@
           return !["won", "failed"].includes(stageCode);
         },
         showTaskFollowUpSuggestion() {
-          return !!this.editingTaskId && !!this.forms.tasks.isDone && this.taskActiveDealRequiresFollowUp;
+          return !!this.editingTaskId && this.isTaskDoneStatus(this.forms.tasks.status) && this.taskActiveDealRequiresFollowUp;
         },
         taskFollowUpDealTitle() {
           return this.taskActiveDeal ? this.taskActiveDeal.title || this.taskActiveDeal.name : "";
@@ -500,7 +564,26 @@
           return this.activeSection === "leads" || this.activeSection === "deals";
         },
         taskFormRemainingLabel() {
-          return this.formatTaskRemainingLabel(this.forms.tasks.dueAt, this.forms.tasks.isDone);
+          return this.formatTaskRemainingLabel(this.forms.tasks.dueAt, this.forms.tasks.status);
+        },
+        taskTouchSelectOptions() {
+          return Array.isArray(this.taskTouchOptions) ? this.taskTouchOptions : [];
+        }
+      },
+      watch: {
+        "forms.tasks.dealId": {
+          handler() {
+            if (this.activeSection === "tasks" && this.showModal) {
+              this.loadTaskTouchOptions();
+            }
+          }
+        },
+        "forms.tasks.companyId": {
+          handler() {
+            if (this.activeSection === "tasks" && this.showModal) {
+              this.loadTaskTouchOptions();
+            }
+          }
         }
       },
       methods: {
@@ -667,6 +750,17 @@
           };
           const normalized = String(value || "").trim();
           return labels[normalized] || normalized || "Событие";
+        },
+        humanizeActivityType(value) {
+          const labels = {
+            call: "звонок",
+            email: "email",
+            meeting: "встреча",
+            note: "заметка",
+            task: "задача",
+          };
+          const normalized = String(value || "").trim();
+          return labels[normalized] || normalized || "активность";
         },
         formatHistoryTimestamp(value) {
           const raw = String(value || "").trim();
@@ -936,6 +1030,21 @@
           if (status === "new") return { status: "new", label: fallbackLabel || "Новый" };
           return { status: "progress", label: fallbackLabel || "В работе" };
         },
+        taskStatusMeta(status) {
+          const normalized = String(status || "todo").trim();
+          return this.taskStatusOptions.find((option) => option.value === normalized)
+            || this.taskStatusOptions[0];
+        },
+        isTaskDoneStatus(status) {
+          return String(status || "").trim() === "done";
+        },
+        isTaskCanceledStatus(status) {
+          return String(status || "").trim() === "canceled";
+        },
+        isTaskActiveStatus(status) {
+          const normalized = String(status || "").trim();
+          return normalized === "todo" || normalized === "in_progress";
+        },
         statusChipClass(item) {
           if (this.activeSection === "deals") {
             return "";
@@ -963,7 +1072,7 @@
             return 0;
           }
           if (this.activeSection === "tasks") {
-            return item.isDone || item.status === "done" ? 1 : 0;
+            return this.isTaskActiveStatus(item.taskStatus) ? 0 : 1;
           }
           return 0;
         },
@@ -1120,7 +1229,7 @@
           );
           const taskIds = new Set();
           this.datasets.tasks.forEach((task) => {
-            if (task.isDone) {
+            if (!this.isTaskActiveStatus(task.taskStatus)) {
               return;
             }
             const matchesClient = String(task.clientId || "") === String(normalizedCompanyId);
@@ -1138,7 +1247,7 @@
             if (String(task.dealId || "") !== String(normalizedDealId)) {
               return false;
             }
-            return !task.isDone;
+            return this.isTaskActiveStatus(task.taskStatus);
           }).length;
         },
         getCurrencyRateToRub(currency) {
@@ -1274,9 +1383,14 @@
             return this.canQuickChangeLeadStatus(item);
           }
           if (this.activeSection === "tasks") {
-            return !item.isDone && item.status !== "done";
+            return item.taskStatus === "todo" || item.taskStatus === "in_progress";
           }
           return false;
+        },
+        nextTaskStatus(currentStatus) {
+          if (currentStatus === "todo") return "in_progress";
+          if (currentStatus === "in_progress") return "done";
+          return null;
         },
         getLeadStatusByCode(code) {
           return this.metaOptions.leadStatuses.find((status) => status.code === code) || null;
@@ -1305,8 +1419,17 @@
               }
             }
             if (this.activeSection === "tasks") {
-              if (!item.isDone && item.status !== "done") {
-                this.openTaskEditor({ ...item, isDone: true });
+              const targetStatus = this.nextTaskStatus(item.taskStatus);
+              if (targetStatus) {
+                if (targetStatus === "done") {
+                  this.openTaskEditor({ ...item, status: "done" });
+                } else {
+                  await this.apiRequest(`/api/v1/activities/${item.id}/`, {
+                    method: "PATCH",
+                    body: { status: targetStatus }
+                  });
+                  await this.loadSection("tasks");
+                }
               }
             }
           } catch (error) {
@@ -1334,6 +1457,10 @@
           }
           if (this.activeSection === "tasks") {
             this.openTaskEditor(item);
+            return;
+          }
+          if (this.activeSection === "touches") {
+            this.openTouchEditor(item);
           }
         },
         openLeadEditor(item) {
@@ -1341,6 +1468,7 @@
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
+          this.editingTouchId = null;
           this.editingDealId = null;
           this.showAllLeadFields = false;
           this.editingLeadId = item.id;
@@ -1369,6 +1497,7 @@
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
+          this.editingTouchId = null;
           this.editingLeadId = null;
           this.showAllDealFields = false;
           this.editingDealId = item.id;
@@ -1402,6 +1531,7 @@
           this.editingDealId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
+          this.editingTouchId = null;
           this.editingContactId = item.id;
           this.forms.contacts = {
             fullName: item.fullName || item.name || "",
@@ -1419,6 +1549,7 @@
           this.editingDealId = null;
           this.editingContactId = null;
           this.editingTaskId = null;
+          this.editingTouchId = null;
           this.editingCompanyId = item.id;
           this.showCompanyEvents = false;
           this.showCompanyNoteDraft = false;
@@ -1461,17 +1592,47 @@
           this.editingTaskId = item.id;
           this.forms.tasks = {
             subject: item.subject || item.name || "",
+            taskTypeId: this.toIntOrNull(item.taskTypeId),
+            priority: item.priority || "medium",
             companyId: this.toIntOrNull(item.clientId),
             dealId: this.toIntOrNull(item.dealId),
+            relatedTouchId: this.toIntOrNull(item.relatedTouchId),
             dueAt: this.toDateTimeLocal(item.dueAtRaw),
             reminderOffsetMinutes: Number(item.reminderOffsetMinutes || 30),
             description: item.description || "",
             result: item.result || "",
             saveCompanyNote: !!item.saveCompanyNote,
             companyNote: item.companyNote || "",
-            isDone: !!item.isDone
+            status: item.taskStatus || item.status || "todo"
           };
           this.resetTaskFollowUpForm();
+          this.showModal = true;
+          this.loadTaskTouchOptions();
+        },
+        openTouchEditor(item) {
+          this.clearUiErrors({ modalOnly: true });
+          this.editingLeadId = null;
+          this.editingDealId = null;
+          this.editingContactId = null;
+          this.editingCompanyId = null;
+          this.editingTaskId = null;
+          this.editingTouchId = null;
+          this.editingTouchId = item.id;
+          this.forms.touches = {
+            happenedAt: this.toDateTimeLocal(item.happenedAtRaw),
+            channelId: this.toIntOrNull(item.channelId),
+            direction: item.direction || "outgoing",
+            result: item.result || "",
+            summary: item.summary || "",
+            nextStep: item.nextStep || "",
+            nextStepAt: this.toDateTimeLocal(item.nextStepAtRaw),
+            ownerId: this.toIntOrNull(item.ownerId),
+            companyId: this.toIntOrNull(item.clientId),
+            contactId: this.toIntOrNull(item.contactId),
+            taskId: this.toIntOrNull(item.taskId),
+            leadId: this.toIntOrNull(item.leadId),
+            dealId: this.toIntOrNull(item.dealId),
+          };
           this.showModal = true;
         },
         openTaskFromDeal(task) {
@@ -1584,7 +1745,7 @@
             return;
           }
           const hasExistingActiveTasks = Array.isArray(this.dealTasksForActiveDeal)
-            && this.dealTasksForActiveDeal.some((task) => !task.isDone);
+            && this.dealTasksForActiveDeal.some((task) => this.isTaskActiveStatus(task.taskStatus));
           if (hasExistingActiveTasks || this.hasPendingDealTaskDraft()) {
             return;
           }
@@ -1616,14 +1777,14 @@
           );
         },
         validateTaskFollowUpRequirement() {
-          if (!this.forms.tasks.isDone || !this.taskActiveDealRequiresFollowUp) {
+          if (!this.isTaskDoneStatus(this.forms.tasks.status) || !this.taskActiveDealRequiresFollowUp) {
             return;
           }
           const hasOtherActiveTasks = Array.isArray(this.datasets.tasks)
             && this.datasets.tasks.some((task) => (
               String(task.id) !== String(this.editingTaskId)
               && String(task.dealId || "") === String(this.toIntOrNull(this.forms.tasks.dealId) || "")
-              && !task.isDone
+              && this.isTaskActiveStatus(task.taskStatus)
             ));
           if (hasOtherActiveTasks || this.hasPreparedTaskFollowUp()) {
             return;
@@ -1684,9 +1845,10 @@
           if (restMinutes) chunks.push(`${restMinutes} мин`);
           return chunks.join(" ");
         },
-        formatTaskRemainingLabel(value, isDone = false) {
+        formatTaskRemainingLabel(value, status = "todo") {
           if (!value) return "";
-          if (isDone) return "Задача выполнена";
+          if (this.isTaskDoneStatus(status)) return "Задача выполнена";
+          if (this.isTaskCanceledStatus(status)) return "Задача отменена";
 
           const date = new Date(value);
           if (Number.isNaN(date.getTime())) return "";
@@ -1734,25 +1896,25 @@
           const diffMinutes = Math.ceil((Date.now() - parsed.getTime()) / 60000);
           return this.formatRemainingDuration(diffMinutes);
         },
-        isTaskOverdue(value, isDone = false) {
-          if (!value || isDone) return false;
+        isTaskOverdue(value, status = "todo") {
+          if (!value || !this.isTaskActiveStatus(status)) return false;
           const parsed = new Date(value);
           if (Number.isNaN(parsed.getTime())) return false;
           return parsed.getTime() < Date.now();
         },
-        taskDuePrimaryLabel(value, isDone = false) {
+        taskDuePrimaryLabel(value, status = "todo") {
           if (!value) return "";
-          return this.isTaskOverdue(value, isDone) ? "Просрочено" : this.formatDueLabel(value);
+          return this.isTaskOverdue(value, status) ? "Просрочено" : this.formatDueLabel(value);
         },
-        taskDueSecondaryLabel(value, isDone = false) {
+        taskDueSecondaryLabel(value, status = "todo") {
           if (!value) return "";
-          if (this.isTaskOverdue(value, isDone)) {
+          if (this.isTaskOverdue(value, status)) {
             const parsed = new Date(value);
             if (Number.isNaN(parsed.getTime())) return "";
             const diffMinutes = Math.ceil((Date.now() - parsed.getTime()) / 60000);
             return this.formatRemainingDuration(diffMinutes);
           }
-          return this.formatTaskRemainingLabel(value, isDone);
+          return this.formatTaskRemainingLabel(value, status);
         },
         normalizeCompanyOkveds(okveds, mainCode = "", mainName = "") {
           const normalized = [];
@@ -1874,7 +2036,9 @@
               `/api/v1/activities/?type=task&deal=${this.editingDealId}&page_size=100`
             );
             const tasks = this.normalizePaginatedResponse(payload);
-            this.dealTasksForActiveDeal = tasks.map((item) => ({
+            this.dealTasksForActiveDeal = tasks.map((item) => {
+              const taskStatus = item.status || (item.is_done ? "done" : "todo");
+              return {
               id: item.id,
               subject: item.subject || `Задача #${item.id}`,
               description: item.description || "",
@@ -1886,10 +2050,12 @@
               deal: item.deal_title || this.forms.deals.title || "",
               dealId: item.deal || this.editingDealId || null,
               dueAtRaw: item.due_at || null,
-              isDone: !!item.is_done,
+              taskStatus,
+              statusLabel: this.taskStatusMeta(taskStatus).label,
               dueLabel: this.formatDueLabel(item.due_at),
-              remainingLabel: this.formatTaskRemainingLabel(item.due_at, item.is_done),
-            }));
+              remainingLabel: this.formatTaskRemainingLabel(item.due_at, taskStatus),
+            };
+            });
           } catch (error) {
             this.errorMessage = `Ошибка загрузки задач сделки: ${error.message}`;
             this.dealTasksForActiveDeal = [];
@@ -1897,11 +2063,34 @@
             this.isDealTasksLoading = false;
           }
         },
-        async setTaskDone(taskId, isDone) {
-          await this.apiRequest(`/api/v1/activities/${taskId}/`, {
-            method: "PATCH",
-            body: { is_done: !!isDone }
-          });
+        async loadTaskTouchOptions() {
+          const dealId = this.toIntOrNull(this.forms.tasks.dealId);
+          const clientId = this.toIntOrNull(this.forms.tasks.companyId);
+          if (!dealId && !clientId) {
+            this.taskTouchOptions = [];
+            return;
+          }
+
+          const params = new URLSearchParams({ page_size: "100", exclude_type: "task" });
+          if (dealId) params.set("deal", String(dealId));
+          if (clientId) params.set("client", String(clientId));
+
+          this.isTaskTouchesLoading = true;
+          try {
+            const payload = await this.apiRequest(`/api/v1/activities/?${params.toString()}`);
+            const touches = this.normalizePaginatedResponse(payload);
+            this.taskTouchOptions = touches.map((item) => ({
+              id: item.id,
+              subject: item.subject || `Активность #${item.id}`,
+              type: item.type || "",
+              label: `${item.subject || `Активность #${item.id}`} · ${this.humanizeActivityType(item.type)}`,
+            }));
+          } catch (error) {
+            this.taskTouchOptions = [];
+            this.setUiError(`Ошибка загрузки связанных касаний: ${error.message}`, { modal: true });
+          } finally {
+            this.isTaskTouchesLoading = false;
+          }
         },
         async loadContactsForSelectedDealCompany() {
           const companyId = this.toIntOrNull(this.forms.deals.companyId);
@@ -2113,7 +2302,12 @@
           };
         },
         mapTask(item) {
-          const normalized = this.uiStatus(item.is_done ? "done" : "progress", item.is_done ? "Завершено" : "В работе");
+          const taskStatus = item.status || (item.is_done ? "done" : "todo");
+          const statusMeta = this.taskStatusMeta(taskStatus);
+          const normalized = this.uiStatus(
+            this.isTaskActiveStatus(taskStatus) ? "progress" : "done",
+            statusMeta.label
+          );
           return {
             id: item.id,
             name: item.subject || `Задача #${item.id}`,
@@ -2122,19 +2316,64 @@
             result: item.result || "",
             saveCompanyNote: !!item.save_company_note,
             companyNote: item.company_note || "",
+            taskTypeId: item.task_type || null,
+            taskTypeName: item.task_type_name || "",
+            priority: item.priority || "medium",
             reminderOffsetMinutes: Number(item.deadline_reminder_offset_minutes || 30),
             company: item.client_name || "",
             clientId: item.client || null,
             deal: item.deal_title || "",
             dealId: item.deal || null,
             dueLabel: this.formatDueLabel(item.due_at),
-            remainingLabel: this.formatTaskRemainingLabel(item.due_at, item.is_done),
+            remainingLabel: this.formatTaskRemainingLabel(item.due_at, taskStatus),
             dueAtRaw: item.due_at || null,
             isDone: !!item.is_done,
+            taskStatus,
+            relatedTouchId: item.related_touch || null,
+            relatedTouchSubject: item.related_touch_subject || "",
             phone: "",
             email: "",
             status: normalized.status,
             statusLabel: normalized.label
+          };
+        },
+        mapTouch(item) {
+          const direction = item.direction || "outgoing";
+          const directionLabel = item.direction_label || (direction === "incoming" ? "Входящее" : "Исходящее");
+          const normalized = this.uiStatus(direction === "incoming" ? "new" : "progress", directionLabel);
+          return {
+            id: item.id,
+            name: item.summary || item.result || `Касание #${item.id}`,
+            summary: item.summary || "",
+            result: item.result || "",
+            company: item.company_name || "",
+            phone: item.task_subject
+              ? `Задача: ${item.task_subject}`
+              : (item.deal_title
+                ? `Сделка: ${item.deal_title}`
+                : (item.lead_title
+                  ? `Лид: ${item.lead_title}`
+                  : (item.contact_name ? `Контакт: ${item.contact_name}` : "—"))),
+            email: this.formatDueLabel(item.happened_at),
+            status: normalized.status,
+            statusLabel: normalized.label,
+            happenedAtRaw: item.happened_at || null,
+            channelId: item.channel || null,
+            channelName: item.channel_name || "",
+            direction,
+            nextStep: item.next_step || "",
+            nextStepAtRaw: item.next_step_at || null,
+            ownerId: item.owner || null,
+            ownerName: item.owner_name || "",
+            clientId: item.client || null,
+            contactId: item.contact || null,
+            contactName: item.contact_name || "",
+            taskId: item.task || null,
+            taskSubject: item.task_subject || "",
+            leadId: item.lead || null,
+            leadTitle: item.lead_title || "",
+            dealId: item.deal || null,
+            dealTitle: item.deal_title || "",
           };
         },
         async loadSection(section) {
@@ -2147,6 +2386,7 @@
           if (section === "contacts") this.datasets.contacts = records.map(this.mapContact);
           if (section === "companies") this.datasets.companies = records.map(this.mapClient);
           if (section === "tasks") this.datasets.tasks = records.map(this.mapTask);
+          if (section === "touches") this.datasets.touches = records.map(this.mapTouch);
         },
         async loadAllSections() {
           this.isLoading = true;
@@ -2235,6 +2475,7 @@
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
           this.resetTaskFollowUpForm();
+          this.taskTouchOptions = [];
           this.cancelSourceCreate();
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
@@ -2269,6 +2510,7 @@
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
           this.resetTaskFollowUpForm();
+          this.taskTouchOptions = [];
           this.cancelSourceCreate();
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
@@ -2379,15 +2621,35 @@
           if (section === "tasks") {
             return {
               subject: "",
+              taskTypeId: null,
+              priority: "medium",
               companyId: null,
               dealId: null,
+              relatedTouchId: null,
               dueAt: "",
               reminderOffsetMinutes: 30,
               description: "",
               result: "",
               saveCompanyNote: false,
               companyNote: "",
-              isDone: false
+              status: "todo"
+            };
+          }
+          if (section === "touches") {
+            return {
+              happenedAt: "",
+              channelId: null,
+              direction: "outgoing",
+              result: "",
+              summary: "",
+              nextStep: "",
+              nextStepAt: "",
+              ownerId: null,
+              companyId: null,
+              contactId: null,
+              taskId: null,
+              leadId: null,
+              dealId: null,
             };
           }
           return {};
@@ -2420,17 +2682,19 @@
           return `${year}-${month}-${day}T${hours}:${minutes}`;
         },
         async loadMetaOptions() {
-          const [leadStatuses, dealStages, leadSources, users, communicationChannels] = await Promise.all([
+          const [leadStatuses, dealStages, leadSources, users, taskTypes, communicationChannels] = await Promise.all([
             this.apiRequest("/api/v1/meta/lead-statuses/"),
             this.apiRequest("/api/v1/meta/deal-stages/"),
             this.apiRequest("/api/v1/meta/lead-sources/"),
             this.apiRequest("/api/v1/meta/users/"),
+            this.apiRequest("/api/v1/meta/task-types/"),
             this.apiRequest("/api/v1/meta/communication-channels/")
           ]);
           this.metaOptions.leadStatuses = this.normalizePaginatedResponse(leadStatuses);
           this.metaOptions.dealStages = this.sortDealStages(this.normalizePaginatedResponse(dealStages));
           this.metaOptions.leadSources = this.normalizePaginatedResponse(leadSources);
           this.metaOptions.users = this.normalizePaginatedResponse(users);
+          this.metaOptions.taskTypes = this.normalizePaginatedResponse(taskTypes);
           this.metaOptions.communicationChannels = this.normalizePaginatedResponse(communicationChannels);
           this.loadCurrencyRates();
         },
@@ -2826,6 +3090,9 @@
           if (form.saveCompanyNote && !form.companyNote.trim()) {
             throw new Error("Укажите важные факты о компании");
           }
+          if (this.isTaskDoneStatus(form.status) && !form.result.trim()) {
+            throw new Error("Укажите результат выполнения задачи");
+          }
           this.validateTaskFollowUpRequirement();
           const clientId = this.toIntOrNull(form.companyId);
           await this.apiRequest("/api/v1/activities/", {
@@ -2833,16 +3100,19 @@
             body: {
               type: "task",
               subject: form.subject.trim(),
+              task_type: this.toIntOrNull(form.taskTypeId),
+              priority: form.priority || "medium",
               description: form.description.trim(),
               result: form.result.trim(),
               due_at: this.toIsoDateTime(form.dueAt),
               deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
               client: clientId,
               deal: this.toIntOrNull(form.dealId),
+              related_touch: this.toIntOrNull(form.relatedTouchId),
               has_follow_up_task: this.hasPreparedTaskFollowUp(),
               save_company_note: !!form.saveCompanyNote,
               company_note: form.companyNote.trim(),
-              is_done: !!form.isDone
+              status: form.status || "todo"
             }
           });
         },
@@ -2860,6 +3130,9 @@
           if (form.saveCompanyNote && !form.companyNote.trim()) {
             throw new Error("Укажите важные факты о компании");
           }
+          if (this.isTaskDoneStatus(form.status) && !form.result.trim()) {
+            throw new Error("Укажите результат выполнения задачи");
+          }
           this.validateTaskFollowUpRequirement();
           const clientId = this.toIntOrNull(form.companyId);
           await this.apiRequest(`/api/v1/activities/${this.editingTaskId}/`, {
@@ -2867,16 +3140,80 @@
             body: {
               type: "task",
               subject: form.subject.trim(),
+              task_type: this.toIntOrNull(form.taskTypeId),
+              priority: form.priority || "medium",
               description: form.description.trim(),
               result: form.result.trim(),
               due_at: this.toIsoDateTime(form.dueAt),
               deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
               client: clientId,
               deal: this.toIntOrNull(form.dealId),
+              related_touch: this.toIntOrNull(form.relatedTouchId),
               has_follow_up_task: this.hasPreparedTaskFollowUp(),
               save_company_note: !!form.saveCompanyNote,
               company_note: form.companyNote.trim(),
-              is_done: !!form.isDone
+              status: form.status || "todo"
+            }
+          });
+        },
+        validateTouchForm(form) {
+          if (!form.happenedAt) {
+            throw new Error("Укажите дату и время касания");
+          }
+          if (
+            !this.toIntOrNull(form.leadId)
+            && !this.toIntOrNull(form.dealId)
+            && !this.toIntOrNull(form.companyId)
+            && !this.toIntOrNull(form.contactId)
+            && !this.toIntOrNull(form.taskId)
+          ) {
+            throw new Error("Привяжите касание хотя бы к одному объекту CRM");
+          }
+        },
+        async createTouch() {
+          const form = this.forms.touches;
+          this.validateTouchForm(form);
+          await this.apiRequest("/api/v1/touches/", {
+            method: "POST",
+            body: {
+              happened_at: this.toIsoDateTime(form.happenedAt),
+              channel: this.toIntOrNull(form.channelId),
+              direction: form.direction || "outgoing",
+              result: form.result.trim(),
+              summary: form.summary.trim(),
+              next_step: form.nextStep.trim(),
+              next_step_at: this.toIsoDateTime(form.nextStepAt),
+              owner: this.toIntOrNull(form.ownerId),
+              client: this.toIntOrNull(form.companyId),
+              contact: this.toIntOrNull(form.contactId),
+              task: this.toIntOrNull(form.taskId),
+              lead: this.toIntOrNull(form.leadId),
+              deal: this.toIntOrNull(form.dealId),
+            }
+          });
+        },
+        async updateTouch() {
+          const form = this.forms.touches;
+          if (!this.editingTouchId) {
+            throw new Error("Касание для редактирования не выбрано");
+          }
+          this.validateTouchForm(form);
+          await this.apiRequest(`/api/v1/touches/${this.editingTouchId}/`, {
+            method: "PATCH",
+            body: {
+              happened_at: this.toIsoDateTime(form.happenedAt),
+              channel: this.toIntOrNull(form.channelId),
+              direction: form.direction || "outgoing",
+              result: form.result.trim(),
+              summary: form.summary.trim(),
+              next_step: form.nextStep.trim(),
+              next_step_at: this.toIsoDateTime(form.nextStepAt),
+              owner: this.toIntOrNull(form.ownerId),
+              client: this.toIntOrNull(form.companyId),
+              contact: this.toIntOrNull(form.contactId),
+              task: this.toIntOrNull(form.taskId),
+              lead: this.toIntOrNull(form.leadId),
+              deal: this.toIntOrNull(form.dealId),
             }
           });
         },
@@ -2897,7 +3234,7 @@
               deadline_reminder_offset_minutes: Number(followUp.reminderOffsetMinutes || 30),
               client: this.toIntOrNull(this.forms.tasks.companyId),
               deal: dealId,
-              is_done: false
+              status: "todo"
             }
           });
         },
@@ -2928,6 +3265,8 @@
               await this.createFollowUpTaskFromCurrentDeal();
             }
             if (this.activeSection === "tasks" && !this.editingTaskId) await this.createTask();
+            if (this.activeSection === "touches" && this.editingTouchId) await this.updateTouch();
+            if (this.activeSection === "touches" && !this.editingTouchId) await this.createTouch();
             this.showModal = false;
             this.cancelSourceCreate();
             this.editingLeadId = null;
@@ -2935,6 +3274,7 @@
             this.editingContactId = null;
             this.editingCompanyId = null;
             this.editingTaskId = null;
+            this.editingTouchId = null;
             this.showDealTaskForm = false;
             this.resetDealTaskForm();
             this.resetTaskFollowUpForm();
@@ -2950,6 +3290,8 @@
               await Promise.all([this.loadSection("deals"), this.loadSection("companies")]);
             } else if (this.activeSection === "tasks") {
               await Promise.all([this.loadSection("tasks"), this.loadSection("deals"), this.loadSection("companies")]);
+            } else if (this.activeSection === "touches") {
+              await Promise.all([this.loadSection("touches"), this.loadSection("leads"), this.loadSection("deals")]);
             } else {
               await this.reloadActiveSection();
             }
