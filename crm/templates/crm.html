@@ -268,13 +268,14 @@
         <div class="h-full min-h-0 rounded-[28px] border border-crm-border bg-[#0b2740] overflow-hidden shadow-panel md:min-h-[540px] flex flex-col">
           <div
             class="hidden lg:grid border-b border-crm-border bg-[#10314d] text-crm-muted text-xs uppercase tracking-[0.16em]"
-            :class="activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : (activeSection === 'deals' ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_110px_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]')"
+            :class="activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : (activeSection === 'deals' ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_150px_110px_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]')"
           >
             <div class="px-4 py-4"></div>
             <div class="px-4 py-4">Наименование</div>
             <div class="px-4 py-4">Компания</div>
             <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Сделка' : (activeSection === 'deals' ? 'Сумма' : 'Телефон') ]]</div>
             <div class="px-4 py-4">[[ activeSection === 'tasks' ? 'Срок' : (activeSection === 'deals' ? 'План закрытия' : 'Email') ]]</div>
+            <div v-if="activeSection === 'deals'" class="px-4 py-4">Ответственный</div>
             <div v-if="activeSection === 'deals'" class="px-4 py-4">Задачи</div>
             <div v-if="activeSection === 'companies'" class="px-4 py-4">В работе</div>
             <div class="px-4 py-4 relative" data-status-filter>
@@ -333,7 +334,7 @@
                     activeSection === 'companies'
                       ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]'
                       : (activeSection === 'deals'
-                        ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_110px_160px]'
+                        ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_150px_110px_160px]'
                         : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]'),
                     (activeSection === 'leads' || activeSection === 'deals' || activeSection === 'contacts' || activeSection === 'companies' || activeSection === 'tasks') ? 'cursor-pointer' : ''
                   ]"
@@ -361,6 +362,9 @@
                     >
                       [[ dealCloseSecondaryLabel(item.closeDate) ]]
                     </div>
+                  </div>
+                  <div v-if="activeSection === 'deals'" class="px-4 py-4 text-sm text-crm-text truncate">
+                    [[ item.ownerName || '—' ]]
                   </div>
                   <div v-if="activeSection === 'deals'" class="px-4 py-4 text-sm text-crm-text font-medium tabular-nums">
                     [[ countDealOpenTasks(item.id) ]]
@@ -483,7 +487,7 @@
                       <div class="min-w-0 flex-1">
                         <div class="text-sm font-medium text-white truncate leading-5">[[ activeSection === 'leads' ? (item.company || item.name) : item.name ]]</div>
                         <div v-if="activeSection === 'deals'" class="mt-1 text-[11px] text-crm-muted truncate">
-                          [[ item.company || 'Без компании' ]] • [[ formatDealAmount(item.amount, item.currency) ]] • [[ dealClosePrimaryLabel(item.closeDate) || 'Без даты' ]]<span v-if="dealCloseSecondaryLabel(item.closeDate)"> • <span :class="isDealOverdue(item.closeDate) ? 'text-red-300' : 'text-crm-muted'">[[ dealCloseSecondaryLabel(item.closeDate) ]]</span></span> • [[ countDealOpenTasks(item.id) ]] задач
+                          [[ item.company || 'Без компании' ]] • [[ formatDealAmount(item.amount, item.currency) ]] • [[ dealClosePrimaryLabel(item.closeDate) || 'Без даты' ]]<span v-if="dealCloseSecondaryLabel(item.closeDate)"> • <span :class="isDealOverdue(item.closeDate) ? 'text-red-300' : 'text-crm-muted'">[[ dealCloseSecondaryLabel(item.closeDate) ]]</span></span> • [[ item.ownerName || 'Без ответственного' ]] • [[ countDealOpenTasks(item.id) ]] задач
                         </div>
                         <div v-else-if="activeSection === 'contacts'" class="mt-0.5 text-[11px] text-crm-muted truncate leading-4">
                           [[ item.company || 'Без компании' ]]
