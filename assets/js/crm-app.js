@@ -2536,6 +2536,7 @@
           }
         },
         openContactFromDealCompany(contact) {
+          this.activeSection = "contacts";
           this.openContactEditor({
             id: contact.id,
             fullName: contact.fullName || "",
