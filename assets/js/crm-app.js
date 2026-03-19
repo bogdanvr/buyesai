@@ -57,8 +57,11 @@
           isSaving: false,
           showStatusFilter: false,
           showTaskCompanyFilter: false,
+          showTouchCompanyFilter: false,
+          showTouchDealFilter: false,
           selectedStatusFilters: [],
           selectedTaskCompanyFilters: [],
+          selectedTouchCompanyFilters: [],
           editingLeadId: null,
           editingDealId: null,
           editingContactId: null,
@@ -91,6 +94,8 @@
           showCompanyEvents: false,
           taskDealFilterId: null,
           taskDealFilterLabel: "",
+          touchDealFilterId: null,
+          touchDealFilterLabel: "",
           taskTouchOptions: [],
           showSourceCreateForm: false,
           sourceCreateTargetSection: "",
@@ -692,13 +697,25 @@
           const q = this.search.trim().toLowerCase();
           const filtered = this.currentItems.filter((item) => {
             const matchesDealFilter =
-              this.activeSection !== "tasks" ||
-              !this.taskDealFilterId ||
-              String(item.dealId || "") === String(this.taskDealFilterId);
+              (
+                this.activeSection !== "tasks" ||
+                !this.taskDealFilterId ||
+                String(item.dealId || "") === String(this.taskDealFilterId)
+              ) && (
+                this.activeSection !== "touches" ||
+                !this.touchDealFilterId ||
+                String(item.dealId || "") === String(this.touchDealFilterId)
+              );
             const matchesCompanyFilter =
-              this.activeSection !== "tasks"
-              || !this.selectedTaskCompanyFilters.length
-              || this.selectedTaskCompanyFilters.includes(String(item.clientId || ""));
+              (
+                this.activeSection !== "tasks"
+                || !this.selectedTaskCompanyFilters.length
+                || this.selectedTaskCompanyFilters.includes(String(item.clientId || ""))
+              ) && (
+                this.activeSection !== "touches"
+                || !this.selectedTouchCompanyFilters.length
+                || this.selectedTouchCompanyFilters.includes(String(item.clientId || ""))
+              );
             const matchesSearch = !q || [item.name, item.company, item.deal, item.phone, item.email, item.statusLabel]
               .filter(Boolean)
               .some((value) => String(value).toLowerCase().includes(q));
@@ -761,6 +778,48 @@
             });
           });
           return Array.from(uniqueCompanies.values()).sort((left, right) => (
+            String(left.label).localeCompare(String(right.label), "ru")
+          ));
+        },
+        touchCompanyFilterOptions() {
+          if (this.activeSection !== "touches") {
+            return [];
+          }
+          const uniqueCompanies = new Map();
+          (this.datasets.touches || []).forEach((touch) => {
+            const companyId = String(this.toIntOrNull(touch.clientId));
+            if (!companyId || uniqueCompanies.has(companyId)) {
+              return;
+            }
+            uniqueCompanies.set(companyId, {
+              value: companyId,
+              label: String(touch.company || `Компания #${companyId}`).trim(),
+            });
+          });
+          return Array.from(uniqueCompanies.values()).sort((left, right) => (
+            String(left.label).localeCompare(String(right.label), "ru")
+          ));
+        },
+        touchDealFilterOptions() {
+          if (this.activeSection !== "touches") {
+            return [];
+          }
+          const filteredByCompany = (this.datasets.touches || []).filter((touch) => (
+            !this.selectedTouchCompanyFilters.length
+            || this.selectedTouchCompanyFilters.includes(String(touch.clientId || ""))
+          ));
+          const uniqueDeals = new Map();
+          filteredByCompany.forEach((touch) => {
+            const dealId = String(this.toIntOrNull(touch.dealId));
+            if (!dealId || uniqueDeals.has(dealId)) {
+              return;
+            }
+            uniqueDeals.set(dealId, {
+              value: dealId,
+              label: String(touch.deal || `Сделка #${dealId}`).trim(),
+            });
+          });
+          return Array.from(uniqueDeals.values()).sort((left, right) => (
             String(left.label).localeCompare(String(right.label), "ru")
           ));
         },
@@ -1804,6 +1863,8 @@
           this.showTaskCompanyFilter = !this.showTaskCompanyFilter;
           if (this.showTaskCompanyFilter) {
             this.showStatusFilter = false;
+            this.showTouchCompanyFilter = false;
+            this.showTouchDealFilter = false;
           }
         },
         toggleTaskCompanyFilterValue(value) {
@@ -1816,6 +1877,42 @@
         },
         clearTaskCompanyFilter() {
           this.selectedTaskCompanyFilters = [];
+        },
+        toggleTouchCompanyFilter() {
+          this.showTouchCompanyFilter = !this.showTouchCompanyFilter;
+          if (this.showTouchCompanyFilter) {
+            this.showStatusFilter = false;
+            this.showTaskCompanyFilter = false;
+            this.showTouchDealFilter = false;
+          }
+        },
+        toggleTouchCompanyFilterValue(value) {
+          const normalizedValue = String(value || "");
+          if (this.selectedTouchCompanyFilters.includes(normalizedValue)) {
+            this.selectedTouchCompanyFilters = this.selectedTouchCompanyFilters.filter((item) => item !== normalizedValue);
+            return;
+          }
+          this.selectedTouchCompanyFilters = [...this.selectedTouchCompanyFilters, normalizedValue];
+        },
+        clearTouchCompanyFilter() {
+          this.selectedTouchCompanyFilters = [];
+        },
+        toggleTouchDealFilter() {
+          this.showTouchDealFilter = !this.showTouchDealFilter;
+          if (this.showTouchDealFilter) {
+            this.showStatusFilter = false;
+            this.showTaskCompanyFilter = false;
+            this.showTouchCompanyFilter = false;
+          }
+        },
+        setTouchDealFilter(value, label = "") {
+          this.touchDealFilterId = value ? String(value) : null;
+          this.touchDealFilterLabel = String(label || "").trim();
+          this.showTouchDealFilter = false;
+        },
+        clearTouchDealFilter() {
+          this.touchDealFilterId = null;
+          this.touchDealFilterLabel = "";
         },
         clearTaskDealFilter() {
           this.taskDealFilterId = null;
@@ -1963,6 +2060,14 @@
           if (this.showTaskCompanyFilter) {
             if (target && target.closest && target.closest("[data-task-company-filter]")) return;
             this.showTaskCompanyFilter = false;
+          }
+          if (this.showTouchCompanyFilter) {
+            if (target && target.closest && target.closest("[data-touch-company-filter]")) return;
+            this.showTouchCompanyFilter = false;
+          }
+          if (this.showTouchDealFilter) {
+            if (target && target.closest && target.closest("[data-touch-deal-filter]")) return;
+            this.showTouchDealFilter = false;
           }
         },
         getStatusBucket(status) {
@@ -2278,8 +2383,12 @@
           this.search = "";
           this.showStatusFilter = false;
           this.showTaskCompanyFilter = false;
+          this.showTouchCompanyFilter = false;
+          this.showTouchDealFilter = false;
           this.selectedStatusFilters = [];
           this.selectedTaskCompanyFilters = [];
+          this.selectedTouchCompanyFilters = [];
+          this.clearTouchDealFilter();
           if (!this.datasets.tasks.length) {
             await this.reloadActiveSection();
           }
@@ -2955,8 +3064,12 @@
           this.activeSection = "contacts";
           this.showStatusFilter = false;
           this.showTaskCompanyFilter = false;
+          this.showTouchCompanyFilter = false;
+          this.showTouchDealFilter = false;
           this.selectedStatusFilters = [];
           this.selectedTaskCompanyFilters = [];
+          this.selectedTouchCompanyFilters = [];
+          this.clearTouchDealFilter();
           this.openContactEditor({
             id: contact.id,
             fullName: contact.fullName || "",
@@ -3164,6 +3277,7 @@
             leadId: item.lead || null,
             leadTitle: item.lead_title || "",
             dealId: item.deal || null,
+            deal: item.deal_title || "",
             dealTitle: item.deal_title || "",
           };
         },
@@ -3253,14 +3367,19 @@
           this.search = "";
           this.showStatusFilter = false;
           this.showTaskCompanyFilter = false;
+          this.showTouchCompanyFilter = false;
+          this.showTouchDealFilter = false;
           this.selectedStatusFilters = [];
           this.selectedTaskCompanyFilters = [];
+          this.selectedTouchCompanyFilters = [];
           this.clearTaskDealFilter();
+          this.clearTouchDealFilter();
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
+          this.editingTouchId = null;
           this.resetExpandedOptionalFields();
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
@@ -3289,11 +3408,14 @@
           this.showModal = false;
           this.cancelSourceCreate();
           this.clearUiErrors({ globalOnly: true });
+          this.showTouchCompanyFilter = false;
+          this.showTouchDealFilter = false;
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
+          this.editingTouchId = null;
           this.resetExpandedOptionalFields();
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
@@ -3315,11 +3437,14 @@
         },
         openCreateModal() {
           this.clearUiErrors({ modalOnly: true });
+          this.showTouchCompanyFilter = false;
+          this.showTouchDealFilter = false;
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
+          this.editingTouchId = null;
           this.resetExpandedOptionalFields();
           this.showCompanyNoteDraft = false;
           this.showDealTaskForm = false;
@@ -4133,6 +4258,7 @@
           this.clearUiErrors({ modalOnly: true });
           try {
             let savedDeal = null;
+            const currentTouchId = this.editingTouchId;
             if (this.activeSection === "leads" && this.editingLeadId) await this.updateLead();
             if (this.activeSection === "leads" && !this.editingLeadId) await this.createLead();
             if (this.activeSection === "deals") {
@@ -4156,10 +4282,10 @@
             }
             if (this.activeSection === "tasks" && !this.editingTaskId) await this.createTask();
             let savedTouch = null;
-            if (this.activeSection === "touches" && this.editingTouchId) savedTouch = await this.updateTouch();
-            if (this.activeSection === "touches" && !this.editingTouchId) savedTouch = await this.createTouch();
+            if (this.activeSection === "touches" && currentTouchId) savedTouch = await this.updateTouch();
+            if (this.activeSection === "touches" && !currentTouchId) savedTouch = await this.createTouch();
             if (this.activeSection === "touches" && this.hasValidTouchFollowUp()) {
-              await this.createFollowUpTaskFromCurrentTouch(savedTouch && savedTouch.id ? savedTouch.id : this.editingTouchId);
+              await this.createFollowUpTaskFromCurrentTouch(savedTouch && savedTouch.id ? savedTouch.id : currentTouchId);
             }
             this.showModal = false;
             this.cancelSourceCreate();
