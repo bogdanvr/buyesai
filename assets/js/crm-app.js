@@ -65,8 +65,6 @@
           editingCompanyId: null,
           editingTaskId: null,
           editingTouchId: null,
-          showAllLeadFields: false,
-          showAllDealFields: false,
           isDealTaskSaving: false,
           isDealTasksLoading: false,
           showDealTaskForm: false,
@@ -82,8 +80,12 @@
           showCompanyContactForm: false,
           showCompanyNoteDraft: false,
           showCompanyOkvedDetails: false,
-          showAllCompanyFields: false,
-          showAllTaskFields: false,
+          expandedOptionalFields: {
+            leads: {},
+            deals: {},
+            companies: {},
+            tasks: {}
+          },
           expandedCompanyCards: {},
           showCompanyEvents: false,
           taskDealFilterId: null,
@@ -374,21 +376,6 @@
           }
           return "Сохранить";
         },
-        fieldEditToggleLabel() {
-          if (this.activeSection === "leads") {
-            return this.showAllLeadFields ? "Скрыть" : "Редактировать";
-          }
-          if (this.activeSection === "deals") {
-            return this.showAllDealFields ? "Скрыть" : "Редактировать";
-          }
-          if (this.activeSection === "companies") {
-            return this.showAllCompanyFields ? "Скрыть" : "Редактировать";
-          }
-          if (this.activeSection === "tasks") {
-            return this.showAllTaskFields ? "Скрыть" : "Редактировать";
-          }
-          return "Редактировать";
-        },
         companyOptions() {
           return this.datasets.companies.map((company) => ({
             id: company.id,
@@ -435,19 +422,43 @@
           return !!this.dealCompanyForm.name.trim();
         },
         shouldShowCompanyField() {
-          return (value) => this.isCreatingCompany || this.showAllCompanyFields || !!String(value || "").trim();
+          return (fieldKeyOrValue, maybeValue) => {
+            const fieldKey = maybeValue === undefined ? null : fieldKeyOrValue;
+            const value = maybeValue === undefined ? fieldKeyOrValue : maybeValue;
+            return this.isCreatingCompany
+              || (!!fieldKey ? this.isOptionalFieldExpanded("companies", fieldKey) : !!this.editingCompanyId)
+              || this.hasVisibleFieldValue(value);
+          };
         },
         shouldShowLeadField() {
-          return (value) => this.isCreatingLead || this.showAllLeadFields || this.hasVisibleFieldValue(value);
+          return (fieldKeyOrValue, maybeValue) => {
+            const fieldKey = maybeValue === undefined ? null : fieldKeyOrValue;
+            const value = maybeValue === undefined ? fieldKeyOrValue : maybeValue;
+            return this.isCreatingLead
+              || (!!fieldKey && this.isOptionalFieldExpanded("leads", fieldKey))
+              || this.hasVisibleFieldValue(value);
+          };
         },
         shouldShowDealField() {
-          return (value) => this.isCreatingDeal || this.showAllDealFields || this.hasVisibleFieldValue(value);
+          return (fieldKeyOrValue, maybeValue) => {
+            const fieldKey = maybeValue === undefined ? null : fieldKeyOrValue;
+            const value = maybeValue === undefined ? fieldKeyOrValue : maybeValue;
+            return this.isCreatingDeal
+              || (!!fieldKey ? this.isOptionalFieldExpanded("deals", fieldKey) : !!this.editingDealId)
+              || this.hasVisibleFieldValue(value);
+          };
         },
         shouldShowTaskField() {
-          return (value) => this.isCreatingTask || this.showAllTaskFields || this.hasVisibleFieldValue(value);
+          return (fieldKeyOrValue, maybeValue) => {
+            const fieldKey = maybeValue === undefined ? null : fieldKeyOrValue;
+            const value = maybeValue === undefined ? fieldKeyOrValue : maybeValue;
+            return this.isCreatingTask
+              || (!!fieldKey && this.isOptionalFieldExpanded("tasks", fieldKey))
+              || this.hasVisibleFieldValue(value);
+          };
         },
         showTaskTypeSelector() {
-          return this.showAllTaskFields
+          return this.isOptionalFieldExpanded("tasks", "taskTypeGroup")
             || !!String(this.forms.tasks.taskTypeGroup || "").trim()
             || !!this.toIntOrNull(this.forms.tasks.taskTypeId);
         },
@@ -465,22 +476,13 @@
         showTaskDealSelector() {
           return !!this.toIntOrNull(this.forms.tasks.companyId)
             || !!this.toIntOrNull(this.forms.tasks.dealId)
-            || this.showAllTaskFields;
+            || this.isOptionalFieldExpanded("tasks", "dealId");
         },
         shouldShowLeadTrackingBlock() {
           return this.isCreatingLead
-            || this.showAllLeadFields
             || !!this.forms.leads.websiteSessionId
             || this.forms.leads.sourceNames.length > 0
             || this.forms.leads.history.length > 0;
-        },
-        showFieldEditToggle() {
-          return (
-            (this.activeSection === "leads" && !!this.editingLeadId)
-            || (this.activeSection === "deals" && !!this.editingDealId)
-            || (this.activeSection === "companies" && !!this.editingCompanyId)
-            || (this.activeSection === "tasks" && !!this.editingTaskId)
-          );
         },
         showTaskResultField() {
           return this.isTaskDoneStatus(this.forms.tasks.status) || !!String(this.forms.tasks.result || "").trim();
@@ -850,37 +852,25 @@
           }
           return !!String(value || "").trim();
         },
-        toggleFieldEditMode() {
-          if (this.activeSection === "leads") {
-            this.showAllLeadFields = !this.showAllLeadFields;
-            return;
-          }
-          if (this.activeSection === "deals") {
-            this.showAllDealFields = !this.showAllDealFields;
-            return;
-          }
-          if (this.activeSection === "companies") {
-            this.showAllCompanyFields = !this.showAllCompanyFields;
-            return;
-          }
-          if (this.activeSection === "tasks") {
-            this.showAllTaskFields = !this.showAllTaskFields;
-          }
+        isOptionalFieldExpanded(section, fieldKey) {
+          return !!this.expandedOptionalFields?.[section]?.[fieldKey];
         },
-        isFieldEditModeActive() {
-          if (this.activeSection === "leads") {
-            return this.showAllLeadFields;
+        toggleOptionalField(section, fieldKey) {
+          if (!this.expandedOptionalFields[section]) {
+            this.expandedOptionalFields[section] = {};
           }
-          if (this.activeSection === "deals") {
-            return this.showAllDealFields;
-          }
-          if (this.activeSection === "companies") {
-            return this.showAllCompanyFields;
-          }
-          if (this.activeSection === "tasks") {
-            return this.showAllTaskFields;
-          }
-          return false;
+          this.expandedOptionalFields[section] = {
+            ...this.expandedOptionalFields[section],
+            [fieldKey]: !this.isOptionalFieldExpanded(section, fieldKey),
+          };
+        },
+        resetExpandedOptionalFields() {
+          this.expandedOptionalFields = {
+            leads: {},
+            deals: {},
+            companies: {},
+            tasks: {}
+          };
         },
         parseEventLog(value) {
           const raw = String(value || "").trim();
@@ -1604,10 +1594,6 @@
           }
 
           event.preventDefault();
-          if (this.showFieldEditToggle && !this.isFieldEditModeActive()) {
-            this.toggleFieldEditMode();
-            return;
-          }
           if (this.isSaving) {
             return;
           }
@@ -1752,7 +1738,7 @@
           this.editingTaskId = null;
           this.editingTouchId = null;
           this.editingDealId = null;
-          this.showAllLeadFields = false;
+          this.resetExpandedOptionalFields();
           this.editingLeadId = item.id;
           this.forms.leads = {
             title: item.title || "",
@@ -1781,7 +1767,7 @@
           this.editingTaskId = null;
           this.editingTouchId = null;
           this.editingLeadId = null;
-          this.showAllDealFields = false;
+          this.resetExpandedOptionalFields();
           this.editingDealId = item.id;
           this.forms.deals = {
             title: item.title || "",
@@ -1835,7 +1821,7 @@
           this.editingCompanyId = item.id;
           this.showCompanyEvents = false;
           this.showCompanyNoteDraft = false;
-          this.showAllCompanyFields = false;
+          this.resetExpandedOptionalFields();
           const normalizedOkveds = this.normalizeCompanyOkveds(item.okveds, item.okved, item.industry);
           const resolvedIndustry = this.resolvePrimaryIndustry(item.industry, item.okved, normalizedOkveds);
           this.forms.companies = {
@@ -1870,7 +1856,7 @@
           this.editingDealId = null;
           this.editingContactId = null;
           this.editingCompanyId = null;
-          this.showAllTaskFields = false;
+          this.resetExpandedOptionalFields();
           this.editingTaskId = item.id;
           this.forms.tasks = {
             subject: item.subject || item.name || "",
@@ -2815,10 +2801,7 @@
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
-          this.showAllLeadFields = false;
-          this.showAllDealFields = false;
-          this.showAllCompanyFields = false;
-          this.showAllTaskFields = false;
+          this.resetExpandedOptionalFields();
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
           this.resetTaskFollowUpForm();
@@ -2850,10 +2833,7 @@
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
-          this.showAllLeadFields = false;
-          this.showAllDealFields = false;
-          this.showAllCompanyFields = false;
-          this.showAllTaskFields = false;
+          this.resetExpandedOptionalFields();
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
           this.resetTaskFollowUpForm();
@@ -2878,11 +2858,8 @@
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
-          this.showAllLeadFields = false;
-          this.showAllDealFields = false;
-          this.showAllCompanyFields = false;
+          this.resetExpandedOptionalFields();
           this.showCompanyNoteDraft = false;
-          this.showAllTaskFields = false;
           this.showDealTaskForm = false;
           this.forms[this.activeSection] = this.getDefaultForm(this.activeSection);
           this.resetDealTaskForm();
