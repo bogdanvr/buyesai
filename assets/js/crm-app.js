@@ -428,6 +428,25 @@
           if (!dealId) return [];
           return (this.datasets.touches || []).filter((touch) => String(touch.dealId || "") === String(dealId));
         },
+        dealSummaryUpcomingTasks() {
+          const dealId = this.toIntOrNull(this.editingDealId);
+          if (!dealId) return [];
+          return (this.datasets.tasks || [])
+            .filter((task) => (
+              String(task.dealId || "") === String(dealId)
+              && ["client_task", "internal_task"].includes(String(task.taskTypeGroup || ""))
+              && this.isTaskActiveStatus(task.taskStatus || task.status)
+              && task.dueAtRaw
+            ))
+            .slice()
+            .sort((left, right) => (
+              (String(left.taskTypeGroup || "") === "client_task" ? 0 : 1) - (String(right.taskTypeGroup || "") === "client_task" ? 0 : 1)
+              || (this.parseTaskDueTimestamp(left.dueAtRaw) || 0) - (this.parseTaskDueTimestamp(right.dueAtRaw) || 0)
+            ));
+        },
+        dealSummaryNextStepTask() {
+          return this.dealSummaryUpcomingTasks[0] || null;
+        },
         dealSummaryLastTouch() {
           const touches = this.dealSummaryTouches.slice();
           touches.sort((left, right) => (this.parseTaskDueTimestamp(right.happenedAtRaw) || 0) - (this.parseTaskDueTimestamp(left.happenedAtRaw) || 0));
