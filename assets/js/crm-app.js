@@ -84,6 +84,7 @@
           showCompanyNoteDraft: false,
           showCompanyOkvedDetails: false,
           dealSummaryEditingField: "",
+          companySummaryEditingField: "",
           expandedOptionalFields: {
             leads: {},
             deals: {},
@@ -502,6 +503,136 @@
             return `Без контакта ${daysWithoutContact} дн`;
           }
           return "Без контакта";
+        },
+        companySummaryDeals() {
+          const companyId = this.toIntOrNull(this.editingCompanyId);
+          if (!companyId) return [];
+          return (this.datasets.deals || []).filter((deal) => String(deal.clientId || "") === String(companyId));
+        },
+        companySummaryActiveDeals() {
+          return this.companySummaryDeals.filter((deal) => this.getDealStatusBucket(deal) !== "done");
+        },
+        companySummaryWonDeals() {
+          return this.companySummaryDeals.filter((deal) => {
+            const stageCode = String(deal.stageCode || "").trim().toLowerCase();
+            return !!deal.isWon || stageCode === "won";
+          });
+        },
+        companySummaryTouches() {
+          const companyId = this.toIntOrNull(this.editingCompanyId);
+          if (!companyId) return [];
+          return (this.datasets.touches || []).filter((touch) => String(touch.clientId || "") === String(companyId));
+        },
+        companySummaryTasks() {
+          const companyId = this.toIntOrNull(this.editingCompanyId);
+          if (!companyId) return [];
+          return (this.datasets.tasks || []).filter((task) => String(task.clientId || "") === String(companyId));
+        },
+        companySummaryLastTouch() {
+          const touches = this.companySummaryTouches.slice();
+          touches.sort((left, right) => (this.parseTaskDueTimestamp(right.happenedAtRaw) || 0) - (this.parseTaskDueTimestamp(left.happenedAtRaw) || 0));
+          return touches[0] || null;
+        },
+        companySummaryNextTouch() {
+          const now = Date.now();
+          const touches = this.companySummaryTouches
+            .filter((touch) => {
+              const ts = this.parseTaskDueTimestamp(touch.nextStepAtRaw);
+              return ts !== null && ts >= now;
+            })
+            .slice();
+          touches.sort((left, right) => (this.parseTaskDueTimestamp(left.nextStepAtRaw) || 0) - (this.parseTaskDueTimestamp(right.nextStepAtRaw) || 0));
+          return touches[0] || null;
+        },
+        companySummaryNextTask() {
+          const now = Date.now();
+          const tasks = this.companySummaryTasks
+            .filter((task) => this.isTaskActiveStatus(task.taskStatus || task.status))
+            .filter((task) => {
+              const ts = this.parseTaskDueTimestamp(task.dueAtRaw);
+              return ts !== null && ts >= now;
+            })
+            .slice();
+          tasks.sort((left, right) => (this.parseTaskDueTimestamp(left.dueAtRaw) || 0) - (this.parseTaskDueTimestamp(right.dueAtRaw) || 0));
+          return tasks[0] || null;
+        },
+        companySummaryNextAction() {
+          const nextTask = this.companySummaryNextTask;
+          const nextTouch = this.companySummaryNextTouch;
+          const nextTaskTs = this.parseTaskDueTimestamp(nextTask?.dueAtRaw);
+          const nextTouchTs = this.parseTaskDueTimestamp(nextTouch?.nextStepAtRaw);
+          if (nextTaskTs !== null && nextTouchTs !== null) {
+            return nextTaskTs <= nextTouchTs
+              ? { type: "task", item: nextTask, at: nextTask.dueAtRaw }
+              : { type: "touch", item: nextTouch, at: nextTouch.nextStepAtRaw };
+          }
+          if (nextTaskTs !== null) {
+            return { type: "task", item: nextTask, at: nextTask.dueAtRaw };
+          }
+          if (nextTouchTs !== null) {
+            return { type: "touch", item: nextTouch, at: nextTouch.nextStepAtRaw };
+          }
+          return null;
+        },
+        companySummaryCurrentDeal() {
+          const deals = this.companySummaryActiveDeals.slice();
+          deals.sort((left, right) => {
+            const leftTs = this.parseTaskDueTimestamp(left.closeDate) || Number.MAX_SAFE_INTEGER;
+            const rightTs = this.parseTaskDueTimestamp(right.closeDate) || Number.MAX_SAFE_INTEGER;
+            return leftTs - rightTs || Number(left.id || 0) - Number(right.id || 0);
+          });
+          return deals[0] || null;
+        },
+        companySummaryOpenAmount() {
+          return this.companySummaryActiveDeals.reduce((sum, deal) => {
+            const numeric = Number(deal.amount || 0);
+            return sum + (Number.isFinite(numeric) ? numeric : 0);
+          }, 0);
+        },
+        companySummaryWonAmount() {
+          return this.companySummaryWonDeals.reduce((sum, deal) => {
+            const numeric = Number(deal.amount || 0);
+            return sum + (Number.isFinite(numeric) ? numeric : 0);
+          }, 0);
+        },
+        companySummaryResponsibleLabel() {
+          const currentDealOwner = this.companySummaryCurrentDeal?.ownerName;
+          if (currentDealOwner) {
+            return currentDealOwner;
+          }
+          const activeDealWithOwner = this.companySummaryActiveDeals.find((deal) => String(deal.ownerName || "").trim());
+          if (activeDealWithOwner) {
+            return activeDealWithOwner.ownerName;
+          }
+          const companyId = this.toIntOrNull(this.editingCompanyId);
+          if (!companyId) return "Не назначен";
+          const leadWithOwner = (this.datasets.leads || []).find((lead) => (
+            String(lead.clientId || "") === String(companyId) && String(lead.assignedToName || "").trim()
+          ));
+          return leadWithOwner?.assignedToName || "Не назначен";
+        },
+        companySummaryFirstSourceLabel() {
+          const companyId = this.toIntOrNull(this.editingCompanyId);
+          if (!companyId) return "Не указан";
+          const leadCandidates = (this.datasets.leads || [])
+            .filter((lead) => String(lead.clientId || "") === String(companyId) && String(lead.sourceName || "").trim())
+            .sort((left, right) => Number(left.id || 0) - Number(right.id || 0));
+          if (leadCandidates.length) {
+            return leadCandidates[0].sourceName;
+          }
+          const dealCandidates = this.companySummaryDeals
+            .filter((deal) => String(deal.sourceName || "").trim())
+            .sort((left, right) => Number(left.id || 0) - Number(right.id || 0));
+          return dealCandidates[0]?.sourceName || "Не указан";
+        },
+        companySummaryRegionLabel() {
+          return this.resolveCompanyRegionLabel(this.forms.companies.address);
+        },
+        companySummarySegmentLabel() {
+          return "Не указан";
+        },
+        companySummaryStatusLabel() {
+          return this.forms.companies.isActive ? "Активный" : "Неактивный";
         },
         isDealFailedStageSelected() {
           return this.resolveDealStageCode(this.forms.deals.stageId) === "failed";
@@ -2276,12 +2407,14 @@
         },
         openCompanyEditor(item) {
           this.clearUiErrors({ modalOnly: true });
+          this.activeSection = "companies";
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
           this.editingTaskId = null;
           this.editingTouchId = null;
           this.editingCompanyId = item.id;
+          this.companySummaryEditingField = "";
           this.showCompanyEvents = false;
           this.showCompanyNoteDraft = false;
           this.resetExpandedOptionalFields();
@@ -2344,6 +2477,7 @@
         },
         openTouchEditor(item) {
           this.clearUiErrors({ modalOnly: true });
+          this.activeSection = "touches";
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
@@ -2716,6 +2850,62 @@
           const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId));
           if (!company) return;
           this.openCompanyEditor(company);
+        },
+        resolveCompanyRegionLabel(address) {
+          const chunks = String(address || "")
+            .split(",")
+            .map((chunk) => chunk.trim())
+            .filter(Boolean);
+          if (!chunks.length) {
+            return "Не указан";
+          }
+          return chunks.slice(0, 2).join(", ");
+        },
+        isCompanySummaryEditing(fieldKey) {
+          return String(this.companySummaryEditingField || "") === String(fieldKey || "");
+        },
+        startCompanySummaryEdit(fieldKey) {
+          this.companySummaryEditingField = String(fieldKey || "");
+        },
+        stopCompanySummaryEdit(fieldKey = "") {
+          if (!fieldKey || this.isCompanySummaryEditing(fieldKey)) {
+            this.companySummaryEditingField = "";
+          }
+        },
+        openCompanySummaryField(fieldKey) {
+          if (fieldKey === "activeDeal") {
+            if (this.companySummaryCurrentDeal) {
+              this.openDealEditor(this.companySummaryCurrentDeal);
+            }
+            return;
+          }
+          if (fieldKey === "lastTouch") {
+            if (this.companySummaryLastTouch) {
+              this.openTouchEditor(this.companySummaryLastTouch);
+            }
+            return;
+          }
+          if (fieldKey === "nextAction") {
+            const action = this.companySummaryNextAction;
+            if (action?.type === "task" && action.item) {
+              this.openTaskEditor(action.item);
+              return;
+            }
+            if (action?.type === "touch" && action.item) {
+              this.openTouchEditor(action.item);
+              return;
+            }
+            this.activeSection = "touches";
+            this.editingTouchId = null;
+            this.forms.touches = {
+              ...this.getDefaultForm("touches"),
+              happenedAt: this.toDateTimeLocal(new Date().toISOString()),
+              companyId: this.toIntOrNull(this.editingCompanyId),
+            };
+            this.showModal = true;
+            return;
+          }
+          this.startCompanySummaryEdit(fieldKey);
         },
         formatRemainingDuration(totalMinutes) {
           const minutes = Math.max(1, Math.ceil(Number(totalMinutes) || 0));
@@ -3106,7 +3296,8 @@
             sourceNames: Array.isArray(item.source_names) ? item.source_names : [],
             history: Array.isArray(item.history) ? item.history : [],
             websiteSessionId: item.website_session_id || "",
-            clientId: item.client || null
+            clientId: item.client || null,
+            createdAt: item.created_at || null
           };
         },
         mapDeal(item) {
@@ -3151,7 +3342,8 @@
             closeDate: item.close_date || "",
             failureReason: item.failure_reason || "",
             events: item.events || "",
-            isWon: !!item.is_won
+            isWon: !!item.is_won,
+            createdAt: item.created_at || null
           };
         },
         mapContact(item) {
@@ -3364,6 +3556,7 @@
         setSection(section) {
           this.activeSection = section;
           window.localStorage.setItem("crm_active_section", section);
+          this.companySummaryEditingField = "";
           this.search = "";
           this.showStatusFilter = false;
           this.showTaskCompanyFilter = false;
@@ -3406,6 +3599,7 @@
         },
         closeModal() {
           this.showModal = false;
+          this.companySummaryEditingField = "";
           this.cancelSourceCreate();
           this.clearUiErrors({ globalOnly: true });
           this.showTouchCompanyFilter = false;
@@ -3437,6 +3631,7 @@
         },
         openCreateModal() {
           this.clearUiErrors({ modalOnly: true });
+          this.companySummaryEditingField = "";
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.editingLeadId = null;

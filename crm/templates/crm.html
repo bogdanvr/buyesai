@@ -1274,7 +1274,7 @@
                         <button
                           v-if="eventItem.touchId"
                           type="button"
-                          @click="openTouchFromEvent(eventItem.touchId)"
+                          @click.stop="openTouchFromEvent(eventItem.touchId)"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                         >
                           Касание #[[ eventItem.touchId ]]
@@ -1585,6 +1585,119 @@
           </template>
 
           <template v-if="activeSection === 'companies'">
+            <div class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Название компании</div>
+                  <button v-if="!isCompanySummaryEditing('name')" type="button" @click="openCompanySummaryField('name')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.name || 'Не указано' ]]
+                  </button>
+                  <input
+                    v-else
+                    v-model="forms.companies.name"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('name')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('name')"
+                    @blur="stopCompanySummaryEdit('name')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                    autofocus
+                  />
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Сайт</div>
+                  <button v-if="!isCompanySummaryEditing('website')" type="button" @click="openCompanySummaryField('website')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.website || 'Не указан' ]]
+                  </button>
+                  <input
+                    v-else
+                    v-model="forms.companies.website"
+                    type="url"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('website')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('website')"
+                    @blur="stopCompanySummaryEdit('website')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Отрасль</div>
+                  <button v-if="!isCompanySummaryEditing('industry')" type="button" @click="openCompanySummaryField('industry')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.industry || 'Не указана' ]]
+                  </button>
+                  <input
+                    v-else
+                    v-model="forms.companies.industry"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('industry')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('industry')"
+                    @blur="stopCompanySummaryEdit('industry')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Размер / сегмент</div>
+                  <div class="mt-1 text-sm text-white">[[ companySummarySegmentLabel ]]</div>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Регион</div>
+                  <button v-if="!isCompanySummaryEditing('address')" type="button" @click="openCompanySummaryField('address')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ companySummaryRegionLabel ]]
+                  </button>
+                  <input
+                    v-else
+                    v-model="forms.companies.address"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('address')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('address')"
+                    @blur="stopCompanySummaryEdit('address')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Источник первого обращения</div>
+                  <div class="mt-1 text-sm text-white">[[ companySummaryFirstSourceLabel ]]</div>
+                </div>
+                <div class="rounded-xl border border-crm-accent/40 bg-crm-accent/10 px-3 py-2">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-accent">Статус клиента</div>
+                  <button v-if="!isCompanySummaryEditing('isActive')" type="button" @click="openCompanySummaryField('isActive')" class="mt-1 text-left text-sm font-medium text-white hover:text-crm-accent transition">
+                    [[ companySummaryStatusLabel ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.companies.isActive"
+                    @change="stopCompanySummaryEdit('isActive')"
+                    @blur="stopCompanySummaryEdit('isActive')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-accent/40 bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option :value="true">Активный</option>
+                    <option :value="false">Неактивный</option>
+                  </select>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Ответственный менеджер</div>
+                  <div class="mt-1 text-sm text-white">[[ companySummaryResponsibleLabel ]]</div>
+                </div>
+                <button type="button" @click="openCompanySummaryField('lastTouch')" class="text-left py-1 hover:text-white transition">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дата последнего касания</div>
+                  <div class="mt-1 text-sm text-white">[[ companySummaryLastTouch?.happenedAtRaw ? formatDueLabel(companySummaryLastTouch.happenedAtRaw) : 'Не указана' ]]</div>
+                </button>
+                <button type="button" @click="openCompanySummaryField('nextAction')" class="text-left py-1 hover:text-white transition">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дата следующего действия</div>
+                  <div class="mt-1 text-sm text-white">[[ companySummaryNextAction?.at ? formatDueLabel(companySummaryNextAction.at) : 'Не указана' ]]</div>
+                </button>
+                <button type="button" @click="openCompanySummaryField('activeDeal')" class="text-left py-1 hover:text-white transition">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Текущая активная сделка</div>
+                  <div class="mt-1 text-sm text-white">[[ companySummaryCurrentDeal?.title || 'Не указана' ]]</div>
+                </button>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Сумма открытых сделок</div>
+                  <div class="mt-1 text-sm text-white">[[ formatDealAmountSummary(companySummaryOpenAmount, forms.companies.currency || 'RUB') ]]</div>
+                </div>
+                <div class="py-1 md:col-span-2">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Сумма успешных сделок за всё время</div>
+                  <div class="mt-1 text-sm text-white">[[ formatDealAmountSummary(companySummaryWonAmount, forms.companies.currency || 'RUB') ]]</div>
+                </div>
+              </div>
+            </div>
             <label class="block">
               <span class="text-sm text-crm-muted">Название</span>
               <input v-model="forms.companies.name" required type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
