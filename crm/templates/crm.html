@@ -1473,6 +1473,13 @@
               </select>
               <div v-if="forms.tasks.taskTypeGroup && !filteredTaskTypeOptions.length" class="mt-2 text-xs text-crm-muted">Для выбранной категории пока нет типов задач. Добавьте их в Django admin.</div>
             </label>
+            <label v-if="showTaskCommunicationChannelField" class="block">
+              <span class="text-sm text-crm-muted">Тип канала</span>
+              <select v-model="forms.tasks.communicationChannelId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбран</option>
+                <option v-for="channel in metaOptions.communicationChannels" :key="`task-channel-${channel.id}`" :value="channel.id">[[ channel.name ]]</option>
+              </select>
+            </label>
             <label v-if="shouldShowTaskField(forms.tasks.status)" class="block">
               <span class="text-sm text-crm-muted">Статус</span>
               <select v-model="forms.tasks.status" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
@@ -1529,8 +1536,8 @@
               <textarea v-model="forms.tasks.companyNote" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
             <div v-if="showTaskFollowUpSuggestion" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
-              <div class="text-sm font-semibold text-white">Следующая задача по сделке</div>
-              <div class="mt-1 text-xs text-crm-muted">Сделка: [[ taskFollowUpDealTitle ]]</div>
+              <div class="text-sm font-semibold text-white">Следующая задача</div>
+              <div class="mt-1 text-xs text-crm-muted">Контекст: [[ taskFollowUpDealTitle ]]</div>
               <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label class="block md:col-span-2">
                   <span class="text-sm text-crm-muted">Название следующей задачи</span>

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.utils import timezone
 
 from crm.models import Activity
-from crm.models.activity import ActivityType, TaskStatus
+from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup
 
 
 class ActivitySerializer(serializers.ModelSerializer):
@@ -13,6 +13,7 @@ class ActivitySerializer(serializers.ModelSerializer):
     task_type_name = serializers.CharField(source="task_type.name", read_only=True)
     task_type_group = serializers.CharField(source="task_type.group", read_only=True)
     task_type_group_label = serializers.CharField(source="task_type.get_group_display", read_only=True)
+    communication_channel_name = serializers.CharField(source="communication_channel.name", read_only=True)
     related_touch_subject = serializers.CharField(source="related_touch.subject", read_only=True)
     status_label = serializers.SerializerMethodField()
     has_follow_up_task = serializers.BooleanField(write_only=True, required=False, default=False)
@@ -47,6 +48,8 @@ class ActivitySerializer(serializers.ModelSerializer):
         status = self._resolve_task_status(attrs)
         is_done = status == TaskStatus.DONE
         result = attrs.get("result", getattr(self.instance, "result", ""))
+        task_type = attrs.get("task_type", getattr(self.instance, "task_type", None))
+        task_type_group = str(getattr(task_type, "group", "") or "").strip()
         deal = attrs.get("deal", getattr(self.instance, "deal", None))
         related_touch = attrs.get("related_touch", getattr(self.instance, "related_touch", None))
         has_follow_up_task = bool(attrs.pop("has_follow_up_task", False))
@@ -68,10 +71,18 @@ class ActivitySerializer(serializers.ModelSerializer):
         if activity_type == ActivityType.TASK and is_done:
             has_result = bool(str(result or "").strip())
             has_related_touch = related_touch is not None
-            if not has_result and not has_related_touch:
+            if task_type_group == TaskTypeGroup.INTERNAL_TASK and not has_result:
+                raise serializers.ValidationError({"result": "Для внутренней задачи укажите результат выполнения."})
+            if task_type_group == TaskTypeGroup.CLIENT_TASK:
+                pass
+            elif not has_result and not has_related_touch:
                 raise serializers.ValidationError(
                     {"result": "Укажите результат завершения задачи или привяжите касание."}
                 )
+        if activity_type == ActivityType.TASK and is_done and task_type_group == TaskTypeGroup.INTERNAL_TASK and not has_follow_up_task:
+            raise serializers.ValidationError(
+                {"has_follow_up_task": "Для внутренней задачи заполните следующую задачу перед завершением текущей."}
+            )
         if activity_type == ActivityType.TASK and save_company_note and not str(company_note or "").strip():
             raise serializers.ValidationError({"company_note": "Укажите важные факты о компании."})
         if activity_type == ActivityType.TASK and is_done and deal is not None:
@@ -118,6 +129,8 @@ class ActivitySerializer(serializers.ModelSerializer):
             "task_type_name",
             "task_type_group",
             "task_type_group_label",
+            "communication_channel",
+            "communication_channel_name",
             "related_touch",
             "related_touch_subject",
             "deadline_reminder_offset_minutes",

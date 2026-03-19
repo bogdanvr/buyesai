@@ -92,6 +92,14 @@ class Activity(TimestampedModel):
         on_delete=models.SET_NULL,
         verbose_name="Тип задачи",
     )
+    communication_channel = models.ForeignKey(
+        "crm.CommunicationChannel",
+        related_name="activities",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Канал связи",
+    )
     related_touch = models.ForeignKey(
         "self",
         related_name="related_tasks",

@@ -12,7 +12,7 @@ class ActivityViewSet(ModelViewSet):
 
     def get_queryset(self):
         queryset = Activity.objects.select_related(
-            "lead", "deal", "client", "contact", "created_by", "task_type", "related_touch"
+            "lead", "deal", "client", "contact", "created_by", "task_type", "communication_channel", "related_touch"
         ).order_by("-created_at")
         type_code = self.request.query_params.get("type")
         exclude_type = self.request.query_params.get("exclude_type")

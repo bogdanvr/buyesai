@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 import re
 from datetime import timedelta
 
-from crm.models import Activity, Client, Deal, DealStage, LeadSource, TaskType
+from crm.models import Activity, Client, CommunicationChannel, Deal, DealStage, LeadSource, TaskType, Touch
 from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup
 
 
@@ -127,6 +127,90 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(task.related_touch_id, related_touch.pk)
         self.assertEqual(task.result, "")
 
+    def test_client_task_completion_creates_touch(self):
+        task_type = TaskType.objects.create(name="Созвон с клиентом", group=TaskTypeGroup.CLIENT_TASK)
+        channel = CommunicationChannel.objects.create(name="Телефон")
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Обсудить предложение",
+            task_type=task_type,
+            communication_channel=channel,
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "has_follow_up_task": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        task.refresh_from_db()
+        touch = Touch.objects.get(task=task)
+        self.assertTrue(task.is_done)
+        self.assertEqual(touch.deal_id, self.deal.pk)
+        self.assertEqual(touch.client_id, self.company.pk)
+        self.assertEqual(touch.channel_id, channel.pk)
+        self.assertEqual(touch.summary, "Обсудить предложение")
+
+    def test_internal_task_completion_requires_result(self):
+        task_type = TaskType.objects.create(name="Подготовить договор", group=TaskTypeGroup.INTERNAL_TASK)
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Подготовить договор",
+            task_type=task_type,
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "has_follow_up_task": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["result"][0], "Для внутренней задачи укажите результат выполнения.")
+
+    def test_internal_task_completion_requires_follow_up(self):
+        task_type = TaskType.objects.create(name="Сверка данных", group=TaskTypeGroup.INTERNAL_TASK)
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Сверить данные",
+            task_type=task_type,
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "result": "Данные сверены",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["has_follow_up_task"][0],
+            "Для внутренней задачи заполните следующую задачу перед завершением текущей.",
+        )
+
     def test_task_completion_can_append_company_note(self):
         task = Activity.objects.create(
             type=ActivityType.TASK,
@@ -232,6 +316,7 @@ class TaskResultAndEventsTests(APITestCase):
 
     def test_task_can_store_type_priority_related_touch_and_status(self):
         task_type = TaskType.objects.create(name="Квалификация", group=TaskTypeGroup.INTERNAL_TASK)
+        channel = CommunicationChannel.objects.create(name="Email")
         touch = Activity.objects.create(
             type=ActivityType.CALL,
             subject="Первичный звонок",
@@ -250,6 +335,7 @@ class TaskResultAndEventsTests(APITestCase):
                 "status": TaskStatus.IN_PROGRESS,
                 "priority": "high",
                 "task_type": task_type.pk,
+                "communication_channel": channel.pk,
                 "related_touch": touch.pk,
             },
             format="json",
@@ -263,6 +349,8 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(response.data["task_type_name"], "Квалификация")
         self.assertEqual(response.data["task_type_group"], TaskTypeGroup.INTERNAL_TASK)
         self.assertEqual(response.data["task_type_group_label"], "Внутренняя задача")
+        self.assertEqual(response.data["communication_channel"], channel.pk)
+        self.assertEqual(response.data["communication_channel_name"], "Email")
         self.assertEqual(response.data["related_touch"], touch.pk)
         self.assertEqual(response.data["related_touch_subject"], "Первичный звонок")
 

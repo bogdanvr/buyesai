@@ -5,8 +5,9 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 from audit.services import log_model_event
-from crm.models import Activity, Client, Deal, DealStage, Lead
-from crm.models.activity import ActivityType, TaskStatus
+from crm.models import Activity, Client, Deal, DealStage, Lead, Touch
+from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup
+from crm.models.touch import TouchDirection
 from crm.services.lead_services import convert_lead_to_deal
 
 
@@ -102,6 +103,11 @@ def _task_related_client_ids(instance: Activity) -> list[int]:
         if client_id and client_id not in client_ids:
             client_ids.append(client_id)
     return client_ids
+
+
+def _task_type_group(instance: Activity) -> str:
+    task_type = getattr(instance, "task_type", None)
+    return str(getattr(task_type, "group", "") or "").strip()
 
 
 @receiver(post_save, sender=Lead)
@@ -232,6 +238,32 @@ def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
     _append_deal_event(instance.deal_id, entry)
     for client_id in _task_related_client_ids(instance):
         _append_client_event(client_id, entry)
+
+
+@receiver(post_save, sender=Activity)
+def activity_client_task_touch_signal(sender, instance: Activity, created, **kwargs):
+    if instance.type != ActivityType.TASK or instance.status != TaskStatus.DONE:
+        return
+    if _task_type_group(instance) != TaskTypeGroup.CLIENT_TASK:
+        return
+
+    previous = getattr(instance, "_previous_activity_state", None)
+    if previous is not None and previous.type == ActivityType.TASK and previous.status == TaskStatus.DONE:
+        return
+
+    summary = str(instance.result or "").strip() or str(instance.subject or "").strip() or f"Завершена задача #{instance.pk}"
+    Touch.objects.create(
+        happened_at=instance.completed_at or timezone.now(),
+        channel=instance.communication_channel,
+        direction=TouchDirection.OUTGOING,
+        summary=summary,
+        owner=instance.created_by,
+        lead=instance.lead,
+        deal=instance.deal,
+        client=instance.client or getattr(instance.deal, "client", None) or getattr(instance.lead, "client", None),
+        contact=instance.contact,
+        task=instance,
+    )
 
 
 @receiver(post_save, sender=Activity)

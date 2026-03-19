@@ -163,6 +163,7 @@
               subject: "",
               taskTypeGroup: "",
               taskTypeId: null,
+              communicationChannelId: null,
               priority: "medium",
               companyId: null,
               dealId: null,
@@ -441,6 +442,11 @@
             || !!String(this.forms.tasks.taskTypeGroup || "").trim()
             || !!this.toIntOrNull(this.forms.tasks.taskTypeId);
         },
+        showTaskCommunicationChannelField() {
+          return this.currentTaskTypeGroup === "client_task"
+            || this.showAllTaskFields
+            || !!this.toIntOrNull(this.forms.tasks.communicationChannelId);
+        },
         shouldShowLeadTrackingBlock() {
           return this.isCreatingLead
             || this.showAllLeadFields
@@ -459,6 +465,11 @@
         showTaskResultField() {
           return this.isTaskDoneStatus(this.forms.tasks.status) || !!String(this.forms.tasks.result || "").trim();
         },
+        currentTaskTypeGroup() {
+          return this.normalizeTaskTypeGroup(
+            this.forms.tasks.taskTypeGroup || this.resolveTaskTypeGroupById(this.forms.tasks.taskTypeId)
+          );
+        },
         taskActiveDeal() {
           const dealId = this.toIntOrNull(this.forms.tasks.dealId);
           if (!dealId) return null;
@@ -471,10 +482,25 @@
           return !["won", "failed"].includes(stageCode);
         },
         showTaskFollowUpSuggestion() {
-          return !!this.editingTaskId && this.isTaskDoneStatus(this.forms.tasks.status) && this.taskActiveDealRequiresFollowUp;
+          return !!this.editingTaskId
+            && this.isTaskDoneStatus(this.forms.tasks.status)
+            && (
+              this.currentTaskTypeGroup === "internal_task"
+              || this.taskActiveDealRequiresFollowUp
+            );
         },
         taskFollowUpDealTitle() {
-          return this.taskActiveDeal ? this.taskActiveDeal.title || this.taskActiveDeal.name : "";
+          if (this.taskActiveDeal) {
+            return this.taskActiveDeal.title || this.taskActiveDeal.name;
+          }
+          const companyId = this.toIntOrNull(this.forms.tasks.companyId);
+          if (companyId) {
+            const company = this.datasets.companies.find((item) => String(item.id) === String(companyId));
+            if (company) {
+              return company.name || `Компания #${companyId}`;
+            }
+          }
+          return "Без сделки";
         },
         emptyLabel() {
           const labels = {
@@ -594,6 +620,9 @@
       watch: {
         "forms.tasks.taskTypeGroup": {
           handler(nextValue) {
+            if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
+              this.forms.tasks.communicationChannelId = null;
+            }
             const selectedTaskTypeId = this.toIntOrNull(this.forms.tasks.taskTypeId);
             if (!selectedTaskTypeId) {
               return;
@@ -1640,6 +1669,7 @@
             subject: item.subject || item.name || "",
             taskTypeGroup: item.taskTypeGroup || this.resolveTaskTypeGroupById(item.taskTypeId),
             taskTypeId: this.toIntOrNull(item.taskTypeId),
+            communicationChannelId: this.toIntOrNull(item.communicationChannelId),
             priority: item.priority || "medium",
             companyId: this.toIntOrNull(item.clientId),
             dealId: this.toIntOrNull(item.dealId),
@@ -1824,7 +1854,16 @@
           );
         },
         validateTaskFollowUpRequirement() {
-          if (!this.isTaskDoneStatus(this.forms.tasks.status) || !this.taskActiveDealRequiresFollowUp) {
+          if (!this.isTaskDoneStatus(this.forms.tasks.status)) {
+            return;
+          }
+          if (this.currentTaskTypeGroup === "internal_task") {
+            if (this.hasPreparedTaskFollowUp()) {
+              return;
+            }
+            throw new Error("Для внутренней задачи заполните следующую задачу перед завершением текущей");
+          }
+          if (!this.taskActiveDealRequiresFollowUp) {
             return;
           }
           const hasOtherActiveTasks = Array.isArray(this.datasets.tasks)
@@ -1842,8 +1881,18 @@
           if (!this.isTaskDoneStatus(form.status)) {
             return;
           }
+          const taskTypeGroup = this.normalizeTaskTypeGroup(form.taskTypeGroup || this.resolveTaskTypeGroupById(form.taskTypeId));
           const hasResult = !!form.result.trim();
           const hasRelatedTouch = !!this.toIntOrNull(form.relatedTouchId);
+          if (taskTypeGroup === "internal_task") {
+            if (!hasResult) {
+              throw new Error("Для внутренней задачи укажите результат выполнения");
+            }
+            return;
+          }
+          if (taskTypeGroup === "client_task") {
+            return;
+          }
           if (!hasResult && !hasRelatedTouch) {
             throw new Error("Укажите результат выполнения задачи или привяжите касание");
           }
@@ -2377,6 +2426,8 @@
             taskTypeName: item.task_type_name || "",
             taskTypeGroup: item.task_type_group || "",
             taskTypeGroupLabel: item.task_type_group_label || "",
+            communicationChannelId: item.communication_channel || null,
+            communicationChannelName: item.communication_channel_name || "",
             priority: item.priority || "medium",
             reminderOffsetMinutes: Number(item.deadline_reminder_offset_minutes || 30),
             company: item.client_name || "",
@@ -2683,6 +2734,7 @@
               subject: "",
               taskTypeGroup: "",
               taskTypeId: null,
+              communicationChannelId: null,
               priority: "medium",
               companyId: null,
               dealId: null,
@@ -3162,6 +3214,7 @@
               type: "task",
               subject: form.subject.trim(),
               task_type: this.toIntOrNull(form.taskTypeId),
+              communication_channel: this.toIntOrNull(form.communicationChannelId),
               priority: form.priority || "medium",
               description: form.description.trim(),
               result: form.result.trim(),
@@ -3200,6 +3253,7 @@
               type: "task",
               subject: form.subject.trim(),
               task_type: this.toIntOrNull(form.taskTypeId),
+              communication_channel: this.toIntOrNull(form.communicationChannelId),
               priority: form.priority || "medium",
               description: form.description.trim(),
               result: form.result.trim(),
@@ -3279,10 +3333,11 @@
         async createFollowUpTaskFromCurrentDeal() {
           const followUp = this.taskFollowUpForm;
           const subject = followUp.subject.trim();
-          const dealId = this.toIntOrNull(this.forms.tasks.dealId);
-          if (!subject || !dealId || !followUp.dueAt) {
+          if (!subject || !followUp.dueAt) {
             return;
           }
+          const dealId = this.toIntOrNull(this.forms.tasks.dealId);
+          const clientId = this.toIntOrNull(this.forms.tasks.companyId);
           await this.apiRequest("/api/v1/activities/", {
             method: "POST",
             body: {
@@ -3291,7 +3346,7 @@
               description: followUp.description.trim(),
               due_at: this.toIsoDateTime(followUp.dueAt),
               deadline_reminder_offset_minutes: Number(followUp.reminderOffsetMinutes || 30),
-              client: this.toIntOrNull(this.forms.tasks.companyId),
+              client: clientId,
               deal: dealId,
               status: "todo"
             }
