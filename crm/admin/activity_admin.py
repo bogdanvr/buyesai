@@ -5,7 +5,7 @@ from crm.models import Activity, TaskType
 
 @admin.register(TaskType)
 class TaskTypeAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "group", "is_active", "created_at")
+    list_display = ("name", "group", "is_active", "created_at")
     list_filter = ("group", "is_active")
     search_fields = ("name",)
 
