@@ -83,6 +83,7 @@
           showCompanyContactForm: false,
           showCompanyContactsPanel: false,
           showCompanyDealsPanel: false,
+          showCompanyLeadsPanel: false,
           showCompanyWorkRules: false,
           showCompanyNoteDraft: false,
           showCompanyOkvedDetails: false,
@@ -534,6 +535,28 @@
           const companyId = this.toIntOrNull(this.editingCompanyId);
           if (!companyId) return [];
           return (this.datasets.deals || []).filter((deal) => String(deal.clientId || "") === String(companyId));
+        },
+        companySummaryLeads() {
+          const companyId = this.toIntOrNull(this.editingCompanyId);
+          if (!companyId) return [];
+          return (this.datasets.leads || []).filter((lead) => String(lead.clientId || "") === String(companyId));
+        },
+        companySummaryActiveLeads() {
+          const activeCodes = new Set(["new", "in_progress", "attempting_contact", "qualified"]);
+          return this.companySummaryLeads.filter((lead) => activeCodes.has(String(lead.statusCode || lead.status || "").trim()));
+        },
+        companySummaryConvertedLeads() {
+          return this.companySummaryLeads.filter((lead) => {
+            const statusCode = String(lead.statusCode || lead.status || "").trim();
+            return statusCode === "converted" || !!this.leadConvertedDealByLeadId(lead.id);
+          });
+        },
+        companySummaryClosedLeads() {
+          const closedCodes = new Set(["lost", "unqualified", "spam", "archived"]);
+          return this.companySummaryLeads.filter((lead) => {
+            const statusCode = String(lead.statusCode || lead.status || "").trim();
+            return closedCodes.has(statusCode) && !this.leadConvertedDealByLeadId(lead.id);
+          });
         },
         companySummaryActiveDeals() {
           return this.companySummaryDeals.filter((deal) => this.getDealStatusBucket(deal) !== "done");
@@ -1808,6 +1831,9 @@
         toggleCompanyDealsPanel() {
           this.showCompanyDealsPanel = !this.showCompanyDealsPanel;
         },
+        toggleCompanyLeadsPanel() {
+          this.showCompanyLeadsPanel = !this.showCompanyLeadsPanel;
+        },
         toggleCompanyNoteDraft() {
           this.showCompanyNoteDraft = !this.showCompanyNoteDraft;
           if (!this.showCompanyNoteDraft) {
@@ -2468,6 +2494,8 @@
           this.showCompanyWorkRules = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDealsPanel = false;
+          this.showCompanyLeadsPanel = false;
+          this.showCompanyLeadsPanel = false;
           this.showCompanyNoteDraft = false;
           this.resetExpandedOptionalFields();
           const normalizedOkveds = this.normalizeCompanyOkveds(item.okveds, item.okved, item.industry);
@@ -2501,6 +2529,8 @@
           this.showCompanyContactsPanel = false;
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
+          this.showCompanyLeadsPanel = false;
+          this.showCompanyLeadsPanel = false;
           this.loadContactsForCompany();
           this.showModal = true;
           this.enrichCompanyFromDadataByInn();
@@ -3064,6 +3094,135 @@
           if (value !== undefined && value !== null && String(value).trim()) return String(value).trim();
           return "—";
         },
+        leadTouchesByLeadId(leadId) {
+          const normalizedLeadId = this.toIntOrNull(leadId);
+          if (!normalizedLeadId) return [];
+          return (this.datasets.touches || []).filter((touch) => String(touch.leadId || "") === String(normalizedLeadId));
+        },
+        leadTasksByLeadId(leadId) {
+          const normalizedLeadId = this.toIntOrNull(leadId);
+          if (!normalizedLeadId) return [];
+          return (this.datasets.tasks || []).filter((task) => String(task.leadId || "") === String(normalizedLeadId));
+        },
+        leadLastTouchByLeadId(leadId) {
+          const touches = this.leadTouchesByLeadId(leadId).slice();
+          touches.sort((left, right) => (this.parseTaskDueTimestamp(right.happenedAtRaw) || 0) - (this.parseTaskDueTimestamp(left.happenedAtRaw) || 0));
+          return touches[0] || null;
+        },
+        leadUpcomingTasksByLeadId(leadId) {
+          const now = Date.now();
+          return this.leadTasksByLeadId(leadId)
+            .filter((task) => this.isTaskActiveStatus(task.taskStatus || task.status))
+            .filter((task) => {
+              const ts = this.parseTaskDueTimestamp(task.dueAtRaw);
+              return ts !== null && ts >= now;
+            })
+            .slice()
+            .sort((left, right) => (
+              (String(left.taskTypeGroup || "") === "client_task" ? 0 : 1) - (String(right.taskTypeGroup || "") === "client_task" ? 0 : 1)
+              || (this.parseTaskDueTimestamp(left.dueAtRaw) || 0) - (this.parseTaskDueTimestamp(right.dueAtRaw) || 0)
+            ));
+        },
+        leadNextTouchByLeadId(leadId) {
+          const now = Date.now();
+          const touches = this.leadTouchesByLeadId(leadId)
+            .filter((touch) => {
+              const ts = this.parseTaskDueTimestamp(touch.nextStepAtRaw);
+              return ts !== null && ts >= now;
+            })
+            .slice();
+          touches.sort((left, right) => (this.parseTaskDueTimestamp(left.nextStepAtRaw) || 0) - (this.parseTaskDueTimestamp(right.nextStepAtRaw) || 0));
+          return touches[0] || null;
+        },
+        leadNextActionSummaryByLeadId(leadId) {
+          const nextTask = this.leadUpcomingTasksByLeadId(leadId)[0] || null;
+          const nextTouch = this.leadNextTouchByLeadId(leadId);
+          const nextTaskTs = this.parseTaskDueTimestamp(nextTask?.dueAtRaw);
+          const nextTouchTs = this.parseTaskDueTimestamp(nextTouch?.nextStepAtRaw);
+          if (nextTaskTs !== null && (nextTouchTs === null || nextTaskTs <= nextTouchTs)) {
+            return {
+              title: nextTask.subject || nextTask.name || "—",
+              at: nextTask.dueAtRaw || null,
+            };
+          }
+          if (nextTouchTs !== null) {
+            return {
+              title: nextTouch.nextStep || nextTouch.summary || nextTouch.resultOptionName || "—",
+              at: nextTouch.nextStepAtRaw || null,
+            };
+          }
+          return { title: "—", at: null };
+        },
+        leadTouchCountByLeadId(leadId) {
+          return this.leadTouchesByLeadId(leadId).length;
+        },
+        leadConvertedDealByLeadId(leadId) {
+          const normalizedLeadId = this.toIntOrNull(leadId);
+          if (!normalizedLeadId) return null;
+          const deals = (this.datasets.deals || [])
+            .filter((deal) => String(deal.leadId || "") === String(normalizedLeadId))
+            .slice()
+            .sort((left, right) => {
+              const leftTs = this.parseTaskDueTimestamp(left.createdAt || left.closedAt || left.closeDate) || 0;
+              const rightTs = this.parseTaskDueTimestamp(right.createdAt || right.closedAt || right.closeDate) || 0;
+              return rightTs - leftTs || Number(right.id || 0) - Number(left.id || 0);
+            });
+          return deals[0] || null;
+        },
+        leadResultLabel(lead) {
+          if (!lead) return "—";
+          const convertedDeal = this.leadConvertedDealByLeadId(lead.id);
+          if (convertedDeal) {
+            return `Создана сделка: ${convertedDeal.title || convertedDeal.name || `#${convertedDeal.id}`}`;
+          }
+          const description = String(lead.description || "").trim();
+          if (description) {
+            return description;
+          }
+          return lead.statusLabel || "—";
+        },
+        leadLossReasonLabel(lead) {
+          if (!lead) return "—";
+          const statusCode = String(lead.statusCode || lead.status || "").trim();
+          if (!["lost", "unqualified", "spam", "archived"].includes(statusCode)) {
+            return "—";
+          }
+          const description = String(lead.description || "").trim();
+          return description || lead.statusLabel || "—";
+        },
+        leadWorkingDaysLabel(lead) {
+          const startTs = this.parseTaskDueTimestamp(lead?.createdAt);
+          if (startTs === null) return "—";
+          const convertedDeal = this.leadConvertedDealByLeadId(lead?.id);
+          const finishTs = this.parseTaskDueTimestamp(convertedDeal?.createdAt || lead?.convertedAt);
+          const endTs = finishTs !== null ? finishTs : Date.now();
+          const diffDays = Math.max(0, Math.floor((endTs - startTs) / 86400000));
+          return `${diffDays} дн`;
+        },
+        openLeadFromCompanyPanel(lead) {
+          this.activeSection = "leads";
+          this.showStatusFilter = false;
+          this.showTaskCompanyFilter = false;
+          this.showTouchCompanyFilter = false;
+          this.showTouchDealFilter = false;
+          this.selectedStatusFilters = [];
+          this.selectedTaskCompanyFilters = [];
+          this.selectedTouchCompanyFilters = [];
+          this.clearTouchDealFilter();
+          this.openLeadEditor(lead);
+        },
+        openDealFromCompanyPanel(deal) {
+          this.activeSection = "deals";
+          this.showStatusFilter = false;
+          this.showTaskCompanyFilter = false;
+          this.showTouchCompanyFilter = false;
+          this.showTouchDealFilter = false;
+          this.selectedStatusFilters = [];
+          this.selectedTaskCompanyFilters = [];
+          this.selectedTouchCompanyFilters = [];
+          this.clearTouchDealFilter();
+          this.openDealEditor(deal);
+        },
         formatRemainingDuration(totalMinutes) {
           const minutes = Math.max(1, Math.ceil(Number(totalMinutes) || 0));
           if (minutes < 60) {
@@ -3470,6 +3629,7 @@
             company: item.client_name || item.company || "",
             phone: item.phone || "",
             email: item.email || "",
+            convertedAt: item.converted_at || null,
             assignedToId: item.assigned_to || null,
             assignedToName: item.assigned_to_name || "",
             status: statusCode,
@@ -3522,6 +3682,8 @@
             statusLabel: normalized.label,
             title: item.title || "",
             clientId: item.client || null,
+            leadId: item.lead || null,
+            leadTitle: item.lead_title || "",
             ownerId: item.owner || null,
             ownerName: item.owner_name || "",
             stageId: item.stage || "",
@@ -3619,6 +3781,8 @@
             reminderOffsetMinutes: Number(item.deadline_reminder_offset_minutes || 30),
             company: item.client_name || "",
             clientId: item.client || null,
+            leadId: item.lead || null,
+            leadTitle: item.lead_title || "",
             deal: item.deal_title || "",
             dealId: item.deal || null,
             dueLabel: this.formatDueLabel(item.due_at),
@@ -3793,6 +3957,7 @@
           this.showCompanyRequisites = false;
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
+          this.showCompanyLeadsPanel = false;
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
@@ -3834,6 +3999,7 @@
           this.showCompanyRequisites = false;
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
+          this.showCompanyLeadsPanel = false;
           this.showCompanyNoteDraft = false;
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
@@ -3856,6 +4022,8 @@
           this.showCompanyWorkRules = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDealsPanel = false;
+          this.showCompanyLeadsPanel = false;
+          this.showCompanyLeadsPanel = false;
           this.showDealTaskForm = false;
           this.forms[this.activeSection] = this.getDefaultForm(this.activeSection);
           this.resetDealTaskForm();
@@ -3872,6 +4040,8 @@
           this.showCompanyContactsPanel = false;
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
+          this.showCompanyLeadsPanel = false;
+          this.showCompanyLeadsPanel = false;
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
@@ -4755,6 +4925,7 @@
             this.showCompanyContactsPanel = false;
             this.showCompanyWorkRules = false;
             this.showCompanyDealsPanel = false;
+            this.showCompanyLeadsPanel = false;
             this.resetCompanyContactForm();
             this.companyContactsForActiveCompany = [];
             if (this.activeSection === "leads") {

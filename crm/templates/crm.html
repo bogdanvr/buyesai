@@ -1811,6 +1811,14 @@
                   <span>Сделки</span>
                   <span class="text-crm-accent text-xs">[[ showCompanyDealsPanel ? '−' : '+' ]]</span>
                 </button>
+                <button
+                  type="button"
+                  @click="toggleCompanyLeadsPanel"
+                  class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                >
+                  <span>Лиды</span>
+                  <span class="text-crm-accent text-xs">[[ showCompanyLeadsPanel ? '−' : '+' ]]</span>
+                </button>
               </div>
               <div v-if="showCompanyRequisites" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                 <div class="py-1">
@@ -2091,7 +2099,7 @@
                       v-for="deal in companySummaryActiveDeals"
                       :key="`company-open-deal-${deal.id}`"
                       type="button"
-                      @click="openDealEditor(deal)"
+                      @click="openDealFromCompanyPanel(deal)"
                       class="w-full rounded-xl border border-crm-border/80 bg-[#0f2f4a] px-3 py-3 text-left hover:border-crm-accent transition"
                     >
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
@@ -2116,7 +2124,7 @@
                       v-for="deal in companySummaryWonDeals"
                       :key="`company-won-deal-${deal.id}`"
                       type="button"
-                      @click="openDealEditor(deal)"
+                      @click="openDealFromCompanyPanel(deal)"
                       class="w-full rounded-xl border border-emerald-400/20 bg-[#0f2f4a] px-3 py-3 text-left hover:border-emerald-300/40 transition"
                     >
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
@@ -2137,7 +2145,7 @@
                       v-for="deal in companySummaryFailedDeals"
                       :key="`company-failed-deal-${deal.id}`"
                       type="button"
-                      @click="openDealEditor(deal)"
+                      @click="openDealFromCompanyPanel(deal)"
                       class="w-full rounded-xl border border-red-400/20 bg-[#0f2f4a] px-3 py-3 text-left hover:border-red-300/40 transition"
                     >
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
@@ -2145,6 +2153,96 @@
                         <div class="text-sm text-white"><span class="text-crm-muted">Причина:</span> [[ deal.failureReason || '—' ]]</div>
                         <div class="text-sm text-white"><span class="text-crm-muted">Конкурент:</span> [[ companyFailedDealCompetitor(deal) ]]</div>
                         <div class="text-sm text-white"><span class="text-crm-muted">Можно ли реанимировать:</span> [[ companyFailedDealCanReviveLabel(deal) ]]</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div v-if="showCompanyLeadsPanel && editingCompanyId" class="mt-4 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-4 space-y-5">
+                <div>
+                  <div class="text-sm font-semibold text-white">Активные лиды</div>
+                  <div v-if="!companySummaryActiveLeads.length" class="mt-2 text-sm text-crm-muted">Активных лидов нет.</div>
+                  <div v-else class="mt-3 space-y-2">
+                    <button
+                      v-for="lead in companySummaryActiveLeads"
+                      :key="`company-active-lead-${lead.id}`"
+                      type="button"
+                      @click="openLeadFromCompanyPanel(lead)"
+                      class="w-full rounded-xl border border-crm-border/80 bg-[#0f2f4a] px-3 py-3 text-left hover:border-crm-accent transition"
+                    >
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                        <div class="text-sm text-white"><span class="text-crm-muted">Название / тема обращения:</span> [[ lead.title || lead.name ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Статус лида:</span> [[ lead.statusLabel || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Источник:</span> [[ lead.sourceName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Дата создания:</span> [[ lead.createdAt ? formatEventTimestamp(lead.createdAt) : '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Ответственный:</span> [[ lead.assignedToName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Контакт:</span> [[ lead.contactName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Последнее касание:</span> [[ leadLastTouchByLeadId(lead.id)?.summary || leadLastTouchByLeadId(lead.id)?.resultOptionName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Следующий шаг:</span> [[ leadNextActionSummaryByLeadId(lead.id).title ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Дата следующего шага:</span> [[ leadNextActionSummaryByLeadId(lead.id).at ? formatDueLabel(leadNextActionSummaryByLeadId(lead.id).at) : '—' ]]</div>
+                        <div class="text-sm text-white md:col-span-2"><span class="text-crm-muted">Результат:</span> [[ leadResultLabel(lead) ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Количество касаний:</span> [[ leadTouchCountByLeadId(lead.id) ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Сколько дней лид в работе:</span> [[ leadWorkingDaysLabel(lead) ]]</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="text-sm font-semibold text-white">Конвертированные лиды</div>
+                  <div v-if="!companySummaryConvertedLeads.length" class="mt-2 text-sm text-crm-muted">Конвертированных лидов нет.</div>
+                  <div v-else class="mt-3 space-y-2">
+                    <button
+                      v-for="lead in companySummaryConvertedLeads"
+                      :key="`company-converted-lead-${lead.id}`"
+                      type="button"
+                      @click="openLeadFromCompanyPanel(lead)"
+                      class="w-full rounded-xl border border-emerald-400/20 bg-[#0f2f4a] px-3 py-3 text-left hover:border-emerald-300/40 transition"
+                    >
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                        <div class="text-sm text-white"><span class="text-crm-muted">Название / тема обращения:</span> [[ lead.title || lead.name ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Статус лида:</span> [[ lead.statusLabel || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Источник:</span> [[ lead.sourceName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Дата создания:</span> [[ lead.createdAt ? formatEventTimestamp(lead.createdAt) : '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Ответственный:</span> [[ lead.assignedToName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Контакт:</span> [[ lead.contactName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Последнее касание:</span> [[ leadLastTouchByLeadId(lead.id)?.summary || leadLastTouchByLeadId(lead.id)?.resultOptionName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Следующий шаг:</span> [[ leadNextActionSummaryByLeadId(lead.id).title ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Дата следующего шага:</span> [[ leadNextActionSummaryByLeadId(lead.id).at ? formatDueLabel(leadNextActionSummaryByLeadId(lead.id).at) : '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Ссылка на созданную сделку:</span> [[ leadConvertedDealByLeadId(lead.id)?.title || leadConvertedDealByLeadId(lead.id)?.name || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Количество касаний:</span> [[ leadTouchCountByLeadId(lead.id) ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Сколько дней лид был в работе:</span> [[ leadWorkingDaysLabel(lead) ]]</div>
+                        <div class="text-sm text-white md:col-span-2"><span class="text-crm-muted">Результат:</span> [[ leadResultLabel(lead) ]]</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="text-sm font-semibold text-white">Закрытые без сделки</div>
+                  <div v-if="!companySummaryClosedLeads.length" class="mt-2 text-sm text-crm-muted">Закрытых лидов без сделки нет.</div>
+                  <div v-else class="mt-3 space-y-2">
+                    <button
+                      v-for="lead in companySummaryClosedLeads"
+                      :key="`company-closed-lead-${lead.id}`"
+                      type="button"
+                      @click="openLeadFromCompanyPanel(lead)"
+                      class="w-full rounded-xl border border-red-400/20 bg-[#0f2f4a] px-3 py-3 text-left hover:border-red-300/40 transition"
+                    >
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                        <div class="text-sm text-white"><span class="text-crm-muted">Название / тема обращения:</span> [[ lead.title || lead.name ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Статус лида:</span> [[ lead.statusLabel || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Источник:</span> [[ lead.sourceName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Дата создания:</span> [[ lead.createdAt ? formatEventTimestamp(lead.createdAt) : '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Ответственный:</span> [[ lead.assignedToName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Контакт:</span> [[ lead.contactName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Последнее касание:</span> [[ leadLastTouchByLeadId(lead.id)?.summary || leadLastTouchByLeadId(lead.id)?.resultOptionName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Следующий шаг:</span> [[ leadNextActionSummaryByLeadId(lead.id).title ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Дата следующего шага:</span> [[ leadNextActionSummaryByLeadId(lead.id).at ? formatDueLabel(leadNextActionSummaryByLeadId(lead.id).at) : '—' ]]</div>
+                        <div class="text-sm text-white md:col-span-2"><span class="text-crm-muted">Причина потери / неквалификации:</span> [[ leadLossReasonLabel(lead) ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Количество касаний:</span> [[ leadTouchCountByLeadId(lead.id) ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Сколько дней лид был в работе:</span> [[ leadWorkingDaysLabel(lead) ]]</div>
+                        <div class="text-sm text-white md:col-span-2"><span class="text-crm-muted">Результат:</span> [[ leadResultLabel(lead) ]]</div>
                       </div>
                     </button>
                   </div>
