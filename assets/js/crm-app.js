@@ -992,6 +992,14 @@
           const taskType = this.resolveTaskTypeById(taskTypeId);
           return String(taskType?.touch_result || "").trim();
         },
+        resolveTaskResultValue(formLike) {
+          const form = formLike && typeof formLike === "object" ? formLike : {};
+          const explicitResult = String(form.result || "").trim();
+          if (explicitResult) {
+            return explicitResult;
+          }
+          return this.resolveTaskTypeDefaultResultById(form.taskTypeId);
+        },
         formatHistoryTimestamp(value) {
           const raw = String(value || "").trim();
           if (!raw) return "";
@@ -2111,22 +2119,14 @@
             return;
           }
           const taskTypeGroup = this.normalizeTaskTypeGroup(form.taskTypeGroup || this.resolveTaskTypeGroupById(form.taskTypeId));
-          const hasResult = !!form.result.trim();
-          const hasRelatedTouch = !!this.toIntOrNull(form.relatedTouchId);
-          if (taskTypeGroup === "internal_task") {
-            if (!hasResult) {
-              throw new Error("Для внутренней задачи укажите результат выполнения");
-            }
-            return;
-          }
+          const hasResult = !!this.resolveTaskResultValue(form);
           if (taskTypeGroup === "client_task") {
             if (!this.toIntOrNull(form.communicationChannelId)) {
               throw new Error("Укажите тип канала перед завершением клиентской задачи");
             }
-            return;
           }
-          if (!hasResult && !hasRelatedTouch) {
-            throw new Error("Укажите результат выполнения задачи или привяжите касание");
+          if (!hasResult) {
+            throw new Error("Укажите результат выполнения задачи или задайте его в типе задачи");
           }
         },
         resetDealCompanyForm() {
@@ -3627,7 +3627,7 @@
             if (this.activeSection === "companies" && this.editingCompanyId) await this.updateCompany();
             if (this.activeSection === "companies" && !this.editingCompanyId) await this.createCompany();
             if (this.activeSection === "tasks" && this.editingTaskId) await this.updateTask();
-            if (this.activeSection === "tasks" && this.editingTaskId && this.showTaskFollowUpSuggestion && this.taskFollowUpForm.subject.trim()) {
+            if (this.activeSection === "tasks" && this.editingTaskId && this.showTaskFollowUpSuggestion && this.hasPreparedTaskFollowUp()) {
               await this.createFollowUpTaskFromCurrentDeal();
             }
             if (this.activeSection === "tasks" && !this.editingTaskId) await this.createTask();

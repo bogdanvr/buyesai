@@ -74,13 +74,26 @@ class ActivitySerializer(serializers.ModelSerializer):
             return
         raise serializers.ValidationError({"subject": "Укажите название задачи или выберите тип задачи."})
 
+    def _resolve_task_result(self, attrs, activity_type, task_type):
+        if activity_type != ActivityType.TASK:
+            return ""
+        result = str(attrs.get("result", getattr(self.instance, "result", "")) or "").strip()
+        if result:
+            attrs["result"] = result
+            return result
+        task_type_result = str(getattr(task_type, "touch_result", "") or "").strip()
+        if task_type_result:
+            attrs["result"] = task_type_result
+            return task_type_result
+        attrs["result"] = ""
+        return ""
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
         activity_type = attrs.get("type", getattr(self.instance, "type", None))
         due_at = attrs.get("due_at", getattr(self.instance, "due_at", None))
         status = self._resolve_task_status(attrs)
         is_done = status == TaskStatus.DONE
-        result = attrs.get("result", getattr(self.instance, "result", ""))
         task_type = attrs.get("task_type", getattr(self.instance, "task_type", None))
         task_type_group = str(getattr(task_type, "group", "") or "").strip()
         has_automatic_follow_up_task = self._has_automatic_follow_up_task(task_type)
@@ -97,6 +110,7 @@ class ActivitySerializer(serializers.ModelSerializer):
         )
         company_note = attrs.get("company_note", getattr(self.instance, "company_note", ""))
         self._resolve_task_subject(attrs, activity_type, task_type)
+        result = self._resolve_task_result(attrs, activity_type, task_type)
         if activity_type == ActivityType.TASK:
             attrs["status"] = status
             attrs["is_done"] = is_done
@@ -111,21 +125,18 @@ class ActivitySerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"related_touch": "Связанное касание должно быть активностью, а не задачей."})
         if activity_type == ActivityType.TASK and is_done:
             has_result = bool(str(result or "").strip())
-            has_related_touch = related_touch is not None
             has_non_overdue_client_task = self._has_non_overdue_client_task_for_deal(
                 deal,
                 current_task_id=getattr(self.instance, "pk", None),
             )
-            if task_type_group == TaskTypeGroup.INTERNAL_TASK and not has_result:
-                raise serializers.ValidationError({"result": "Для внутренней задачи укажите результат выполнения."})
             if task_type_group == TaskTypeGroup.CLIENT_TASK:
                 if communication_channel is None:
                     raise serializers.ValidationError(
                         {"communication_channel": "Укажите тип канала перед завершением клиентской задачи."}
                     )
-            elif not has_result and not has_related_touch:
+            if not has_result:
                 raise serializers.ValidationError(
-                    {"result": "Укажите результат завершения задачи или привяжите касание."}
+                    {"result": "Укажите результат выполнения задачи или задайте его в типе задачи."}
                 )
         if (
             activity_type == ActivityType.TASK

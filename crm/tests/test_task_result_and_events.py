@@ -48,7 +48,7 @@ class TaskResultAndEventsTests(APITestCase):
             stage=self.stage_new,
         )
 
-    def test_task_completion_requires_result_or_touch_and_writes_events_to_deal_and_company(self):
+    def test_task_completion_requires_result_and_writes_events_to_deal_and_company(self):
         task = Activity.objects.create(
             type=ActivityType.TASK,
             subject="Отправить КП",
@@ -67,7 +67,7 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertIn("result", bad_response.data)
         self.assertEqual(
             bad_response.data["result"][0],
-            "Укажите результат завершения задачи или привяжите касание.",
+            "Укажите результат выполнения задачи или задайте его в типе задачи.",
         )
 
         good_response = self.client.patch(
@@ -93,7 +93,7 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertIn(f"deal_id: {self.deal.pk}", self.deal.events)
         self.assertIn("Коммерческое предложение отправлено клиенту", self.company.events)
 
-    def test_task_completion_allows_related_touch_without_result(self):
+    def test_task_completion_requires_result_even_with_related_touch(self):
         related_touch = Activity.objects.create(
             type=ActivityType.CALL,
             subject="Созвон с клиентом",
@@ -120,12 +120,11 @@ class TaskResultAndEventsTests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        task.refresh_from_db()
-        self.assertTrue(task.is_done)
-        self.assertEqual(task.related_touch_id, related_touch.pk)
-        self.assertEqual(task.result, "")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["result"][0],
+            "Укажите результат выполнения задачи или задайте его в типе задачи.",
+        )
 
     def test_client_task_completion_creates_touch(self):
         task_type = TaskType.objects.create(
@@ -160,6 +159,7 @@ class TaskResultAndEventsTests(APITestCase):
         task.refresh_from_db()
         touch = Touch.objects.get(task=task)
         self.assertTrue(task.is_done)
+        self.assertEqual(task.result, "Связались повторно")
         self.assertEqual(touch.deal_id, self.deal.pk)
         self.assertEqual(touch.client_id, self.company.pk)
         self.assertEqual(touch.channel_id, channel.pk)
@@ -252,7 +252,36 @@ class TaskResultAndEventsTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["result"][0], "Для внутренней задачи укажите результат выполнения.")
+        self.assertEqual(response.data["result"][0], "Укажите результат выполнения задачи или задайте его в типе задачи.")
+
+    def test_task_completion_uses_result_from_task_type(self):
+        task_type = TaskType.objects.create(
+            name="Подготовить договор",
+            group=TaskTypeGroup.INTERNAL_TASK,
+            touch_result="Договор подготовлен",
+        )
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Подготовить договор",
+            task_type=task_type,
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "has_follow_up_task": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        task.refresh_from_db()
+        self.assertEqual(task.result, "Договор подготовлен")
 
     def test_internal_task_completion_requires_follow_up(self):
         task_type = TaskType.objects.create(name="Сверка данных", group=TaskTypeGroup.INTERNAL_TASK)
