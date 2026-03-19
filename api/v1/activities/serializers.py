@@ -50,6 +50,10 @@ class ActivitySerializer(serializers.ModelSerializer):
         result = attrs.get("result", getattr(self.instance, "result", ""))
         task_type = attrs.get("task_type", getattr(self.instance, "task_type", None))
         task_type_group = str(getattr(task_type, "group", "") or "").strip()
+        communication_channel = attrs.get(
+            "communication_channel",
+            getattr(self.instance, "communication_channel", None),
+        )
         deal = attrs.get("deal", getattr(self.instance, "deal", None))
         related_touch = attrs.get("related_touch", getattr(self.instance, "related_touch", None))
         has_follow_up_task = bool(attrs.pop("has_follow_up_task", False))
@@ -61,6 +65,8 @@ class ActivitySerializer(serializers.ModelSerializer):
         if activity_type == ActivityType.TASK:
             attrs["status"] = status
             attrs["is_done"] = is_done
+            if task_type_group != TaskTypeGroup.CLIENT_TASK and communication_channel is not None:
+                attrs["communication_channel"] = None
         if activity_type == ActivityType.TASK and not due_at:
             raise serializers.ValidationError({"due_at": "Укажите срок задачи."})
         if activity_type == ActivityType.TASK and related_touch is not None:

@@ -443,9 +443,7 @@
             || !!this.toIntOrNull(this.forms.tasks.taskTypeId);
         },
         showTaskCommunicationChannelField() {
-          return this.currentTaskTypeGroup === "client_task"
-            || this.showAllTaskFields
-            || !!this.toIntOrNull(this.forms.tasks.communicationChannelId);
+          return this.currentTaskTypeGroup === "client_task";
         },
         shouldShowLeadTrackingBlock() {
           return this.isCreatingLead
@@ -3208,13 +3206,16 @@
           this.validateTaskCompletionEvidence(form);
           this.validateTaskFollowUpRequirement();
           const clientId = this.toIntOrNull(form.companyId);
+          const communicationChannelId = this.currentTaskTypeGroup === "client_task"
+            ? this.toIntOrNull(form.communicationChannelId)
+            : null;
           await this.apiRequest("/api/v1/activities/", {
             method: "POST",
             body: {
               type: "task",
               subject: form.subject.trim(),
               task_type: this.toIntOrNull(form.taskTypeId),
-              communication_channel: this.toIntOrNull(form.communicationChannelId),
+              communication_channel: communicationChannelId,
               priority: form.priority || "medium",
               description: form.description.trim(),
               result: form.result.trim(),
@@ -3247,13 +3248,16 @@
           this.validateTaskCompletionEvidence(form);
           this.validateTaskFollowUpRequirement();
           const clientId = this.toIntOrNull(form.companyId);
+          const communicationChannelId = this.currentTaskTypeGroup === "client_task"
+            ? this.toIntOrNull(form.communicationChannelId)
+            : null;
           await this.apiRequest(`/api/v1/activities/${this.editingTaskId}/`, {
             method: "PATCH",
             body: {
               type: "task",
               subject: form.subject.trim(),
               task_type: this.toIntOrNull(form.taskTypeId),
-              communication_channel: this.toIntOrNull(form.communicationChannelId),
+              communication_channel: communicationChannelId,
               priority: form.priority || "medium",
               description: form.description.trim(),
               result: form.result.trim(),
