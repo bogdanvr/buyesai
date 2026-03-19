@@ -5,6 +5,8 @@ from crm.models import Contact
 
 class ContactSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source="client.name", read_only=True)
+    role_name = serializers.CharField(source="role.name", read_only=True)
+    contact_status_name = serializers.CharField(source="contact_status.name", read_only=True)
 
     class Meta:
         model = Contact
@@ -19,7 +21,9 @@ class ContactSerializer(serializers.ModelSerializer):
             "email",
             "telegram_whatsapp",
             "role",
+            "role_name",
             "contact_status",
+            "contact_status_name",
             "person_note",
             "is_primary",
             "created_at",

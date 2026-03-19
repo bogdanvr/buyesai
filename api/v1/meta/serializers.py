@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.utils.text import slugify
 from django.contrib.auth import get_user_model
 
-from crm.models import CommunicationChannel, DealStage, LeadSource, LeadStatus, TaskType, TouchResult
+from crm.models import CommunicationChannel, ContactRole, ContactStatus, DealStage, LeadSource, LeadStatus, TaskType, TouchResult
 
 
 User = get_user_model()
@@ -48,6 +48,18 @@ class LeadSourceSerializer(serializers.ModelSerializer):
 class CommunicationChannelSerializer(serializers.ModelSerializer):
     class Meta:
         model = CommunicationChannel
+        fields = ["id", "name", "is_active"]
+
+
+class ContactRoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactRole
+        fields = ["id", "name", "is_active"]
+
+
+class ContactStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactStatus
         fields = ["id", "name", "is_active"]
 
 

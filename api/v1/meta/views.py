@@ -11,6 +11,8 @@ from rest_framework.views import APIView
 
 from api.v1.meta.serializers import (
     CommunicationChannelSerializer,
+    ContactRoleSerializer,
+    ContactStatusSerializer,
     DealStageSerializer,
     LeadSourceSerializer,
     LeadStatusSerializer,
@@ -18,7 +20,7 @@ from api.v1.meta.serializers import (
     TouchResultSerializer,
     UserOptionSerializer,
 )
-from crm.models import CommunicationChannel, DealStage, LeadSource, LeadStatus, TaskType, TouchResult
+from crm.models import CommunicationChannel, ContactRole, ContactStatus, DealStage, LeadSource, LeadStatus, TaskType, TouchResult
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -104,6 +106,22 @@ class CommunicationChannelListAPIView(ListAPIView):
 
     def get_queryset(self):
         return CommunicationChannel.objects.filter(is_active=True).order_by("name")
+
+
+class ContactRoleListAPIView(ListAPIView):
+    serializer_class = ContactRoleSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return ContactRole.objects.filter(is_active=True).order_by("name")
+
+
+class ContactStatusListAPIView(ListAPIView):
+    serializer_class = ContactStatusSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return ContactStatus.objects.filter(is_active=True).order_by("name")
 
 
 class UserOptionListAPIView(ListAPIView):

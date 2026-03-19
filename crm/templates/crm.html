@@ -1466,11 +1466,17 @@
             </label>
             <label class="block">
               <span class="text-sm text-crm-muted">Роль</span>
-              <input v-model="forms.contacts.role" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+              <select v-model="forms.contacts.roleId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбрана</option>
+                <option v-for="role in metaOptions.contactRoles" :key="`contact-role-${role.id}`" :value="role.id">[[ role.name ]]</option>
+              </select>
             </label>
             <label class="block">
               <span class="text-sm text-crm-muted">Статус контакта</span>
-              <input v-model="forms.contacts.contactStatus" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+              <select v-model="forms.contacts.contactStatusId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбран</option>
+                <option v-for="status in metaOptions.contactStatuses" :key="`contact-status-${status.id}`" :value="status.id">[[ status.name ]]</option>
+              </select>
             </label>
             <label class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Примечание по человеку</span>
@@ -1791,6 +1797,14 @@
                 </button>
                 <button
                   type="button"
+                  @click="toggleCompanyWorkRules"
+                  class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                >
+                  <span>Правила работы</span>
+                  <span class="text-crm-accent text-xs">[[ showCompanyWorkRules ? '−' : '+' ]]</span>
+                </button>
+                <button
+                  type="button"
                   @click="toggleCompanyDealsPanel"
                   class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
                 >
@@ -1937,6 +1951,45 @@
                   </button>
                 </div>
               </div>
+              <div v-if="showCompanyWorkRules" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">ЛПР</div>
+                  <select v-model="forms.companies.workRules.decisionMakerId" class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent">
+                    <option :value="null">Не выбран</option>
+                    <option v-for="contact in companyContactsForActiveCompany" :key="`company-rule-contact-${contact.id}`" :value="contact.id">[[ contact.fullName ]]</option>
+                  </select>
+                  <div v-if="!editingCompanyId" class="mt-1 text-xs text-crm-muted">ЛПР можно выбрать после создания компании и добавления контактов.</div>
+                  <div v-else-if="!companyContactsForActiveCompany.length" class="mt-1 text-xs text-crm-muted">Сначала добавьте контакт компании, затем выберите его как ЛПР.</div>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Канал связи</div>
+                  <select v-model="forms.companies.workRules.communicationChannelIds" multiple class="mt-1 w-full min-h-[108px] rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent">
+                    <option v-for="channel in metaOptions.communicationChannels" :key="`company-rule-channel-${channel.id}`" :value="channel.id">[[ channel.name ]]</option>
+                  </select>
+                  <div v-if="metaOptions.communicationChannels.length" class="mt-1 text-xs text-crm-muted">Можно выбрать несколько каналов связи.</div>
+                  <div v-if="!metaOptions.communicationChannels.length" class="mt-1 text-xs text-crm-muted">Каналы связи добавляются только через Django admin.</div>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Условия оплаты</div>
+                  <input v-model="forms.companies.workRules.paymentTerms" type="text" class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent" />
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Требования к документам</div>
+                  <input v-model="forms.companies.workRules.documentRequirements" type="text" class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent" />
+                </div>
+                <div class="py-1 md:col-span-2">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Цикл согласования</div>
+                  <textarea v-model="forms.companies.workRules.approvalCycle" rows="2" class="mt-1 w-full rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"></textarea>
+                </div>
+                <div class="py-1 md:col-span-2">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Риски</div>
+                  <textarea v-model="forms.companies.workRules.risks" rows="2" class="mt-1 w-full rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"></textarea>
+                </div>
+                <div class="py-1 md:col-span-2">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Предпочтения</div>
+                  <textarea v-model="forms.companies.workRules.preferences" rows="2" class="mt-1 w-full rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"></textarea>
+                </div>
+              </div>
               <div v-if="showCompanyContactsPanel && editingCompanyId" class="mt-4 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-4">
                 <button
                   type="button"
@@ -1958,7 +2011,10 @@
                   </label>
                   <label class="block">
                     <span class="text-sm text-crm-muted">Роль</span>
-                    <input v-model="companyContactForm.role" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" />
+                    <select v-model="companyContactForm.roleId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent">
+                      <option :value="null">Не выбрана</option>
+                      <option v-for="role in metaOptions.contactRoles" :key="`company-contact-role-${role.id}`" :value="role.id">[[ role.name ]]</option>
+                    </select>
                   </label>
                   <label class="block">
                     <span class="text-sm text-crm-muted">Телефон</span>
@@ -1974,7 +2030,10 @@
                   </label>
                   <label class="block">
                     <span class="text-sm text-crm-muted">Статус контакта</span>
-                    <input v-model="companyContactForm.contactStatus" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" />
+                    <select v-model="companyContactForm.contactStatusId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent">
+                      <option :value="null">Не выбран</option>
+                      <option v-for="status in metaOptions.contactStatuses" :key="`company-contact-status-${status.id}`" :value="status.id">[[ status.name ]]</option>
+                    </select>
                   </label>
                   <label class="block md:col-span-2">
                     <span class="text-sm text-crm-muted">Примечание по человеку</span>
@@ -2122,48 +2181,6 @@
                   <span class="text-white">[[ entry.code || '—' ]]</span>
                   <span class="text-crm-muted"> — [[ entry.name || 'без названия' ]]</span>
                 </div>
-              </div>
-            </div>
-            <div class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
-              <div class="text-sm font-semibold text-white">Правила работы</div>
-              <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-                <label class="block">
-                  <span class="text-sm text-crm-muted">ЛПР</span>
-                  <select v-model="forms.companies.workRules.decisionMakerId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
-                    <option :value="null">Не выбран</option>
-                    <option v-for="contact in companyContactsForActiveCompany" :key="`company-rule-contact-${contact.id}`" :value="contact.id">[[ contact.fullName ]]</option>
-                  </select>
-                  <div v-if="!editingCompanyId" class="mt-1 text-xs text-crm-muted">ЛПР можно выбрать после создания компании и добавления контактов.</div>
-                  <div v-else-if="!companyContactsForActiveCompany.length" class="mt-1 text-xs text-crm-muted">Сначала добавьте контакт компании, затем выберите его как ЛПР.</div>
-                </label>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">Канал связи</span>
-                  <select v-model="forms.companies.workRules.communicationChannelIds" multiple class="mt-1 w-full min-h-[112px] rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent">
-                    <option v-for="channel in metaOptions.communicationChannels" :key="`company-rule-channel-${channel.id}`" :value="channel.id">[[ channel.name ]]</option>
-                  </select>
-                  <div v-if="metaOptions.communicationChannels.length" class="mt-1 text-xs text-crm-muted">Можно выбрать несколько каналов связи.</div>
-                  <div v-if="!metaOptions.communicationChannels.length" class="mt-1 text-xs text-crm-muted">Каналы связи добавляются только через Django admin.</div>
-                </label>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">Условия оплаты</span>
-                  <input v-model="forms.companies.workRules.paymentTerms" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">Требования к документам</span>
-                  <input v-model="forms.companies.workRules.documentRequirements" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                </label>
-                <label class="block md:col-span-2">
-                  <span class="text-sm text-crm-muted">Цикл согласования</span>
-                  <textarea v-model="forms.companies.workRules.approvalCycle" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
-                </label>
-                <label class="block md:col-span-2">
-                  <span class="text-sm text-crm-muted">Риски</span>
-                  <textarea v-model="forms.companies.workRules.risks" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
-                </label>
-                <label class="block md:col-span-2">
-                  <span class="text-sm text-crm-muted">Предпочтения</span>
-                  <textarea v-model="forms.companies.workRules.preferences" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
-                </label>
               </div>
             </div>
             <div class="block md:col-span-2">

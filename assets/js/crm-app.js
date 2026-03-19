@@ -83,6 +83,7 @@
           showCompanyContactForm: false,
           showCompanyContactsPanel: false,
           showCompanyDealsPanel: false,
+          showCompanyWorkRules: false,
           showCompanyNoteDraft: false,
           showCompanyOkvedDetails: false,
           showCompanyRequisites: false,
@@ -146,7 +147,9 @@
               phone: "",
               email: "",
               telegramWhatsapp: "",
+              roleId: null,
               role: "",
+              contactStatusId: null,
               contactStatus: "",
               personNote: "",
               isPrimary: false
@@ -287,6 +290,8 @@
             taskTypes: [],
             touchResults: [],
             communicationChannels: [],
+            contactRoles: [],
+            contactStatuses: [],
             currencyRates: { RUB: 1 }
           },
           taskStatusOptions: TASK_STATUS_OPTIONS,
@@ -1797,6 +1802,9 @@
         toggleCompanyRequisites() {
           this.showCompanyRequisites = !this.showCompanyRequisites;
         },
+        toggleCompanyWorkRules() {
+          this.showCompanyWorkRules = !this.showCompanyWorkRules;
+        },
         toggleCompanyDealsPanel() {
           this.showCompanyDealsPanel = !this.showCompanyDealsPanel;
         },
@@ -2436,7 +2444,9 @@
             phone: item.phone || "",
             email: item.email || "",
             telegramWhatsapp: item.telegramWhatsapp || "",
+            roleId: this.toIntOrNull(item.roleId),
             role: item.role || "",
+            contactStatusId: this.toIntOrNull(item.contactStatusId),
             contactStatus: item.contactStatus || "",
             personNote: item.personNote || "",
             isPrimary: !!item.isPrimary
@@ -2455,6 +2465,7 @@
           this.companySummaryEditingField = "";
           this.showCompanyEvents = false;
           this.showCompanyRequisites = false;
+          this.showCompanyWorkRules = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDealsPanel = false;
           this.showCompanyNoteDraft = false;
@@ -2488,6 +2499,7 @@
           this.resetCompanyContactForm();
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
+          this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
           this.loadContactsForCompany();
           this.showModal = true;
@@ -3335,8 +3347,10 @@
               phone: item.phone || "",
               email: item.email || "",
               telegramWhatsapp: item.telegram_whatsapp || "",
-              role: item.role || "",
-              contactStatus: item.contact_status || "",
+              roleId: item.role || null,
+              role: item.role_name || "",
+              contactStatusId: item.contact_status || null,
+              contactStatus: item.contact_status_name || "",
               personNote: item.person_note || "",
               isPrimary: !!item.is_primary,
               clientId: item.client || companyId
@@ -3358,7 +3372,9 @@
             phone: contact.phone || "",
             email: contact.email || "",
             telegramWhatsapp: contact.telegramWhatsapp || "",
+            roleId: this.toIntOrNull(contact.roleId),
             role: contact.role || "",
+            contactStatusId: this.toIntOrNull(contact.contactStatusId),
             contactStatus: contact.contactStatus || "",
             personNote: contact.personNote || "",
             isPrimary: !!contact.isPrimary
@@ -3377,7 +3393,9 @@
             phone: "",
             email: "",
             telegramWhatsapp: "",
+            roleId: null,
             role: "",
+            contactStatusId: null,
             contactStatus: "",
             personNote: "",
             isPrimary: false
@@ -3401,8 +3419,10 @@
               phone: item.phone || "",
               email: item.email || "",
               telegramWhatsapp: item.telegram_whatsapp || "",
-              role: item.role || "",
-              contactStatus: item.contact_status || "",
+              roleId: item.role || null,
+              role: item.role_name || "",
+              contactStatusId: item.contact_status || null,
+              contactStatus: item.contact_status_name || "",
               personNote: item.person_note || "",
               isPrimary: !!item.is_primary,
               clientId: item.client || null
@@ -3432,7 +3452,9 @@
             phone: contact.phone || "",
             email: contact.email || "",
             telegramWhatsapp: contact.telegramWhatsapp || "",
+            roleId: this.toIntOrNull(contact.roleId),
             role: contact.role || "",
+            contactStatusId: this.toIntOrNull(contact.contactStatusId),
             contactStatus: contact.contactStatus || "",
             personNote: contact.personNote || "",
             isPrimary: !!contact.isPrimary
@@ -3526,8 +3548,10 @@
             phone: item.phone || "",
             email: item.email || "",
             telegramWhatsapp: item.telegram_whatsapp || "",
-            role: item.role || "",
-            contactStatus: item.contact_status || "",
+            roleId: item.role || null,
+            role: item.role_name || "",
+            contactStatusId: item.contact_status || null,
+            contactStatus: item.contact_status_name || "",
             personNote: item.person_note || "",
             status: normalized.status,
             statusLabel: normalized.label,
@@ -3767,6 +3791,7 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyRequisites = false;
+          this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
@@ -3807,6 +3832,7 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyRequisites = false;
+          this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
           this.showCompanyNoteDraft = false;
           this.showCompanyOkvedDetails = false;
@@ -3827,6 +3853,7 @@
           this.resetExpandedOptionalFields();
           this.showCompanyNoteDraft = false;
           this.showCompanyRequisites = false;
+          this.showCompanyWorkRules = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDealsPanel = false;
           this.showDealTaskForm = false;
@@ -3843,6 +3870,7 @@
           this.dealTasksForActiveDeal = [];
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
+          this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
@@ -3892,7 +3920,9 @@
               phone: "",
               email: "",
               telegramWhatsapp: "",
+              roleId: null,
               role: "",
+              contactStatusId: null,
               contactStatus: "",
               personNote: "",
               isPrimary: false
@@ -3989,14 +4019,16 @@
           return `${year}-${month}-${day}T${hours}:${minutes}`;
         },
         async loadMetaOptions() {
-          const [leadStatuses, dealStages, leadSources, users, taskTypes, touchResults, communicationChannels] = await Promise.all([
+          const [leadStatuses, dealStages, leadSources, users, taskTypes, touchResults, communicationChannels, contactRoles, contactStatuses] = await Promise.all([
             this.apiRequest("/api/v1/meta/lead-statuses/"),
             this.apiRequest("/api/v1/meta/deal-stages/"),
             this.apiRequest("/api/v1/meta/lead-sources/"),
             this.apiRequest("/api/v1/meta/users/"),
             this.apiRequest("/api/v1/meta/task-types/"),
             this.apiRequest("/api/v1/meta/touch-results/"),
-            this.apiRequest("/api/v1/meta/communication-channels/")
+            this.apiRequest("/api/v1/meta/communication-channels/"),
+            this.apiRequest("/api/v1/meta/contact-roles/"),
+            this.apiRequest("/api/v1/meta/contact-statuses/")
           ]);
           this.metaOptions.leadStatuses = this.normalizePaginatedResponse(leadStatuses);
           this.metaOptions.dealStages = this.sortDealStages(this.normalizePaginatedResponse(dealStages));
@@ -4005,6 +4037,8 @@
           this.metaOptions.taskTypes = this.normalizePaginatedResponse(taskTypes);
           this.metaOptions.touchResults = this.normalizePaginatedResponse(touchResults);
           this.metaOptions.communicationChannels = this.normalizePaginatedResponse(communicationChannels);
+          this.metaOptions.contactRoles = this.normalizePaginatedResponse(contactRoles);
+          this.metaOptions.contactStatuses = this.normalizePaginatedResponse(contactStatuses);
           this.loadCurrencyRates();
         },
         async loadCurrencyRates() {
@@ -4270,13 +4304,13 @@
                 last_name: lastName,
                 position: form.position.trim(),
                 phone: form.phone.trim(),
-                email: form.email.trim(),
-                telegram_whatsapp: form.telegramWhatsapp.trim(),
-                role: form.role.trim(),
-                contact_status: form.contactStatus.trim(),
-                person_note: form.personNote.trim(),
-                is_primary: !!form.isPrimary
-              }
+              email: form.email.trim(),
+              telegram_whatsapp: form.telegramWhatsapp.trim(),
+              role: this.toIntOrNull(form.roleId),
+              contact_status: this.toIntOrNull(form.contactStatusId),
+              person_note: form.personNote.trim(),
+              is_primary: !!form.isPrimary
+            }
             });
         },
         async updateContact() {
@@ -4302,13 +4336,13 @@
                 last_name: lastName,
                 position: form.position.trim(),
                 phone: form.phone.trim(),
-                email: form.email.trim(),
-                telegram_whatsapp: form.telegramWhatsapp.trim(),
-                role: form.role.trim(),
-                contact_status: form.contactStatus.trim(),
-                person_note: form.personNote.trim(),
-                is_primary: !!form.isPrimary
-              }
+              email: form.email.trim(),
+              telegram_whatsapp: form.telegramWhatsapp.trim(),
+              role: this.toIntOrNull(form.roleId),
+              contact_status: this.toIntOrNull(form.contactStatusId),
+              person_note: form.personNote.trim(),
+              is_primary: !!form.isPrimary
+            }
             });
         },
         async createCompany() {
@@ -4398,8 +4432,8 @@
                 phone: this.companyContactForm.phone.trim(),
                 email: this.companyContactForm.email.trim(),
                 telegram_whatsapp: this.companyContactForm.telegramWhatsapp.trim(),
-                role: this.companyContactForm.role.trim(),
-                contact_status: this.companyContactForm.contactStatus.trim(),
+                role: this.toIntOrNull(this.companyContactForm.roleId),
+                contact_status: this.toIntOrNull(this.companyContactForm.contactStatusId),
                 person_note: this.companyContactForm.personNote.trim(),
                 is_primary: !!this.companyContactForm.isPrimary
               }
@@ -4719,6 +4753,7 @@
             this.dealTasksForActiveDeal = [];
             this.showCompanyContactForm = false;
             this.showCompanyContactsPanel = false;
+            this.showCompanyWorkRules = false;
             this.showCompanyDealsPanel = false;
             this.resetCompanyContactForm();
             this.companyContactsForActiveCompany = [];
