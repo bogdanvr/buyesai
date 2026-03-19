@@ -15,6 +15,10 @@ class Contact(TimestampedModel):
     position = models.CharField(max_length=255, blank=True, default="", verbose_name="Должность")
     phone = models.CharField(max_length=32, blank=True, default="", verbose_name="Телефон")
     email = models.EmailField(blank=True, default="", verbose_name="Email")
+    telegram_whatsapp = models.CharField(max_length=255, blank=True, default="", verbose_name="Telegram / WhatsApp")
+    role = models.CharField(max_length=128, blank=True, default="", verbose_name="Роль")
+    contact_status = models.CharField(max_length=128, blank=True, default="", verbose_name="Статус контакта")
+    person_note = models.TextField(blank=True, default="", verbose_name="Примечание")
     is_primary = models.BooleanField(default=False, verbose_name="Основной контакт")
 
     class Meta:

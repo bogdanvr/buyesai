@@ -81,6 +81,7 @@
           isCompanyContactsLoading: false,
           isTaskTouchesLoading: false,
           showCompanyContactForm: false,
+          showCompanyContactsPanel: false,
           showCompanyNoteDraft: false,
           showCompanyOkvedDetails: false,
           showCompanyRequisites: false,
@@ -143,6 +144,10 @@
               position: "",
               phone: "",
               email: "",
+              telegramWhatsapp: "",
+              role: "",
+              contactStatus: "",
+              personNote: "",
               isPrimary: false
             },
             companies: {
@@ -266,6 +271,10 @@
             position: "",
             phone: "",
             email: "",
+            telegramWhatsapp: "",
+            role: "",
+            contactStatus: "",
+            personNote: "",
             isPrimary: false
           },
           companyContactsForActiveCompany: [],
@@ -2403,6 +2412,7 @@
         },
         openContactEditor(item) {
           this.clearUiErrors({ modalOnly: true });
+          this.activeSection = "contacts";
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingCompanyId = null;
@@ -2415,6 +2425,10 @@
             position: item.position || "",
             phone: item.phone || "",
             email: item.email || "",
+            telegramWhatsapp: item.telegramWhatsapp || "",
+            role: item.role || "",
+            contactStatus: item.contactStatus || "",
+            personNote: item.personNote || "",
             isPrimary: !!item.isPrimary
           };
           this.showModal = true;
@@ -2431,6 +2445,7 @@
           this.companySummaryEditingField = "";
           this.showCompanyEvents = false;
           this.showCompanyRequisites = false;
+          this.showCompanyContactsPanel = false;
           this.showCompanyNoteDraft = false;
           this.resetExpandedOptionalFields();
           const normalizedOkveds = this.normalizeCompanyOkveds(item.okveds, item.okved, item.industry);
@@ -2461,6 +2476,7 @@
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
           this.showCompanyContactForm = false;
+          this.showCompanyContactsPanel = false;
           this.loadContactsForCompany();
           this.showModal = true;
           this.enrichCompanyFromDadataByInn();
@@ -3209,6 +3225,10 @@
               position: item.position || "",
               phone: item.phone || "",
               email: item.email || "",
+              telegramWhatsapp: item.telegram_whatsapp || "",
+              role: item.role || "",
+              contactStatus: item.contact_status || "",
+              personNote: item.person_note || "",
               isPrimary: !!item.is_primary,
               clientId: item.client || companyId
             }));
@@ -3228,8 +3248,15 @@
             position: contact.position || "",
             phone: contact.phone || "",
             email: contact.email || "",
+            telegramWhatsapp: contact.telegramWhatsapp || "",
+            role: contact.role || "",
+            contactStatus: contact.contactStatus || "",
+            personNote: contact.personNote || "",
             isPrimary: !!contact.isPrimary
           });
+        },
+        toggleCompanyContactsPanel() {
+          this.showCompanyContactsPanel = !this.showCompanyContactsPanel;
         },
         toggleCompanyContactForm() {
           this.showCompanyContactForm = !this.showCompanyContactForm;
@@ -3240,6 +3267,10 @@
             position: "",
             phone: "",
             email: "",
+            telegramWhatsapp: "",
+            role: "",
+            contactStatus: "",
+            personNote: "",
             isPrimary: false
           };
         },
@@ -3260,6 +3291,10 @@
               position: item.position || "",
               phone: item.phone || "",
               email: item.email || "",
+              telegramWhatsapp: item.telegram_whatsapp || "",
+              role: item.role || "",
+              contactStatus: item.contact_status || "",
+              personNote: item.person_note || "",
               isPrimary: !!item.is_primary,
               clientId: item.client || null
             }));
@@ -3287,6 +3322,10 @@
             position: contact.position || "",
             phone: contact.phone || "",
             email: contact.email || "",
+            telegramWhatsapp: contact.telegramWhatsapp || "",
+            role: contact.role || "",
+            contactStatus: contact.contactStatus || "",
+            personNote: contact.personNote || "",
             isPrimary: !!contact.isPrimary
           });
         },
@@ -3376,6 +3415,10 @@
             company: item.client_name || "",
             phone: item.phone || "",
             email: item.email || "",
+            telegramWhatsapp: item.telegram_whatsapp || "",
+            role: item.role || "",
+            contactStatus: item.contact_status || "",
+            personNote: item.person_note || "",
             status: normalized.status,
             statusLabel: normalized.label,
             clientId: item.client || null,
@@ -3612,6 +3655,7 @@
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.showCompanyContactForm = false;
+          this.showCompanyContactsPanel = false;
           this.showCompanyRequisites = false;
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
@@ -3650,6 +3694,7 @@
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.showCompanyContactForm = false;
+          this.showCompanyContactsPanel = false;
           this.showCompanyRequisites = false;
           this.showCompanyNoteDraft = false;
           this.showCompanyOkvedDetails = false;
@@ -3670,6 +3715,7 @@
           this.resetExpandedOptionalFields();
           this.showCompanyNoteDraft = false;
           this.showCompanyRequisites = false;
+          this.showCompanyContactsPanel = false;
           this.showDealTaskForm = false;
           this.forms[this.activeSection] = this.getDefaultForm(this.activeSection);
           this.resetDealTaskForm();
@@ -3683,6 +3729,7 @@
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.showCompanyContactForm = false;
+          this.showCompanyContactsPanel = false;
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
@@ -3730,6 +3777,10 @@
               position: "",
               phone: "",
               email: "",
+              telegramWhatsapp: "",
+              role: "",
+              contactStatus: "",
+              personNote: "",
               isPrimary: false
             };
           }
@@ -4099,16 +4150,20 @@
           const lastName = parts.slice(1).join(" ");
           await this.apiRequest("/api/v1/contacts/", {
             method: "POST",
-            body: {
-              client: clientId,
-              first_name: firstName,
-              last_name: lastName,
-              position: form.position.trim(),
-              phone: form.phone.trim(),
-              email: form.email.trim(),
-              is_primary: !!form.isPrimary
-            }
-          });
+              body: {
+                client: clientId,
+                first_name: firstName,
+                last_name: lastName,
+                position: form.position.trim(),
+                phone: form.phone.trim(),
+                email: form.email.trim(),
+                telegram_whatsapp: form.telegramWhatsapp.trim(),
+                role: form.role.trim(),
+                contact_status: form.contactStatus.trim(),
+                person_note: form.personNote.trim(),
+                is_primary: !!form.isPrimary
+              }
+            });
         },
         async updateContact() {
           const form = this.forms.contacts;
@@ -4127,16 +4182,20 @@
           const lastName = parts.slice(1).join(" ");
           await this.apiRequest(`/api/v1/contacts/${this.editingContactId}/`, {
             method: "PATCH",
-            body: {
-              client: clientId,
-              first_name: firstName,
-              last_name: lastName,
-              position: form.position.trim(),
-              phone: form.phone.trim(),
-              email: form.email.trim(),
-              is_primary: !!form.isPrimary
-            }
-          });
+              body: {
+                client: clientId,
+                first_name: firstName,
+                last_name: lastName,
+                position: form.position.trim(),
+                phone: form.phone.trim(),
+                email: form.email.trim(),
+                telegram_whatsapp: form.telegramWhatsapp.trim(),
+                role: form.role.trim(),
+                contact_status: form.contactStatus.trim(),
+                person_note: form.personNote.trim(),
+                is_primary: !!form.isPrimary
+              }
+            });
         },
         async createCompany() {
           const form = this.forms.companies;
@@ -4224,6 +4283,10 @@
                 position: this.companyContactForm.position.trim(),
                 phone: this.companyContactForm.phone.trim(),
                 email: this.companyContactForm.email.trim(),
+                telegram_whatsapp: this.companyContactForm.telegramWhatsapp.trim(),
+                role: this.companyContactForm.role.trim(),
+                contact_status: this.companyContactForm.contactStatus.trim(),
+                person_note: this.companyContactForm.personNote.trim(),
                 is_primary: !!this.companyContactForm.isPrimary
               }
             });
@@ -4541,6 +4604,7 @@
             this.resetDealCompanyForm();
             this.dealTasksForActiveDeal = [];
             this.showCompanyContactForm = false;
+            this.showCompanyContactsPanel = false;
             this.resetCompanyContactForm();
             this.companyContactsForActiveCompany = [];
             if (this.activeSection === "leads") {

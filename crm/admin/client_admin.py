@@ -30,9 +30,9 @@ class ClientAdmin(admin.ModelAdmin):
 
 @admin.register(Contact)
 class ContactAdmin(admin.ModelAdmin):
-    list_display = ("id", "first_name", "last_name", "client", "phone", "email", "is_primary")
+    list_display = ("id", "first_name", "last_name", "client", "position", "role", "contact_status", "phone", "email", "is_primary")
     list_filter = ("is_primary",)
-    search_fields = ("first_name", "last_name", "phone", "email", "client__name")
+    search_fields = ("first_name", "last_name", "phone", "email", "telegram_whatsapp", "role", "contact_status", "client__name")
     autocomplete_fields = ("client",)
 
 
