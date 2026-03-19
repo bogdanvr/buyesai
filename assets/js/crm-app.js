@@ -1941,8 +1941,17 @@
           if (!this.isTaskDoneStatus(this.forms.tasks.status)) {
             return;
           }
+          const dealId = String(this.toIntOrNull(this.forms.tasks.dealId) || "");
+          const hasNonOverdueClientTask = Array.isArray(this.datasets.tasks)
+            && this.datasets.tasks.some((task) => (
+              String(task.id) !== String(this.editingTaskId)
+              && String(task.dealId || "") === dealId
+              && this.isTaskActiveStatus(task.taskStatus)
+              && task.taskTypeGroup === "client_task"
+              && !this.isTaskOverdue(task.dueAtRaw, task.taskStatus)
+            ));
           if (this.currentTaskTypeGroup === "internal_task") {
-            if (this.hasPreparedTaskFollowUp()) {
+            if (this.hasPreparedTaskFollowUp() || hasNonOverdueClientTask) {
               return;
             }
             throw new Error("Для внутренней задачи заполните следующую задачу перед завершением текущей");
@@ -1950,16 +1959,10 @@
           if (!this.taskActiveDealRequiresFollowUp) {
             return;
           }
-          const hasOtherActiveTasks = Array.isArray(this.datasets.tasks)
-            && this.datasets.tasks.some((task) => (
-              String(task.id) !== String(this.editingTaskId)
-              && String(task.dealId || "") === String(this.toIntOrNull(this.forms.tasks.dealId) || "")
-              && this.isTaskActiveStatus(task.taskStatus)
-            ));
-          if (hasOtherActiveTasks || this.hasPreparedTaskFollowUp()) {
+          if (hasNonOverdueClientTask || this.hasPreparedTaskFollowUp()) {
             return;
           }
-          throw new Error("Для активной сделки заполните следующую задачу перед завершением текущей");
+          throw new Error("Для активной сделки заполните следующую задачу или держите актуальную клиентскую задачу без просрочки");
         },
         validateTaskCompletionEvidence(form) {
           if (!this.isTaskDoneStatus(form.status)) {
