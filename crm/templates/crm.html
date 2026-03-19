@@ -916,6 +916,15 @@
                   <span>☑</span>
                   <span>Создать задачу</span>
                 </button>
+                <button
+                  v-if="!editingLeadId || !forms.leads.description.trim()"
+                  type="button"
+                  @click="toggleOptionalField('leads', 'description')"
+                  class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                >
+                  <span>＋</span>
+                  <span>Добавить описание</span>
+                </button>
               </div>
             </div>
             <div v-if="showSourceCreateForm && sourceCreateTargetSection === 'leads'" class="block md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
@@ -934,24 +943,27 @@
                 </div>
               </div>
             </div>
-            <button
-              type="button"
-              @click="toggleOptionalField('leads', 'description')"
-              class="md:col-span-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 text-left hover:border-crm-accent transition"
+            <div
+              v-if="forms.leads.description.trim() || isOptionalFieldExpanded('leads', 'description')"
+              class="md:col-span-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3"
             >
-              <div class="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                @click="toggleOptionalField('leads', 'description')"
+                class="flex w-full items-center justify-between gap-3 text-left"
+              >
                 <span class="text-sm text-crm-muted">Описание</span>
                 <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent text-xs shrink-0">
                   [[ isOptionalFieldExpanded('leads', 'description') ? '−' : '+' ]]
                 </span>
-              </div>
-              <div v-if="!isOptionalFieldExpanded('leads', 'description') && forms.leads.description" class="mt-2 text-sm text-white whitespace-pre-line break-words">
+              </button>
+              <div v-if="forms.leads.description.trim()" class="mt-2 text-sm text-white whitespace-pre-line break-words">
                 [[ forms.leads.description ]]
               </div>
-            </button>
-            <label v-if="isOptionalFieldExpanded('leads', 'description')" class="block md:col-span-2">
-              <textarea v-model="forms.leads.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
-            </label>
+              <label v-if="isOptionalFieldExpanded('leads', 'description')" class="block">
+                <textarea v-model="forms.leads.description" rows="3" class="mt-3 w-full rounded-xl border border-crm-border bg-[#0d2942] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+              </label>
+            </div>
             <div
               v-if="editingLeadId && shouldShowLeadTrackingBlock"
               class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4 space-y-4"
