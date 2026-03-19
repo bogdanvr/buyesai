@@ -992,6 +992,27 @@
                   <input v-model="dealTaskForm.subject" type="text" placeholder="Например: Подготовить КП" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                 </label>
                 <label class="block">
+                  <span class="text-sm text-crm-muted">Категория задачи</span>
+                  <select v-model="dealTaskForm.taskTypeGroup" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                    <option value="">Не выбрана</option>
+                    <option v-for="option in taskTypeGroupOptions" :key="`deal-task-group-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                  </select>
+                </label>
+                <label v-if="showDealTaskTypeSelector" class="block">
+                  <span class="text-sm text-crm-muted">Тип задачи</span>
+                  <select v-model="dealTaskForm.taskTypeId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                    <option :value="null">Не выбран</option>
+                    <option v-for="taskType in filteredDealTaskTypeOptions" :key="`deal-task-type-${taskType.id}`" :value="taskType.id">[[ taskType.name ]]</option>
+                  </select>
+                </label>
+                <label v-if="showDealTaskCommunicationChannelField" class="block">
+                  <span class="text-sm text-crm-muted">Тип канала</span>
+                  <select v-model="dealTaskForm.communicationChannelId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                    <option :value="null">Не выбран</option>
+                    <option v-for="channel in metaOptions.communicationChannels" :key="`deal-task-channel-${channel.id}`" :value="channel.id">[[ channel.name ]]</option>
+                  </select>
+                </label>
+                <label class="block">
                   <span class="text-sm text-crm-muted">Срок</span>
                   <input v-model="dealTaskForm.dueAt" type="datetime-local" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                 </label>
@@ -1542,6 +1563,27 @@
                 <label class="block md:col-span-2">
                   <span class="text-sm text-crm-muted">Название следующей задачи</span>
                   <input v-model="taskFollowUpForm.subject" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <label class="block">
+                  <span class="text-sm text-crm-muted">Категория задачи</span>
+                  <select v-model="taskFollowUpForm.taskTypeGroup" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                    <option value="">Не выбрана</option>
+                    <option v-for="option in taskTypeGroupOptions" :key="`task-followup-group-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                  </select>
+                </label>
+                <label v-if="showTaskFollowUpTypeSelector" class="block">
+                  <span class="text-sm text-crm-muted">Тип задачи</span>
+                  <select v-model="taskFollowUpForm.taskTypeId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                    <option :value="null">Не выбран</option>
+                    <option v-for="taskType in filteredTaskFollowUpTypeOptions" :key="`task-followup-type-${taskType.id}`" :value="taskType.id">[[ taskType.name ]]</option>
+                  </select>
+                </label>
+                <label v-if="showTaskFollowUpCommunicationChannelField" class="block">
+                  <span class="text-sm text-crm-muted">Тип канала</span>
+                  <select v-model="taskFollowUpForm.communicationChannelId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                    <option :value="null">Не выбран</option>
+                    <option v-for="channel in metaOptions.communicationChannels" :key="`task-followup-channel-${channel.id}`" :value="channel.id">[[ channel.name ]]</option>
+                  </select>
                 </label>
                 <label class="block">
                   <span class="text-sm text-crm-muted">Срок</span>

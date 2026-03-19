@@ -194,11 +194,18 @@
           },
           dealTaskForm: {
             subject: "",
+            taskTypeGroup: "",
+            taskTypeId: null,
+            communicationChannelId: null,
             dueAt: "",
+            reminderOffsetMinutes: 30,
             description: ""
           },
           taskFollowUpForm: {
             subject: "",
+            taskTypeGroup: "",
+            taskTypeId: null,
+            communicationChannelId: null,
             dueAt: "",
             reminderOffsetMinutes: 30,
             description: ""
@@ -500,6 +507,46 @@
           }
           return "Без сделки";
         },
+        currentTaskFollowUpTypeGroup() {
+          return this.normalizeTaskTypeGroup(
+            this.taskFollowUpForm.taskTypeGroup || this.resolveTaskTypeGroupById(this.taskFollowUpForm.taskTypeId)
+          );
+        },
+        filteredTaskFollowUpTypeOptions() {
+          const selectedGroup = this.currentTaskFollowUpTypeGroup;
+          const taskTypes = Array.isArray(this.metaOptions.taskTypes) ? this.metaOptions.taskTypes : [];
+          if (!selectedGroup) {
+            return [];
+          }
+          return taskTypes.filter((taskType) => this.normalizeTaskTypeGroup(taskType.group) === selectedGroup);
+        },
+        showTaskFollowUpTypeSelector() {
+          return !!String(this.taskFollowUpForm.taskTypeGroup || "").trim()
+            || !!this.toIntOrNull(this.taskFollowUpForm.taskTypeId);
+        },
+        showTaskFollowUpCommunicationChannelField() {
+          return this.currentTaskFollowUpTypeGroup === "client_task";
+        },
+        currentDealTaskTypeGroup() {
+          return this.normalizeTaskTypeGroup(
+            this.dealTaskForm.taskTypeGroup || this.resolveTaskTypeGroupById(this.dealTaskForm.taskTypeId)
+          );
+        },
+        filteredDealTaskTypeOptions() {
+          const selectedGroup = this.currentDealTaskTypeGroup;
+          const taskTypes = Array.isArray(this.metaOptions.taskTypes) ? this.metaOptions.taskTypes : [];
+          if (!selectedGroup) {
+            return [];
+          }
+          return taskTypes.filter((taskType) => this.normalizeTaskTypeGroup(taskType.group) === selectedGroup);
+        },
+        showDealTaskTypeSelector() {
+          return !!String(this.dealTaskForm.taskTypeGroup || "").trim()
+            || !!this.toIntOrNull(this.dealTaskForm.taskTypeId);
+        },
+        showDealTaskCommunicationChannelField() {
+          return this.currentDealTaskTypeGroup === "client_task";
+        },
         emptyLabel() {
           const labels = {
             leads: "лидов",
@@ -642,6 +689,36 @@
           handler() {
             if (this.activeSection === "tasks" && this.showModal) {
               this.loadTaskTouchOptions();
+            }
+          }
+        },
+        "taskFollowUpForm.taskTypeGroup": {
+          handler(nextValue) {
+            if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
+              this.taskFollowUpForm.communicationChannelId = null;
+            }
+            const selectedTaskTypeId = this.toIntOrNull(this.taskFollowUpForm.taskTypeId);
+            if (!selectedTaskTypeId) {
+              return;
+            }
+            const taskTypeGroup = this.resolveTaskTypeGroupById(selectedTaskTypeId);
+            if (taskTypeGroup && taskTypeGroup !== this.normalizeTaskTypeGroup(nextValue)) {
+              this.taskFollowUpForm.taskTypeId = null;
+            }
+          }
+        },
+        "dealTaskForm.taskTypeGroup": {
+          handler(nextValue) {
+            if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
+              this.dealTaskForm.communicationChannelId = null;
+            }
+            const selectedTaskTypeId = this.toIntOrNull(this.dealTaskForm.taskTypeId);
+            if (!selectedTaskTypeId) {
+              return;
+            }
+            const taskTypeGroup = this.resolveTaskTypeGroupById(selectedTaskTypeId);
+            if (taskTypeGroup && taskTypeGroup !== this.normalizeTaskTypeGroup(nextValue)) {
+              this.dealTaskForm.taskTypeId = null;
             }
           }
         }
@@ -1771,6 +1848,9 @@
         resetDealTaskForm() {
           this.dealTaskForm = {
             subject: "",
+            taskTypeGroup: "",
+            taskTypeId: null,
+            communicationChannelId: null,
             dueAt: "",
             reminderOffsetMinutes: 30,
             description: ""
@@ -1779,6 +1859,9 @@
         resetTaskFollowUpForm() {
           this.taskFollowUpForm = {
             subject: "",
+            taskTypeGroup: "",
+            taskTypeId: null,
+            communicationChannelId: null,
             dueAt: "",
             reminderOffsetMinutes: 30,
             description: ""
@@ -1787,6 +1870,9 @@
         hasPendingDealTaskDraft() {
           return !!(
             this.dealTaskForm.subject.trim()
+            || this.dealTaskForm.taskTypeGroup
+            || this.dealTaskForm.taskTypeId
+            || this.dealTaskForm.communicationChannelId
             || this.dealTaskForm.dueAt
             || this.dealTaskForm.description.trim()
           );
@@ -2959,6 +3045,10 @@
               body: {
                 type: "task",
                 subject,
+                task_type: this.toIntOrNull(this.dealTaskForm.taskTypeId),
+                communication_channel: this.currentDealTaskTypeGroup === "client_task"
+                  ? this.toIntOrNull(this.dealTaskForm.communicationChannelId)
+                  : null,
                 description: this.dealTaskForm.description.trim(),
                 due_at: this.toIsoDateTime(this.dealTaskForm.dueAt),
                 deadline_reminder_offset_minutes: Number(this.dealTaskForm.reminderOffsetMinutes || 30),
@@ -3347,6 +3437,10 @@
             body: {
               type: "task",
               subject,
+              task_type: this.toIntOrNull(followUp.taskTypeId),
+              communication_channel: this.currentTaskFollowUpTypeGroup === "client_task"
+                ? this.toIntOrNull(followUp.communicationChannelId)
+                : null,
               description: followUp.description.trim(),
               due_at: this.toIsoDateTime(followUp.dueAt),
               deadline_reminder_offset_minutes: Number(followUp.reminderOffsetMinutes || 30),

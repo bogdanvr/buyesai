@@ -167,6 +167,35 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(touch.summary, "")
         self.assertEqual(touch.next_step, "")
 
+    def test_client_task_without_auto_touch_does_not_create_touch(self):
+        task_type = TaskType.objects.create(
+            name="Написать клиенту",
+            group=TaskTypeGroup.CLIENT_TASK,
+            auto_touch_on_done=False,
+            touch_result="Написали клиенту",
+        )
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Написать клиенту",
+            task_type=task_type,
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "has_follow_up_task": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(Touch.objects.filter(task=task).exists())
+
     def test_internal_task_completion_requires_result(self):
         task_type = TaskType.objects.create(name="Подготовить договор", group=TaskTypeGroup.INTERNAL_TASK)
         task = Activity.objects.create(
