@@ -167,6 +167,38 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(touch.summary, "")
         self.assertEqual(touch.next_step, "")
 
+    def test_client_task_completion_requires_communication_channel(self):
+        task_type = TaskType.objects.create(
+            name="Созвон с клиентом",
+            group=TaskTypeGroup.CLIENT_TASK,
+            auto_touch_on_done=True,
+            touch_result="Связались повторно",
+        )
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Обсудить предложение",
+            task_type=task_type,
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "has_follow_up_task": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["communication_channel"][0],
+            "Укажите тип канала перед завершением клиентской задачи.",
+        )
+
     def test_client_task_without_auto_touch_does_not_create_touch(self):
         task_type = TaskType.objects.create(
             name="Написать клиенту",
@@ -174,10 +206,12 @@ class TaskResultAndEventsTests(APITestCase):
             auto_touch_on_done=False,
             touch_result="Написали клиенту",
         )
+        channel = CommunicationChannel.objects.create(name="Email")
         task = Activity.objects.create(
             type=ActivityType.TASK,
             subject="Написать клиенту",
             task_type=task_type,
+            communication_channel=channel,
             deal=self.deal,
             client=self.company,
             due_at=timezone.now() + timedelta(days=1),

@@ -696,6 +696,19 @@
             }
           }
         },
+        "forms.tasks.taskTypeId": {
+          handler(nextValue, previousValue) {
+            const nextDefaultResult = this.resolveTaskTypeDefaultResultById(nextValue);
+            const previousDefaultResult = this.resolveTaskTypeDefaultResultById(previousValue);
+            const currentResult = String(this.forms.tasks.result || "").trim();
+            if (!nextDefaultResult) {
+              return;
+            }
+            if (!currentResult || currentResult === previousDefaultResult) {
+              this.forms.tasks.result = nextDefaultResult;
+            }
+          }
+        },
         "forms.tasks.dealId": {
           handler() {
             if (this.activeSection === "tasks" && this.showModal) {
@@ -945,6 +958,10 @@
           return (this.metaOptions.taskTypes || []).find(
             (entry) => String(entry.id) === String(normalizedTaskTypeId)
           ) || null;
+        },
+        resolveTaskTypeDefaultResultById(taskTypeId) {
+          const taskType = this.resolveTaskTypeById(taskTypeId);
+          return String(taskType?.touch_result || "").trim();
         },
         formatHistoryTimestamp(value) {
           const raw = String(value || "").trim();
@@ -1786,7 +1803,7 @@
             dueAt: this.toDateTimeLocal(item.dueAtRaw),
             reminderOffsetMinutes: Number(item.reminderOffsetMinutes || 30),
             description: item.description || "",
-            result: item.result || "",
+            result: item.result || this.resolveTaskTypeDefaultResultById(item.taskTypeId),
             saveCompanyNote: !!item.saveCompanyNote,
             companyNote: item.companyNote || "",
             status: item.taskStatus || item.status || "todo"
@@ -2028,6 +2045,9 @@
             return;
           }
           if (taskTypeGroup === "client_task") {
+            if (!this.toIntOrNull(form.communicationChannelId)) {
+              throw new Error("Укажите тип канала перед завершением клиентской задачи");
+            }
             return;
           }
           if (!hasResult && !hasRelatedTouch) {

@@ -119,7 +119,10 @@ class ActivitySerializer(serializers.ModelSerializer):
             if task_type_group == TaskTypeGroup.INTERNAL_TASK and not has_result:
                 raise serializers.ValidationError({"result": "Для внутренней задачи укажите результат выполнения."})
             if task_type_group == TaskTypeGroup.CLIENT_TASK:
-                pass
+                if communication_channel is None:
+                    raise serializers.ValidationError(
+                        {"communication_channel": "Укажите тип канала перед завершением клиентской задачи."}
+                    )
             elif not has_result and not has_related_touch:
                 raise serializers.ValidationError(
                     {"result": "Укажите результат завершения задачи или привяжите касание."}
