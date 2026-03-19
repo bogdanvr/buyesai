@@ -934,12 +934,18 @@
                 </div>
               </div>
             </div>
-            <button type="button" @click="toggleOptionalField('leads', 'description')" class="crm-inline-field-toggle md:col-span-2">
+            <button
+              type="button"
+              @click="toggleOptionalField('leads', 'description')"
+              class="md:col-span-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 text-left hover:border-crm-accent transition"
+            >
               <div class="flex items-center justify-between gap-3">
                 <span class="text-sm text-crm-muted">Описание</span>
-                <span class="text-crm-accent text-xs">[[ isOptionalFieldExpanded('leads', 'description') ? '−' : '+' ]]</span>
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent text-xs shrink-0">
+                  [[ isOptionalFieldExpanded('leads', 'description') ? '−' : '+' ]]
+                </span>
               </div>
-              <div v-if="!isOptionalFieldExpanded('leads', 'description') && forms.leads.description" class="mt-2 text-left text-sm text-white line-clamp-2">
+              <div v-if="!isOptionalFieldExpanded('leads', 'description') && forms.leads.description" class="mt-2 text-sm text-white whitespace-pre-line break-words">
                 [[ forms.leads.description ]]
               </div>
             </button>
