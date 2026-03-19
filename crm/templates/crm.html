@@ -1789,6 +1789,14 @@
                   <span>Контакты</span>
                   <span class="text-crm-accent text-xs">[[ showCompanyContactsPanel ? '−' : '+' ]]</span>
                 </button>
+                <button
+                  type="button"
+                  @click="toggleCompanyDealsPanel"
+                  class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                >
+                  <span>Сделки</span>
+                  <span class="text-crm-accent text-xs">[[ showCompanyDealsPanel ? '−' : '+' ]]</span>
+                </button>
               </div>
               <div v-if="showCompanyRequisites" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                 <div class="py-1">
@@ -2012,6 +2020,74 @@
                         </span>
                       </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+              <div v-if="showCompanyDealsPanel && editingCompanyId" class="mt-4 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-4 space-y-5">
+                <div>
+                  <div class="text-sm font-semibold text-white">Открытые сделки</div>
+                  <div v-if="!companySummaryActiveDeals.length" class="mt-2 text-sm text-crm-muted">Открытых сделок нет.</div>
+                  <div v-else class="mt-3 space-y-2">
+                    <button
+                      v-for="deal in companySummaryActiveDeals"
+                      :key="`company-open-deal-${deal.id}`"
+                      type="button"
+                      @click="openDealEditor(deal)"
+                      class="w-full rounded-xl border border-crm-border/80 bg-[#0f2f4a] px-3 py-3 text-left hover:border-crm-accent transition"
+                    >
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                        <div class="text-sm text-white"><span class="text-crm-muted">Название:</span> [[ deal.title || deal.name ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Этап:</span> [[ deal.stageName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Сумма:</span> [[ formatDealAmountSummary(deal.amount, deal.currency || forms.companies.currency || 'RUB') ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Ответственный:</span> [[ deal.ownerName || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Следующий шаг:</span> [[ dealNextActionSummaryByDealId(deal.id).title ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Дата следующего шага:</span> [[ dealNextActionSummaryByDealId(deal.id).at ? formatDueLabel(dealNextActionSummaryByDealId(deal.id).at) : '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Последнее касание:</span> [[ dealLastTouchSummaryByDealId(deal.id) ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Риск просрочки:</span> [[ dealOverdueRiskLabel(deal) ]]</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="text-sm font-semibold text-white">Успешные</div>
+                  <div v-if="!companySummaryWonDeals.length" class="mt-2 text-sm text-crm-muted">Успешных сделок нет.</div>
+                  <div v-else class="mt-3 space-y-2">
+                    <button
+                      v-for="deal in companySummaryWonDeals"
+                      :key="`company-won-deal-${deal.id}`"
+                      type="button"
+                      @click="openDealEditor(deal)"
+                      class="w-full rounded-xl border border-emerald-400/20 bg-[#0f2f4a] px-3 py-3 text-left hover:border-emerald-300/40 transition"
+                    >
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                        <div class="text-sm text-white"><span class="text-crm-muted">Дата:</span> [[ deal.closedAt || deal.closeDate ? formatEventTimestamp(deal.closedAt || deal.closeDate) : '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Сумма:</span> [[ formatDealAmountSummary(deal.amount, deal.currency || forms.companies.currency || 'RUB') ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Что продали:</span> [[ deal.title || deal.name || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Кто вёл:</span> [[ deal.ownerName || '—' ]]</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="text-sm font-semibold text-white">Проваленные</div>
+                  <div v-if="!companySummaryFailedDeals.length" class="mt-2 text-sm text-crm-muted">Проваленных сделок нет.</div>
+                  <div v-else class="mt-3 space-y-2">
+                    <button
+                      v-for="deal in companySummaryFailedDeals"
+                      :key="`company-failed-deal-${deal.id}`"
+                      type="button"
+                      @click="openDealEditor(deal)"
+                      class="w-full rounded-xl border border-red-400/20 bg-[#0f2f4a] px-3 py-3 text-left hover:border-red-300/40 transition"
+                    >
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                        <div class="text-sm text-white"><span class="text-crm-muted">Дата:</span> [[ deal.closedAt || deal.closeDate ? formatEventTimestamp(deal.closedAt || deal.closeDate) : '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Причина:</span> [[ deal.failureReason || '—' ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Конкурент:</span> [[ companyFailedDealCompetitor(deal) ]]</div>
+                        <div class="text-sm text-white"><span class="text-crm-muted">Можно ли реанимировать:</span> [[ companyFailedDealCanReviveLabel(deal) ]]</div>
+                      </div>
+                    </button>
                   </div>
                 </div>
               </div>

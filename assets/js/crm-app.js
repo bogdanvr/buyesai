@@ -82,6 +82,7 @@
           isTaskTouchesLoading: false,
           showCompanyContactForm: false,
           showCompanyContactsPanel: false,
+          showCompanyDealsPanel: false,
           showCompanyNoteDraft: false,
           showCompanyOkvedDetails: false,
           showCompanyRequisites: false,
@@ -536,6 +537,12 @@
           return this.companySummaryDeals.filter((deal) => {
             const stageCode = String(deal.stageCode || "").trim().toLowerCase();
             return !!deal.isWon || stageCode === "won";
+          });
+        },
+        companySummaryFailedDeals() {
+          return this.companySummaryDeals.filter((deal) => {
+            const stageCode = String(deal.stageCode || "").trim().toLowerCase();
+            return stageCode === "failed";
           });
         },
         companySummaryTouches() {
@@ -1790,6 +1797,9 @@
         toggleCompanyRequisites() {
           this.showCompanyRequisites = !this.showCompanyRequisites;
         },
+        toggleCompanyDealsPanel() {
+          this.showCompanyDealsPanel = !this.showCompanyDealsPanel;
+        },
         toggleCompanyNoteDraft() {
           this.showCompanyNoteDraft = !this.showCompanyNoteDraft;
           if (!this.showCompanyNoteDraft) {
@@ -2446,6 +2456,7 @@
           this.showCompanyEvents = false;
           this.showCompanyRequisites = false;
           this.showCompanyContactsPanel = false;
+          this.showCompanyDealsPanel = false;
           this.showCompanyNoteDraft = false;
           this.resetExpandedOptionalFields();
           const normalizedOkveds = this.normalizeCompanyOkveds(item.okveds, item.okved, item.industry);
@@ -2477,6 +2488,7 @@
           this.resetCompanyContactForm();
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
+          this.showCompanyDealsPanel = false;
           this.loadContactsForCompany();
           this.showModal = true;
           this.enrichCompanyFromDadataByInn();
@@ -2943,6 +2955,103 @@
           }
           this.startCompanySummaryEdit(fieldKey);
         },
+        dealTouchesByDealId(dealId) {
+          const normalizedDealId = this.toIntOrNull(dealId);
+          if (!normalizedDealId) return [];
+          return (this.datasets.touches || []).filter((touch) => String(touch.dealId || "") === String(normalizedDealId));
+        },
+        dealUpcomingTasksByDealId(dealId) {
+          const normalizedDealId = this.toIntOrNull(dealId);
+          if (!normalizedDealId) return [];
+          return (this.datasets.tasks || [])
+            .filter((task) => (
+              String(task.dealId || "") === String(normalizedDealId)
+              && ["client_task", "internal_task"].includes(String(task.taskTypeGroup || ""))
+              && this.isTaskActiveStatus(task.taskStatus || task.status)
+              && task.dueAtRaw
+            ))
+            .slice()
+            .sort((left, right) => (
+              (String(left.taskTypeGroup || "") === "client_task" ? 0 : 1) - (String(right.taskTypeGroup || "") === "client_task" ? 0 : 1)
+              || (this.parseTaskDueTimestamp(left.dueAtRaw) || 0) - (this.parseTaskDueTimestamp(right.dueAtRaw) || 0)
+            ));
+        },
+        dealLastTouchByDealId(dealId) {
+          const touches = this.dealTouchesByDealId(dealId).slice();
+          touches.sort((left, right) => (this.parseTaskDueTimestamp(right.happenedAtRaw) || 0) - (this.parseTaskDueTimestamp(left.happenedAtRaw) || 0));
+          return touches[0] || null;
+        },
+        dealNextTouchByDealId(dealId) {
+          const touches = this.dealTouchesByDealId(dealId)
+            .filter((touch) => touch.nextStepAtRaw)
+            .slice();
+          touches.sort((left, right) => (this.parseTaskDueTimestamp(left.nextStepAtRaw) || 0) - (this.parseTaskDueTimestamp(right.nextStepAtRaw) || 0));
+          return touches[0] || null;
+        },
+        dealNextActionSummaryByDealId(dealId) {
+          const nextTask = this.dealUpcomingTasksByDealId(dealId)[0] || null;
+          const nextTouch = this.dealNextTouchByDealId(dealId);
+          if (nextTask) {
+            return {
+              title: nextTask.subject || nextTask.name || "Не указан",
+              at: nextTask.dueAtRaw || null,
+            };
+          }
+          if (nextTouch) {
+            return {
+              title: nextTouch.nextStep || nextTouch.summary || nextTouch.resultOptionName || "Не указан",
+              at: nextTouch.nextStepAtRaw || null,
+            };
+          }
+          return {
+            title: "Не указан",
+            at: null,
+          };
+        },
+        dealLastTouchSummaryByDealId(dealId) {
+          const lastTouch = this.dealLastTouchByDealId(dealId);
+          if (!lastTouch) {
+            return "Не указано";
+          }
+          return lastTouch.summary || lastTouch.resultOptionName || "Не указано";
+        },
+        dealOverdueRiskLabel(deal) {
+          const normalizedDealId = this.toIntOrNull(deal?.id);
+          if (!normalizedDealId) return "Не определён";
+          const hasOverdueTask = (this.datasets.tasks || []).some((task) => (
+            String(task.dealId || "") === String(normalizedDealId)
+            && this.isTaskOverdue(task.dueAtRaw, task.taskStatus || task.status)
+          ));
+          if (hasOverdueTask || this.isDealOverdue(deal?.closeDate)) {
+            return "Просрочено";
+          }
+          const nextAction = this.dealNextActionSummaryByDealId(normalizedDealId);
+          const nextAt = this.parseTaskDueTimestamp(nextAction.at);
+          if (nextAt !== null) {
+            const diffDays = Math.ceil((nextAt - Date.now()) / 86400000);
+            if (diffDays <= 1) return "Высокий";
+            if (diffDays <= 3) return "Средний";
+            return "Низкий";
+          }
+          return "Нет следующего шага";
+        },
+        companyFailedDealCompetitor(deal) {
+          const metadata = deal?.metadata || {};
+          return String(
+            metadata.failed_competitor
+            || metadata.competitor
+            || metadata.lost_to_competitor
+            || ""
+          ).trim() || "—";
+        },
+        companyFailedDealCanReviveLabel(deal) {
+          const metadata = deal?.metadata || {};
+          const value = metadata.can_revive ?? metadata.can_reanimate ?? metadata.revive_possible;
+          if (value === true) return "Да";
+          if (value === false) return "Нет";
+          if (value !== undefined && value !== null && String(value).trim()) return String(value).trim();
+          return "—";
+        },
         formatRemainingDuration(totalMinutes) {
           const minutes = Math.max(1, Math.ceil(Number(totalMinutes) || 0));
           if (minutes < 60) {
@@ -3400,6 +3509,7 @@
             currency: item.currency || "RUB",
             closeDate: item.close_date || "",
             failureReason: item.failure_reason || "",
+            metadata: item.metadata || {},
             events: item.events || "",
             isWon: !!item.is_won,
             createdAt: item.created_at || null
@@ -3657,6 +3767,7 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyRequisites = false;
+          this.showCompanyDealsPanel = false;
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
@@ -3696,6 +3807,7 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyRequisites = false;
+          this.showCompanyDealsPanel = false;
           this.showCompanyNoteDraft = false;
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
@@ -3716,6 +3828,7 @@
           this.showCompanyNoteDraft = false;
           this.showCompanyRequisites = false;
           this.showCompanyContactsPanel = false;
+          this.showCompanyDealsPanel = false;
           this.showDealTaskForm = false;
           this.forms[this.activeSection] = this.getDefaultForm(this.activeSection);
           this.resetDealTaskForm();
@@ -3730,6 +3843,7 @@
           this.dealTasksForActiveDeal = [];
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
+          this.showCompanyDealsPanel = false;
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
@@ -4605,6 +4719,7 @@
             this.dealTasksForActiveDeal = [];
             this.showCompanyContactForm = false;
             this.showCompanyContactsPanel = false;
+            this.showCompanyDealsPanel = false;
             this.resetCompanyContactForm();
             this.companyContactsForActiveCompany = [];
             if (this.activeSection === "leads") {
