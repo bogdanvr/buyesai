@@ -88,6 +88,7 @@
           showCompanyNoteDraft: false,
           showCompanyOkvedDetails: false,
           showCompanyRequisites: false,
+          leadSummaryEditingField: "",
           dealSummaryEditingField: "",
           companySummaryEditingField: "",
           expandedOptionalFields: {
@@ -438,6 +439,40 @@
         },
         isCreatingTask() {
           return this.activeSection === "tasks" && !this.editingTaskId;
+        },
+        editingLeadItem() {
+          const leadId = this.toIntOrNull(this.editingLeadId);
+          if (!leadId) return null;
+          return (this.datasets.leads || []).find((lead) => String(lead.id) === String(leadId)) || null;
+        },
+        leadSummaryStatusLabel() {
+          const statusId = this.toIntOrNull(this.forms.leads.statusId);
+          if (!statusId) return "Не выбран";
+          const status = (this.metaOptions.leadStatuses || []).find((item) => String(item.id) === String(statusId));
+          return status?.name || this.editingLeadItem?.statusLabel || "Не выбран";
+        },
+        leadSummarySourceLabel() {
+          const sourceId = this.toIntOrNull(this.forms.leads.sourceId);
+          if (!sourceId) return "Не выбран";
+          const source = (this.metaOptions.leadSources || []).find((item) => String(item.id) === String(sourceId));
+          return source?.name || this.editingLeadItem?.sourceName || "Не выбран";
+        },
+        leadSummaryAssignedToLabel() {
+          const assignedToId = this.toIntOrNull(this.forms.leads.assignedToId);
+          if (!assignedToId) return "Не назначен";
+          const user = (this.metaOptions.users || []).find((item) => String(item.id) === String(assignedToId));
+          return user ? (user.full_name || user.username) : (this.editingLeadItem?.assignedToName || "Не назначен");
+        },
+        leadSummaryLastTouch() {
+          const leadId = this.toIntOrNull(this.editingLeadId);
+          if (!leadId) return null;
+          return this.leadLastTouchByLeadId(leadId);
+        },
+        leadSummaryNextAction() {
+          const leadId = this.toIntOrNull(this.editingLeadId);
+          if (!leadId) return null;
+          const next = this.leadNextActionSummaryByLeadId(leadId);
+          return next?.title || next?.at ? next : null;
         },
         touchLeadOptions() {
           const companyId = this.toIntOrNull(this.forms.touches.companyId);
@@ -2424,6 +2459,7 @@
         },
         openLeadEditor(item) {
           this.clearUiErrors({ modalOnly: true });
+          this.leadSummaryEditingField = "";
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
@@ -2995,6 +3031,37 @@
             this.companySummaryEditingField = "";
           }
         },
+        isLeadSummaryEditing(fieldKey) {
+          return String(this.leadSummaryEditingField || "") === String(fieldKey || "");
+        },
+        startLeadSummaryEdit(fieldKey) {
+          this.leadSummaryEditingField = String(fieldKey || "");
+        },
+        stopLeadSummaryEdit(fieldKey = "") {
+          if (!fieldKey || this.isLeadSummaryEditing(fieldKey)) {
+            this.leadSummaryEditingField = "";
+          }
+        },
+        openLeadSummaryField(fieldKey) {
+          if (fieldKey === "lastTouch") {
+            if (this.leadSummaryLastTouch) {
+              this.openTouchEditor(this.leadSummaryLastTouch);
+            }
+            return;
+          }
+          if (fieldKey === "nextAction") {
+            const nextAction = this.leadSummaryNextAction;
+            if (nextAction?.item) {
+              if (nextAction.item.dueAtRaw || nextAction.item.taskStatus) {
+                this.openTaskEditor(nextAction.item);
+                return;
+              }
+              this.openTouchEditor(nextAction.item);
+              return;
+            }
+          }
+          this.startLeadSummaryEdit(fieldKey);
+        },
         companyWorkRuleDecisionMakerLabel() {
           const decisionMakerId = this.toIntOrNull(this.forms.companies.workRules.decisionMakerId);
           if (!decisionMakerId) return "Не выбран";
@@ -3187,17 +3254,21 @@
           const nextTouchTs = this.parseTaskDueTimestamp(nextTouch?.nextStepAtRaw);
           if (nextTaskTs !== null && (nextTouchTs === null || nextTaskTs <= nextTouchTs)) {
             return {
+              type: "task",
+              item: nextTask,
               title: nextTask.subject || nextTask.name || "—",
               at: nextTask.dueAtRaw || null,
             };
           }
           if (nextTouchTs !== null) {
             return {
+              type: "touch",
+              item: nextTouch,
               title: nextTouch.nextStep || nextTouch.summary || nextTouch.resultOptionName || "—",
               at: nextTouch.nextStepAtRaw || null,
             };
           }
-          return { title: "—", at: null };
+          return { type: "", item: null, title: "—", at: null };
         },
         leadTouchCountByLeadId(leadId) {
           return this.leadTouchesByLeadId(leadId).length;
@@ -3968,6 +4039,7 @@
         setSection(section) {
           this.activeSection = section;
           window.localStorage.setItem("crm_active_section", section);
+          this.leadSummaryEditingField = "";
           this.companySummaryEditingField = "";
           this.search = "";
           this.showStatusFilter = false;
@@ -4016,6 +4088,7 @@
         },
         closeModal() {
           this.showModal = false;
+          this.leadSummaryEditingField = "";
           this.companySummaryEditingField = "";
           this.cancelSourceCreate();
           this.clearUiErrors({ globalOnly: true });
@@ -4053,6 +4126,7 @@
         },
         openCreateModal() {
           this.clearUiErrors({ modalOnly: true });
+          this.leadSummaryEditingField = "";
           this.companySummaryEditingField = "";
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
