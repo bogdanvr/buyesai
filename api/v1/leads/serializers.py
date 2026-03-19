@@ -52,6 +52,7 @@ class LeadSerializer(serializers.ModelSerializer):
             "payload",
             "utm_data",
             "history",
+            "events",
             "priority",
             "expected_value",
             "last_contact_at",
@@ -70,6 +71,7 @@ class LeadSerializer(serializers.ModelSerializer):
             "website_session",
             "website_session_id",
             "history",
+            "events",
         )
 
     def get_source_names(self, obj):

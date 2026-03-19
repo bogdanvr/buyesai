@@ -84,6 +84,7 @@ class Lead(TimestampedModel):
     payload = models.JSONField(default=dict, blank=True, verbose_name="Payload")
     utm_data = models.JSONField(default=dict, blank=True, verbose_name="UTM")
     history = models.JSONField(default=list, blank=True, verbose_name="История")
+    events = models.TextField(blank=True, default="", verbose_name="События")
     priority = models.CharField(
         max_length=16,
         choices=LeadPriority.choices,

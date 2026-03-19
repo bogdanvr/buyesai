@@ -1,7 +1,10 @@
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from crm.models import Deal, DealStage, Lead, LeadStatus
+from crm.models import Activity, Deal, DealStage, Lead, LeadStatus, Touch
+from crm.models.activity import ActivityType, TaskStatus
+from crm.models.touch import TouchDirection
 
 
 class LeadAutoConvertSignalTests(TestCase):
@@ -102,3 +105,61 @@ class LeadAutoConvertSignalTests(TestCase):
         deal = Deal.objects.get(lead=lead)
         self.assertEqual(deal.stage, work_stage)
         self.assertNotEqual(deal.stage, final_stage)
+
+    def test_converted_deal_receives_lead_events_and_history(self):
+        lead = Lead.objects.create(
+            title="Lead with history",
+            company="Acme",
+            status=self.in_progress_status,
+            assigned_to=self.user,
+            events=(
+                "19.03.2026 10:00\n"
+                "Результат: Лид квалифицирован\n"
+                "event_type: system\n"
+                "priority: low\n"
+                "title: Системное событие"
+            ),
+            history=[
+                {
+                    "event": "chat_opened",
+                    "timestamp": timezone.now().isoformat(),
+                }
+            ],
+        )
+
+        lead.status = self.converted_status
+        lead.save(update_fields=["status", "updated_at"])
+
+        deal = Deal.objects.get(lead=lead)
+        self.assertIn("Лид квалифицирован", deal.events)
+        self.assertIn("Открытие чата", deal.events)
+
+    def test_task_and_touch_are_written_to_lead_events(self):
+        lead = Lead.objects.create(
+            title="Lead events",
+            company="Acme",
+            status=self.in_progress_status,
+            assigned_to=self.user,
+        )
+
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Позвонить клиенту",
+            lead=lead,
+            created_by=self.user,
+        )
+        task.status = TaskStatus.DONE
+        task.result = "Созвонились и договорились о демонстрации"
+        task.completed_at = timezone.now()
+        task.save(update_fields=["status", "result", "completed_at", "updated_at"])
+        Touch.objects.create(
+            happened_at=timezone.now(),
+            direction=TouchDirection.OUTGOING,
+            summary="Обсудили следующие шаги",
+            lead=lead,
+            owner=self.user,
+        )
+
+        lead.refresh_from_db()
+        self.assertIn("Создана задача: Позвонить клиенту", lead.events)
+        self.assertIn("Касание: Обсудили следующие шаги", lead.events)

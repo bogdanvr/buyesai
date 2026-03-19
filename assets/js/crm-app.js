@@ -128,7 +128,8 @@
               sourceCode: "",
               sourceNames: [],
               history: [],
-              websiteSessionId: ""
+              websiteSessionId: "",
+              events: ""
             },
             deals: {
               title: "",
@@ -793,7 +794,8 @@
           return this.isCreatingLead
             || !!this.forms.leads.websiteSessionId
             || this.forms.leads.sourceNames.length > 0
-            || this.forms.leads.history.length > 0;
+            || this.forms.leads.history.length > 0
+            || !!String(this.forms.leads.events || "").trim();
         },
         showTaskResultField() {
           return this.isTaskDoneStatus(this.forms.tasks.status) || !!String(this.forms.tasks.result || "").trim();
@@ -1512,6 +1514,41 @@
               return eventItem;
             })
             .filter(Boolean);
+        },
+        leadHistoryEventLabel(item) {
+          const eventCode = String((item && item.event) || "").trim();
+          if (eventCode === "page_view") return "Просмотр страницы";
+          if (eventCode === "chat_opened") return "Открытие чата";
+          if (eventCode === "first_message_sent") return "Первое сообщение";
+          if (eventCode === "phone_clicked") return "Клик по телефону";
+          if (eventCode === "messenger_clicked") return "Клик по мессенджеру";
+          if (eventCode === "form_submitted") {
+            const formType = String((item && item.form_type) || "").trim();
+            return formType ? `Отправка формы ${formType}` : "Отправка формы";
+          }
+          return eventCode || "Событие сайта";
+        },
+        buildLeadHistoryEventLog(history) {
+          const items = Array.isArray(history) ? [...history].reverse() : [];
+          return items
+            .filter((item) => item && typeof item === "object" && String(item.timestamp || "").trim())
+            .map((item) => [
+              String(item.timestamp || "").trim(),
+              `Результат: ${this.leadHistoryEventLabel(item)}`,
+              "event_type: system",
+              "priority: low",
+              "title: Системное событие",
+            ].join("\n"))
+            .join("\n\n");
+        },
+        leadEventLog(leadForm) {
+          const form = leadForm && typeof leadForm === "object" ? leadForm : {};
+          const storedEvents = String(form.events || "").trim();
+          const historyEvents = this.buildLeadHistoryEventLog(form.history);
+          if (storedEvents && historyEvents) {
+            return `${storedEvents}\n\n${historyEvents}`;
+          }
+          return storedEvents || historyEvents;
         },
         trackingEventLabel(value) {
           const labels = {
@@ -2483,7 +2520,8 @@
             sourceCode: item.sourceCode || "",
             sourceNames: Array.isArray(item.sourceNames) ? item.sourceNames : [],
             history: Array.isArray(item.history) ? item.history : [],
-            websiteSessionId: item.websiteSessionId || ""
+            websiteSessionId: item.websiteSessionId || "",
+            events: item.events || ""
           };
           this.showModal = true;
         },
@@ -3788,6 +3826,7 @@
             sourceNames: Array.isArray(item.source_names) ? item.source_names : [],
             history: Array.isArray(item.history) ? item.history : [],
             websiteSessionId: item.website_session_id || "",
+            events: item.events || "",
             clientId: item.client || null,
             createdAt: item.created_at || null
           };
@@ -4210,7 +4249,8 @@
               sourceCode: "",
               sourceNames: [],
               history: [],
-              websiteSessionId: ""
+              websiteSessionId: "",
+              events: ""
             };
           }
           if (section === "deals") {

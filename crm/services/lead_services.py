@@ -16,6 +16,63 @@ def _text_or_empty(value) -> str:
     return str(value or "").strip()
 
 
+def _merge_text_blocks(current: str, extra: str) -> str:
+    normalized_current = str(current or "").strip()
+    normalized_extra = str(extra or "").strip()
+    if not normalized_current:
+        return normalized_extra
+    if not normalized_extra:
+        return normalized_current
+    return f"{normalized_current}\n\n{normalized_extra}"
+
+
+def _lead_history_event_label(item: dict) -> str:
+    event_code = _text_or_empty((item or {}).get("event"))
+    if event_code == "page_view":
+        return "Просмотр страницы"
+    if event_code == "chat_opened":
+        return "Открытие чата"
+    if event_code == "first_message_sent":
+        return "Первое сообщение"
+    if event_code == "phone_clicked":
+        return "Клик по телефону"
+    if event_code == "messenger_clicked":
+        return "Клик по мессенджеру"
+    if event_code == "form_submitted":
+        form_type = _text_or_empty((item or {}).get("form_type"))
+        return f"Отправка формы {form_type}" if form_type else "Отправка формы"
+    return event_code or "Событие сайта"
+
+
+def build_lead_history_event_log(history: list[dict] | None) -> str:
+    chunks: list[str] = []
+    for item in reversed(history or []):
+        if not isinstance(item, dict):
+            continue
+        timestamp = _text_or_empty(item.get("timestamp"))
+        if not timestamp:
+            continue
+        label = _lead_history_event_label(item)
+        chunks.append(
+            "\n".join(
+                [
+                    timestamp,
+                    f"Результат: {label}",
+                    "event_type: system",
+                    "priority: low",
+                    "title: Системное событие",
+                ]
+            )
+        )
+    return "\n\n".join(chunk for chunk in chunks if chunk)
+
+
+def build_lead_combined_event_log(lead: Lead) -> str:
+    stored_events = str(getattr(lead, "events", "") or "").strip()
+    history_events = build_lead_history_event_log(getattr(lead, "history", []) or [])
+    return _merge_text_blocks(stored_events, history_events)
+
+
 def _merge_dicts(base: dict | None, extra: dict | None) -> dict:
     result = dict(base) if isinstance(base, dict) else {}
     if isinstance(extra, dict):
@@ -439,4 +496,7 @@ def convert_lead_to_deal(
     lead.client = target_client
     lead.converted_at = timezone.now()
     lead.save(update_fields=["client", "converted_at", "updated_at"])
+    lead_event_log = build_lead_combined_event_log(lead)
+    if lead_event_log:
+        Deal.objects.filter(pk=deal.pk).update(events=_merge_text_blocks(deal.events, lead_event_log))
     return deal

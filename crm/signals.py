@@ -104,6 +104,15 @@ def _append_deal_event(deal_id: int | None, entry: str) -> None:
     Deal.objects.filter(pk=deal.pk).update(events=_prepend_event(deal.events, entry))
 
 
+def _append_lead_event(lead_id: int | None, entry: str) -> None:
+    if not lead_id:
+        return
+    lead = Lead.objects.filter(pk=lead_id).only("id", "events").first()
+    if lead is None:
+        return
+    Lead.objects.filter(pk=lead.pk).update(events=_prepend_event(lead.events, entry))
+
+
 def _touch_result_label(instance: Touch) -> str:
     return str(getattr(getattr(instance, "result_option", None), "name", "") or "").strip()
 
@@ -157,6 +166,78 @@ def _resolve_auto_follow_up_due_at(instance: Activity):
 @receiver(post_save, sender=Lead)
 def lead_audit_signal(sender, instance: Lead, created, **kwargs):
     log_model_event(instance=instance, action="lead.created" if created else "lead.updated")
+
+
+@receiver(pre_save, sender=Lead)
+def lead_previous_state_signal(sender, instance: Lead, **kwargs):
+    instance._previous_lead_state = None
+    if not instance.pk:
+        return
+    instance._previous_lead_state = (
+        Lead.objects.filter(pk=instance.pk)
+        .select_related("status", "source", "assigned_to")
+        .only(
+            "title",
+            "company",
+            "status_id",
+            "status__name",
+            "source_id",
+            "source__name",
+            "assigned_to_id",
+            "assigned_to__username",
+            "assigned_to__first_name",
+            "assigned_to__last_name",
+            "expected_value",
+        )
+        .first()
+    )
+
+
+@receiver(post_save, sender=Lead)
+def lead_system_events_signal(sender, instance: Lead, created, **kwargs):
+    previous = getattr(instance, "_previous_lead_state", None)
+    if created:
+        entry = _format_structured_event_entry(
+            result_text=f"Лид создан: {instance.title or instance.name or f'Лид #{instance.pk}'}",
+            happened_at=instance.created_at,
+            event_type="system",
+            priority="low",
+            extra_lines=["title: Системное событие"],
+        )
+        _append_lead_event(instance.pk, entry)
+        return
+
+    if previous is None:
+        return
+
+    changes: list[str] = []
+    if str(previous.title or "").strip() != str(instance.title or "").strip():
+        changes.append(f"Название лида изменено: {previous.title or 'Без названия'} -> {instance.title or 'Без названия'}")
+    if str(previous.company or "").strip() != str(instance.company or "").strip():
+        changes.append(f"Компания лида изменена: {previous.company or 'Не указана'} -> {instance.company or 'Не указана'}")
+    if getattr(previous, "status_id", None) != getattr(instance, "status_id", None):
+        previous_status = str(getattr(getattr(previous, "status", None), "name", "") or "Не выбран")
+        current_status = str(getattr(getattr(instance, "status", None), "name", "") or "Не выбран")
+        changes.append(f"Статус лида изменён: {previous_status} -> {current_status}")
+    if getattr(previous, "source_id", None) != getattr(instance, "source_id", None):
+        previous_source = str(getattr(getattr(previous, "source", None), "name", "") or "Не выбран")
+        current_source = str(getattr(getattr(instance, "source", None), "name", "") or "Не выбран")
+        changes.append(f"Источник лида изменён: {previous_source} -> {current_source}")
+    if getattr(previous, "assigned_to_id", None) != getattr(instance, "assigned_to_id", None):
+        changes.append(
+            f"Ответственный изменён: {_actor_display_name(getattr(previous, 'assigned_to', None))} -> {_actor_display_name(getattr(instance, 'assigned_to', None))}"
+        )
+    if getattr(previous, "expected_value", None) != getattr(instance, "expected_value", None):
+        changes.append(f"Ожидаемая сумма изменена: {previous.expected_value or 0} -> {instance.expected_value or 0}")
+
+    for change_text in changes:
+        entry = _format_structured_event_entry(
+            result_text=change_text,
+            event_type="system",
+            priority="low",
+            extra_lines=["title: Системное событие"],
+        )
+        _append_lead_event(instance.pk, entry)
 
 
 def _resolve_converted_stage():
@@ -282,6 +363,8 @@ def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
         )
         if instance.deal_id:
             _append_deal_event(instance.deal_id, entry)
+        if instance.lead_id:
+            _append_lead_event(instance.lead_id, entry)
         for client_id in _task_related_client_ids(instance):
             _append_client_event(client_id, entry)
 
@@ -314,6 +397,8 @@ def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
         ],
     )
     _append_deal_event(instance.deal_id, entry)
+    if instance.lead_id:
+        _append_lead_event(instance.lead_id, entry)
     for client_id in _task_related_client_ids(instance):
         _append_client_event(client_id, entry)
 
@@ -671,6 +756,73 @@ def touch_deal_events_signal(sender, instance: Touch, created, **kwargs):
         ],
     )
     _append_deal_event(instance.deal_id, entry)
+
+
+@receiver(post_save, sender=Touch)
+def touch_lead_events_signal(sender, instance: Touch, created, **kwargs):
+    if not instance.lead_id:
+        return
+
+    previous = getattr(instance, "_previous_touch_state", None)
+    result_label = _touch_result_label(instance)
+    channel_label = _touch_channel_label(instance)
+    direction_label = _touch_direction_label(instance.direction)
+    base_text = result_label or str(instance.summary or "").strip() or f"{direction_label} касание"
+
+    if created:
+        entry = _format_structured_event_entry(
+            result_text=f"Касание: {base_text}",
+            happened_at=instance.happened_at,
+            touch_id=instance.pk,
+            event_type="touch",
+            priority="high",
+            extra_lines=[
+                f"title: {_touch_title(instance)}",
+                f"actor_name: {_actor_display_name(instance.owner)}",
+                channel_label and f"channel_name: {channel_label}",
+                f"direction_label: {_touch_direction_label(instance.direction)}",
+                result_label and f"touch_result: {result_label}",
+                instance.summary and f"summary: {instance.summary}",
+                instance.next_step and f"next_step: {instance.next_step}",
+                instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
+            ],
+        )
+        _append_lead_event(instance.lead_id, entry)
+        return
+
+    if previous is None:
+        return
+
+    changed = (
+        previous.channel_id != instance.channel_id
+        or previous.direction != instance.direction
+        or previous.result_option_id != instance.result_option_id
+        or str(previous.summary or "") != str(instance.summary or "")
+        or str(previous.next_step or "") != str(instance.next_step or "")
+        or previous.next_step_at != instance.next_step_at
+        or previous.owner_id != instance.owner_id
+    )
+    if not changed:
+        return
+
+    entry = _format_structured_event_entry(
+        result_text=f"Касание обновлено: {base_text}",
+        happened_at=instance.happened_at,
+        touch_id=instance.pk,
+        event_type="touch",
+        priority="high",
+        extra_lines=[
+            f"title: {_touch_title(instance)}",
+            f"actor_name: {_actor_display_name(instance.owner)}",
+            channel_label and f"channel_name: {channel_label}",
+            f"direction_label: {_touch_direction_label(instance.direction)}",
+            result_label and f"touch_result: {result_label}",
+            instance.summary and f"summary: {instance.summary}",
+            instance.next_step and f"next_step: {instance.next_step}",
+            instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
+        ],
+    )
+    _append_lead_event(instance.lead_id, entry)
 
 
 @receiver(post_save, sender=Touch)
