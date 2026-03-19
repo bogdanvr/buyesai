@@ -452,6 +452,13 @@
           touches.sort((left, right) => (this.parseTaskDueTimestamp(right.happenedAtRaw) || 0) - (this.parseTaskDueTimestamp(left.happenedAtRaw) || 0));
           return touches[0] || null;
         },
+        dealSummaryOverdueTasksLabel() {
+          const overdueCount = (this.dealTasksForActiveDeal || []).filter((task) => this.isTaskOverdue(task.dueAtRaw, task.taskStatus)).length;
+          if (!overdueCount) {
+            return "Нет просроченных задач";
+          }
+          return overdueCount === 1 ? "1 просроченная задача" : `${overdueCount} просроченных задач`;
+        },
         dealSummaryNextTouch() {
           const touches = this.dealSummaryTouches
             .filter((touch) => touch.nextStepAtRaw)
@@ -978,6 +985,19 @@
                 dealId: null,
                 eventType: "",
                 priority: "",
+                title: "",
+                actorName: "",
+                channelName: "",
+                directionLabel: "",
+                touchResult: "",
+                summaryText: "",
+                nextStep: "",
+                nextStepAt: "",
+                taskTypeName: "",
+                taskStatusLabel: "",
+                dueAt: "",
+                ownerName: "",
+                taskResult: "",
                 extra: "",
               };
               const contentLines = eventItem.timestamp ? lines.slice(1) : lines.slice();
@@ -1012,6 +1032,58 @@
                   eventItem.priority = line.replace(/^priority:\s*/u, "").trim();
                   return;
                 }
+                if (line.indexOf("title:") === 0) {
+                  eventItem.title = line.replace(/^title:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("actor_name:") === 0) {
+                  eventItem.actorName = line.replace(/^actor_name:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("channel_name:") === 0) {
+                  eventItem.channelName = line.replace(/^channel_name:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("direction_label:") === 0) {
+                  eventItem.directionLabel = line.replace(/^direction_label:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("touch_result:") === 0) {
+                  eventItem.touchResult = line.replace(/^touch_result:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("summary:") === 0) {
+                  eventItem.summaryText = line.replace(/^summary:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("next_step:") === 0) {
+                  eventItem.nextStep = line.replace(/^next_step:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("next_step_at:") === 0) {
+                  eventItem.nextStepAt = line.replace(/^next_step_at:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("task_type_name:") === 0) {
+                  eventItem.taskTypeName = line.replace(/^task_type_name:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("task_status_label:") === 0) {
+                  eventItem.taskStatusLabel = line.replace(/^task_status_label:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("due_at:") === 0) {
+                  eventItem.dueAt = line.replace(/^due_at:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("owner_name:") === 0) {
+                  eventItem.ownerName = line.replace(/^owner_name:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("task_result:") === 0) {
+                  eventItem.taskResult = line.replace(/^task_result:\s*/u, "").trim();
+                  return;
+                }
                 extraLines.push(line);
               });
 
@@ -1024,6 +1096,19 @@
                   dealId: null,
                   eventType: "",
                   priority: "",
+                  title: "",
+                  actorName: "",
+                  channelName: "",
+                  directionLabel: "",
+                  touchResult: "",
+                  summaryText: "",
+                  nextStep: "",
+                  nextStepAt: "",
+                  taskTypeName: "",
+                  taskStatusLabel: "",
+                  dueAt: "",
+                  ownerName: "",
+                  taskResult: "",
                   extra: "",
                 };
               }
@@ -1137,6 +1222,35 @@
           if (eventType === "task") return "Задача";
           if (eventType === "system") return "Система";
           return "";
+        },
+        eventShortTimestamp(value) {
+          const raw = String(value || "").trim();
+          if (!raw) return "";
+          if (/^\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}$/.test(raw)) {
+            const [, rest] = raw.split(".");
+            return `${raw.slice(0, 5)} ${raw.slice(11, 16)}`;
+          }
+          const parsed = new Date(raw);
+          if (Number.isNaN(parsed.getTime())) {
+            return raw;
+          }
+          return parsed.toLocaleString("ru-RU", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          }).replace(",", "");
+        },
+        dealEventIcon(eventItem) {
+          const eventType = String(eventItem?.eventType || "").trim();
+          if (eventType === "task") return "☑";
+          if (eventType === "system") return "•";
+          const channel = String(eventItem?.channelName || eventItem?.title || "").toLowerCase();
+          if (channel.includes("звон")) return "☎";
+          if (channel.includes("email") || channel.includes("почт")) return "✉";
+          if (channel.includes("встреч")) return "◈";
+          if (channel.includes("док")) return "▣";
+          return "◉";
         },
         humanizeLeadSourceName(value) {
           const raw = String(value || "").trim();

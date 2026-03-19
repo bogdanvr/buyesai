@@ -116,6 +116,18 @@ def _touch_direction_label(direction: str) -> str:
     return TouchDirection.OUTGOING.label if direction == TouchDirection.OUTGOING else TouchDirection.INCOMING.label
 
 
+def _touch_title(instance: Touch) -> str:
+    channel_label = _touch_channel_label(instance).strip().lower()
+    direction_label = _touch_direction_label(instance.direction)
+    if channel_label:
+        return f"{direction_label} {channel_label}"
+    return f"{direction_label} касание"
+
+
+def _task_status_label(status: str) -> str:
+    return TaskStatus(status).label if status in TaskStatus.values else str(status or "").strip()
+
+
 def _task_related_client_ids(instance: Activity) -> list[int]:
     client_ids = []
     candidates = [
@@ -260,6 +272,13 @@ def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
             deal_id=instance.deal_id,
             event_type="task",
             priority="medium" if instance.status in ACTIVE_TASK_STATUSES else "low",
+            extra_lines=[
+                f"title: Задача: {instance.subject}",
+                getattr(instance.task_type, "name", "") and f"task_type_name: {instance.task_type.name}",
+                f"task_status_label: {_task_status_label(instance.status)}",
+                instance.due_at and f"due_at: {timezone.localtime(instance.due_at).isoformat()}",
+                f"owner_name: {_actor_display_name(getattr(instance, 'created_by', None))}",
+            ],
         )
         _append_deal_event(instance.deal_id, entry)
 
@@ -282,6 +301,14 @@ def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
         deal_id=instance.deal_id,
         event_type="task",
         priority="low",
+        extra_lines=[
+            f"title: Задача: {instance.subject}",
+            getattr(instance.task_type, "name", "") and f"task_type_name: {instance.task_type.name}",
+            f"task_status_label: {_task_status_label(instance.status)}",
+            instance.due_at and f"due_at: {timezone.localtime(instance.due_at).isoformat()}",
+            f"owner_name: {_actor_display_name(getattr(instance, 'created_by', None))}",
+            result_text and f"task_result: {result_text}",
+        ],
     )
     _append_deal_event(instance.deal_id, entry)
     for client_id in _task_related_client_ids(instance):
@@ -460,6 +487,7 @@ def deal_stage_change_events_signal(sender, instance: Deal, created, **kwargs):
         deal_id=instance.pk,
         event_type="system",
         priority="low",
+        extra_lines=["title: Системное событие"],
     )
     _append_deal_event(instance.pk, entry)
 
@@ -473,6 +501,7 @@ def deal_system_events_signal(sender, instance: Deal, created, **kwargs):
             deal_id=instance.pk,
             event_type="system",
             priority="low",
+            extra_lines=["title: Системное событие"],
         )
         _append_deal_event(instance.pk, entry)
         return
@@ -508,6 +537,7 @@ def deal_system_events_signal(sender, instance: Deal, created, **kwargs):
             deal_id=instance.pk,
             event_type="system",
             priority="low",
+            extra_lines=["title: Системное событие"],
         )
         _append_deal_event(instance.pk, entry)
 
@@ -538,6 +568,7 @@ def deal_failed_reason_events_signal(sender, instance: Deal, created, **kwargs):
         deal_id=instance.pk,
         event_type="system",
         priority="low",
+        extra_lines=["title: Системное событие"],
     )
     _append_deal_event(instance.pk, entry)
     _append_client_event(instance.client_id, entry)
@@ -561,6 +592,7 @@ def deal_completion_events_signal(sender, instance: Deal, created, **kwargs):
         deal_id=instance.pk,
         event_type="system",
         priority="low",
+        extra_lines=["title: Системное событие"],
     )
     _append_deal_event(instance.pk, entry)
     _append_client_event(instance.client_id, entry)
@@ -586,9 +618,14 @@ def touch_deal_events_signal(sender, instance: Touch, created, **kwargs):
             event_type="touch",
             priority="high",
             extra_lines=[
-                channel_label and f"Канал: {channel_label}",
-                instance.summary and f"Содержание: {instance.summary}",
-                instance.next_step and f"Следующий шаг: {instance.next_step}",
+                f"title: {_touch_title(instance)}",
+                f"actor_name: {_actor_display_name(instance.owner)}",
+                channel_label and f"channel_name: {channel_label}",
+                f"direction_label: {_touch_direction_label(instance.direction)}",
+                result_label and f"touch_result: {result_label}",
+                instance.summary and f"summary: {instance.summary}",
+                instance.next_step and f"next_step: {instance.next_step}",
+                instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
             ],
         )
         _append_deal_event(instance.deal_id, entry)
@@ -617,9 +654,14 @@ def touch_deal_events_signal(sender, instance: Touch, created, **kwargs):
         event_type="touch",
         priority="high",
         extra_lines=[
-            channel_label and f"Канал: {channel_label}",
-            instance.summary and f"Содержание: {instance.summary}",
-            instance.next_step and f"Следующий шаг: {instance.next_step}",
+            f"title: {_touch_title(instance)}",
+            f"actor_name: {_actor_display_name(instance.owner)}",
+            channel_label and f"channel_name: {channel_label}",
+            f"direction_label: {_touch_direction_label(instance.direction)}",
+            result_label and f"touch_result: {result_label}",
+            instance.summary and f"summary: {instance.summary}",
+            instance.next_step and f"next_step: {instance.next_step}",
+            instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
         ],
     )
     _append_deal_event(instance.deal_id, entry)
