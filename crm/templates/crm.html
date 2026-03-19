@@ -766,18 +766,146 @@
           </template>
 
           <template v-if="activeSection === 'deals'">
-            <label class="block">
-              <span class="text-sm text-crm-muted">Название сделки</span>
-              <input v-model="forms.deals.title" required type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-            </label>
-            <label class="block">
-              <span class="text-sm text-crm-muted">Источник сделки</span>
-              <select v-model="forms.deals.sourceId" @change="handleSourceSelectChange('deals')" required class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option value="" disabled>Выберите источник</option>
-                <option value="__create__">+ Добавить новый источник</option>
-                <option v-for="source in metaOptions.leadSources" :key="source.id" :value="source.id">[[ source.name ]]</option>
-              </select>
-            </label>
+            <div class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Название сделки</div>
+                  <button v-if="!isDealSummaryEditing('title')" type="button" @click="openDealSummaryField('title')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.deals.title || 'Не указано' ]]
+                  </button>
+                  <input
+                    v-else
+                    v-model="forms.deals.title"
+                    type="text"
+                    @keydown.enter.prevent="stopDealSummaryEdit('title')"
+                    @keydown.esc.prevent="stopDealSummaryEdit('title')"
+                    @blur="stopDealSummaryEdit('title')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                    autofocus
+                  />
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Компания</div>
+                  <button v-if="!isDealSummaryEditing('companyId')" type="button" @click="openDealSummaryField('companyId')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ dealSelectedCompanyName || 'Не выбрана' ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.deals.companyId"
+                    @change="handleDealCompanySelectChange(); stopDealSummaryEdit('companyId')"
+                    @blur="stopDealSummaryEdit('companyId')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option :value="null">Не выбрана</option>
+                    <option value="__create__">+ Добавить новую компанию</option>
+                    <option v-for="company in companyOptions" :key="`deal-summary-company-${company.id}`" :value="company.id">[[ company.name ]]</option>
+                  </select>
+                </div>
+                <button type="button" @click="openDealSummaryField('contact')" class="text-left py-1 hover:text-white transition">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Контакт</div>
+                  <div class="text-sm text-white">[[ dealSummaryContact ? dealSummaryContact.fullName : 'Не выбран' ]]</div>
+                </button>
+                <div class="rounded-xl border border-crm-accent/40 bg-crm-accent/10 px-3 py-2">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-accent">Этап</div>
+                  <button v-if="!isDealSummaryEditing('stageId')" type="button" @click="openDealSummaryField('stageId')" class="mt-1 text-left text-sm font-medium text-white hover:text-crm-accent transition">
+                    [[ metaOptions.dealStages.find(stage => String(stage.id) === String(forms.deals.stageId))?.name || 'Не выбран' ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.deals.stageId"
+                    @change="stopDealSummaryEdit('stageId')"
+                    @blur="stopDealSummaryEdit('stageId')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-accent/40 bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option value="">Не выбран</option>
+                    <option v-for="stage in metaOptions.dealStages" :key="`deal-summary-stage-${stage.id}`" :value="stage.id">[[ stage.name ]]</option>
+                  </select>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Сумма</div>
+                  <button v-if="!isDealSummaryEditing('amount')" type="button" @click="openDealSummaryField('amount')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ formatDealAmountSummary(forms.deals.amount, datasets.companies.find(company => String(company.id) === String(forms.deals.companyId))?.currency || 'RUB') ]]
+                  </button>
+                  <input
+                    v-else
+                    v-model="forms.deals.amount"
+                    @focus="clearZeroOnFocus(forms.deals, 'amount')"
+                    @keydown.enter.prevent="stopDealSummaryEdit('amount')"
+                    @keydown.esc.prevent="stopDealSummaryEdit('amount')"
+                    @blur="stopDealSummaryEdit('amount')"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Ответственный</div>
+                  <button v-if="!isDealSummaryEditing('ownerId')" type="button" @click="openDealSummaryField('ownerId')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ metaOptions.users.find(user => String(user.id) === String(forms.deals.ownerId))?.full_name || metaOptions.users.find(user => String(user.id) === String(forms.deals.ownerId))?.username || 'Не выбран' ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.deals.ownerId"
+                    @change="stopDealSummaryEdit('ownerId')"
+                    @blur="stopDealSummaryEdit('ownerId')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option :value="null">Не выбран</option>
+                    <option v-for="user in metaOptions.users" :key="`deal-summary-owner-${user.id}`" :value="user.id">[[ user.full_name || user.username ]]</option>
+                  </select>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Источник сделки</div>
+                  <button v-if="!isDealSummaryEditing('sourceId')" type="button" @click="openDealSummaryField('sourceId')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ metaOptions.leadSources.find(source => String(source.id) === String(forms.deals.sourceId))?.name || 'Не выбран' ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.deals.sourceId"
+                    @change="handleSourceSelectChange('deals'); stopDealSummaryEdit('sourceId')"
+                    @blur="stopDealSummaryEdit('sourceId')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option value="" disabled>Выберите источник</option>
+                    <option value="__create__">+ Добавить новый источник</option>
+                    <option v-for="source in metaOptions.leadSources" :key="`deal-summary-source-${source.id}`" :value="source.id">[[ source.name ]]</option>
+                  </select>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">План закрытия</div>
+                  <button v-if="!isDealSummaryEditing('closeDate')" type="button" @click="openDealSummaryField('closeDate')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.deals.closeDate || 'Не указан' ]]
+                  </button>
+                  <input
+                    v-else
+                    v-model="forms.deals.closeDate"
+                    type="date"
+                    @keydown.enter.prevent="stopDealSummaryEdit('closeDate')"
+                    @keydown.esc.prevent="stopDealSummaryEdit('closeDate')"
+                    @blur="stopDealSummaryEdit('closeDate')"
+                    @change="stopDealSummaryEdit('closeDate')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                </div>
+                <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дата следующего шага</div>
+                  <div class="text-sm text-white">[[ dealSummaryNextTouch?.nextStepAtRaw ? formatDueLabel(dealSummaryNextTouch.nextStepAtRaw) : 'Не указана' ]]</div>
+                </button>
+                <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Следующий шаг</div>
+                  <div class="text-sm text-white">[[ dealSummaryNextTouch?.nextStep || 'Не указан' ]]</div>
+                </button>
+                <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дата последнего касания</div>
+                  <div class="text-sm text-white">[[ dealSummaryLastTouch?.happenedAtRaw ? formatDueLabel(dealSummaryLastTouch.happenedAtRaw) : 'Не указана' ]]</div>
+                </button>
+                <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Статус активности</div>
+                  <div class="text-sm text-white">[[ dealActivityStatusLabel ]]</div>
+                </button>
+              </div>
+            </div>
             <div v-if="showSourceCreateForm && sourceCreateTargetSection === 'deals'" class="block md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
                 <label class="block">
@@ -803,17 +931,6 @@
             </button>
             <div class="block md:col-span-2">
               <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-end">
-                <div v-if="shouldShowDealField('companyId', forms.deals.companyId)" class="block">
-                  <span class="text-sm text-crm-muted">Компания</span>
-                  <select v-model="forms.deals.companyId" @change="handleDealCompanySelectChange" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                    <option :value="null">Не выбрана</option>
-                    <option value="__create__">+ Добавить новую компанию</option>
-                    <option v-for="company in companyOptions" :key="company.id" :value="company.id">[[ company.name ]]</option>
-                  </select>
-                </div>
-                <button v-else type="button" @click="toggleOptionalField('deals', 'companyId')" class="crm-inline-field-toggle">
-                  <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Компания</span><span class="text-crm-accent text-xs">+</span></div>
-                </button>
                 <div v-if="dealHasSelectedCompany" class="flex items-end">
                   <button
                     type="button"
@@ -826,10 +943,6 @@
                     </svg>
                   </button>
                 </div>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">Сумма</span>
-                  <input v-model="forms.deals.amount" @focus="clearZeroOnFocus(forms.deals, 'amount')" type="number" min="0" step="0.01" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-                </label>
               </div>
             </div>
 
@@ -998,36 +1111,10 @@
                 </div>
               </div>
             </div>
-            <label v-if="shouldShowDealField('stageId', forms.deals.stageId)" class="block rounded-xl border border-crm-accent/35 bg-crm-accent/8 px-4 py-3">
-              <div class="flex items-center gap-3">
-                <span class="inline-flex shrink-0 items-center rounded-md border border-crm-accent/35 bg-crm-accent/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-crm-accent">Этап сделки</span>
-                <select v-model="forms.deals.stageId" class="min-w-0 flex-1 h-10 rounded-lg border border-crm-accent/30 bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
-                <option value="">Не выбран</option>
-                <option v-for="stage in metaOptions.dealStages" :key="stage.id" :value="stage.id">[[ stage.name ]]</option>
-                </select>
-              </div>
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('deals', 'stageId')" class="crm-inline-field-toggle crm-inline-field-toggle-accent">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-accent">Статус сделки</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
-            <label class="block">
-              <span class="text-sm text-crm-muted">Ответственный</span>
-              <select v-model="forms.deals.ownerId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option :value="null">Не выбран</option>
-                <option v-for="user in metaOptions.users" :key="`deal-owner-${user.id}`" :value="user.id">[[ user.full_name || user.username ]]</option>
-              </select>
-            </label>
             <label v-if="isDealFailedStageSelected" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Причина провала</span>
               <textarea v-model="forms.deals.failureReason" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <label v-if="shouldShowDealField('closeDate', forms.deals.closeDate)" class="block">
-              <span class="text-sm text-crm-muted">План закрытия</span>
-              <input v-model="forms.deals.closeDate" type="date" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('deals', 'closeDate')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">План закрытия</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
             <label v-if="shouldShowDealField('events', forms.deals.events)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">События</span>
               <div class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">

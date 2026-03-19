@@ -80,6 +80,7 @@
           showCompanyContactForm: false,
           showCompanyNoteDraft: false,
           showCompanyOkvedDetails: false,
+          dealSummaryEditingField: "",
           expandedOptionalFields: {
             leads: {},
             deals: {},
@@ -414,6 +415,44 @@
           if (!companyId) return "";
           const selected = this.datasets.companies.find((company) => String(company.id) === String(companyId));
           return selected ? selected.name : `Компания #${companyId}`;
+        },
+        dealSummaryContact() {
+          const companyId = this.toIntOrNull(this.forms.deals.companyId);
+          if (!companyId) return null;
+          const contacts = (this.dealCompanyContacts.length ? this.dealCompanyContacts : this.datasets.contacts)
+            .filter((contact) => String(contact.clientId || "") === String(companyId));
+          return contacts.find((contact) => contact.isPrimary) || contacts[0] || null;
+        },
+        dealSummaryTouches() {
+          const dealId = this.toIntOrNull(this.editingDealId);
+          if (!dealId) return [];
+          return (this.datasets.touches || []).filter((touch) => String(touch.dealId || "") === String(dealId));
+        },
+        dealSummaryLastTouch() {
+          const touches = this.dealSummaryTouches.slice();
+          touches.sort((left, right) => (this.parseTaskDueTimestamp(right.happenedAtRaw) || 0) - (this.parseTaskDueTimestamp(left.happenedAtRaw) || 0));
+          return touches[0] || null;
+        },
+        dealSummaryNextTouch() {
+          const touches = this.dealSummaryTouches
+            .filter((touch) => touch.nextStepAtRaw)
+            .slice();
+          touches.sort((left, right) => (this.parseTaskDueTimestamp(left.nextStepAtRaw) || 0) - (this.parseTaskDueTimestamp(right.nextStepAtRaw) || 0));
+          return touches[0] || null;
+        },
+        dealActivityStatusLabel() {
+          const nextTouch = this.dealSummaryNextTouch;
+          const nextStepAt = this.parseTaskDueTimestamp(nextTouch?.nextStepAtRaw);
+          if (nextStepAt !== null) {
+            return nextStepAt < Date.now() ? "Просрочено" : "В срок";
+          }
+          const lastTouch = this.dealSummaryLastTouch;
+          const happenedAt = this.parseTaskDueTimestamp(lastTouch?.happenedAtRaw);
+          if (happenedAt !== null) {
+            const daysWithoutContact = Math.max(0, Math.floor((Date.now() - happenedAt) / 86400000));
+            return `Без контакта ${daysWithoutContact} дн`;
+          }
+          return "Без контакта";
         },
         isDealFailedStageSelected() {
           return this.resolveDealStageCode(this.forms.deals.stageId) === "failed";
@@ -2149,6 +2188,53 @@
             hour: "2-digit",
             minute: "2-digit",
           });
+        },
+        formatDealAmountSummary(amount, currency) {
+          const numeric = Number(amount);
+          if (!Number.isFinite(numeric) || numeric <= 0) {
+            return "Не указана";
+          }
+          return `${numeric.toLocaleString("ru-RU")} ${String(currency || "RUB").trim()}`;
+        },
+        isDealSummaryEditing(fieldKey) {
+          return String(this.dealSummaryEditingField || "") === String(fieldKey || "");
+        },
+        startDealSummaryEdit(fieldKey) {
+          this.dealSummaryEditingField = String(fieldKey || "");
+        },
+        stopDealSummaryEdit(fieldKey = "") {
+          if (!fieldKey || this.isDealSummaryEditing(fieldKey)) {
+            this.dealSummaryEditingField = "";
+          }
+        },
+        openDealSummaryField(fieldKey) {
+          if (fieldKey === "contact") {
+            if (!this.toIntOrNull(this.forms.deals.companyId)) {
+              this.startDealSummaryEdit("companyId");
+              return;
+            }
+            this.showDealContactsPanel = true;
+            return;
+          }
+          if (fieldKey === "touch") {
+            const touch = this.dealSummaryNextTouch || this.dealSummaryLastTouch;
+            if (touch) {
+              this.openTouchEditor(touch);
+              return;
+            }
+            this.activeSection = "touches";
+            this.editingTouchId = null;
+            this.forms.touches = {
+              ...this.getDefaultForm("touches"),
+              happenedAt: this.toDateTimeLocal(new Date().toISOString()),
+              companyId: this.toIntOrNull(this.forms.deals.companyId),
+              dealId: this.toIntOrNull(this.editingDealId),
+              ownerId: this.toIntOrNull(this.forms.deals.ownerId),
+            };
+            this.showModal = true;
+            return;
+          }
+          this.startDealSummaryEdit(fieldKey);
         },
         formatRemainingDuration(totalMinutes) {
           const minutes = Math.max(1, Math.ceil(Number(totalMinutes) || 0));
