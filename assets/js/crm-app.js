@@ -56,7 +56,9 @@
           isLoading: false,
           isSaving: false,
           showStatusFilter: false,
+          showTaskCompanyFilter: false,
           selectedStatusFilters: [],
+          selectedTaskCompanyFilters: [],
           editingLeadId: null,
           editingDealId: null,
           editingContactId: null,
@@ -588,13 +590,17 @@
               this.activeSection !== "tasks" ||
               !this.taskDealFilterId ||
               String(item.dealId || "") === String(this.taskDealFilterId);
+            const matchesCompanyFilter =
+              this.activeSection !== "tasks"
+              || !this.selectedTaskCompanyFilters.length
+              || this.selectedTaskCompanyFilters.includes(String(item.clientId || ""));
             const matchesSearch = !q || [item.name, item.company, item.deal, item.phone, item.email, item.statusLabel]
               .filter(Boolean)
               .some((value) => String(value).toLowerCase().includes(q));
             const matchesStatus =
               !this.selectedStatusFilters.length ||
               this.selectedStatusFilters.includes(item.statusLabel);
-            return matchesDealFilter && matchesSearch && matchesStatus;
+            return matchesDealFilter && matchesCompanyFilter && matchesSearch && matchesStatus;
           });
           const ordered = filtered.map((item, index) => ({ item, index }));
           ordered.sort((left, right) => {
@@ -629,6 +635,29 @@
           return Array.from(labels)
             .sort((a, b) => String(a).localeCompare(String(b), "ru"))
             .map((label) => ({ value: label, label }));
+        },
+        taskCompanyFilterOptions() {
+          if (this.activeSection !== "tasks") {
+            return [];
+          }
+          const activeTasks = (this.datasets.tasks || []).filter((task) => {
+            const status = String(task.taskStatus || task.status || "").trim();
+            return status !== "done" && status !== "canceled" && this.toIntOrNull(task.clientId);
+          });
+          const uniqueCompanies = new Map();
+          activeTasks.forEach((task) => {
+            const companyId = String(this.toIntOrNull(task.clientId));
+            if (!companyId || uniqueCompanies.has(companyId)) {
+              return;
+            }
+            uniqueCompanies.set(companyId, {
+              value: companyId,
+              label: String(task.company || `Компания #${companyId}`).trim(),
+            });
+          });
+          return Array.from(uniqueCompanies.values()).sort((left, right) => (
+            String(left.label).localeCompare(String(right.label), "ru")
+          ));
         },
         stats() {
           const items = this.filteredItems;
@@ -1404,6 +1433,9 @@
         },
         toggleStatusFilter() {
           this.showStatusFilter = !this.showStatusFilter;
+          if (this.showStatusFilter) {
+            this.showTaskCompanyFilter = false;
+          }
         },
         toggleStatusFilterValue(value) {
           if (this.selectedStatusFilters.includes(value)) {
@@ -1414,6 +1446,23 @@
         },
         clearStatusFilter() {
           this.selectedStatusFilters = [];
+        },
+        toggleTaskCompanyFilter() {
+          this.showTaskCompanyFilter = !this.showTaskCompanyFilter;
+          if (this.showTaskCompanyFilter) {
+            this.showStatusFilter = false;
+          }
+        },
+        toggleTaskCompanyFilterValue(value) {
+          const normalizedValue = String(value || "");
+          if (this.selectedTaskCompanyFilters.includes(normalizedValue)) {
+            this.selectedTaskCompanyFilters = this.selectedTaskCompanyFilters.filter((item) => item !== normalizedValue);
+            return;
+          }
+          this.selectedTaskCompanyFilters = [...this.selectedTaskCompanyFilters, normalizedValue];
+        },
+        clearTaskCompanyFilter() {
+          this.selectedTaskCompanyFilters = [];
         },
         clearTaskDealFilter() {
           this.taskDealFilterId = null;
@@ -1557,10 +1606,15 @@
           await this.createItem();
         },
         handleDocumentClick(event) {
-          if (!this.showStatusFilter) return;
           const target = event.target;
-          if (target && target.closest && target.closest("[data-status-filter]")) return;
-          this.showStatusFilter = false;
+          if (this.showStatusFilter) {
+            if (target && target.closest && target.closest("[data-status-filter]")) return;
+            this.showStatusFilter = false;
+          }
+          if (this.showTaskCompanyFilter) {
+            if (target && target.closest && target.closest("[data-task-company-filter]")) return;
+            this.showTaskCompanyFilter = false;
+          }
         },
         getStatusBucket(status) {
           if (["converted", "archived", "done", "lost", "unqualified", "spam"].includes(status)) {
@@ -1870,7 +1924,9 @@
           this.activeSection = "tasks";
           this.search = "";
           this.showStatusFilter = false;
+          this.showTaskCompanyFilter = false;
           this.selectedStatusFilters = [];
+          this.selectedTaskCompanyFilters = [];
           if (!this.datasets.tasks.length) {
             await this.reloadActiveSection();
           }
@@ -2453,7 +2509,9 @@
         openContactFromCompany(contact) {
           this.activeSection = "contacts";
           this.showStatusFilter = false;
+          this.showTaskCompanyFilter = false;
           this.selectedStatusFilters = [];
+          this.selectedTaskCompanyFilters = [];
           this.openContactEditor({
             id: contact.id,
             fullName: contact.fullName || "",
@@ -2748,7 +2806,9 @@
           window.localStorage.setItem("crm_active_section", section);
           this.search = "";
           this.showStatusFilter = false;
+          this.showTaskCompanyFilter = false;
           this.selectedStatusFilters = [];
+          this.selectedTaskCompanyFilters = [];
           this.clearTaskDealFilter();
           this.editingLeadId = null;
           this.editingDealId = null;
