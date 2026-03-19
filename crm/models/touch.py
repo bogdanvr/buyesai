@@ -9,6 +9,19 @@ class TouchDirection(models.TextChoices):
     OUTGOING = "outgoing", "Исходящее"
 
 
+class TouchResult(TimestampedModel):
+    name = models.CharField(max_length=128, unique=True, verbose_name="Результат касания")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
+
+    class Meta:
+        verbose_name = "Результат касания"
+        verbose_name_plural = "Результаты касаний"
+        ordering = ("name",)
+
+    def __str__(self):
+        return self.name
+
+
 class Touch(TimestampedModel):
     happened_at = models.DateTimeField(verbose_name="Дата и время")
     channel = models.ForeignKey(
@@ -24,7 +37,14 @@ class Touch(TimestampedModel):
         choices=TouchDirection.choices,
         verbose_name="Направление",
     )
-    result = models.TextField(blank=True, default="", verbose_name="Результат")
+    result_option = models.ForeignKey(
+        "crm.TouchResult",
+        related_name="touches",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Результат касания",
+    )
     summary = models.TextField(blank=True, default="", verbose_name="Краткое содержание")
     next_step = models.TextField(blank=True, default="", verbose_name="Следующий шаг")
     next_step_at = models.DateTimeField(blank=True, null=True, verbose_name="Дата следующего шага")
@@ -92,4 +112,4 @@ class Touch(TimestampedModel):
         ]
 
     def __str__(self):
-        return self.summary or self.result or f"Касание #{self.pk}"
+        return self.summary or getattr(self.result_option, "name", "") or f"Касание #{self.pk}"

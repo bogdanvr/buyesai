@@ -7,6 +7,7 @@ from api.v1.meta.views import (
     LeadSourceListAPIView,
     LeadStatusListAPIView,
     TaskTypeListAPIView,
+    TouchResultListAPIView,
     UserOptionListAPIView,
 )
 
@@ -17,5 +18,6 @@ urlpatterns = [
     path("communication-channels/", CommunicationChannelListAPIView.as_view(), name="meta-communication-channels"),
     path("users/", UserOptionListAPIView.as_view(), name="meta-users"),
     path("task-types/", TaskTypeListAPIView.as_view(), name="meta-task-types"),
+    path("touch-results/", TouchResultListAPIView.as_view(), name="meta-touch-results"),
     path("currency-rates/", CurrencyRatesAPIView.as_view(), name="meta-currency-rates"),
 ]

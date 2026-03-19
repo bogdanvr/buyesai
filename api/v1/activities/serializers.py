@@ -11,6 +11,8 @@ class ActivitySerializer(serializers.ModelSerializer):
     deal_title = serializers.CharField(source="deal.title", read_only=True)
     contact_name = serializers.SerializerMethodField()
     task_type_name = serializers.CharField(source="task_type.name", read_only=True)
+    task_type_group = serializers.CharField(source="task_type.group", read_only=True)
+    task_type_group_label = serializers.CharField(source="task_type.get_group_display", read_only=True)
     related_touch_subject = serializers.CharField(source="related_touch.subject", read_only=True)
     status_label = serializers.SerializerMethodField()
     has_follow_up_task = serializers.BooleanField(write_only=True, required=False, default=False)
@@ -58,15 +60,20 @@ class ActivitySerializer(serializers.ModelSerializer):
             attrs["is_done"] = is_done
         if activity_type == ActivityType.TASK and not due_at:
             raise serializers.ValidationError({"due_at": "Укажите срок задачи."})
-        if activity_type == ActivityType.TASK and is_done and not str(result or "").strip():
-            raise serializers.ValidationError({"result": "Укажите результат завершения задачи."})
-        if activity_type == ActivityType.TASK and save_company_note and not str(company_note or "").strip():
-            raise serializers.ValidationError({"company_note": "Укажите важные факты о компании."})
         if activity_type == ActivityType.TASK and related_touch is not None:
             if self.instance is not None and related_touch.pk == self.instance.pk:
                 raise serializers.ValidationError({"related_touch": "Нельзя связать задачу саму с собой."})
             if related_touch.type == ActivityType.TASK:
                 raise serializers.ValidationError({"related_touch": "Связанное касание должно быть активностью, а не задачей."})
+        if activity_type == ActivityType.TASK and is_done:
+            has_result = bool(str(result or "").strip())
+            has_related_touch = related_touch is not None
+            if not has_result and not has_related_touch:
+                raise serializers.ValidationError(
+                    {"result": "Укажите результат завершения задачи или привяжите касание."}
+                )
+        if activity_type == ActivityType.TASK and save_company_note and not str(company_note or "").strip():
+            raise serializers.ValidationError({"company_note": "Укажите важные факты о компании."})
         if activity_type == ActivityType.TASK and is_done and deal is not None:
             stage_code = str(getattr(getattr(deal, "stage", None), "code", "") or "").strip().lower()
             if stage_code not in {"won", "failed"}:
@@ -109,6 +116,8 @@ class ActivitySerializer(serializers.ModelSerializer):
             "priority",
             "task_type",
             "task_type_name",
+            "task_type_group",
+            "task_type_group_label",
             "related_touch",
             "related_touch_subject",
             "deadline_reminder_offset_minutes",

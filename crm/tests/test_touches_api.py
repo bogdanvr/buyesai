@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from datetime import timedelta
 
-from crm.models import Activity, Client, CommunicationChannel, Contact, Deal, DealStage, Lead, Touch
+from crm.models import Activity, Client, CommunicationChannel, Contact, Deal, DealStage, Lead, Touch, TouchResult
 from crm.models.activity import ActivityType
 
 
@@ -18,6 +18,7 @@ class TouchesApiTests(APITestCase):
         )
         self.client.force_authenticate(user=self.user)
         self.channel = CommunicationChannel.objects.create(name="Телефон")
+        self.touch_result = TouchResult.objects.create(name="Назначен следующий шаг")
         self.company = Client.objects.create(name="Acme")
         self.contact = Contact.objects.create(client=self.company, first_name="Иван", last_name="Иванов")
         self.lead = Lead.objects.create(title="Лид для касания", company="Acme")
@@ -54,8 +55,8 @@ class TouchesApiTests(APITestCase):
             {
                 "happened_at": "2026-03-18T10:00:00+06:00",
                 "channel": self.channel.pk,
+                "result_option": self.touch_result.pk,
                 "direction": "outgoing",
-                "result": "Созвон состоялся",
                 "summary": "Обсудили условия поставки",
                 "next_step": "Подготовить КП",
                 "next_step_at": "2026-03-19T12:00:00+06:00",
@@ -67,11 +68,11 @@ class TouchesApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["channel_name"], "Телефон")
+        self.assertEqual(response.data["result_option_name"], "Назначен следующий шаг")
         self.assertEqual(response.data["direction_label"], "Исходящее")
         self.assertEqual(response.data["deal_title"], "Сделка для касания")
 
         touch = Touch.objects.get(pk=response.data["id"])
-        self.assertEqual(touch.result, "Созвон состоялся")
         self.assertEqual(touch.summary, "Обсудили условия поставки")
 
     def test_can_create_touch_for_lead(self):

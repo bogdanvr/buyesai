@@ -41,6 +41,11 @@
       { value: "high", label: "Высокий" }
     ];
 
+    const TASK_TYPE_GROUP_OPTIONS = [
+      { value: "internal_task", label: "Внутренняя задача" },
+      { value: "client_task", label: "Клиентская задача" }
+    ];
+
     createApp({
       delimiters: ["[[", "]]"],
       data() {
@@ -156,6 +161,7 @@
             },
             tasks: {
               subject: "",
+              taskTypeGroup: "",
               taskTypeId: null,
               priority: "medium",
               companyId: null,
@@ -172,8 +178,8 @@
             touches: {
               happenedAt: "",
               channelId: null,
+              resultOptionId: null,
               direction: "outgoing",
-              result: "",
               summary: "",
               nextStep: "",
               nextStepAt: "",
@@ -230,11 +236,13 @@
             leadSources: [],
             users: [],
             taskTypes: [],
+            touchResults: [],
             communicationChannels: [],
             currencyRates: { RUB: 1 }
           },
           taskStatusOptions: TASK_STATUS_OPTIONS,
           taskPriorityOptions: TASK_PRIORITY_OPTIONS,
+          taskTypeGroupOptions: TASK_TYPE_GROUP_OPTIONS,
           taskReminderOptions: [
             { value: 5, label: "5 минут" },
             { value: 10, label: "10 минут" },
@@ -428,6 +436,11 @@
         shouldShowTaskField() {
           return (value) => this.isCreatingTask || this.showAllTaskFields || this.hasVisibleFieldValue(value);
         },
+        showTaskTypeSelector() {
+          return this.showAllTaskFields
+            || !!String(this.forms.tasks.taskTypeGroup || "").trim()
+            || !!this.toIntOrNull(this.forms.tasks.taskTypeId);
+        },
         shouldShowLeadTrackingBlock() {
           return this.isCreatingLead
             || this.showAllLeadFields
@@ -568,9 +581,29 @@
         },
         taskTouchSelectOptions() {
           return Array.isArray(this.taskTouchOptions) ? this.taskTouchOptions : [];
+        },
+        filteredTaskTypeOptions() {
+          const selectedGroup = this.normalizeTaskTypeGroup(this.forms.tasks.taskTypeGroup);
+          const taskTypes = Array.isArray(this.metaOptions.taskTypes) ? this.metaOptions.taskTypes : [];
+          if (!selectedGroup) {
+            return [];
+          }
+          return taskTypes.filter((taskType) => this.normalizeTaskTypeGroup(taskType.group) === selectedGroup);
         }
       },
       watch: {
+        "forms.tasks.taskTypeGroup": {
+          handler(nextValue) {
+            const selectedTaskTypeId = this.toIntOrNull(this.forms.tasks.taskTypeId);
+            if (!selectedTaskTypeId) {
+              return;
+            }
+            const taskTypeGroup = this.resolveTaskTypeGroupById(selectedTaskTypeId);
+            if (taskTypeGroup && taskTypeGroup !== this.normalizeTaskTypeGroup(nextValue)) {
+              this.forms.tasks.taskTypeId = null;
+            }
+          }
+        },
         "forms.tasks.dealId": {
           handler() {
             if (this.activeSection === "tasks" && this.showModal) {
@@ -761,6 +794,19 @@
           };
           const normalized = String(value || "").trim();
           return labels[normalized] || normalized || "активность";
+        },
+        normalizeTaskTypeGroup(value) {
+          return String(value || "").trim();
+        },
+        resolveTaskTypeGroupById(taskTypeId) {
+          const normalizedTaskTypeId = this.toIntOrNull(taskTypeId);
+          if (!normalizedTaskTypeId) {
+            return "";
+          }
+          const taskType = (this.metaOptions.taskTypes || []).find(
+            (entry) => String(entry.id) === String(normalizedTaskTypeId)
+          );
+          return this.normalizeTaskTypeGroup(taskType ? taskType.group : "");
         },
         formatHistoryTimestamp(value) {
           const raw = String(value || "").trim();
@@ -1592,6 +1638,7 @@
           this.editingTaskId = item.id;
           this.forms.tasks = {
             subject: item.subject || item.name || "",
+            taskTypeGroup: item.taskTypeGroup || this.resolveTaskTypeGroupById(item.taskTypeId),
             taskTypeId: this.toIntOrNull(item.taskTypeId),
             priority: item.priority || "medium",
             companyId: this.toIntOrNull(item.clientId),
@@ -1621,8 +1668,8 @@
           this.forms.touches = {
             happenedAt: this.toDateTimeLocal(item.happenedAtRaw),
             channelId: this.toIntOrNull(item.channelId),
+            resultOptionId: this.toIntOrNull(item.resultOptionId),
             direction: item.direction || "outgoing",
-            result: item.result || "",
             summary: item.summary || "",
             nextStep: item.nextStep || "",
             nextStepAt: this.toDateTimeLocal(item.nextStepAtRaw),
@@ -1790,6 +1837,16 @@
             return;
           }
           throw new Error("Для активной сделки заполните следующую задачу перед завершением текущей");
+        },
+        validateTaskCompletionEvidence(form) {
+          if (!this.isTaskDoneStatus(form.status)) {
+            return;
+          }
+          const hasResult = !!form.result.trim();
+          const hasRelatedTouch = !!this.toIntOrNull(form.relatedTouchId);
+          if (!hasResult && !hasRelatedTouch) {
+            throw new Error("Укажите результат выполнения задачи или привяжите касание");
+          }
         },
         resetDealCompanyForm() {
           this.dealCompanyForm = {
@@ -2318,6 +2375,8 @@
             companyNote: item.company_note || "",
             taskTypeId: item.task_type || null,
             taskTypeName: item.task_type_name || "",
+            taskTypeGroup: item.task_type_group || "",
+            taskTypeGroupLabel: item.task_type_group_label || "",
             priority: item.priority || "medium",
             reminderOffsetMinutes: Number(item.deadline_reminder_offset_minutes || 30),
             company: item.client_name || "",
@@ -2343,9 +2402,10 @@
           const normalized = this.uiStatus(direction === "incoming" ? "new" : "progress", directionLabel);
           return {
             id: item.id,
-            name: item.summary || item.result || `Касание #${item.id}`,
+            name: item.summary || item.result_option_name || `Касание #${item.id}`,
             summary: item.summary || "",
-            result: item.result || "",
+            resultOptionId: item.result_option || null,
+            resultOptionName: item.result_option_name || "",
             company: item.company_name || "",
             phone: item.task_subject
               ? `Задача: ${item.task_subject}`
@@ -2621,6 +2681,7 @@
           if (section === "tasks") {
             return {
               subject: "",
+              taskTypeGroup: "",
               taskTypeId: null,
               priority: "medium",
               companyId: null,
@@ -2639,8 +2700,8 @@
             return {
               happenedAt: "",
               channelId: null,
+              resultOptionId: null,
               direction: "outgoing",
-              result: "",
               summary: "",
               nextStep: "",
               nextStepAt: "",
@@ -2682,12 +2743,13 @@
           return `${year}-${month}-${day}T${hours}:${minutes}`;
         },
         async loadMetaOptions() {
-          const [leadStatuses, dealStages, leadSources, users, taskTypes, communicationChannels] = await Promise.all([
+          const [leadStatuses, dealStages, leadSources, users, taskTypes, touchResults, communicationChannels] = await Promise.all([
             this.apiRequest("/api/v1/meta/lead-statuses/"),
             this.apiRequest("/api/v1/meta/deal-stages/"),
             this.apiRequest("/api/v1/meta/lead-sources/"),
             this.apiRequest("/api/v1/meta/users/"),
             this.apiRequest("/api/v1/meta/task-types/"),
+            this.apiRequest("/api/v1/meta/touch-results/"),
             this.apiRequest("/api/v1/meta/communication-channels/")
           ]);
           this.metaOptions.leadStatuses = this.normalizePaginatedResponse(leadStatuses);
@@ -2695,6 +2757,7 @@
           this.metaOptions.leadSources = this.normalizePaginatedResponse(leadSources);
           this.metaOptions.users = this.normalizePaginatedResponse(users);
           this.metaOptions.taskTypes = this.normalizePaginatedResponse(taskTypes);
+          this.metaOptions.touchResults = this.normalizePaginatedResponse(touchResults);
           this.metaOptions.communicationChannels = this.normalizePaginatedResponse(communicationChannels);
           this.loadCurrencyRates();
         },
@@ -3090,9 +3153,7 @@
           if (form.saveCompanyNote && !form.companyNote.trim()) {
             throw new Error("Укажите важные факты о компании");
           }
-          if (this.isTaskDoneStatus(form.status) && !form.result.trim()) {
-            throw new Error("Укажите результат выполнения задачи");
-          }
+          this.validateTaskCompletionEvidence(form);
           this.validateTaskFollowUpRequirement();
           const clientId = this.toIntOrNull(form.companyId);
           await this.apiRequest("/api/v1/activities/", {
@@ -3130,9 +3191,7 @@
           if (form.saveCompanyNote && !form.companyNote.trim()) {
             throw new Error("Укажите важные факты о компании");
           }
-          if (this.isTaskDoneStatus(form.status) && !form.result.trim()) {
-            throw new Error("Укажите результат выполнения задачи");
-          }
+          this.validateTaskCompletionEvidence(form);
           this.validateTaskFollowUpRequirement();
           const clientId = this.toIntOrNull(form.companyId);
           await this.apiRequest(`/api/v1/activities/${this.editingTaskId}/`, {
@@ -3178,8 +3237,8 @@
             body: {
               happened_at: this.toIsoDateTime(form.happenedAt),
               channel: this.toIntOrNull(form.channelId),
+              result_option: this.toIntOrNull(form.resultOptionId),
               direction: form.direction || "outgoing",
-              result: form.result.trim(),
               summary: form.summary.trim(),
               next_step: form.nextStep.trim(),
               next_step_at: this.toIsoDateTime(form.nextStepAt),
@@ -3203,8 +3262,8 @@
             body: {
               happened_at: this.toIsoDateTime(form.happenedAt),
               channel: this.toIntOrNull(form.channelId),
+              result_option: this.toIntOrNull(form.resultOptionId),
               direction: form.direction || "outgoing",
-              result: form.result.trim(),
               summary: form.summary.trim(),
               next_step: form.nextStep.trim(),
               next_step_at: this.toIsoDateTime(form.nextStepAt),

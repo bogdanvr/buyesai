@@ -1115,6 +1115,13 @@
               </select>
             </label>
             <label class="block">
+              <span class="text-sm text-crm-muted">Результат</span>
+              <select v-model="forms.touches.resultOptionId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбран</option>
+                <option v-for="option in metaOptions.touchResults" :key="option.id" :value="option.id">[[ option.name ]]</option>
+              </select>
+            </label>
+            <label class="block">
               <span class="text-sm text-crm-muted">Направление</span>
               <select v-model="forms.touches.direction" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option value="incoming">Входящее</option>
@@ -1141,10 +1148,6 @@
                 <option :value="null">Не выбран</option>
                 <option v-for="contact in touchContactOptions" :key="contact.id" :value="contact.id">[[ contact.title ]]</option>
               </select>
-            </label>
-            <label class="block md:col-span-2">
-              <span class="text-sm text-crm-muted">Результат</span>
-              <textarea v-model="forms.touches.result" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
             <label class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Краткое содержание</span>
@@ -1455,12 +1458,20 @@
               <span class="text-sm text-crm-muted">Название задачи</span>
               <input v-model="forms.tasks.subject" required type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <label v-if="shouldShowTaskField(forms.tasks.taskTypeId)" class="block">
+            <label v-if="shouldShowTaskField(forms.tasks.taskTypeGroup)" class="block">
+              <span class="text-sm text-crm-muted">Категория задачи</span>
+              <select v-model="forms.tasks.taskTypeGroup" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option value="">Не выбрана</option>
+                <option v-for="option in taskTypeGroupOptions" :key="`task-type-group-${option.value}`" :value="option.value">[[ option.label ]]</option>
+              </select>
+            </label>
+            <label v-if="showTaskTypeSelector" class="block">
               <span class="text-sm text-crm-muted">Тип задачи</span>
               <select v-model="forms.tasks.taskTypeId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option :value="null">Не выбран</option>
-                <option v-for="taskType in metaOptions.taskTypes" :key="taskType.id" :value="taskType.id">[[ taskType.name ]]</option>
+                <option v-for="taskType in filteredTaskTypeOptions" :key="taskType.id" :value="taskType.id">[[ taskType.name ]]</option>
               </select>
+              <div v-if="forms.tasks.taskTypeGroup && !filteredTaskTypeOptions.length" class="mt-2 text-xs text-crm-muted">Для выбранной категории пока нет типов задач. Добавьте их в Django admin.</div>
             </label>
             <label v-if="shouldShowTaskField(forms.tasks.status)" class="block">
               <span class="text-sm text-crm-muted">Статус</span>

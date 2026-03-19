@@ -6,6 +6,7 @@ from crm.models.activity import ActivityType
 
 class TouchSerializer(serializers.ModelSerializer):
     channel_name = serializers.CharField(source="channel.name", read_only=True)
+    result_option_name = serializers.CharField(source="result_option.name", read_only=True)
     owner_name = serializers.SerializerMethodField()
     contact_name = serializers.SerializerMethodField()
     lead_title = serializers.CharField(source="lead.title", read_only=True)
@@ -64,9 +65,10 @@ class TouchSerializer(serializers.ModelSerializer):
             "happened_at",
             "channel",
             "channel_name",
+            "result_option",
+            "result_option_name",
             "direction",
             "direction_label",
-            "result",
             "summary",
             "next_step",
             "next_step_at",

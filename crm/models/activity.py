@@ -37,8 +37,19 @@ class TaskReminderOffset(models.IntegerChoices):
     HOURS_3 = 180, "3 часа"
 
 
+class TaskTypeGroup(models.TextChoices):
+    INTERNAL_TASK = "internal_task", "Внутренняя задача"
+    CLIENT_TASK = "client_task", "Клиентская задача"
+
+
 class TaskType(TimestampedModel):
     name = models.CharField(max_length=128, unique=True, verbose_name="Тип задачи")
+    group = models.CharField(
+        max_length=32,
+        choices=TaskTypeGroup.choices,
+        default=TaskTypeGroup.INTERNAL_TASK,
+        verbose_name="Группа типа задачи",
+    )
     is_active = models.BooleanField(default=True, verbose_name="Активен")
 
     class Meta:

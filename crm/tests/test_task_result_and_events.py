@@ -7,7 +7,7 @@ import re
 from datetime import timedelta
 
 from crm.models import Activity, Client, Deal, DealStage, LeadSource, TaskType
-from crm.models.activity import ActivityType, TaskStatus
+from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup
 
 
 class TaskResultAndEventsTests(APITestCase):
@@ -48,7 +48,7 @@ class TaskResultAndEventsTests(APITestCase):
             stage=self.stage_new,
         )
 
-    def test_task_completion_requires_result_and_writes_events_to_deal_and_company(self):
+    def test_task_completion_requires_result_or_touch_and_writes_events_to_deal_and_company(self):
         task = Activity.objects.create(
             type=ActivityType.TASK,
             subject="Отправить КП",
@@ -65,6 +65,10 @@ class TaskResultAndEventsTests(APITestCase):
         )
         self.assertEqual(bad_response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("result", bad_response.data)
+        self.assertEqual(
+            bad_response.data["result"][0],
+            "Укажите результат завершения задачи или привяжите касание.",
+        )
 
         good_response = self.client.patch(
             reverse("activities-detail", kwargs={"pk": task.pk}),
@@ -88,6 +92,40 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertIn(f"task_id: {task.pk}", self.deal.events)
         self.assertIn(f"deal_id: {self.deal.pk}", self.deal.events)
         self.assertIn("Коммерческое предложение отправлено клиенту", self.company.events)
+
+    def test_task_completion_allows_related_touch_without_result(self):
+        related_touch = Activity.objects.create(
+            type=ActivityType.CALL,
+            subject="Созвон с клиентом",
+            deal=self.deal,
+            client=self.company,
+            created_by=self.user,
+        )
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Зафиксировать итог созвона",
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "related_touch": related_touch.pk,
+                "has_follow_up_task": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        task.refresh_from_db()
+        self.assertTrue(task.is_done)
+        self.assertEqual(task.related_touch_id, related_touch.pk)
+        self.assertEqual(task.result, "")
 
     def test_task_completion_can_append_company_note(self):
         task = Activity.objects.create(
@@ -193,7 +231,7 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_task_can_store_type_priority_related_touch_and_status(self):
-        task_type = TaskType.objects.create(name="Квалификация")
+        task_type = TaskType.objects.create(name="Квалификация", group=TaskTypeGroup.INTERNAL_TASK)
         touch = Activity.objects.create(
             type=ActivityType.CALL,
             subject="Первичный звонок",
@@ -223,8 +261,25 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(response.data["priority"], "high")
         self.assertEqual(response.data["task_type"], task_type.pk)
         self.assertEqual(response.data["task_type_name"], "Квалификация")
+        self.assertEqual(response.data["task_type_group"], TaskTypeGroup.INTERNAL_TASK)
+        self.assertEqual(response.data["task_type_group_label"], "Внутренняя задача")
         self.assertEqual(response.data["related_touch"], touch.pk)
         self.assertEqual(response.data["related_touch_subject"], "Первичный звонок")
+
+    def test_task_type_meta_returns_group(self):
+        task_type = TaskType.objects.create(name="Коммерческое предложение", group=TaskTypeGroup.CLIENT_TASK)
+
+        response = self.client.get(reverse("meta-task-types"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            any(
+                item["id"] == task_type.pk
+                and item["group"] == TaskTypeGroup.CLIENT_TASK
+                and item["group_label"] == "Клиентская задача"
+                for item in response.data
+            )
+        )
 
     def test_company_note_draft_writes_author_and_timestamp(self):
         response = self.client.patch(

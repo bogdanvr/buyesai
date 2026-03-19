@@ -5,7 +5,7 @@ from crm.models.deal import Deal
 from crm.models.lead import Lead
 from crm.models.source import LeadSource
 from crm.models.status import DealStage, LeadStatus
-from crm.models.touch import Touch
+from crm.models.touch import Touch, TouchResult
 
 __all__ = [
     "Activity",
@@ -19,4 +19,5 @@ __all__ = [
     "LeadStatus",
     "DealStage",
     "Touch",
+    "TouchResult",
 ]

@@ -28,5 +28,5 @@ class TouchViewSet(ModelViewSet):
             queryset = queryset.filter(contact_id=contact_id)
         if task_id:
             queryset = queryset.filter(task_id=task_id)
-        queryset = apply_text_search(queryset, search_query, ["summary", "result", "next_step"])
+        queryset = apply_text_search(queryset, search_query, ["summary", "next_step"])
         return queryset

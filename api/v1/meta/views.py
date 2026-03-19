@@ -15,9 +15,10 @@ from api.v1.meta.serializers import (
     LeadSourceSerializer,
     LeadStatusSerializer,
     TaskTypeSerializer,
+    TouchResultSerializer,
     UserOptionSerializer,
 )
-from crm.models import CommunicationChannel, DealStage, LeadSource, LeadStatus, TaskType
+from crm.models import CommunicationChannel, DealStage, LeadSource, LeadStatus, TaskType, TouchResult
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -119,6 +120,14 @@ class TaskTypeListAPIView(ListAPIView):
 
     def get_queryset(self):
         return TaskType.objects.filter(is_active=True).order_by("name")
+
+
+class TouchResultListAPIView(ListAPIView):
+    serializer_class = TouchResultSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return TouchResult.objects.filter(is_active=True).order_by("name")
 
 
 class CurrencyRatesAPIView(APIView):
