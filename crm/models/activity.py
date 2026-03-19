@@ -51,6 +51,8 @@ class TaskType(TimestampedModel):
         default=TaskTypeGroup.INTERNAL_TASK,
         verbose_name="Группа типа задачи",
     )
+    auto_touch_on_done = models.BooleanField(default=False, verbose_name="Автокасание")
+    touch_result = models.CharField(max_length=128, blank=True, default="", verbose_name="Результат")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
 
     class Meta:

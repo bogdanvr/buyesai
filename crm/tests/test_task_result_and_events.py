@@ -128,7 +128,12 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(task.result, "")
 
     def test_client_task_completion_creates_touch(self):
-        task_type = TaskType.objects.create(name="Созвон с клиентом", group=TaskTypeGroup.CLIENT_TASK)
+        task_type = TaskType.objects.create(
+            name="Созвон с клиентом",
+            group=TaskTypeGroup.CLIENT_TASK,
+            auto_touch_on_done=True,
+            touch_result="Связались повторно",
+        )
         channel = CommunicationChannel.objects.create(name="Телефон")
         task = Activity.objects.create(
             type=ActivityType.TASK,
@@ -158,7 +163,9 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(touch.deal_id, self.deal.pk)
         self.assertEqual(touch.client_id, self.company.pk)
         self.assertEqual(touch.channel_id, channel.pk)
-        self.assertEqual(touch.summary, "Обсудить предложение")
+        self.assertEqual(touch.result_option.name, "Связались повторно")
+        self.assertEqual(touch.summary, "")
+        self.assertEqual(touch.next_step, "")
 
     def test_internal_task_completion_requires_result(self):
         task_type = TaskType.objects.create(name="Подготовить договор", group=TaskTypeGroup.INTERNAL_TASK)
@@ -374,6 +381,22 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(response.data[1]["id"], later_task_type.pk)
         self.assertEqual(response.data[1]["group"], TaskTypeGroup.CLIENT_TASK)
         self.assertEqual(response.data[1]["group_label"], "Клиентская задача")
+
+    def test_task_type_meta_returns_auto_touch_fields(self):
+        task_type = TaskType.objects.create(
+            name="Связаться повторно",
+            group=TaskTypeGroup.CLIENT_TASK,
+            auto_touch_on_done=True,
+            touch_result="Связались повторно",
+            sort_order=30,
+        )
+
+        response = self.client.get(reverse("meta-task-types"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        matched = next(item for item in response.data if item["id"] == task_type.pk)
+        self.assertTrue(matched["auto_touch_on_done"])
+        self.assertEqual(matched["touch_result"], "Связались повторно")
 
     def test_company_note_draft_writes_author_and_timestamp(self):
         response = self.client.patch(

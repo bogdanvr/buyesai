@@ -5,7 +5,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 from audit.services import log_model_event
-from crm.models import Activity, Client, Deal, DealStage, Lead, Touch
+from crm.models import Activity, Client, Deal, DealStage, Lead, Touch, TouchResult
 from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup
 from crm.models.touch import TouchDirection
 from crm.services.lead_services import convert_lead_to_deal
@@ -244,19 +244,29 @@ def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
 def activity_client_task_touch_signal(sender, instance: Activity, created, **kwargs):
     if instance.type != ActivityType.TASK or instance.status != TaskStatus.DONE:
         return
-    if _task_type_group(instance) != TaskTypeGroup.CLIENT_TASK:
+    task_type = getattr(instance, "task_type", None)
+    if task_type is None or not getattr(task_type, "auto_touch_on_done", False):
         return
 
     previous = getattr(instance, "_previous_activity_state", None)
     if previous is not None and previous.type == ActivityType.TASK and previous.status == TaskStatus.DONE:
         return
 
-    summary = str(instance.result or "").strip() or str(instance.subject or "").strip() or f"Завершена задача #{instance.pk}"
+    touch_result_name = str(getattr(task_type, "touch_result", "") or "").strip()
+    result_option = None
+    if touch_result_name:
+        result_option, _ = TouchResult.objects.get_or_create(
+            name=touch_result_name,
+            defaults={"is_active": True},
+        )
+
     Touch.objects.create(
         happened_at=instance.completed_at or timezone.now(),
         channel=instance.communication_channel,
         direction=TouchDirection.OUTGOING,
-        summary=summary,
+        result_option=result_option,
+        summary="",
+        next_step="",
         owner=instance.created_by,
         lead=instance.lead,
         deal=instance.deal,
