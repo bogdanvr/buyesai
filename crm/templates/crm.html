@@ -615,14 +615,14 @@
               <span class="text-sm text-crm-muted">Контактное лицо</span>
               <input v-model="forms.leads.name" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'name')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('leads', 'name')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Контактное лицо</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowLeadField('company', forms.leads.company)" class="block">
               <span class="text-sm text-crm-muted">Компания</span>
               <input v-model="forms.leads.company" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'company')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('leads', 'company')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Компания</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowLeadField('phone', forms.leads.phone)" class="block">
@@ -641,14 +641,14 @@
                 </a>
               </div>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'phone')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('leads', 'phone')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Телефон</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowLeadField('email', forms.leads.email)" class="block">
               <span class="text-sm text-crm-muted">Email</span>
               <input v-model="forms.leads.email" type="email" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'email')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('leads', 'email')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Email</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowLeadField('priority', forms.leads.priority)" class="block">
@@ -659,7 +659,7 @@
                 <option value="high">Высокий</option>
               </select>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'priority')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('leads', 'priority')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Приоритет</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowLeadField('statusId', forms.leads.statusId)" class="block">
@@ -669,7 +669,7 @@
                 <option v-for="status in metaOptions.leadStatuses" :key="status.id" :value="status.id">[[ status.name ]]</option>
               </select>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'statusId')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('leads', 'statusId')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Статус лида</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label class="block">
@@ -706,21 +706,21 @@
                 [[ leadSourcePath(forms.leads).join(' -> ') ]]
               </div>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'sourceId')" class="block md:col-span-2 rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('leads', 'sourceId')" class="crm-inline-field-toggle md:col-span-2">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Источник</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowLeadField('expectedValue', forms.leads.expectedValue)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Ожидаемая сумма</span>
               <input v-model="forms.leads.expectedValue" type="number" min="0" step="0.01" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'expectedValue')" class="block md:col-span-2 rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('leads', 'expectedValue')" class="crm-inline-field-toggle md:col-span-2">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Ожидаемая сумма</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowLeadField('description', forms.leads.description)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Описание</span>
               <textarea v-model="forms.leads.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'description')" class="block md:col-span-2 rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('leads', 'description')" class="crm-inline-field-toggle md:col-span-2">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Описание</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <div
@@ -796,7 +796,7 @@
               <span class="text-sm text-crm-muted">Описание сделки</span>
               <textarea v-model="forms.deals.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('deals', 'description')" class="block md:col-span-2 rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('deals', 'description')" class="crm-inline-field-toggle md:col-span-2">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Описание сделки</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <div class="block md:col-span-2">
@@ -809,7 +809,7 @@
                     <option v-for="company in companyOptions" :key="company.id" :value="company.id">[[ company.name ]]</option>
                   </select>
                 </div>
-                <button v-else type="button" @click="toggleOptionalField('deals', 'companyId')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+                <button v-else type="button" @click="toggleOptionalField('deals', 'companyId')" class="crm-inline-field-toggle">
                   <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Компания</span><span class="text-crm-accent text-xs">+</span></div>
                 </button>
                 <div v-if="dealHasSelectedCompany" class="flex items-end">
@@ -1004,7 +1004,7 @@
                 <option v-for="stage in metaOptions.dealStages" :key="stage.id" :value="stage.id">[[ stage.name ]]</option>
               </select>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('deals', 'stageId')" class="block rounded-xl border border-crm-accent/30 bg-crm-accent/5 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('deals', 'stageId')" class="crm-inline-field-toggle crm-inline-field-toggle-accent">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-accent">Статус сделки</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label class="block">
@@ -1022,7 +1022,7 @@
               <span class="text-sm text-crm-muted">План закрытия</span>
               <input v-model="forms.deals.closeDate" type="date" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <button v-else type="button" @click="toggleOptionalField('deals', 'closeDate')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('deals', 'closeDate')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">План закрытия</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowDealField('events', forms.deals.events)" class="block md:col-span-2">
@@ -1054,7 +1054,7 @@
                 </div>
               </div>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('deals', 'events')" class="block md:col-span-2 rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('deals', 'events')" class="crm-inline-field-toggle md:col-span-2">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">События</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <div v-if="editingDealId" class="md:col-span-2 mt-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
@@ -1295,28 +1295,28 @@
               <span class="text-sm text-crm-muted">Юридическое название</span>
               <input v-model="forms.companies.legalName" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <button v-else type="button" @click="toggleOptionalField('companies', 'legalName')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('companies', 'legalName')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Юридическое название</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowCompanyField('inn', forms.companies.inn)" class="block">
               <span class="text-sm text-crm-muted">ИНН</span>
               <input v-model="forms.companies.inn" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <button v-else type="button" @click="toggleOptionalField('companies', 'inn')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('companies', 'inn')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">ИНН</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowCompanyField('okved', forms.companies.okved)" class="block">
               <span class="text-sm text-crm-muted">ОКВЭД</span>
               <input v-model="forms.companies.okved" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <button v-else type="button" @click="toggleOptionalField('companies', 'okved')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('companies', 'okved')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">ОКВЭД</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowCompanyField('industry', forms.companies.industry)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Сфера деятельности</span>
               <input v-model="forms.companies.industry" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <button v-else type="button" @click="toggleOptionalField('companies', 'industry')" class="block md:col-span-2 rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('companies', 'industry')" class="crm-inline-field-toggle md:col-span-2">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Сфера деятельности</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <div class="md:col-span-2" v-if="secondaryCompanyOkvedEntries().length">
@@ -1348,14 +1348,14 @@
               <span class="text-sm text-crm-muted">Адрес</span>
               <input v-model="forms.companies.address" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <button v-else type="button" @click="toggleOptionalField('companies', 'address')" class="block md:col-span-2 rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('companies', 'address')" class="crm-inline-field-toggle md:col-span-2">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Адрес</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowCompanyField('website', forms.companies.website)" class="block">
               <span class="text-sm text-crm-muted">Сайт</span>
               <input v-model="forms.companies.website" type="url" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <button v-else type="button" @click="toggleOptionalField('companies', 'website')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('companies', 'website')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Сайт</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label class="block">
@@ -1383,14 +1383,14 @@
                 <option value="EUR">EUR</option>
               </select>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('companies', 'currency')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('companies', 'currency')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Валюта компании</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowCompanyField('email', forms.companies.email)" class="block">
               <span class="text-sm text-crm-muted">Email</span>
               <input v-model="forms.companies.email" type="email" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
-            <button v-else type="button" @click="toggleOptionalField('companies', 'email')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('companies', 'email')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Email</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <div class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
@@ -1591,7 +1591,7 @@
                 <option v-for="option in taskTypeGroupOptions" :key="`task-type-group-${option.value}`" :value="option.value">[[ option.label ]]</option>
               </select>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'taskTypeGroup')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('tasks', 'taskTypeGroup')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Категория задачи</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="showTaskTypeSelector" class="block">
@@ -1616,7 +1616,7 @@
                 <option v-for="option in taskStatusOptions" :key="`task-status-${option.value}`" :value="option.value">[[ option.label ]]</option>
               </select>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'status')" class="block rounded-xl border border-crm-accent/30 bg-crm-accent/5 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('tasks', 'status')" class="crm-inline-field-toggle crm-inline-field-toggle-accent">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-accent">Статус задачи</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowTaskField('priority', forms.tasks.priority)" class="block">
@@ -1625,7 +1625,7 @@
                 <option v-for="option in taskPriorityOptions" :key="`task-priority-${option.value}`" :value="option.value">[[ option.label ]]</option>
               </select>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'priority')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('tasks', 'priority')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Приоритет</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowTaskField('companyId', forms.tasks.companyId)" class="block">
@@ -1635,7 +1635,7 @@
                 <option v-for="company in companyOptions" :key="company.id" :value="company.id">[[ company.name ]]</option>
               </select>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'companyId')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('tasks', 'companyId')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Компания</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="showTaskDealSelector" class="block">
@@ -1651,7 +1651,7 @@
               <input v-model="forms.tasks.dueAt" type="datetime-local" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
               <div v-if="taskFormRemainingLabel" class="mt-2 text-xs text-crm-muted">[[ taskFormRemainingLabel ]]</div>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'dueAt')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('tasks', 'dueAt')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Срок</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowTaskField('reminderOffsetMinutes', forms.tasks.reminderOffsetMinutes)" class="block">
@@ -1660,14 +1660,14 @@
                 <option v-for="option in taskReminderOptions" :key="`task-reminder-${option.value}`" :value="option.value">[[ option.label ]]</option>
               </select>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'reminderOffsetMinutes')" class="block rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('tasks', 'reminderOffsetMinutes')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Напомнить за</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowTaskField('description', forms.tasks.description)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Описание</span>
               <textarea v-model="forms.tasks.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'description')" class="block md:col-span-2 rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('tasks', 'description')" class="crm-inline-field-toggle md:col-span-2">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Описание</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="shouldShowTaskField('relatedTouchId', forms.tasks.relatedTouchId)" class="block md:col-span-2">
@@ -1679,14 +1679,14 @@
               <div v-if="isTaskTouchesLoading" class="mt-2 text-xs text-crm-muted">Загрузка касаний...</div>
               <div v-else-if="!taskTouchSelectOptions.length" class="mt-2 text-xs text-crm-muted">Для выбранной компании или сделки касаний пока нет.</div>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'relatedTouchId')" class="block md:col-span-2 rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('tasks', 'relatedTouchId')" class="crm-inline-field-toggle md:col-span-2">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Связанное касание</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <label v-if="showTaskResultField || isCreatingTask || isOptionalFieldExpanded('tasks', 'result')" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Результат выполнения</span>
               <textarea v-model="forms.tasks.result" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'result')" class="block md:col-span-2 rounded-xl border border-crm-border/80 bg-[#102f4a]/40 px-4 py-3 text-left hover:border-crm-accent transition">
+            <button v-else type="button" @click="toggleOptionalField('tasks', 'result')" class="crm-inline-field-toggle md:col-span-2">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Результат выполнения</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <div v-if="showTaskResultField || isCreatingTask || isOptionalFieldExpanded('tasks', 'result')" class="md:col-span-2 flex items-center gap-2">

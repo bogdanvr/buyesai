@@ -47,6 +47,33 @@ body.crm-startup-screen-active {
   min-height: 100vh;
 }
 
+.crm-inline-field-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: #8ba7bf;
+  transition: color 160ms ease;
+}
+
+.crm-inline-field-toggle:hover {
+  color: #d8e7f4;
+}
+
+.crm-inline-field-toggle > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.crm-inline-field-toggle-accent {
+  color: #73b7ff;
+}
+
 @media (max-width: 960px) {
   .crm-grid {
     grid-template-columns: 1fr;
