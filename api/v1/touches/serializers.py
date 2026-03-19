@@ -1,10 +1,12 @@
 from rest_framework import serializers
+from django.utils import timezone
 
 from crm.models import Touch
-from crm.models.activity import ActivityType
+from crm.models.activity import ActivityType, TaskStatus
 
 
 class TouchSerializer(serializers.ModelSerializer):
+    has_follow_up_task = serializers.BooleanField(write_only=True, required=False, default=False)
     channel_name = serializers.CharField(source="channel.name", read_only=True)
     result_option_name = serializers.CharField(source="result_option.name", read_only=True)
     owner_name = serializers.SerializerMethodField()
@@ -44,6 +46,7 @@ class TouchSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        has_follow_up_task = bool(attrs.pop("has_follow_up_task", False))
         lead = attrs.get("lead", getattr(self.instance, "lead", None))
         deal = attrs.get("deal", getattr(self.instance, "deal", None))
         client = attrs.get("client", getattr(self.instance, "client", None))
@@ -56,7 +59,44 @@ class TouchSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"lead": "Привяжите касание хотя бы к одному объекту CRM."})
         if task is not None and task.type != ActivityType.TASK:
             raise serializers.ValidationError({"task": "Можно привязать только задачу."})
+        if deal is not None:
+            self._validate_deal_next_activity(attrs, deal, has_follow_up_task)
         return attrs
+
+    def _validate_deal_next_activity(self, attrs, deal, has_follow_up_task=False):
+        stage_code = str(getattr(getattr(deal, "stage", None), "code", "") or "").strip().lower()
+        if stage_code in {"won", "failed"}:
+            return
+        if has_follow_up_task:
+            return
+
+        now = timezone.now()
+        next_step_at = attrs.get("next_step_at", getattr(self.instance, "next_step_at", None))
+        if next_step_at and next_step_at >= now:
+            return
+
+        has_future_touch = deal.touches.filter(next_step_at__gte=now)
+        if self.instance is not None and self.instance.pk:
+            has_future_touch = has_future_touch.exclude(pk=self.instance.pk)
+        if has_future_touch.exists():
+            return
+
+        has_active_task = deal.activities.filter(
+            type=ActivityType.TASK,
+            status__in={TaskStatus.TODO, TaskStatus.IN_PROGRESS},
+            due_at__gte=now,
+        ).exists()
+        if has_active_task:
+            return
+
+        raise serializers.ValidationError(
+            {
+                "next_step_at": (
+                    "После касания по активной сделке должна остаться следующая активность: "
+                    "укажите дату следующего шага, создайте задачу или закройте сделку."
+                )
+            }
+        )
 
     class Meta:
         model = Touch
@@ -87,5 +127,6 @@ class TouchSerializer(serializers.ModelSerializer):
             "company_name",
             "created_at",
             "updated_at",
+            "has_follow_up_task",
         ]
         read_only_fields = ("created_at", "updated_at")

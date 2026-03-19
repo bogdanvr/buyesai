@@ -206,6 +206,15 @@
             reminderOffsetMinutes: 30,
             description: ""
           },
+          touchFollowUpForm: {
+            subject: "",
+            taskTypeGroup: "",
+            taskTypeId: null,
+            communicationChannelId: null,
+            dueAt: "",
+            reminderOffsetMinutes: 30,
+            description: ""
+          },
           taskFollowUpForm: {
             subject: "",
             taskTypeGroup: "",
@@ -396,13 +405,22 @@
           return this.activeSection === "tasks" && !this.editingTaskId;
         },
         touchLeadOptions() {
-          return this.datasets.leads.map((lead) => ({ id: lead.id, title: lead.title || lead.name }));
+          const companyId = this.toIntOrNull(this.forms.touches.companyId);
+          return this.datasets.leads
+            .filter((lead) => !companyId || String(lead.clientId || "") === String(companyId))
+            .map((lead) => ({ id: lead.id, title: lead.title || lead.name }));
         },
         touchDealOptions() {
-          return this.datasets.deals.map((deal) => ({ id: deal.id, title: deal.title || deal.name }));
+          const companyId = this.toIntOrNull(this.forms.touches.companyId);
+          return this.datasets.deals
+            .filter((deal) => !companyId || String(deal.clientId || "") === String(companyId))
+            .map((deal) => ({ id: deal.id, title: deal.title || deal.name }));
         },
         touchContactOptions() {
-          return this.datasets.contacts.map((contact) => ({ id: contact.id, title: contact.fullName || contact.name }));
+          const companyId = this.toIntOrNull(this.forms.touches.companyId);
+          return this.datasets.contacts
+            .filter((contact) => !companyId || String(contact.clientId || "") === String(companyId))
+            .map((contact) => ({ id: contact.id, title: contact.fullName || contact.name }));
         },
         touchTaskOptions() {
           return this.datasets.tasks.map((task) => ({ id: task.id, title: task.subject || task.name }));
@@ -634,6 +652,26 @@
         showDealTaskCommunicationChannelField() {
           return this.currentDealTaskTypeGroup === "client_task";
         },
+        currentTouchFollowUpTypeGroup() {
+          return this.normalizeTaskTypeGroup(
+            this.touchFollowUpForm.taskTypeGroup || this.resolveTaskTypeGroupById(this.touchFollowUpForm.taskTypeId)
+          );
+        },
+        filteredTouchFollowUpTypeOptions() {
+          const selectedGroup = this.currentTouchFollowUpTypeGroup;
+          const taskTypes = Array.isArray(this.metaOptions.taskTypes) ? this.metaOptions.taskTypes : [];
+          if (!selectedGroup) {
+            return [];
+          }
+          return taskTypes.filter((taskType) => this.normalizeTaskTypeGroup(taskType.group) === selectedGroup);
+        },
+        showTouchFollowUpTypeSelector() {
+          return !!String(this.touchFollowUpForm.taskTypeGroup || "").trim()
+            || !!this.toIntOrNull(this.touchFollowUpForm.taskTypeId);
+        },
+        showTouchFollowUpCommunicationChannelField() {
+          return this.currentTouchFollowUpTypeGroup === "client_task";
+        },
         emptyLabel() {
           const labels = {
             leads: "лидов",
@@ -828,6 +866,66 @@
             }
           }
         },
+        "forms.touches.companyId": {
+          handler() {
+            const selectedContactId = this.toIntOrNull(this.forms.touches.contactId);
+            if (!selectedContactId) {
+            } else {
+              const contactStillAvailable = this.touchContactOptions.some(
+                (contact) => String(contact.id) === String(selectedContactId)
+              );
+              if (!contactStillAvailable) {
+                this.forms.touches.contactId = null;
+              }
+            }
+
+            const selectedLeadId = this.toIntOrNull(this.forms.touches.leadId);
+            if (selectedLeadId) {
+              const leadStillAvailable = this.touchLeadOptions.some(
+                (lead) => String(lead.id) === String(selectedLeadId)
+              );
+              if (!leadStillAvailable) {
+                this.forms.touches.leadId = null;
+              }
+            }
+
+            const selectedDealId = this.toIntOrNull(this.forms.touches.dealId);
+            if (selectedDealId) {
+              const dealStillAvailable = this.touchDealOptions.some(
+                (deal) => String(deal.id) === String(selectedDealId)
+              );
+              if (!dealStillAvailable) {
+                this.forms.touches.dealId = null;
+              }
+            }
+
+            const selectedTaskId = this.toIntOrNull(this.forms.touches.taskId);
+            if (selectedTaskId && this.toIntOrNull(this.forms.touches.dealId)) {
+              const taskStillAvailable = (this.datasets.tasks || []).some(
+                (task) => String(task.id) === String(selectedTaskId)
+                  && String(task.dealId || "") === String(this.forms.touches.dealId)
+              );
+              if (!taskStillAvailable) {
+                this.forms.touches.taskId = null;
+              }
+            }
+          }
+        },
+        "forms.touches.dealId": {
+          handler() {
+            const selectedTaskId = this.toIntOrNull(this.forms.touches.taskId);
+            if (!selectedTaskId) {
+              return;
+            }
+            const taskStillAvailable = (this.datasets.tasks || []).some(
+              (task) => String(task.id) === String(selectedTaskId)
+                && String(task.dealId || "") === String(this.forms.touches.dealId || "")
+            );
+            if (!taskStillAvailable) {
+              this.forms.touches.taskId = null;
+            }
+          }
+        },
         "taskFollowUpForm.taskTypeGroup": {
           handler(nextValue) {
             if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
@@ -855,6 +953,21 @@
             const taskTypeGroup = this.resolveTaskTypeGroupById(selectedTaskTypeId);
             if (taskTypeGroup && taskTypeGroup !== this.normalizeTaskTypeGroup(nextValue)) {
               this.dealTaskForm.taskTypeId = null;
+            }
+          }
+        },
+        "touchFollowUpForm.taskTypeGroup": {
+          handler(nextValue) {
+            if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
+              this.touchFollowUpForm.communicationChannelId = null;
+            }
+            const selectedTaskTypeId = this.toIntOrNull(this.touchFollowUpForm.taskTypeId);
+            if (!selectedTaskTypeId) {
+              return;
+            }
+            const taskTypeGroup = this.resolveTaskTypeGroupById(selectedTaskTypeId);
+            if (taskTypeGroup && taskTypeGroup !== this.normalizeTaskTypeGroup(nextValue)) {
+              this.touchFollowUpForm.taskTypeId = null;
             }
           }
         },
@@ -2148,6 +2261,7 @@
             leadId: this.toIntOrNull(item.leadId),
             dealId: this.toIntOrNull(item.dealId),
           };
+          this.resetTouchFollowUpForm();
           this.showModal = true;
         },
         openTaskFromDeal(task) {
@@ -2221,6 +2335,17 @@
             description: ""
           };
         },
+        resetTouchFollowUpForm() {
+          this.touchFollowUpForm = {
+            subject: "",
+            taskTypeGroup: "",
+            taskTypeId: null,
+            communicationChannelId: null,
+            dueAt: "",
+            reminderOffsetMinutes: 30,
+            description: ""
+          };
+        },
         resetTaskFollowUpForm() {
           this.taskFollowUpForm = {
             subject: "",
@@ -2231,6 +2356,19 @@
             reminderOffsetMinutes: 30,
             description: ""
           };
+        },
+        hasPreparedTouchFollowUp() {
+          return !!(
+            this.touchFollowUpForm.subject.trim()
+            || this.touchFollowUpForm.taskTypeGroup
+            || this.touchFollowUpForm.taskTypeId
+            || this.touchFollowUpForm.communicationChannelId
+            || this.touchFollowUpForm.dueAt
+            || this.touchFollowUpForm.description.trim()
+          );
+        },
+        hasValidTouchFollowUp() {
+          return !!(this.resolveTaskSubject(this.touchFollowUpForm) && this.touchFollowUpForm.dueAt);
         },
         hasPendingDealTaskDraft() {
           return !!(
@@ -2854,7 +2992,8 @@
             expectedValue: item.expected_value || "",
             sourceNames: Array.isArray(item.source_names) ? item.source_names : [],
             history: Array.isArray(item.history) ? item.history : [],
-            websiteSessionId: item.website_session_id || ""
+            websiteSessionId: item.website_session_id || "",
+            clientId: item.client || null
           };
         },
         mapDeal(item) {
@@ -3125,6 +3264,7 @@
           this.resetExpandedOptionalFields();
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
+          this.resetTouchFollowUpForm();
           this.resetTaskFollowUpForm();
           this.taskTouchOptions = [];
           this.cancelSourceCreate();
@@ -3157,6 +3297,7 @@
           this.resetExpandedOptionalFields();
           this.showDealTaskForm = false;
           this.resetDealTaskForm();
+          this.resetTouchFollowUpForm();
           this.resetTaskFollowUpForm();
           this.taskTouchOptions = [];
           this.cancelSourceCreate();
@@ -3184,6 +3325,7 @@
           this.showDealTaskForm = false;
           this.forms[this.activeSection] = this.getDefaultForm(this.activeSection);
           this.resetDealTaskForm();
+          this.resetTouchFollowUpForm();
           this.resetTaskFollowUpForm();
           this.cancelSourceCreate();
           this.showDealCompanyForm = false;
@@ -3828,11 +3970,63 @@
           ) {
             throw new Error("Привяжите касание хотя бы к одному объекту CRM");
           }
+          if (this.hasPreparedTouchFollowUp() && !this.hasValidTouchFollowUp()) {
+            throw new Error("Для следующей задачи укажите название или тип задачи и срок");
+          }
+          this.validateTouchNextActivityRequirement(form);
+        },
+        validateTouchNextActivityRequirement(form) {
+          const dealId = this.toIntOrNull(form.dealId);
+          if (!dealId) {
+            return;
+          }
+          const deal = (this.datasets.deals || []).find((item) => String(item.id) === String(dealId));
+          const stageCode = String(deal?.stageCode || "").trim().toLowerCase();
+          if (stageCode === "won" || stageCode === "failed") {
+            return;
+          }
+
+          const now = Date.now();
+          const currentNextStepAt = this.parseTaskDueTimestamp(this.toIsoDateTime(form.nextStepAt));
+          if (currentNextStepAt !== null && currentNextStepAt >= now) {
+            return;
+          }
+          if (this.hasValidTouchFollowUp()) {
+            return;
+          }
+
+          const hasFutureTouch = (this.datasets.touches || []).some((touch) => {
+            if (String(touch.dealId || "") !== String(dealId)) {
+              return false;
+            }
+            if (this.editingTouchId && String(touch.id) === String(this.editingTouchId)) {
+              return false;
+            }
+            const nextStepAt = this.parseTaskDueTimestamp(touch.nextStepAtRaw);
+            return nextStepAt !== null && nextStepAt >= now;
+          });
+          if (hasFutureTouch) {
+            return;
+          }
+
+          const hasActiveTask = (this.datasets.tasks || []).some((task) => (
+            String(task.dealId || "") === String(dealId)
+            && this.isTaskActiveStatus(task.taskStatus || task.status)
+            && !this.isTaskOverdue(task.dueAtRaw, task.taskStatus || task.status)
+          ));
+          if (hasActiveTask) {
+            return;
+          }
+
+          throw new Error("После касания по активной сделке укажите дату следующего шага, создайте задачу или закройте сделку");
         },
         async createTouch() {
           const form = this.forms.touches;
           this.validateTouchForm(form);
-          await this.apiRequest("/api/v1/touches/", {
+          const followUpSubject = this.resolveTaskSubject(this.touchFollowUpForm);
+          const nextStepText = followUpSubject || form.nextStep.trim();
+          const nextStepAtValue = this.touchFollowUpForm.dueAt || form.nextStepAt;
+          return this.apiRequest("/api/v1/touches/", {
             method: "POST",
             body: {
               happened_at: this.toIsoDateTime(form.happenedAt),
@@ -3840,14 +4034,15 @@
               result_option: this.toIntOrNull(form.resultOptionId),
               direction: form.direction || "outgoing",
               summary: form.summary.trim(),
-              next_step: form.nextStep.trim(),
-              next_step_at: this.toIsoDateTime(form.nextStepAt),
+              next_step: nextStepText,
+              next_step_at: this.toIsoDateTime(nextStepAtValue),
               owner: this.toIntOrNull(form.ownerId),
               client: this.toIntOrNull(form.companyId),
               contact: this.toIntOrNull(form.contactId),
               task: this.toIntOrNull(form.taskId),
               lead: this.toIntOrNull(form.leadId),
               deal: this.toIntOrNull(form.dealId),
+              has_follow_up_task: this.hasValidTouchFollowUp(),
             }
           });
         },
@@ -3857,7 +4052,10 @@
             throw new Error("Касание для редактирования не выбрано");
           }
           this.validateTouchForm(form);
-          await this.apiRequest(`/api/v1/touches/${this.editingTouchId}/`, {
+          const followUpSubject = this.resolveTaskSubject(this.touchFollowUpForm);
+          const nextStepText = followUpSubject || form.nextStep.trim();
+          const nextStepAtValue = this.touchFollowUpForm.dueAt || form.nextStepAt;
+          return this.apiRequest(`/api/v1/touches/${this.editingTouchId}/`, {
             method: "PATCH",
             body: {
               happened_at: this.toIsoDateTime(form.happenedAt),
@@ -3865,14 +4063,15 @@
               result_option: this.toIntOrNull(form.resultOptionId),
               direction: form.direction || "outgoing",
               summary: form.summary.trim(),
-              next_step: form.nextStep.trim(),
-              next_step_at: this.toIsoDateTime(form.nextStepAt),
+              next_step: nextStepText,
+              next_step_at: this.toIsoDateTime(nextStepAtValue),
               owner: this.toIntOrNull(form.ownerId),
               client: this.toIntOrNull(form.companyId),
               contact: this.toIntOrNull(form.contactId),
               task: this.toIntOrNull(form.taskId),
               lead: this.toIntOrNull(form.leadId),
               deal: this.toIntOrNull(form.dealId),
+              has_follow_up_task: this.hasValidTouchFollowUp(),
             }
           });
         },
@@ -3898,6 +4097,33 @@
               deadline_reminder_offset_minutes: Number(followUp.reminderOffsetMinutes || 30),
               client: clientId,
               deal: dealId,
+              status: "todo"
+            }
+          });
+        },
+        async createFollowUpTaskFromCurrentTouch(touchId = null) {
+          const followUp = this.touchFollowUpForm;
+          const subject = this.resolveTaskSubject(followUp);
+          if (!subject || !followUp.dueAt) {
+            return;
+          }
+          await this.apiRequest("/api/v1/activities/", {
+            method: "POST",
+            body: {
+              type: "task",
+              subject,
+              task_type: this.toIntOrNull(followUp.taskTypeId),
+              communication_channel: this.currentTouchFollowUpTypeGroup === "client_task"
+                ? this.toIntOrNull(followUp.communicationChannelId)
+                : null,
+              description: followUp.description.trim(),
+              due_at: this.toIsoDateTime(followUp.dueAt),
+              deadline_reminder_offset_minutes: Number(followUp.reminderOffsetMinutes || 30),
+              client: this.toIntOrNull(this.forms.touches.companyId),
+              deal: this.toIntOrNull(this.forms.touches.dealId),
+              lead: this.toIntOrNull(this.forms.touches.leadId),
+              contact: this.toIntOrNull(this.forms.touches.contactId),
+              related_touch: this.toIntOrNull(touchId),
               status: "todo"
             }
           });
@@ -3929,8 +4155,12 @@
               await this.createFollowUpTaskFromCurrentDeal();
             }
             if (this.activeSection === "tasks" && !this.editingTaskId) await this.createTask();
-            if (this.activeSection === "touches" && this.editingTouchId) await this.updateTouch();
-            if (this.activeSection === "touches" && !this.editingTouchId) await this.createTouch();
+            let savedTouch = null;
+            if (this.activeSection === "touches" && this.editingTouchId) savedTouch = await this.updateTouch();
+            if (this.activeSection === "touches" && !this.editingTouchId) savedTouch = await this.createTouch();
+            if (this.activeSection === "touches" && this.hasValidTouchFollowUp()) {
+              await this.createFollowUpTaskFromCurrentTouch(savedTouch && savedTouch.id ? savedTouch.id : this.editingTouchId);
+            }
             this.showModal = false;
             this.cancelSourceCreate();
             this.editingLeadId = null;
@@ -3941,6 +4171,7 @@
             this.editingTouchId = null;
             this.showDealTaskForm = false;
             this.resetDealTaskForm();
+            this.resetTouchFollowUpForm();
             this.resetTaskFollowUpForm();
             this.showDealCompanyForm = false;
             this.resetDealCompanyForm();
