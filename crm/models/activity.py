@@ -15,7 +15,7 @@ class ActivityType(models.TextChoices):
 
 
 class TaskStatus(models.TextChoices):
-    TODO = "todo", "К выполнению"
+    TODO = "todo", "Новая"
     IN_PROGRESS = "in_progress", "В работе"
     DONE = "done", "Выполнено"
     CANCELED = "canceled", "Отменено"

@@ -990,9 +990,9 @@
                       class="rounded-xl border p-3"
                     >
                       <template v-if="eventItem.eventType === 'touch'">
-                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                          <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                          <span class="font-medium text-white">[[ eventItem.title || eventItem.result ]]</span>
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || eventItem.result ]]</span>
                           <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
                           <span v-if="eventItem.actorName" class="text-crm-muted shrink-0">[[ eventItem.actorName ]]</span>
                           <button
@@ -1012,15 +1012,15 @@
                             Сделка #[[ eventItem.dealId ]]
                           </button>
                         </div>
-                        <div v-if="eventItem.summaryText || eventItem.touchResult" class="mt-2 text-sm text-white whitespace-pre-line">[[ eventItem.summaryText || eventItem.touchResult ]]</div>
-                        <div v-if="eventItem.nextStep" class="mt-2 text-sm text-crm-muted">
-                          Следующий шаг: [[ eventItem.nextStep ]][[ eventItem.nextStepAt ? ` до ${formatEventTimestamp(eventItem.nextStepAt)}` : '' ]]
-                        </div>
+                      <div v-if="eventItem.summaryText || eventItem.touchResult" class="mt-2 text-sm text-white whitespace-pre-line [overflow-wrap:anywhere]">[[ eventItem.summaryText || eventItem.touchResult ]]</div>
+                      <div v-if="eventItem.nextStep" class="mt-2 text-sm text-crm-muted [overflow-wrap:anywhere]">
+                        Следующий шаг: [[ eventItem.nextStep ]][[ eventItem.nextStepAt ? ` до ${formatEventTimestamp(eventItem.nextStepAt)}` : '' ]]
+                      </div>
                       </template>
                       <template v-else-if="eventItem.eventType === 'task'">
-                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                          <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                          <span class="font-medium text-white">[[ eventItem.title || eventItem.result ]]</span>
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || eventItem.result ]]</span>
                           <span v-if="eventItem.taskTypeName" class="text-crm-muted shrink-0">Тип: [[ eventItem.taskTypeName ]]</span>
                           <span v-if="eventItem.dueAt" class="text-crm-muted shrink-0">Срок: [[ eventShortTimestamp(eventItem.dueAt) ]]</span>
                           <span v-if="eventItem.taskStatusLabel" class="text-crm-muted shrink-0">Статус: [[ eventItem.taskStatusLabel.toLowerCase() ]]</span>
@@ -1042,14 +1042,14 @@
                             Сделка #[[ eventItem.dealId ]]
                           </button>
                         </div>
-                        <div v-if="eventItem.taskResult" class="mt-2 text-sm text-white">
-                          Результат: [[ eventItem.taskResult ]]
-                        </div>
+                      <div v-if="eventItem.taskResult" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
+                        Результат: [[ eventItem.taskResult ]]
+                      </div>
                       </template>
                       <template v-else>
                         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-crm-muted">
                           <span class="text-[11px] uppercase tracking-[0.16em] shrink-0">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
-                          <span class="text-white">[[ eventItem.result || eventItem.title || 'Системное событие' ]]</span>
+                        <span class="text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.result || eventItem.title || 'Системное событие' ]]</span>
                         </div>
                       </template>
                     </div>
@@ -1485,9 +1485,9 @@
                     class="rounded-xl border p-3"
                   >
                     <template v-if="eventItem.eventType === 'touch'">
-                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
                         <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                        <span class="font-medium text-white">[[ eventItem.title || eventItem.result ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || eventItem.result ]]</span>
                         <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
                         <span v-if="eventItem.actorName" class="text-crm-muted shrink-0">[[ eventItem.actorName ]]</span>
                         <button
@@ -1499,15 +1499,15 @@
                           Касание #[[ eventItem.touchId ]]
                         </button>
                       </div>
-                      <div v-if="eventItem.summaryText || eventItem.touchResult" class="mt-2 text-sm text-white whitespace-pre-line">[[ eventItem.summaryText || eventItem.touchResult ]]</div>
-                      <div v-if="eventItem.nextStep" class="mt-2 text-sm text-crm-muted">
-                        Следующий шаг: [[ eventItem.nextStep ]][[ eventItem.nextStepAt ? ` до ${formatEventTimestamp(eventItem.nextStepAt)}` : '' ]]
-                      </div>
+                        <div v-if="eventItem.summaryText || eventItem.touchResult" class="mt-2 text-sm text-white whitespace-pre-line [overflow-wrap:anywhere]">[[ eventItem.summaryText || eventItem.touchResult ]]</div>
+                        <div v-if="eventItem.nextStep" class="mt-2 text-sm text-crm-muted [overflow-wrap:anywhere]">
+                          Следующий шаг: [[ eventItem.nextStep ]][[ eventItem.nextStepAt ? ` до ${formatEventTimestamp(eventItem.nextStepAt)}` : '' ]]
+                        </div>
                     </template>
                     <template v-else-if="eventItem.eventType === 'task'">
-                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                        <span class="font-medium text-white">[[ eventItem.title || eventItem.result ]]</span>
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
+                          <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
+                          <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || eventItem.result ]]</span>
                         <span v-if="eventItem.taskTypeName" class="text-crm-muted shrink-0">Тип: [[ eventItem.taskTypeName ]]</span>
                         <span v-if="eventItem.dueAt" class="text-crm-muted shrink-0">Срок: [[ eventShortTimestamp(eventItem.dueAt) ]]</span>
                         <span v-if="eventItem.taskStatusLabel" class="text-crm-muted shrink-0">Статус: [[ eventItem.taskStatusLabel.toLowerCase() ]]</span>
@@ -1521,14 +1521,14 @@
                           Задача #[[ eventItem.taskId ]]
                         </button>
                       </div>
-                      <div v-if="eventItem.taskResult" class="mt-2 text-sm text-white">
-                        Результат: [[ eventItem.taskResult ]]
-                      </div>
+                        <div v-if="eventItem.taskResult" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
+                          Результат: [[ eventItem.taskResult ]]
+                        </div>
                     </template>
                     <template v-else>
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-crm-muted">
                         <span class="text-[11px] uppercase tracking-[0.16em] shrink-0">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
-                        <span class="text-white">[[ eventItem.result || eventItem.title || 'Системное событие' ]]</span>
+                          <span class="text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.result || eventItem.title || 'Системное событие' ]]</span>
                       </div>
                     </template>
                   </div>
@@ -2618,9 +2618,9 @@
                     class="rounded-xl border p-3"
                   >
                     <template v-if="eventItem.eventType === 'touch'">
-                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
                         <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                        <span class="font-medium text-white">[[ eventItem.title || eventItem.result ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || eventItem.result ]]</span>
                         <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
                         <span v-if="eventItem.actorName" class="text-crm-muted shrink-0">[[ eventItem.actorName ]]</span>
                         <button
@@ -2640,15 +2640,15 @@
                           Сделка #[[ eventItem.dealId ]]
                         </button>
                       </div>
-                      <div v-if="eventItem.summaryText || eventItem.touchResult" class="mt-2 text-sm text-white whitespace-pre-line">[[ eventItem.summaryText || eventItem.touchResult ]]</div>
-                      <div v-if="eventItem.nextStep" class="mt-2 text-sm text-crm-muted">
+                      <div v-if="eventItem.summaryText || eventItem.touchResult" class="mt-2 text-sm text-white whitespace-pre-line [overflow-wrap:anywhere]">[[ eventItem.summaryText || eventItem.touchResult ]]</div>
+                      <div v-if="eventItem.nextStep" class="mt-2 text-sm text-crm-muted [overflow-wrap:anywhere]">
                         Следующий шаг: [[ eventItem.nextStep ]][[ eventItem.nextStepAt ? ` до ${formatEventTimestamp(eventItem.nextStepAt)}` : '' ]]
                       </div>
                     </template>
                     <template v-else-if="eventItem.eventType === 'task'">
-                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
                         <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                        <span class="font-medium text-white">[[ eventItem.title || eventItem.result ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || eventItem.result ]]</span>
                         <span v-if="eventItem.taskTypeName" class="text-crm-muted shrink-0">Тип: [[ eventItem.taskTypeName ]]</span>
                         <span v-if="eventItem.dueAt" class="text-crm-muted shrink-0">Срок: [[ eventShortTimestamp(eventItem.dueAt) ]]</span>
                         <span v-if="eventItem.taskStatusLabel" class="text-crm-muted shrink-0">Статус: [[ eventItem.taskStatusLabel.toLowerCase() ]]</span>
@@ -2670,14 +2670,14 @@
                           Сделка #[[ eventItem.dealId ]]
                         </button>
                       </div>
-                      <div v-if="eventItem.taskResult" class="mt-2 text-sm text-white">
+                      <div v-if="eventItem.taskResult" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
                         Результат: [[ eventItem.taskResult ]]
                       </div>
                     </template>
                     <template v-else>
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-crm-muted">
                         <span class="text-[11px] uppercase tracking-[0.16em] shrink-0">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
-                        <span class="text-white">[[ eventItem.result || eventItem.title || 'Системное событие' ]]</span>
+                          <span class="text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.result || eventItem.title || 'Системное событие' ]]</span>
                         <button
                           v-if="eventItem.dealId"
                           type="button"

@@ -29,7 +29,7 @@
     };
 
     const TASK_STATUS_OPTIONS = [
-      { value: "todo", label: "К выполнению" },
+      { value: "todo", label: "Новая" },
       { value: "in_progress", label: "В работе" },
       { value: "done", label: "Выполнено" },
       { value: "canceled", label: "Отменено" }
