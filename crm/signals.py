@@ -28,14 +28,26 @@ def _format_structured_event_entry(
     result_text: str,
     happened_at=None,
     task_id: int | None = None,
+    touch_id: int | None = None,
     deal_id: int | None = None,
+    event_type: str | None = None,
+    priority: str | None = None,
+    extra_lines: list[str] | None = None,
 ) -> str:
     timestamp = timezone.localtime(happened_at or timezone.now()).strftime("%d.%m.%Y %H:%M")
     lines = [timestamp, f"Результат: {str(result_text or '').strip()}"]
+    if event_type:
+        lines.append(f"event_type: {event_type}")
+    if priority:
+        lines.append(f"priority: {priority}")
     if task_id:
         lines.append(f"task_id: {task_id}")
+    if touch_id:
+        lines.append(f"touch_id: {touch_id}")
     if deal_id:
         lines.append(f"deal_id: {deal_id}")
+    if extra_lines:
+        lines.extend([str(line or "").strip() for line in extra_lines if str(line or "").strip()])
     return "\n".join(lines)
 
 
@@ -90,6 +102,18 @@ def _append_deal_event(deal_id: int | None, entry: str) -> None:
     if deal is None:
         return
     Deal.objects.filter(pk=deal.pk).update(events=_prepend_event(deal.events, entry))
+
+
+def _touch_result_label(instance: Touch) -> str:
+    return str(getattr(getattr(instance, "result_option", None), "name", "") or "").strip()
+
+
+def _touch_channel_label(instance: Touch) -> str:
+    return str(getattr(getattr(instance, "channel", None), "name", "") or "").strip()
+
+
+def _touch_direction_label(direction: str) -> str:
+    return TouchDirection.OUTGOING.label if direction == TouchDirection.OUTGOING else TouchDirection.INCOMING.label
 
 
 def _task_related_client_ids(instance: Activity) -> list[int]:
@@ -225,7 +249,21 @@ def activity_task_deadline_state_signal(sender, instance: Activity, **kwargs):
 
 @receiver(post_save, sender=Activity)
 def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
-    if instance.type != ActivityType.TASK or instance.status != TaskStatus.DONE:
+    if instance.type != ActivityType.TASK:
+        return
+
+    if created and instance.deal_id:
+        entry = _format_structured_event_entry(
+            result_text=f"Создана задача: {instance.subject}",
+            happened_at=instance.created_at,
+            task_id=instance.pk,
+            deal_id=instance.deal_id,
+            event_type="task",
+            priority="medium" if instance.status in ACTIVE_TASK_STATUSES else "low",
+        )
+        _append_deal_event(instance.deal_id, entry)
+
+    if instance.status != TaskStatus.DONE:
         return
 
     previous = getattr(instance, "_previous_activity_state", None)
@@ -242,6 +280,8 @@ def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
         happened_at=happened_at,
         task_id=instance.pk,
         deal_id=instance.deal_id,
+        event_type="task",
+        priority="low",
     )
     _append_deal_event(instance.deal_id, entry)
     for client_id in _task_related_client_ids(instance):
@@ -348,8 +388,52 @@ def deal_previous_state_signal(sender, instance: Deal, **kwargs):
         return
     instance._previous_deal_state = (
         Deal.objects.filter(pk=instance.pk)
-        .select_related("stage", "client")
-        .only("is_won", "title", "stage_id", "stage__name", "client_id", "metadata")
+        .select_related("stage", "client", "owner", "source")
+        .only(
+            "is_won",
+            "title",
+            "stage_id",
+            "stage__name",
+            "client_id",
+            "client__name",
+            "owner_id",
+            "owner__username",
+            "owner__first_name",
+            "owner__last_name",
+            "source_id",
+            "source__name",
+            "amount",
+            "close_date",
+            "metadata",
+        )
+        .first()
+    )
+
+
+@receiver(pre_save, sender=Touch)
+def touch_previous_state_signal(sender, instance: Touch, **kwargs):
+    instance._previous_touch_state = None
+    if not instance.pk:
+        return
+    instance._previous_touch_state = (
+        Touch.objects.filter(pk=instance.pk)
+        .select_related("channel", "result_option", "owner")
+        .only(
+            "deal_id",
+            "happened_at",
+            "channel_id",
+            "channel__name",
+            "direction",
+            "result_option_id",
+            "result_option__name",
+            "summary",
+            "next_step",
+            "next_step_at",
+            "owner_id",
+            "owner__username",
+            "owner__first_name",
+            "owner__last_name",
+        )
         .first()
     )
 
@@ -374,8 +458,58 @@ def deal_stage_change_events_signal(sender, instance: Deal, created, **kwargs):
     entry = _format_structured_event_entry(
         result_text=result_text,
         deal_id=instance.pk,
+        event_type="system",
+        priority="low",
     )
     _append_deal_event(instance.pk, entry)
+
+
+@receiver(post_save, sender=Deal)
+def deal_system_events_signal(sender, instance: Deal, created, **kwargs):
+    previous = getattr(instance, "_previous_deal_state", None)
+    if created:
+        entry = _format_structured_event_entry(
+            result_text=f"Сделка создана: {instance.title}",
+            deal_id=instance.pk,
+            event_type="system",
+            priority="low",
+        )
+        _append_deal_event(instance.pk, entry)
+        return
+
+    if previous is None:
+        return
+
+    changes: list[str] = []
+    if str(previous.title or "").strip() != str(instance.title or "").strip():
+        changes.append(f"Название сделки изменено: {previous.title or 'Без названия'} -> {instance.title or 'Без названия'}")
+    if getattr(previous, "owner_id", None) != getattr(instance, "owner_id", None):
+        changes.append(
+            f"Ответственный изменён: {_actor_display_name(getattr(previous, 'owner', None))} -> {_actor_display_name(getattr(instance, 'owner', None))}"
+        )
+    if getattr(previous, "amount", None) != getattr(instance, "amount", None):
+        changes.append(f"Сумма изменена: {previous.amount or 0} -> {instance.amount or 0} {instance.currency}")
+    if getattr(previous, "source_id", None) != getattr(instance, "source_id", None):
+        previous_source = str(getattr(getattr(previous, "source", None), "name", "") or "Не выбран")
+        current_source = str(getattr(getattr(instance, "source", None), "name", "") or "Не выбран")
+        changes.append(f"Источник сделки изменён: {previous_source} -> {current_source}")
+    if getattr(previous, "client_id", None) != getattr(instance, "client_id", None):
+        previous_client = str(getattr(getattr(previous, "client", None), "name", "") or "Не выбрана")
+        current_client = str(getattr(getattr(instance, "client", None), "name", "") or "Не выбрана")
+        changes.append(f"Компания изменена: {previous_client} -> {current_client}")
+    if getattr(previous, "close_date", None) != getattr(instance, "close_date", None):
+        changes.append(
+            f"План закрытия изменён: {previous.close_date.isoformat() if previous.close_date else 'Не указан'} -> {instance.close_date.isoformat() if instance.close_date else 'Не указан'}"
+        )
+
+    for change_text in changes:
+        entry = _format_structured_event_entry(
+            result_text=change_text,
+            deal_id=instance.pk,
+            event_type="system",
+            priority="low",
+        )
+        _append_deal_event(instance.pk, entry)
 
 
 @receiver(post_save, sender=Deal)
@@ -402,6 +536,8 @@ def deal_failed_reason_events_signal(sender, instance: Deal, created, **kwargs):
     entry = _format_structured_event_entry(
         result_text=result_text,
         deal_id=instance.pk,
+        event_type="system",
+        priority="low",
     )
     _append_deal_event(instance.pk, entry)
     _append_client_event(instance.client_id, entry)
@@ -423,6 +559,67 @@ def deal_completion_events_signal(sender, instance: Deal, created, **kwargs):
     entry = _format_structured_event_entry(
         result_text=result_text,
         deal_id=instance.pk,
+        event_type="system",
+        priority="low",
     )
     _append_deal_event(instance.pk, entry)
     _append_client_event(instance.client_id, entry)
+
+
+@receiver(post_save, sender=Touch)
+def touch_deal_events_signal(sender, instance: Touch, created, **kwargs):
+    if not instance.deal_id:
+        return
+
+    previous = getattr(instance, "_previous_touch_state", None)
+    result_label = _touch_result_label(instance)
+    channel_label = _touch_channel_label(instance)
+    direction_label = _touch_direction_label(instance.direction)
+    base_text = result_label or str(instance.summary or "").strip() or f"{direction_label} касание"
+
+    if created:
+        entry = _format_structured_event_entry(
+            result_text=f"Касание: {base_text}",
+            happened_at=instance.happened_at,
+            touch_id=instance.pk,
+            deal_id=instance.deal_id,
+            event_type="touch",
+            priority="high",
+            extra_lines=[
+                channel_label and f"Канал: {channel_label}",
+                instance.summary and f"Содержание: {instance.summary}",
+                instance.next_step and f"Следующий шаг: {instance.next_step}",
+            ],
+        )
+        _append_deal_event(instance.deal_id, entry)
+        return
+
+    if previous is None:
+        return
+
+    changed = (
+        previous.channel_id != instance.channel_id
+        or previous.direction != instance.direction
+        or previous.result_option_id != instance.result_option_id
+        or str(previous.summary or "") != str(instance.summary or "")
+        or str(previous.next_step or "") != str(instance.next_step or "")
+        or previous.next_step_at != instance.next_step_at
+        or previous.owner_id != instance.owner_id
+    )
+    if not changed:
+        return
+
+    entry = _format_structured_event_entry(
+        result_text=f"Касание обновлено: {base_text}",
+        happened_at=instance.happened_at,
+        touch_id=instance.pk,
+        deal_id=instance.deal_id,
+        event_type="touch",
+        priority="high",
+        extra_lines=[
+            channel_label and f"Канал: {channel_label}",
+            instance.summary and f"Содержание: {instance.summary}",
+            instance.next_step and f"Следующий шаг: {instance.next_step}",
+        ],
+    )
+    _append_deal_event(instance.deal_id, entry)

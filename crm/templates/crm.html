@@ -1161,12 +1161,22 @@
                   <div
                     v-for="(eventItem, eventIndex) in parseEventLog(forms.deals.events)"
                     :key="`deal-event-${editingDealId || 'new'}-${eventIndex}`"
-                    class="rounded-xl border border-crm-border/80 bg-[#0f2f4a] p-3"
+                    :class="dealEventCardClass(eventItem)"
+                    class="rounded-xl border p-3"
                   >
                     <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                       <span class="text-[11px] uppercase tracking-[0.16em] text-crm-muted shrink-0">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
+                      <span v-if="dealEventTypeLabel(eventItem)" class="inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]" :class="eventItem.priority === 'high' ? 'bg-emerald-300/15 text-emerald-200' : (eventItem.priority === 'medium' ? 'bg-sky-300/15 text-sky-200' : 'bg-white/5 text-crm-muted')">[[ dealEventTypeLabel(eventItem) ]]</span>
                       <span v-if="eventItem.result" class="text-white break-words">[[ eventItem.result ]]</span>
                       <span v-if="eventItem.extra" class="text-crm-muted break-words">[[ eventItem.extra ]]</span>
+                      <button
+                        v-if="eventItem.touchId"
+                        type="button"
+                        @click="openTouchFromEvent(eventItem.touchId)"
+                        class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                      >
+                        Касание #[[ eventItem.touchId ]]
+                      </button>
                       <button
                         v-if="eventItem.taskId"
                         type="button"

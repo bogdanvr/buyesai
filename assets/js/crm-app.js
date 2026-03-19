@@ -974,7 +974,10 @@
                 timestamp: timestampPattern.test(firstLine) ? firstLine : "",
                 result: "",
                 taskId: null,
+                touchId: null,
                 dealId: null,
+                eventType: "",
+                priority: "",
                 extra: "",
               };
               const contentLines = eventItem.timestamp ? lines.slice(1) : lines.slice();
@@ -991,9 +994,22 @@
                   eventItem.taskId = Number.isNaN(parsedTaskId) ? null : parsedTaskId;
                   return;
                 }
+                if (line.indexOf("touch_id:") === 0) {
+                  const parsedTouchId = Number.parseInt(line.replace(/^touch_id:\s*/u, "").trim(), 10);
+                  eventItem.touchId = Number.isNaN(parsedTouchId) ? null : parsedTouchId;
+                  return;
+                }
                 if (line.indexOf("deal_id:") === 0) {
                   const parsedDealId = Number.parseInt(line.replace(/^deal_id:\s*/u, "").trim(), 10);
                   eventItem.dealId = Number.isNaN(parsedDealId) ? null : parsedDealId;
+                  return;
+                }
+                if (line.indexOf("event_type:") === 0) {
+                  eventItem.eventType = line.replace(/^event_type:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("priority:") === 0) {
+                  eventItem.priority = line.replace(/^priority:\s*/u, "").trim();
                   return;
                 }
                 extraLines.push(line);
@@ -1004,7 +1020,10 @@
                   timestamp: eventItem.timestamp,
                   result: contentLines.join("\n") || chunk,
                   taskId: null,
+                  touchId: null,
                   dealId: null,
+                  eventType: "",
+                  priority: "",
                   extra: "",
                 };
               }
@@ -1101,6 +1120,23 @@
             hour: "2-digit",
             minute: "2-digit",
           });
+        },
+        dealEventCardClass(eventItem) {
+          const priority = String(eventItem?.priority || "").trim();
+          if (priority === "high") {
+            return "border-emerald-400/30 bg-emerald-400/10";
+          }
+          if (priority === "medium") {
+            return "border-sky-400/30 bg-sky-400/10";
+          }
+          return "border-crm-border/80 bg-[#0f2f4a]";
+        },
+        dealEventTypeLabel(eventItem) {
+          const eventType = String(eventItem?.eventType || "").trim();
+          if (eventType === "touch") return "Касание";
+          if (eventType === "task") return "Задача";
+          if (eventType === "system") return "Система";
+          return "";
         },
         humanizeLeadSourceName(value) {
           const raw = String(value || "").trim();
@@ -1202,6 +1238,19 @@
             this.openTaskEditor(task);
           } catch (error) {
             this.errorMessage = `Ошибка открытия задачи: ${error.message}`;
+          }
+        },
+        async openTouchFromEvent(touchId) {
+          try {
+            const normalizedTouchId = this.toIntOrNull(touchId);
+            if (!normalizedTouchId) {
+              throw new Error("Касание не найдено");
+            }
+            const existingTouch = (this.datasets.touches || []).find((item) => String(item.id) === String(normalizedTouchId));
+            const touch = existingTouch || this.mapTouch(await this.apiRequest(`/api/v1/touches/${normalizedTouchId}/`));
+            this.openTouchEditor(touch);
+          } catch (error) {
+            this.errorMessage = `Ошибка открытия касания: ${error.message}`;
           }
         },
         async openDealFromEvent(dealId) {
