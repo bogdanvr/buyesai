@@ -1642,6 +1642,21 @@
                   />
                 </div>
                 <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Юридическое название</div>
+                  <button v-if="!isCompanySummaryEditing('legalName')" type="button" @click="openCompanySummaryField('legalName')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.legalName || 'Не указано' ]]
+                  </button>
+                  <input
+                    v-else
+                    v-model="forms.companies.legalName"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('legalName')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('legalName')"
+                    @blur="stopCompanySummaryEdit('legalName')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                </div>
+                <div class="py-1">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Телефон / Email</div>
                   <div class="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div class="flex items-center gap-2 min-w-0">
@@ -2322,13 +2337,6 @@
                 </div>
               </div>
             </div>
-            <label v-if="shouldShowCompanyField('legalName', forms.companies.legalName)" class="block">
-              <span class="text-sm text-crm-muted">Юридическое название</span>
-              <input v-model="forms.companies.legalName" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('companies', 'legalName')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Юридическое название</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
             <div class="md:col-span-2" v-if="secondaryCompanyOkvedEntries().length">
               <button
                 type="button"
@@ -2383,33 +2391,87 @@
                 </div>
               </button>
               <div v-if="showCompanyEvents" class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
-                <div class="space-y-3">
+                <div v-if="!parseEventLog(forms.companies.events).length" class="text-sm text-crm-muted">
+                  Событий пока нет.
+                </div>
+                <div v-else class="space-y-3">
                   <div
                     v-for="(eventItem, eventIndex) in parseEventLog(forms.companies.events)"
                     :key="`company-event-${editingCompanyId || 'new'}-${eventIndex}`"
-                    class="rounded-xl border border-crm-border/80 bg-[#0f2f4a] p-3"
+                    :class="dealEventCardClass(eventItem)"
+                    class="rounded-xl border p-3"
                   >
-                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                      <span class="text-[11px] uppercase tracking-[0.16em] text-crm-muted shrink-0">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
-                      <span v-if="eventItem.result" class="text-white break-words">[[ eventItem.result ]]</span>
-                      <span v-if="eventItem.extra" class="text-crm-muted break-words">[[ eventItem.extra ]]</span>
-                      <button
-                        v-if="eventItem.taskId"
-                        type="button"
-                        @click="openTaskFromEvent(eventItem.taskId)"
-                        class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
-                      >
-                        Задача #[[ eventItem.taskId ]]
-                      </button>
-                      <button
-                        v-if="eventItem.dealId"
-                        type="button"
-                        @click="openDealFromEvent(eventItem.dealId)"
-                        class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
-                      >
-                        Сделка #[[ eventItem.dealId ]]
-                      </button>
-                    </div>
+                    <template v-if="eventItem.eventType === 'touch'">
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
+                        <span class="font-medium text-white">[[ eventItem.title || eventItem.result ]]</span>
+                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
+                        <span v-if="eventItem.actorName" class="text-crm-muted shrink-0">[[ eventItem.actorName ]]</span>
+                        <button
+                          v-if="eventItem.touchId"
+                          type="button"
+                          @click.stop="openTouchFromEvent(eventItem.touchId)"
+                          class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                        >
+                          Касание #[[ eventItem.touchId ]]
+                        </button>
+                        <button
+                          v-if="eventItem.dealId"
+                          type="button"
+                          @click.stop="openDealFromEvent(eventItem.dealId)"
+                          class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                        >
+                          Сделка #[[ eventItem.dealId ]]
+                        </button>
+                      </div>
+                      <div v-if="eventItem.summaryText || eventItem.touchResult" class="mt-2 text-sm text-white whitespace-pre-line">[[ eventItem.summaryText || eventItem.touchResult ]]</div>
+                      <div v-if="eventItem.nextStep" class="mt-2 text-sm text-crm-muted">
+                        Следующий шаг: [[ eventItem.nextStep ]][[ eventItem.nextStepAt ? ` до ${formatEventTimestamp(eventItem.nextStepAt)}` : '' ]]
+                      </div>
+                    </template>
+                    <template v-else-if="eventItem.eventType === 'task'">
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
+                        <span class="font-medium text-white">[[ eventItem.title || eventItem.result ]]</span>
+                        <span v-if="eventItem.taskTypeName" class="text-crm-muted shrink-0">Тип: [[ eventItem.taskTypeName ]]</span>
+                        <span v-if="eventItem.dueAt" class="text-crm-muted shrink-0">Срок: [[ eventShortTimestamp(eventItem.dueAt) ]]</span>
+                        <span v-if="eventItem.taskStatusLabel" class="text-crm-muted shrink-0">Статус: [[ eventItem.taskStatusLabel.toLowerCase() ]]</span>
+                        <span v-if="eventItem.ownerName" class="text-crm-muted shrink-0">[[ eventItem.ownerName ]]</span>
+                        <button
+                          v-if="eventItem.taskId"
+                          type="button"
+                          @click.stop="openTaskFromEvent(eventItem.taskId)"
+                          class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                        >
+                          Задача #[[ eventItem.taskId ]]
+                        </button>
+                        <button
+                          v-if="eventItem.dealId"
+                          type="button"
+                          @click.stop="openDealFromEvent(eventItem.dealId)"
+                          class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                        >
+                          Сделка #[[ eventItem.dealId ]]
+                        </button>
+                      </div>
+                      <div v-if="eventItem.taskResult" class="mt-2 text-sm text-white">
+                        Результат: [[ eventItem.taskResult ]]
+                      </div>
+                    </template>
+                    <template v-else>
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-crm-muted">
+                        <span class="text-[11px] uppercase tracking-[0.16em] shrink-0">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
+                        <span class="text-white">[[ eventItem.result || eventItem.title || 'Системное событие' ]]</span>
+                        <button
+                          v-if="eventItem.dealId"
+                          type="button"
+                          @click.stop="openDealFromEvent(eventItem.dealId)"
+                          class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                        >
+                          Сделка #[[ eventItem.dealId ]]
+                        </button>
+                      </div>
+                    </template>
                   </div>
                 </div>
               </div>

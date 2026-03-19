@@ -264,7 +264,7 @@ def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
     if instance.type != ActivityType.TASK:
         return
 
-    if created and instance.deal_id:
+    if created:
         entry = _format_structured_event_entry(
             result_text=f"Создана задача: {instance.subject}",
             happened_at=instance.created_at,
@@ -280,7 +280,10 @@ def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
                 f"owner_name: {_actor_display_name(getattr(instance, 'created_by', None))}",
             ],
         )
-        _append_deal_event(instance.deal_id, entry)
+        if instance.deal_id:
+            _append_deal_event(instance.deal_id, entry)
+        for client_id in _task_related_client_ids(instance):
+            _append_client_event(client_id, entry)
 
     if instance.status != TaskStatus.DONE:
         return
@@ -490,6 +493,7 @@ def deal_stage_change_events_signal(sender, instance: Deal, created, **kwargs):
         extra_lines=["title: Системное событие"],
     )
     _append_deal_event(instance.pk, entry)
+    _append_client_event(instance.client_id, entry)
 
 
 @receiver(post_save, sender=Deal)
@@ -504,6 +508,7 @@ def deal_system_events_signal(sender, instance: Deal, created, **kwargs):
             extra_lines=["title: Системное событие"],
         )
         _append_deal_event(instance.pk, entry)
+        _append_client_event(instance.client_id, entry)
         return
 
     if previous is None:
@@ -540,6 +545,7 @@ def deal_system_events_signal(sender, instance: Deal, created, **kwargs):
             extra_lines=["title: Системное событие"],
         )
         _append_deal_event(instance.pk, entry)
+        _append_client_event(instance.client_id, entry)
 
 
 @receiver(post_save, sender=Deal)
@@ -665,3 +671,72 @@ def touch_deal_events_signal(sender, instance: Touch, created, **kwargs):
         ],
     )
     _append_deal_event(instance.deal_id, entry)
+
+
+@receiver(post_save, sender=Touch)
+def touch_client_events_signal(sender, instance: Touch, created, **kwargs):
+    if not instance.client_id:
+        return
+
+    previous = getattr(instance, "_previous_touch_state", None)
+    result_label = _touch_result_label(instance)
+    channel_label = _touch_channel_label(instance)
+    direction_label = _touch_direction_label(instance.direction)
+    base_text = result_label or str(instance.summary or "").strip() or f"{direction_label} касание"
+
+    if created:
+        entry = _format_structured_event_entry(
+            result_text=f"Касание: {base_text}",
+            happened_at=instance.happened_at,
+            touch_id=instance.pk,
+            deal_id=instance.deal_id,
+            event_type="touch",
+            priority="high",
+            extra_lines=[
+                f"title: {_touch_title(instance)}",
+                f"actor_name: {_actor_display_name(instance.owner)}",
+                channel_label and f"channel_name: {channel_label}",
+                f"direction_label: {_touch_direction_label(instance.direction)}",
+                result_label and f"touch_result: {result_label}",
+                instance.summary and f"summary: {instance.summary}",
+                instance.next_step and f"next_step: {instance.next_step}",
+                instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
+            ],
+        )
+        _append_client_event(instance.client_id, entry)
+        return
+
+    if previous is None:
+        return
+
+    changed = (
+        previous.channel_id != instance.channel_id
+        or previous.direction != instance.direction
+        or previous.result_option_id != instance.result_option_id
+        or str(previous.summary or "") != str(instance.summary or "")
+        or str(previous.next_step or "") != str(instance.next_step or "")
+        or previous.next_step_at != instance.next_step_at
+        or previous.owner_id != instance.owner_id
+    )
+    if not changed:
+        return
+
+    entry = _format_structured_event_entry(
+        result_text=f"Касание обновлено: {base_text}",
+        happened_at=instance.happened_at,
+        touch_id=instance.pk,
+        deal_id=instance.deal_id,
+        event_type="touch",
+        priority="high",
+        extra_lines=[
+            f"title: {_touch_title(instance)}",
+            f"actor_name: {_actor_display_name(instance.owner)}",
+            channel_label and f"channel_name: {channel_label}",
+            f"direction_label: {_touch_direction_label(instance.direction)}",
+            result_label and f"touch_result: {result_label}",
+            instance.summary and f"summary: {instance.summary}",
+            instance.next_step and f"next_step: {instance.next_step}",
+            instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
+        ],
+    )
+    _append_client_event(instance.client_id, entry)
