@@ -349,25 +349,31 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(response.data["task_type_name"], "Квалификация")
         self.assertEqual(response.data["task_type_group"], TaskTypeGroup.INTERNAL_TASK)
         self.assertEqual(response.data["task_type_group_label"], "Внутренняя задача")
-        self.assertEqual(response.data["communication_channel"], channel.pk)
-        self.assertEqual(response.data["communication_channel_name"], "Email")
+        self.assertIsNone(response.data["communication_channel"])
+        self.assertNotIn("communication_channel_name", response.data)
         self.assertEqual(response.data["related_touch"], touch.pk)
         self.assertEqual(response.data["related_touch_subject"], "Первичный звонок")
 
     def test_task_type_meta_returns_group(self):
-        task_type = TaskType.objects.create(name="Коммерческое предложение", group=TaskTypeGroup.CLIENT_TASK)
+        later_task_type = TaskType.objects.create(
+            name="Коммерческое предложение",
+            group=TaskTypeGroup.CLIENT_TASK,
+            sort_order=20,
+        )
+        earlier_task_type = TaskType.objects.create(
+            name="Первичный контакт",
+            group=TaskTypeGroup.INTERNAL_TASK,
+            sort_order=10,
+        )
 
         response = self.client.get(reverse("meta-task-types"))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(
-            any(
-                item["id"] == task_type.pk
-                and item["group"] == TaskTypeGroup.CLIENT_TASK
-                and item["group_label"] == "Клиентская задача"
-                for item in response.data
-            )
-        )
+        self.assertEqual(response.data[0]["id"], earlier_task_type.pk)
+        self.assertEqual(response.data[0]["sort_order"], 10)
+        self.assertEqual(response.data[1]["id"], later_task_type.pk)
+        self.assertEqual(response.data[1]["group"], TaskTypeGroup.CLIENT_TASK)
+        self.assertEqual(response.data[1]["group_label"], "Клиентская задача")
 
     def test_company_note_draft_writes_author_and_timestamp(self):
         response = self.client.patch(

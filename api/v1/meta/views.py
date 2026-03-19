@@ -119,7 +119,7 @@ class TaskTypeListAPIView(ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        return TaskType.objects.filter(is_active=True).order_by("name")
+        return TaskType.objects.filter(is_active=True).order_by("sort_order", "name")
 
 
 class TouchResultListAPIView(ListAPIView):

@@ -68,7 +68,7 @@ class TaskTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TaskType
-        fields = ["id", "name", "group", "group_label", "is_active"]
+        fields = ["id", "name", "sort_order", "group", "group_label", "is_active"]
 
 
 class TouchResultSerializer(serializers.ModelSerializer):

@@ -44,6 +44,7 @@ class TaskTypeGroup(models.TextChoices):
 
 class TaskType(TimestampedModel):
     name = models.CharField(max_length=128, unique=True, verbose_name="Тип задачи")
+    sort_order = models.PositiveIntegerField(default=100, verbose_name="Порядок сортировки")
     group = models.CharField(
         max_length=32,
         choices=TaskTypeGroup.choices,
@@ -55,7 +56,7 @@ class TaskType(TimestampedModel):
     class Meta:
         verbose_name = "Тип задачи"
         verbose_name_plural = "Типы задач"
-        ordering = ("name",)
+        ordering = ("sort_order", "name")
 
     def __str__(self):
         return self.name
