@@ -850,6 +850,11 @@
               this.dealTaskForm.taskTypeId = null;
             }
           }
+        },
+        "forms.deals.description": {
+          handler() {
+            this.$nextTick(() => this.resizeTextareaById("deal-description-textarea"));
+          }
         }
       },
       methods: {
@@ -872,6 +877,18 @@
           if (current === "0" || current === "0.0" || current === "0.00") {
             target[field] = "";
           }
+        },
+        resizeTextareaById(id) {
+          const element = document.getElementById(id);
+          if (!element) return;
+          element.style.height = "0px";
+          element.style.height = `${Math.max(element.scrollHeight, 44)}px`;
+        },
+        autoResizeTextarea(event) {
+          const element = event?.target;
+          if (!element) return;
+          element.style.height = "0px";
+          element.style.height = `${Math.max(element.scrollHeight, 44)}px`;
         },
         setUiError(message, options = {}) {
           const useModal = options.modal === true || (options.modal !== false && this.showModal);
@@ -2276,6 +2293,12 @@
         },
         quickToggleDealTaskForm() {
           this.showDealTaskForm = true;
+          this.$nextTick(() => {
+            const panel = document.getElementById("deal-task-panel");
+            if (panel && typeof panel.scrollIntoView === "function") {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
         },
         quickOpenDealDocuments() {
           const companyId = this.toIntOrNull(this.forms.deals.companyId);

@@ -1073,7 +1073,7 @@
             </div>
             <label v-if="shouldShowDealField('description', forms.deals.description)" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Описание сделки</span>
-              <textarea v-model="forms.deals.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+              <textarea id="deal-description-textarea" v-model="forms.deals.description" rows="1" @input="autoResizeTextarea" class="mt-2 w-full overflow-hidden resize-none rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
             <button v-else type="button" @click="toggleOptionalField('deals', 'description')" class="crm-inline-field-toggle md:col-span-2">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Описание сделки</span><span class="text-crm-accent text-xs">+</span></div>
@@ -1183,7 +1183,7 @@
             <button v-else type="button" @click="toggleOptionalField('deals', 'events')" class="crm-inline-field-toggle md:col-span-2">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">События</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
-            <div v-if="editingDealId" class="md:col-span-2 mt-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+            <div v-if="editingDealId" id="deal-task-panel" class="md:col-span-2 mt-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <button
                 type="button"
                 @click="toggleDealTaskForm"
