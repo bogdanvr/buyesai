@@ -1297,6 +1297,25 @@
           }
           return leftDueAt - rightDueAt;
         },
+        sortTasksByListRules(items) {
+          const tasks = Array.isArray(items) ? items : [];
+          const ordered = tasks.map((item, index) => ({ item, index }));
+          ordered.sort((left, right) => {
+            const leftActive = this.isTaskActiveStatus(left.item?.taskStatus);
+            const rightActive = this.isTaskActiveStatus(right.item?.taskStatus);
+            if (leftActive !== rightActive) {
+              return leftActive ? -1 : 1;
+            }
+            if (leftActive && rightActive) {
+              const taskOrder = this.compareActiveTasksByDueAt(left.item, right.item);
+              if (taskOrder !== 0) {
+                return taskOrder;
+              }
+            }
+            return left.index - right.index;
+          });
+          return ordered.map((entry) => entry.item);
+        },
         parseTaskDueTimestamp(value) {
           if (!value) return null;
           const parsed = new Date(value);
@@ -2299,7 +2318,7 @@
               `/api/v1/activities/?type=task&deal=${this.editingDealId}&page_size=100`
             );
             const tasks = this.normalizePaginatedResponse(payload);
-            this.dealTasksForActiveDeal = tasks.map((item) => {
+            this.dealTasksForActiveDeal = this.sortTasksByListRules(tasks.map((item) => {
               const taskStatus = item.status || (item.is_done ? "done" : "todo");
               return {
               id: item.id,
@@ -2318,7 +2337,7 @@
               dueLabel: this.formatDueLabel(item.due_at),
               remainingLabel: this.formatTaskRemainingLabel(item.due_at, taskStatus),
             };
-            });
+            }));
           } catch (error) {
             this.errorMessage = `Ошибка загрузки задач сделки: ${error.message}`;
             this.dealTasksForActiveDeal = [];
