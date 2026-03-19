@@ -1477,7 +1477,7 @@
           <template v-if="activeSection === 'tasks'">
             <label class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Название задачи</span>
-              <input v-model="forms.tasks.subject" required type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+              <input v-model="forms.tasks.subject" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
             <label v-if="shouldShowTaskField(forms.tasks.taskTypeGroup)" class="block">
               <span class="text-sm text-crm-muted">Категория задачи</span>
