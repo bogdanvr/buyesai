@@ -801,10 +801,37 @@
                     <option v-for="company in companyOptions" :key="`deal-summary-company-${company.id}`" :value="company.id">[[ company.name ]]</option>
                   </select>
                 </div>
-                <button type="button" @click="openDealSummaryField('contact')" class="text-left py-1 hover:text-white transition">
+                <div class="py-1">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Контакт</div>
-                  <div class="text-sm text-white">[[ dealSummaryContact ? dealSummaryContact.fullName : 'Не выбран' ]]</div>
-                </button>
+                  <div class="mt-1 flex items-center gap-2">
+                    <button type="button" @click="openDealSummaryField('contact')" class="min-w-0 text-left text-sm text-white hover:text-crm-accent transition">
+                      [[ dealSummaryContact ? dealSummaryContact.fullName : 'Не выбран' ]]
+                    </button>
+                    <a
+                      v-if="dealSummaryContact && phoneHref(dealSummaryContact.phone)"
+                      :href="phoneHref(dealSummaryContact.phone)"
+                      @click.stop
+                      class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                      title="Позвонить"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                      </svg>
+                    </a>
+                    <a
+                      v-if="dealSummaryContact && emailHref(dealSummaryContact.email)"
+                      :href="emailHref(dealSummaryContact.email)"
+                      @click.stop
+                      class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                      title="Написать письмо"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5A2.25 2.25 0 015.25 5.25h13.5A2.25 2.25 0 0121 7.5v9A2.25 2.25 0 0118.75 18.75H5.25A2.25 2.25 0 013 16.5v-9z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6l8.25 6 8.25-6" />
+                      </svg>
+                    </a>
+                  </div>
+                </div>
                 <div class="rounded-xl border border-crm-accent/40 bg-crm-accent/10 px-3 py-2">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-accent">Этап</div>
                   <button v-if="!isDealSummaryEditing('stageId')" type="button" @click="openDealSummaryField('stageId')" class="mt-1 text-left text-sm font-medium text-white hover:text-crm-accent transition">
@@ -1066,7 +1093,9 @@
                     >
                       <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
-                          <div class="text-sm font-medium text-white truncate">[[ contact.fullName ]]</div>
+                          <button type="button" @click.stop="openContactFromDealCompany(contact)" class="text-left text-sm font-medium text-white truncate hover:text-crm-accent transition">
+                            [[ contact.fullName ]]
+                          </button>
                           <div v-if="contact.position" class="mt-1 text-xs text-crm-muted">[[ contact.position ]]</div>
                           <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-crm-muted">
                             <span>[[ contact.phone || '—' ]]</span>

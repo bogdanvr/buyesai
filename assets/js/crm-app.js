@@ -874,6 +874,10 @@
           const normalized = String(value || "").trim().replace(/[^\d+]/g, "");
           return normalized ? `tel:${normalized}` : "";
         },
+        emailHref(value) {
+          const normalized = String(value || "").trim();
+          return normalized ? `mailto:${normalized}` : "";
+        },
         normalizePaginatedResponse(data) {
           if (Array.isArray(data)) return data;
           if (data && Array.isArray(data.results)) return data.results;
