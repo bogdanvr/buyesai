@@ -83,6 +83,7 @@
           showCompanyContactForm: false,
           showCompanyNoteDraft: false,
           showCompanyOkvedDetails: false,
+          showCompanyRequisites: false,
           dealSummaryEditingField: "",
           companySummaryEditingField: "",
           expandedOptionalFields: {
@@ -149,6 +150,11 @@
               legalName: "",
               inn: "",
               address: "",
+              actualAddress: "",
+              bankDetails: "",
+              iban: "",
+              bik: "",
+              bankName: "",
               industry: "",
               okved: "",
               okveds: [],
@@ -234,6 +240,11 @@
             name: "",
             inn: "",
             address: "",
+            actualAddress: "",
+            bankDetails: "",
+            iban: "",
+            bik: "",
+            bankName: "",
             industry: "",
             okved: "",
             phone: "",
@@ -1767,6 +1778,9 @@
         toggleCompanyEvents() {
           this.showCompanyEvents = !this.showCompanyEvents;
         },
+        toggleCompanyRequisites() {
+          this.showCompanyRequisites = !this.showCompanyRequisites;
+        },
         toggleCompanyNoteDraft() {
           this.showCompanyNoteDraft = !this.showCompanyNoteDraft;
           if (!this.showCompanyNoteDraft) {
@@ -2416,6 +2430,7 @@
           this.editingCompanyId = item.id;
           this.companySummaryEditingField = "";
           this.showCompanyEvents = false;
+          this.showCompanyRequisites = false;
           this.showCompanyNoteDraft = false;
           this.resetExpandedOptionalFields();
           const normalizedOkveds = this.normalizeCompanyOkveds(item.okveds, item.okved, item.industry);
@@ -2425,6 +2440,11 @@
             legalName: item.legalName || "",
             inn: item.inn || "",
             address: item.address || "",
+            actualAddress: item.actualAddress || "",
+            bankDetails: item.bankDetails || "",
+            iban: item.iban || "",
+            bik: item.bik || "",
+            bankName: item.bankName || "",
             industry: resolvedIndustry,
             okved: item.okved || "",
             okveds: normalizedOkveds,
@@ -3381,6 +3401,11 @@
             legalName: item.legal_name || "",
             inn: item.inn || "",
             address: item.address || "",
+            actualAddress: item.actual_address || "",
+            bankDetails: item.bank_details || "",
+            iban: item.iban || "",
+            bik: item.bik || "",
+            bankName: item.bank_name || "",
             industry: resolvedIndustry || primaryOkved.name || "",
             okved: item.okved || primaryOkved.code || "",
             okveds: normalizedOkveds,
@@ -3587,6 +3612,7 @@
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.showCompanyContactForm = false;
+          this.showCompanyRequisites = false;
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
@@ -3624,6 +3650,7 @@
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.showCompanyContactForm = false;
+          this.showCompanyRequisites = false;
           this.showCompanyNoteDraft = false;
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
@@ -3642,6 +3669,7 @@
           this.editingTouchId = null;
           this.resetExpandedOptionalFields();
           this.showCompanyNoteDraft = false;
+          this.showCompanyRequisites = false;
           this.showDealTaskForm = false;
           this.forms[this.activeSection] = this.getDefaultForm(this.activeSection);
           this.resetDealTaskForm();
@@ -3711,6 +3739,11 @@
               legalName: "",
               inn: "",
               address: "",
+              actualAddress: "",
+              bankDetails: "",
+              iban: "",
+              bik: "",
+              bankName: "",
               industry: "",
               okved: "",
               okveds: [],
@@ -4117,6 +4150,11 @@
               legal_name: form.legalName.trim(),
               inn: form.inn.trim() || null,
               address: form.address.trim(),
+              actual_address: form.actualAddress.trim(),
+              bank_details: form.bankDetails.trim(),
+              iban: form.iban.trim(),
+              bik: form.bik.trim(),
+              bank_name: form.bankName.trim(),
               industry: form.industry.trim(),
               okved: form.okved.trim(),
               okveds: this.normalizeCompanyOkveds(form.okveds, form.okved, form.industry),
@@ -4145,6 +4183,11 @@
               legal_name: form.legalName.trim(),
               inn: form.inn.trim() || null,
               address: form.address.trim(),
+              actual_address: form.actualAddress.trim(),
+              bank_details: form.bankDetails.trim(),
+              iban: form.iban.trim(),
+              bik: form.bik.trim(),
+              bank_name: form.bankName.trim(),
               industry: form.industry.trim(),
               okved: form.okved.trim(),
               okveds: this.normalizeCompanyOkveds(form.okveds, form.okved, form.industry),

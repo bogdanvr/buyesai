@@ -1619,32 +1619,60 @@
                   />
                 </div>
                 <div class="py-1">
-                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Телефон</div>
-                  <div class="mt-1 flex items-center gap-2">
-                    <button v-if="!isCompanySummaryEditing('phone')" type="button" @click="openCompanySummaryField('phone')" class="min-w-0 text-left text-sm text-white hover:text-crm-accent transition">
-                      [[ forms.companies.phone || 'Не указан' ]]
-                    </button>
-                    <input
-                      v-else
-                      v-model="forms.companies.phone"
-                      type="text"
-                      @focus="ensurePhonePrefix(forms.companies, 'phone')"
-                      @keydown.enter.prevent="stopCompanySummaryEdit('phone')"
-                      @keydown.esc.prevent="stopCompanySummaryEdit('phone')"
-                      @blur="stopCompanySummaryEdit('phone')"
-                      class="w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
-                    />
-                    <a
-                      v-if="phoneHref(forms.companies.phone)"
-                      :href="phoneHref(forms.companies.phone)"
-                      @click.stop
-                      class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
-                      title="Позвонить"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
-                      </svg>
-                    </a>
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Телефон / Email</div>
+                  <div class="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <button v-if="!isCompanySummaryEditing('phone')" type="button" @click="openCompanySummaryField('phone')" class="min-w-0 text-left text-sm text-white hover:text-crm-accent transition truncate">
+                        [[ forms.companies.phone || 'Телефон не указан' ]]
+                      </button>
+                      <input
+                        v-else
+                        v-model="forms.companies.phone"
+                        type="text"
+                        @focus="ensurePhonePrefix(forms.companies, 'phone')"
+                        @keydown.enter.prevent="stopCompanySummaryEdit('phone')"
+                        @keydown.esc.prevent="stopCompanySummaryEdit('phone')"
+                        @blur="stopCompanySummaryEdit('phone')"
+                        class="w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                      />
+                      <a
+                        v-if="phoneHref(forms.companies.phone)"
+                        :href="phoneHref(forms.companies.phone)"
+                        @click.stop
+                        class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                        title="Позвонить"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                        </svg>
+                      </a>
+                    </div>
+                    <div class="flex items-center gap-2 min-w-0">
+                      <button v-if="!isCompanySummaryEditing('email')" type="button" @click="openCompanySummaryField('email')" class="min-w-0 text-left text-sm text-white hover:text-crm-accent transition truncate">
+                        [[ forms.companies.email || 'Email не указан' ]]
+                      </button>
+                      <input
+                        v-else
+                        v-model="forms.companies.email"
+                        type="email"
+                        @keydown.enter.prevent="stopCompanySummaryEdit('email')"
+                        @keydown.esc.prevent="stopCompanySummaryEdit('email')"
+                        @blur="stopCompanySummaryEdit('email')"
+                        class="w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                      />
+                      <a
+                        v-if="emailHref(forms.companies.email)"
+                        :href="emailHref(forms.companies.email)"
+                        @click.stop
+                        class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                        title="Написать письмо"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5A2.25 2.25 0 015.25 5.25h13.5A2.25 2.25 0 0121 7.5v9A2.25 2.25 0 0118.75 18.75H5.25A2.25 2.25 0 013 16.5v-9z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6l8.25 6 8.25-6" />
+                        </svg>
+                      </a>
+                    </div>
                   </div>
                 </div>
                 <div class="py-1">
@@ -1727,26 +1755,166 @@
                 </div>
               </div>
             </div>
+            <div class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <button
+                type="button"
+                @click="toggleCompanyRequisites"
+                class="w-full text-left flex items-center justify-between gap-3"
+              >
+                <div>
+                  <div class="text-sm font-semibold text-white">Реквизиты</div>
+                  <div class="mt-1 text-xs text-crm-muted">Валюта, ИНН / БИН, адреса и банковские данные</div>
+                </div>
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent text-xs shrink-0">
+                  [[ showCompanyRequisites ? '−' : '+' ]]
+                </span>
+              </button>
+              <div v-if="showCompanyRequisites" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Валюта</div>
+                  <select
+                    v-if="isCompanySummaryEditing('currency')"
+                    v-model="forms.companies.currency"
+                    @change="stopCompanySummaryEdit('currency')"
+                    @blur="stopCompanySummaryEdit('currency')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option value="RUB">RUB</option>
+                    <option value="KZT">KZT</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                  </select>
+                  <button v-else type="button" @click="openCompanySummaryField('currency')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.currency || 'Не указана' ]]
+                  </button>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">ИНН / БИН</div>
+                  <input
+                    v-if="isCompanySummaryEditing('inn')"
+                    v-model="forms.companies.inn"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('inn')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('inn')"
+                    @blur="stopCompanySummaryEdit('inn')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                  <button v-else type="button" @click="openCompanySummaryField('inn')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.inn || 'Не указан' ]]
+                  </button>
+                </div>
+                <div class="py-1 md:col-span-2">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Юридический адрес</div>
+                  <input
+                    v-if="isCompanySummaryEditing('address')"
+                    v-model="forms.companies.address"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('address')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('address')"
+                    @blur="stopCompanySummaryEdit('address')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                  <button v-else type="button" @click="openCompanySummaryField('address')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition break-words">
+                    [[ forms.companies.address || 'Не указан' ]]
+                  </button>
+                </div>
+                <div class="py-1 md:col-span-2">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Фактический адрес</div>
+                  <input
+                    v-if="isCompanySummaryEditing('actualAddress')"
+                    v-model="forms.companies.actualAddress"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('actualAddress')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('actualAddress')"
+                    @blur="stopCompanySummaryEdit('actualAddress')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                  <button v-else type="button" @click="openCompanySummaryField('actualAddress')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition break-words">
+                    [[ forms.companies.actualAddress || 'Не указан' ]]
+                  </button>
+                </div>
+                <div class="py-1 md:col-span-2">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Банковские реквизиты</div>
+                  <textarea
+                    v-if="isCompanySummaryEditing('bankDetails')"
+                    v-model="forms.companies.bankDetails"
+                    rows="2"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('bankDetails')"
+                    @blur="stopCompanySummaryEdit('bankDetails')"
+                    class="mt-1 w-full rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"
+                  ></textarea>
+                  <button v-else type="button" @click="openCompanySummaryField('bankDetails')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition whitespace-pre-line break-words">
+                    [[ forms.companies.bankDetails || 'Не указаны' ]]
+                  </button>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">ИИК / IBAN</div>
+                  <input
+                    v-if="isCompanySummaryEditing('iban')"
+                    v-model="forms.companies.iban"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('iban')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('iban')"
+                    @blur="stopCompanySummaryEdit('iban')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                  <button v-else type="button" @click="openCompanySummaryField('iban')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.iban || 'Не указан' ]]
+                  </button>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">БИК</div>
+                  <input
+                    v-if="isCompanySummaryEditing('bik')"
+                    v-model="forms.companies.bik"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('bik')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('bik')"
+                    @blur="stopCompanySummaryEdit('bik')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                  <button v-else type="button" @click="openCompanySummaryField('bik')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.bik || 'Не указан' ]]
+                  </button>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Банк</div>
+                  <input
+                    v-if="isCompanySummaryEditing('bankName')"
+                    v-model="forms.companies.bankName"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('bankName')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('bankName')"
+                    @blur="stopCompanySummaryEdit('bankName')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                  <button v-else type="button" @click="openCompanySummaryField('bankName')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.bankName || 'Не указан' ]]
+                  </button>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">ОКВЭД</div>
+                  <input
+                    v-if="isCompanySummaryEditing('okved')"
+                    v-model="forms.companies.okved"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('okved')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('okved')"
+                    @blur="stopCompanySummaryEdit('okved')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                  <button v-else type="button" @click="openCompanySummaryField('okved')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.okved || 'Не указан' ]]
+                  </button>
+                </div>
+              </div>
+            </div>
             <label v-if="shouldShowCompanyField('legalName', forms.companies.legalName)" class="block">
               <span class="text-sm text-crm-muted">Юридическое название</span>
               <input v-model="forms.companies.legalName" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
             <button v-else type="button" @click="toggleOptionalField('companies', 'legalName')" class="crm-inline-field-toggle">
               <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Юридическое название</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
-            <label v-if="shouldShowCompanyField('inn', forms.companies.inn)" class="block">
-              <span class="text-sm text-crm-muted">ИНН</span>
-              <input v-model="forms.companies.inn" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('companies', 'inn')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">ИНН</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
-            <label v-if="shouldShowCompanyField('okved', forms.companies.okved)" class="block">
-              <span class="text-sm text-crm-muted">ОКВЭД</span>
-              <input v-model="forms.companies.okved" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('companies', 'okved')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">ОКВЭД</span><span class="text-crm-accent text-xs">+</span></div>
             </button>
             <div class="md:col-span-2" v-if="secondaryCompanyOkvedEntries().length">
               <button
@@ -1773,25 +1941,6 @@
                 </div>
               </div>
             </div>
-            <label v-if="shouldShowCompanyField('currency', forms.companies.currency)" class="block">
-              <span class="text-sm text-crm-muted">Валюта компании</span>
-              <select v-model="forms.companies.currency" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option value="RUB">RUB</option>
-                <option value="KZT">KZT</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-              </select>
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('companies', 'currency')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Валюта компании</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
-            <label v-if="shouldShowCompanyField('email', forms.companies.email)" class="block">
-              <span class="text-sm text-crm-muted">Email</span>
-              <input v-model="forms.companies.email" type="email" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('companies', 'email')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Email</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
             <div class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <div class="text-sm font-semibold text-white">Правила работы</div>
               <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
