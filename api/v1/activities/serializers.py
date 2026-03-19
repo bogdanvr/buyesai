@@ -6,6 +6,7 @@ from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup
 
 
 class ActivitySerializer(serializers.ModelSerializer):
+    subject = serializers.CharField(required=False, allow_blank=True)
     client_name = serializers.CharField(source="client.name", read_only=True)
     lead_title = serializers.CharField(source="lead.title", read_only=True)
     deal_title = serializers.CharField(source="deal.title", read_only=True)
@@ -55,6 +56,19 @@ class ActivitySerializer(serializers.ModelSerializer):
         full_name = f"{contact.first_name} {contact.last_name}".strip()
         return full_name or contact.phone or f"Контакт #{contact.id}"
 
+    def _resolve_task_subject(self, attrs, activity_type, task_type):
+        if activity_type != ActivityType.TASK:
+            return
+        subject = str(attrs.get("subject", getattr(self.instance, "subject", "")) or "").strip()
+        if subject:
+            attrs["subject"] = subject
+            return
+        task_type_name = str(getattr(task_type, "name", "") or "").strip()
+        if task_type_name:
+            attrs["subject"] = task_type_name
+            return
+        raise serializers.ValidationError({"subject": "Укажите название задачи или выберите тип задачи."})
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
         activity_type = attrs.get("type", getattr(self.instance, "type", None))
@@ -76,6 +90,7 @@ class ActivitySerializer(serializers.ModelSerializer):
             getattr(self.instance, "save_company_note", False),
         )
         company_note = attrs.get("company_note", getattr(self.instance, "company_note", ""))
+        self._resolve_task_subject(attrs, activity_type, task_type)
         if activity_type == ActivityType.TASK:
             attrs["status"] = status
             attrs["is_done"] = is_done

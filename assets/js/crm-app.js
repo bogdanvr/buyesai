@@ -452,6 +452,19 @@
         showTaskCommunicationChannelField() {
           return this.currentTaskTypeGroup === "client_task";
         },
+        filteredTaskDealOptions() {
+          const companyId = this.toIntOrNull(this.forms.tasks.companyId);
+          const deals = Array.isArray(this.datasets.deals) ? this.datasets.deals : [];
+          if (!companyId) {
+            return [];
+          }
+          return deals.filter((deal) => String(deal.clientId || "") === String(companyId));
+        },
+        showTaskDealSelector() {
+          return !!this.toIntOrNull(this.forms.tasks.companyId)
+            || !!this.toIntOrNull(this.forms.tasks.dealId)
+            || this.showAllTaskFields;
+        },
         shouldShowLeadTrackingBlock() {
           return this.isCreatingLead
             || this.showAllLeadFields
@@ -687,6 +700,15 @@
         },
         "forms.tasks.companyId": {
           handler() {
+            const selectedDealId = this.toIntOrNull(this.forms.tasks.dealId);
+            if (selectedDealId) {
+              const dealStillAvailable = this.filteredTaskDealOptions.some(
+                (deal) => String(deal.id) === String(selectedDealId)
+              );
+              if (!dealStillAvailable) {
+                this.forms.tasks.dealId = null;
+              }
+            }
             if (this.activeSection === "tasks" && this.showModal) {
               this.loadTaskTouchOptions();
             }
@@ -1924,8 +1946,8 @@
           if (!this.hasPendingDealTaskDraft()) {
             return;
           }
-          if (!this.dealTaskForm.subject.trim()) {
-            throw new Error("Укажите название новой задачи по сделке");
+          if (!this.resolveTaskSubject(this.dealTaskForm)) {
+            throw new Error("Укажите название новой задачи по сделке или выберите тип задачи");
           }
           if (!this.dealTaskForm.dueAt) {
             throw new Error("Укажите срок новой задачи по сделке");
@@ -1933,9 +1955,22 @@
         },
         hasPreparedTaskFollowUp() {
           return !!(
-            this.taskFollowUpForm.subject.trim()
+            this.resolveTaskSubject(this.taskFollowUpForm)
             && this.taskFollowUpForm.dueAt
           );
+        },
+        resolveTaskSubject(formLike) {
+          const form = formLike && typeof formLike === "object" ? formLike : {};
+          const explicitSubject = String(form.subject || "").trim();
+          if (explicitSubject) {
+            return explicitSubject;
+          }
+          const taskTypeId = this.toIntOrNull(form.taskTypeId);
+          if (!taskTypeId) {
+            return "";
+          }
+          const taskType = (this.metaOptions.taskTypes || []).find((item) => String(item.id) === String(taskTypeId));
+          return String(taskType?.name || "").trim();
         },
         validateTaskFollowUpRequirement() {
           if (!this.isTaskDoneStatus(this.forms.tasks.status)) {
@@ -3033,9 +3068,9 @@
           if (!targetDealId) {
             throw new Error("Сначала откройте сделку");
           }
-          const subject = this.dealTaskForm.subject.trim();
+          const subject = this.resolveTaskSubject(this.dealTaskForm);
           if (!subject) {
-            throw new Error("Укажите название задачи");
+            throw new Error("Укажите название задачи или выберите тип задачи");
           }
           if (!this.dealTaskForm.dueAt) {
             throw new Error("Укажите срок задачи");
@@ -3287,8 +3322,9 @@
         },
         async createTask() {
           const form = this.forms.tasks;
-          if (!form.subject.trim()) {
-            throw new Error("Укажите название задачи");
+          const subject = this.resolveTaskSubject(form);
+          if (!subject) {
+            throw new Error("Укажите название задачи или выберите тип задачи");
           }
           if (!form.dueAt) {
             throw new Error("Укажите срок задачи");
@@ -3306,7 +3342,7 @@
             method: "POST",
             body: {
               type: "task",
-              subject: form.subject.trim(),
+              subject,
               task_type: this.toIntOrNull(form.taskTypeId),
               communication_channel: communicationChannelId,
               priority: form.priority || "medium",
@@ -3329,8 +3365,9 @@
           if (!this.editingTaskId) {
             throw new Error("Задача для редактирования не выбрана");
           }
-          if (!form.subject.trim()) {
-            throw new Error("Укажите название задачи");
+          const subject = this.resolveTaskSubject(form);
+          if (!subject) {
+            throw new Error("Укажите название задачи или выберите тип задачи");
           }
           if (!form.dueAt) {
             throw new Error("Укажите срок задачи");
@@ -3348,7 +3385,7 @@
             method: "PATCH",
             body: {
               type: "task",
-              subject: form.subject.trim(),
+              subject,
               task_type: this.toIntOrNull(form.taskTypeId),
               communication_channel: communicationChannelId,
               priority: form.priority || "medium",
@@ -3429,7 +3466,7 @@
         },
         async createFollowUpTaskFromCurrentDeal() {
           const followUp = this.taskFollowUpForm;
-          const subject = followUp.subject.trim();
+          const subject = this.resolveTaskSubject(followUp);
           if (!subject || !followUp.dueAt) {
             return;
           }

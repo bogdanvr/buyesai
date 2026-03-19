@@ -551,3 +551,23 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertIn("Результат: Статус сделки изменён: Первичный контакт -> Провален", self.deal.events)
         self.assertIn("Результат: Сделка провалена. Причина: Клиент выбрал конкурента", self.deal.events)
         self.assertIn("Сделка провалена. Причина: Клиент выбрал конкурента", self.company.events)
+
+    def test_task_can_be_created_without_subject_when_task_type_selected(self):
+        task_type = TaskType.objects.create(name="Подготовить КП", group=TaskTypeGroup.INTERNAL_TASK)
+
+        response = self.client.post(
+            reverse("activities-list"),
+            {
+                "type": ActivityType.TASK,
+                "subject": "",
+                "task_type": task_type.pk,
+                "client": self.company.pk,
+                "deal": self.deal.pk,
+                "due_at": "2026-03-20T10:00:00+06:00",
+                "status": TaskStatus.TODO,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["subject"], "Подготовить КП")

@@ -1520,6 +1520,14 @@
                 <option v-for="company in companyOptions" :key="company.id" :value="company.id">[[ company.name ]]</option>
               </select>
             </label>
+            <label v-if="showTaskDealSelector" class="block">
+              <span class="text-sm text-crm-muted">Сделка</span>
+              <select v-model="forms.tasks.dealId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбрана</option>
+                <option v-for="deal in filteredTaskDealOptions" :key="`task-deal-${deal.id}`" :value="deal.id">[[ deal.title || deal.name ]]</option>
+              </select>
+              <div v-if="forms.tasks.companyId && !filteredTaskDealOptions.length" class="mt-2 text-xs text-crm-muted">У выбранной компании пока нет сделок.</div>
+            </label>
             <label v-if="shouldShowTaskField(forms.tasks.dueAt)" class="block">
               <span class="text-sm text-crm-muted">Срок</span>
               <input v-model="forms.tasks.dueAt" type="datetime-local" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
