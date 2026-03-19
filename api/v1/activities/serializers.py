@@ -21,6 +21,11 @@ class ActivitySerializer(serializers.ModelSerializer):
 
     ACTIVE_TASK_STATUSES = {TaskStatus.TODO, TaskStatus.IN_PROGRESS}
 
+    def _has_automatic_follow_up_task(self, task_type):
+        if task_type is None:
+            return False
+        return bool(getattr(task_type, "auto_task_on_done", False) and getattr(task_type, "auto_task_type_id", None))
+
     def _has_non_overdue_client_task_for_deal(self, deal, current_task_id=None):
         if deal is None:
             return False
@@ -78,6 +83,7 @@ class ActivitySerializer(serializers.ModelSerializer):
         result = attrs.get("result", getattr(self.instance, "result", ""))
         task_type = attrs.get("task_type", getattr(self.instance, "task_type", None))
         task_type_group = str(getattr(task_type, "group", "") or "").strip()
+        has_automatic_follow_up_task = self._has_automatic_follow_up_task(task_type)
         communication_channel = attrs.get(
             "communication_channel",
             getattr(self.instance, "communication_channel", None),
@@ -123,6 +129,7 @@ class ActivitySerializer(serializers.ModelSerializer):
             and is_done
             and task_type_group == TaskTypeGroup.INTERNAL_TASK
             and not has_follow_up_task
+            and not has_automatic_follow_up_task
             and not has_non_overdue_client_task
         ):
             raise serializers.ValidationError(
@@ -133,7 +140,7 @@ class ActivitySerializer(serializers.ModelSerializer):
         if activity_type == ActivityType.TASK and is_done and deal is not None:
             stage_code = str(getattr(getattr(deal, "stage", None), "code", "") or "").strip().lower()
             if stage_code not in {"won", "failed"}:
-                if not has_non_overdue_client_task and not has_follow_up_task:
+                if not has_non_overdue_client_task and not has_follow_up_task and not has_automatic_follow_up_task:
                     raise serializers.ValidationError(
                         {"has_follow_up_task": "Для активной сделки укажите следующую задачу или держите актуальную клиентскую задачу без просрочки."}
                     )

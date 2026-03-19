@@ -110,6 +110,14 @@ def _task_type_group(instance: Activity) -> str:
     return str(getattr(task_type, "group", "") or "").strip()
 
 
+def _resolve_auto_follow_up_due_at(instance: Activity):
+    now = instance.completed_at or timezone.now()
+    due_at = getattr(instance, "due_at", None)
+    if due_at is None:
+        return now
+    return due_at if due_at >= now else now
+
+
 @receiver(post_save, sender=Lead)
 def lead_audit_signal(sender, instance: Lead, created, **kwargs):
     log_model_event(instance=instance, action="lead.created" if created else "lead.updated")
@@ -273,6 +281,39 @@ def activity_client_task_touch_signal(sender, instance: Activity, created, **kwa
         client=instance.client or getattr(instance.deal, "client", None) or getattr(instance.lead, "client", None),
         contact=instance.contact,
         task=instance,
+    )
+
+
+@receiver(post_save, sender=Activity)
+def activity_task_auto_follow_up_signal(sender, instance: Activity, created, **kwargs):
+    if instance.type != ActivityType.TASK or instance.status != TaskStatus.DONE:
+        return
+
+    previous = getattr(instance, "_previous_activity_state", None)
+    if previous is not None and previous.type == ActivityType.TASK and previous.status == TaskStatus.DONE:
+        return
+
+    task_type = getattr(instance, "task_type", None)
+    auto_task_type = getattr(task_type, "auto_task_type", None)
+    if task_type is None or not getattr(task_type, "auto_task_on_done", False) or auto_task_type is None:
+        return
+
+    communication_channel = instance.communication_channel if getattr(auto_task_type, "group", "") == TaskTypeGroup.CLIENT_TASK else None
+    Activity.objects.create(
+        type=ActivityType.TASK,
+        subject=str(getattr(auto_task_type, "name", "") or "").strip() or instance.subject,
+        description="",
+        due_at=_resolve_auto_follow_up_due_at(instance),
+        status=TaskStatus.TODO,
+        priority=instance.priority or "medium",
+        task_type=auto_task_type,
+        communication_channel=communication_channel,
+        deadline_reminder_offset_minutes=instance.deadline_reminder_offset_minutes,
+        lead=instance.lead,
+        deal=instance.deal,
+        client=instance.client or getattr(instance.deal, "client", None) or getattr(instance.lead, "client", None),
+        contact=instance.contact,
+        created_by=instance.created_by,
     )
 
 

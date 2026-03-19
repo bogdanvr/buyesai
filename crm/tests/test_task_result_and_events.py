@@ -461,6 +461,66 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertTrue(matched["auto_touch_on_done"])
         self.assertEqual(matched["touch_result"], "Связались повторно")
 
+    def test_task_type_meta_returns_auto_task_fields(self):
+        auto_task_type = TaskType.objects.create(
+            name="Подготовить договор",
+            group=TaskTypeGroup.INTERNAL_TASK,
+            sort_order=40,
+        )
+        task_type = TaskType.objects.create(
+            name="Провести встречу",
+            group=TaskTypeGroup.CLIENT_TASK,
+            auto_task_on_done=True,
+            auto_task_type=auto_task_type,
+            sort_order=30,
+        )
+
+        response = self.client.get(reverse("meta-task-types"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        matched = next(item for item in response.data if item["id"] == task_type.pk)
+        self.assertTrue(matched["auto_task_on_done"])
+        self.assertEqual(matched["auto_task_type"], auto_task_type.pk)
+        self.assertEqual(matched["auto_task_type_name"], "Подготовить договор")
+
+    def test_internal_task_with_auto_follow_up_creates_next_task_without_manual_follow_up(self):
+        auto_task_type = TaskType.objects.create(
+            name="Согласовать договор",
+            group=TaskTypeGroup.INTERNAL_TASK,
+        )
+        task_type = TaskType.objects.create(
+            name="Подготовить договор",
+            group=TaskTypeGroup.INTERNAL_TASK,
+            auto_task_on_done=True,
+            auto_task_type=auto_task_type,
+        )
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Подготовить договор",
+            task_type=task_type,
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "result": "Договор подготовлен",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        follow_up_task = Activity.objects.exclude(pk=task.pk).get(task_type=auto_task_type)
+        self.assertEqual(follow_up_task.subject, "Согласовать договор")
+        self.assertEqual(follow_up_task.status, TaskStatus.TODO)
+        self.assertFalse(follow_up_task.is_done)
+        self.assertEqual(follow_up_task.deal_id, self.deal.pk)
+        self.assertEqual(follow_up_task.client_id, self.company.pk)
+
     def test_company_note_draft_writes_author_and_timestamp(self):
         response = self.client.patch(
             reverse("clients-detail", kwargs={"pk": self.company.pk}),

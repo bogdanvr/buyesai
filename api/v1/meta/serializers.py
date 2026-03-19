@@ -65,6 +65,7 @@ class UserOptionSerializer(serializers.ModelSerializer):
 
 class TaskTypeSerializer(serializers.ModelSerializer):
     group_label = serializers.CharField(source="get_group_display", read_only=True)
+    auto_task_type_name = serializers.CharField(source="auto_task_type.name", read_only=True)
 
     class Meta:
         model = TaskType
@@ -76,6 +77,9 @@ class TaskTypeSerializer(serializers.ModelSerializer):
             "group_label",
             "auto_touch_on_done",
             "touch_result",
+            "auto_task_on_done",
+            "auto_task_type",
+            "auto_task_type_name",
             "is_active",
         ]
 

@@ -53,6 +53,15 @@ class TaskType(TimestampedModel):
     )
     auto_touch_on_done = models.BooleanField(default=False, verbose_name="Автокасание")
     touch_result = models.CharField(max_length=128, blank=True, default="", verbose_name="Результат")
+    auto_task_on_done = models.BooleanField(default=False, verbose_name="Автозадача")
+    auto_task_type = models.ForeignKey(
+        "self",
+        related_name="auto_created_from_types",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Тип автозадачи",
+    )
     is_active = models.BooleanField(default=True, verbose_name="Активен")
 
     class Meta:

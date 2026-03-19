@@ -488,6 +488,10 @@
             this.forms.tasks.taskTypeGroup || this.resolveTaskTypeGroupById(this.forms.tasks.taskTypeId)
           );
         },
+        currentTaskTypeHasAutomaticFollowUp() {
+          const taskType = this.resolveTaskTypeById(this.forms.tasks.taskTypeId);
+          return !!(taskType && taskType.auto_task_on_done && this.toIntOrNull(taskType.auto_task_type));
+        },
         taskActiveDeal() {
           const dealId = this.toIntOrNull(this.forms.tasks.dealId);
           if (!dealId) return null;
@@ -502,6 +506,7 @@
         showTaskFollowUpSuggestion() {
           return !!this.editingTaskId
             && this.isTaskDoneStatus(this.forms.tasks.status)
+            && !this.currentTaskTypeHasAutomaticFollowUp
             && (
               this.currentTaskTypeGroup === "internal_task"
               || this.taskActiveDealRequiresFollowUp
@@ -929,10 +934,17 @@
           if (!normalizedTaskTypeId) {
             return "";
           }
-          const taskType = (this.metaOptions.taskTypes || []).find(
-            (entry) => String(entry.id) === String(normalizedTaskTypeId)
-          );
+          const taskType = this.resolveTaskTypeById(normalizedTaskTypeId);
           return this.normalizeTaskTypeGroup(taskType ? taskType.group : "");
+        },
+        resolveTaskTypeById(taskTypeId) {
+          const normalizedTaskTypeId = this.toIntOrNull(taskTypeId);
+          if (!normalizedTaskTypeId) {
+            return null;
+          }
+          return (this.metaOptions.taskTypes || []).find(
+            (entry) => String(entry.id) === String(normalizedTaskTypeId)
+          ) || null;
         },
         formatHistoryTimestamp(value) {
           const raw = String(value || "").trim();
@@ -1985,6 +1997,9 @@
               && task.taskTypeGroup === "client_task"
               && !this.isTaskOverdue(task.dueAtRaw, task.taskStatus)
             ));
+          if (this.currentTaskTypeHasAutomaticFollowUp) {
+            return;
+          }
           if (this.currentTaskTypeGroup === "internal_task") {
             if (this.hasPreparedTaskFollowUp() || hasNonOverdueClientTask) {
               return;
