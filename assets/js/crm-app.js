@@ -2620,6 +2620,7 @@
             communicationChannelId: this.toIntOrNull(item.communicationChannelId),
             priority: item.priority || "medium",
             companyId: this.toIntOrNull(item.clientId),
+            leadId: this.toIntOrNull(item.leadId),
             dealId: this.toIntOrNull(item.dealId),
             relatedTouchId: this.toIntOrNull(item.relatedTouchId),
             dueAt: this.toDateTimeLocal(item.dueAtRaw),
@@ -3009,6 +3010,30 @@
           const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId));
           if (!company) return;
           this.openCompanyEditor(company);
+        },
+        quickAddLeadTouch() {
+          this.activeSection = "touches";
+          this.editingTouchId = null;
+          this.forms.touches = {
+            ...this.getDefaultForm("touches"),
+            happenedAt: this.toDateTimeLocal(new Date().toISOString()),
+            companyId: this.toIntOrNull(this.editingLeadItem?.clientId),
+            leadId: this.toIntOrNull(this.editingLeadId),
+            ownerId: this.toIntOrNull(this.forms.leads.assignedToId),
+          };
+          this.showModal = true;
+        },
+        quickAddLeadTask() {
+          this.activeSection = "tasks";
+          this.editingTaskId = null;
+          this.forms.tasks = {
+            ...this.getDefaultForm("tasks"),
+            companyId: this.toIntOrNull(this.editingLeadItem?.clientId),
+            leadId: this.toIntOrNull(this.editingLeadId),
+          };
+          this.resetTaskFollowUpForm();
+          this.showModal = true;
+          this.loadTaskTouchOptions();
         },
         resolveCompanyRegionLabel(address) {
           const chunks = String(address || "")
@@ -4251,6 +4276,7 @@
               communicationChannelId: null,
               priority: "medium",
               companyId: null,
+              leadId: null,
               dealId: null,
               relatedTouchId: null,
               dueAt: "",
@@ -4772,6 +4798,7 @@
               due_at: this.toIsoDateTime(form.dueAt),
               deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
               client: clientId,
+              lead: this.toIntOrNull(form.leadId),
               deal: this.toIntOrNull(form.dealId),
               related_touch: this.toIntOrNull(form.relatedTouchId),
               has_follow_up_task: this.hasPreparedTaskFollowUp(),
@@ -4815,6 +4842,7 @@
               due_at: this.toIsoDateTime(form.dueAt),
               deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
               client: clientId,
+              lead: this.toIntOrNull(form.leadId),
               deal: this.toIntOrNull(form.dealId),
               related_touch: this.toIntOrNull(form.relatedTouchId),
               has_follow_up_task: this.hasPreparedTaskFollowUp(),

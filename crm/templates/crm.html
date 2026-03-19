@@ -786,6 +786,78 @@
                     class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
                   />
                 </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Компания</div>
+                  <button v-if="!isLeadSummaryEditing('company')" type="button" @click="openLeadSummaryField('company')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.leads.company || 'Не указана' ]]
+                  </button>
+                  <input
+                    v-else
+                    v-model="forms.leads.company"
+                    type="text"
+                    @keydown.enter.prevent="stopLeadSummaryEdit('company')"
+                    @keydown.esc.prevent="stopLeadSummaryEdit('company')"
+                    @blur="stopLeadSummaryEdit('company')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Телефон / Email</div>
+                  <div class="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <button v-if="!isLeadSummaryEditing('phone')" type="button" @click="openLeadSummaryField('phone')" class="min-w-0 text-left text-sm text-white hover:text-crm-accent transition truncate">
+                        [[ forms.leads.phone || 'Телефон не указан' ]]
+                      </button>
+                      <input
+                        v-else
+                        v-model="forms.leads.phone"
+                        type="text"
+                        @focus="ensurePhonePrefix(forms.leads, 'phone')"
+                        @keydown.enter.prevent="stopLeadSummaryEdit('phone')"
+                        @keydown.esc.prevent="stopLeadSummaryEdit('phone')"
+                        @blur="stopLeadSummaryEdit('phone')"
+                        class="w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                      />
+                      <a
+                        v-if="phoneHref(forms.leads.phone)"
+                        :href="phoneHref(forms.leads.phone)"
+                        @click.stop
+                        class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                        title="Позвонить"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                        </svg>
+                      </a>
+                    </div>
+                    <div class="flex items-center gap-2 min-w-0">
+                      <button v-if="!isLeadSummaryEditing('email')" type="button" @click="openLeadSummaryField('email')" class="min-w-0 text-left text-sm text-white hover:text-crm-accent transition truncate">
+                        [[ forms.leads.email || 'Email не указан' ]]
+                      </button>
+                      <input
+                        v-else
+                        v-model="forms.leads.email"
+                        type="email"
+                        @keydown.enter.prevent="stopLeadSummaryEdit('email')"
+                        @keydown.esc.prevent="stopLeadSummaryEdit('email')"
+                        @blur="stopLeadSummaryEdit('email')"
+                        class="w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                      />
+                      <a
+                        v-if="emailHref(forms.leads.email)"
+                        :href="emailHref(forms.leads.email)"
+                        @click.stop
+                        class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                        title="Написать письмо"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5A2.25 2.25 0 015.25 5.25h13.5A2.25 2.25 0 0121 7.5v9A2.25 2.25 0 0118.75 18.75H5.25A2.25 2.25 0 013 16.5v-9z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6l8.25 6 8.25-6" />
+                        </svg>
+                      </a>
+                    </div>
+                  </div>
+                </div>
                 <button type="button" @click="openLeadSummaryField('lastTouch')" class="text-left py-1 hover:text-white transition">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Последнее касание</div>
                   <div class="mt-1 text-sm text-white">[[ leadSummaryLastTouch?.summary || leadSummaryLastTouch?.resultOptionName || 'Не указано' ]]</div>
@@ -815,41 +887,37 @@
                     class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
                   />
                 </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Приоритет</div>
+                  <button v-if="!isLeadSummaryEditing('priority')" type="button" @click="openLeadSummaryField('priority')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.leads.priority === 'high' ? 'Высокий' : (forms.leads.priority === 'low' ? 'Низкий' : 'Средний') ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.leads.priority"
+                    @change="stopLeadSummaryEdit('priority')"
+                    @blur="stopLeadSummaryEdit('priority')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option value="low">Низкий</option>
+                    <option value="medium">Средний</option>
+                    <option value="high">Высокий</option>
+                  </select>
+                </div>
               </div>
             </div>
-            <label v-if="shouldShowLeadField('company', forms.leads.company)" class="block">
-              <span class="text-sm text-crm-muted">Компания</span>
-              <input v-model="forms.leads.company" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'company')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Компания</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
-            <label v-if="shouldShowLeadField('phone', forms.leads.phone)" class="block">
-              <span class="text-sm text-crm-muted">Телефон</span>
-              <div class="relative mt-2">
-                <input v-model="forms.leads.phone" @focus="ensurePhonePrefix(forms.leads, 'phone')" type="text" class="w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] pl-4 pr-12 outline-none focus:border-crm-accent" />
-                <a
-                  v-if="phoneHref(forms.leads.phone)"
-                  :href="phoneHref(forms.leads.phone)"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
-                  title="Позвонить"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
-                  </svg>
-                </a>
+            <div class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <div class="flex flex-wrap gap-2">
+                <button type="button" @click="quickAddLeadTouch" :disabled="!editingLeadId" class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed">
+                  <span>◉</span>
+                  <span>Добавить касание</span>
+                </button>
+                <button type="button" @click="quickAddLeadTask" :disabled="!editingLeadId" class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed">
+                  <span>☑</span>
+                  <span>Создать задачу</span>
+                </button>
               </div>
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'phone')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Телефон</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
-            <label v-if="shouldShowLeadField('email', forms.leads.email)" class="block">
-              <span class="text-sm text-crm-muted">Email</span>
-              <input v-model="forms.leads.email" type="email" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'email')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Email</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
+            </div>
             <div v-if="showSourceCreateForm && sourceCreateTargetSection === 'leads'" class="block md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
                 <label class="block">
@@ -866,24 +934,18 @@
                 </div>
               </div>
             </div>
-            <label v-if="shouldShowLeadField('priority', forms.leads.priority)" class="block">
-              <span class="text-sm text-crm-muted">Приоритет</span>
-              <select v-model="forms.leads.priority" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option value="low">Низкий</option>
-                <option value="medium">Средний</option>
-                <option value="high">Высокий</option>
-              </select>
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'priority')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Приоритет</span><span class="text-crm-accent text-xs">+</span></div>
+            <button type="button" @click="toggleOptionalField('leads', 'description')" class="crm-inline-field-toggle md:col-span-2">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-sm text-crm-muted">Описание</span>
+                <span class="text-crm-accent text-xs">[[ isOptionalFieldExpanded('leads', 'description') ? '−' : '+' ]]</span>
+              </div>
+              <div v-if="!isOptionalFieldExpanded('leads', 'description') && forms.leads.description" class="mt-2 text-left text-sm text-white line-clamp-2">
+                [[ forms.leads.description ]]
+              </div>
             </button>
-            <label v-if="shouldShowLeadField('description', forms.leads.description)" class="block md:col-span-2">
-              <span class="text-sm text-crm-muted">Описание</span>
+            <label v-if="isOptionalFieldExpanded('leads', 'description')" class="block md:col-span-2">
               <textarea v-model="forms.leads.description" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <button v-else type="button" @click="toggleOptionalField('leads', 'description')" class="crm-inline-field-toggle md:col-span-2">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Описание</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
             <div
               v-if="editingLeadId && shouldShowLeadTrackingBlock"
               class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4 space-y-4"
