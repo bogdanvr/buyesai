@@ -1829,6 +1829,9 @@
           this.showDealContactForm = false;
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
+          if (this.forms.deals.companyId) {
+            this.loadContactsForSelectedDealCompany();
+          }
           this.loadTasksForDeal();
           this.showModal = true;
         },
