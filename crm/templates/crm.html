@@ -1091,30 +1091,27 @@
                       class="rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 cursor-pointer hover:border-crm-accent transition"
                       @click="openContactFromDealCompany(contact)"
                     >
-                      <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                          <button type="button" @click.stop="openContactFromDealCompany(contact)" class="text-left text-sm font-medium text-white truncate hover:text-crm-accent transition">
+                      <div class="flex items-center justify-between gap-3">
+                        <div class="min-w-0 flex items-center gap-2 text-xs text-crm-muted">
+                          <button type="button" @click.stop="openContactFromDealCompany(contact)" class="shrink-0 text-left text-sm font-medium text-white truncate hover:text-crm-accent transition">
                             [[ contact.fullName ]]
                           </button>
-                          <div v-if="contact.position" class="mt-1 text-xs text-crm-muted">[[ contact.position ]]</div>
-                          <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-crm-muted">
-                            <span>[[ contact.phone || '—' ]]</span>
-                            <a
-                              v-if="phoneHref(contact.phone)"
-                              :href="phoneHref(contact.phone)"
-                              @click.stop
-                              class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
-                              title="Позвонить"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
-                              </svg>
-                            </a>
-                            <span>•</span>
-                            <span>[[ contact.email || '—' ]]</span>
-                          </div>
+                          <span v-if="contact.position" class="truncate">• [[ contact.position ]]</span>
+                          <span v-if="contact.phone" class="truncate">• [[ contact.phone ]]</span>
+                          <a
+                            v-if="phoneHref(contact.phone)"
+                            :href="phoneHref(contact.phone)"
+                            @click.stop
+                            class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent"
+                            title="Позвонить"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
+                            </svg>
+                          </a>
+                          <span v-if="contact.email" class="truncate">• [[ contact.email ]]</span>
                         </div>
-                        <span class="inline-flex items-center rounded-full px-2 py-1 text-[11px] font-medium border" :class="contact.isPrimary ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-sky-400/30 bg-sky-400/10 text-sky-300'">
+                        <span class="inline-flex shrink-0 items-center rounded-full px-2 py-1 text-[11px] font-medium border" :class="contact.isPrimary ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-sky-400/30 bg-sky-400/10 text-sky-300'">
                           [[ contact.isPrimary ? 'Основной' : 'Контакт' ]]
                         </span>
                       </div>
