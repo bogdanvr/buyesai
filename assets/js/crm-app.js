@@ -2262,6 +2262,28 @@
           }
           this.startDealSummaryEdit(fieldKey);
         },
+        quickAddDealTouch() {
+          this.activeSection = "touches";
+          this.editingTouchId = null;
+          this.forms.touches = {
+            ...this.getDefaultForm("touches"),
+            happenedAt: this.toDateTimeLocal(new Date().toISOString()),
+            companyId: this.toIntOrNull(this.forms.deals.companyId),
+            dealId: this.toIntOrNull(this.editingDealId),
+            ownerId: this.toIntOrNull(this.forms.deals.ownerId),
+          };
+          this.showModal = true;
+        },
+        quickToggleDealTaskForm() {
+          this.showDealTaskForm = true;
+        },
+        quickOpenDealDocuments() {
+          const companyId = this.toIntOrNull(this.forms.deals.companyId);
+          if (!companyId) return;
+          const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId));
+          if (!company) return;
+          this.openCompanyEditor(company);
+        },
         formatRemainingDuration(totalMinutes) {
           const minutes = Math.max(1, Math.ceil(Number(totalMinutes) || 0));
           if (minutes < 60) {

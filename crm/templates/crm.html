@@ -946,6 +946,20 @@
                 </button>
               </div>
             </div>
+            <div class="md:col-span-2 flex flex-wrap gap-2">
+              <button type="button" @click="quickAddDealTouch" class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent">
+                <span class="text-crm-accent">+</span>
+                <span>Добавить касание</span>
+              </button>
+              <button type="button" @click="quickToggleDealTaskForm" class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent">
+                <span class="text-crm-accent">+</span>
+                <span>Создать задачу</span>
+              </button>
+              <button type="button" @click="quickOpenDealDocuments" :disabled="!dealHasSelectedCompany" class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed">
+                <span class="text-crm-accent">+</span>
+                <span>Добавить документ</span>
+              </button>
+            </div>
             <div v-if="dealHasSelectedCompany && showDealContactsPanel" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="min-w-0">
