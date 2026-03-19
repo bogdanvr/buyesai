@@ -41,7 +41,9 @@ class Contact(TimestampedModel):
     position = models.CharField(max_length=255, blank=True, default="", verbose_name="Должность")
     phone = models.CharField(max_length=32, blank=True, default="", verbose_name="Телефон")
     email = models.EmailField(blank=True, default="", verbose_name="Email")
-    telegram_whatsapp = models.CharField(max_length=255, blank=True, default="", verbose_name="Telegram / WhatsApp")
+    telegram = models.CharField(max_length=255, blank=True, default="", verbose_name="Telegram")
+    whatsapp = models.CharField(max_length=255, blank=True, default="", verbose_name="WhatsApp")
+    max_contact = models.CharField(max_length=255, blank=True, default="", verbose_name="Max")
     role = models.ForeignKey(
         "crm.ContactRole",
         related_name="contacts",

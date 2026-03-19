@@ -1461,21 +1461,22 @@
               <input v-model="forms.contacts.email" type="email" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
             <label class="block">
-              <span class="text-sm text-crm-muted">Telegram / WhatsApp</span>
-              <input v-model="forms.contacts.telegramWhatsapp" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+              <span class="text-sm text-crm-muted">Telegram</span>
+              <input v-model="forms.contacts.telegram" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">WhatsApp</span>
+              <input v-model="forms.contacts.whatsapp" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">Max</span>
+              <input v-model="forms.contacts.maxContact" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
             </label>
             <label class="block">
               <span class="text-sm text-crm-muted">Роль</span>
               <select v-model="forms.contacts.roleId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option :value="null">Не выбрана</option>
                 <option v-for="role in metaOptions.contactRoles" :key="`contact-role-${role.id}`" :value="role.id">[[ role.name ]]</option>
-              </select>
-            </label>
-            <label class="block">
-              <span class="text-sm text-crm-muted">Статус контакта</span>
-              <select v-model="forms.contacts.contactStatusId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option :value="null">Не выбран</option>
-                <option v-for="status in metaOptions.contactStatuses" :key="`contact-status-${status.id}`" :value="status.id">[[ status.name ]]</option>
               </select>
             </label>
             <label class="block md:col-span-2">
@@ -1962,40 +1963,110 @@
               <div v-if="showCompanyWorkRules" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                 <div class="py-1">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">ЛПР</div>
-                  <select v-model="forms.companies.workRules.decisionMakerId" class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent">
+                  <select
+                    v-if="isCompanySummaryEditing('workRules.decisionMakerId')"
+                    v-model="forms.companies.workRules.decisionMakerId"
+                    @change="stopCompanySummaryEdit('workRules.decisionMakerId')"
+                    @blur="stopCompanySummaryEdit('workRules.decisionMakerId')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
                     <option :value="null">Не выбран</option>
                     <option v-for="contact in companyContactsForActiveCompany" :key="`company-rule-contact-${contact.id}`" :value="contact.id">[[ contact.fullName ]]</option>
                   </select>
+                  <button v-else type="button" @click="openCompanySummaryField('workRules.decisionMakerId')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ companyWorkRuleDecisionMakerLabel() ]]
+                  </button>
                   <div v-if="!editingCompanyId" class="mt-1 text-xs text-crm-muted">ЛПР можно выбрать после создания компании и добавления контактов.</div>
                   <div v-else-if="!companyContactsForActiveCompany.length" class="mt-1 text-xs text-crm-muted">Сначала добавьте контакт компании, затем выберите его как ЛПР.</div>
                 </div>
                 <div class="py-1">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Канал связи</div>
-                  <select v-model="forms.companies.workRules.communicationChannelIds" multiple class="mt-1 w-full min-h-[108px] rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent">
+                  <select
+                    v-if="isCompanySummaryEditing('workRules.communicationChannelIds')"
+                    v-model="forms.companies.workRules.communicationChannelIds"
+                    multiple
+                    @blur="stopCompanySummaryEdit('workRules.communicationChannelIds')"
+                    class="mt-1 w-full min-h-[108px] rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"
+                  >
                     <option v-for="channel in metaOptions.communicationChannels" :key="`company-rule-channel-${channel.id}`" :value="channel.id">[[ channel.name ]]</option>
                   </select>
+                  <button v-else type="button" @click="openCompanySummaryField('workRules.communicationChannelIds')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition break-words">
+                    [[ companyWorkRuleChannelsLabel() ]]
+                  </button>
                   <div v-if="metaOptions.communicationChannels.length" class="mt-1 text-xs text-crm-muted">Можно выбрать несколько каналов связи.</div>
                   <div v-if="!metaOptions.communicationChannels.length" class="mt-1 text-xs text-crm-muted">Каналы связи добавляются только через Django admin.</div>
                 </div>
                 <div class="py-1">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Условия оплаты</div>
-                  <input v-model="forms.companies.workRules.paymentTerms" type="text" class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent" />
+                  <input
+                    v-if="isCompanySummaryEditing('workRules.paymentTerms')"
+                    v-model="forms.companies.workRules.paymentTerms"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('workRules.paymentTerms')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('workRules.paymentTerms')"
+                    @blur="stopCompanySummaryEdit('workRules.paymentTerms')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                  <button v-else type="button" @click="openCompanySummaryField('workRules.paymentTerms')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.workRules.paymentTerms || 'Не указаны' ]]
+                  </button>
                 </div>
                 <div class="py-1">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Требования к документам</div>
-                  <input v-model="forms.companies.workRules.documentRequirements" type="text" class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent" />
+                  <input
+                    v-if="isCompanySummaryEditing('workRules.documentRequirements')"
+                    v-model="forms.companies.workRules.documentRequirements"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('workRules.documentRequirements')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('workRules.documentRequirements')"
+                    @blur="stopCompanySummaryEdit('workRules.documentRequirements')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                  <button v-else type="button" @click="openCompanySummaryField('workRules.documentRequirements')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.workRules.documentRequirements || 'Не указаны' ]]
+                  </button>
                 </div>
                 <div class="py-1 md:col-span-2">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Цикл согласования</div>
-                  <textarea v-model="forms.companies.workRules.approvalCycle" rows="2" class="mt-1 w-full rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"></textarea>
+                  <textarea
+                    v-if="isCompanySummaryEditing('workRules.approvalCycle')"
+                    v-model="forms.companies.workRules.approvalCycle"
+                    rows="2"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('workRules.approvalCycle')"
+                    @blur="stopCompanySummaryEdit('workRules.approvalCycle')"
+                    class="mt-1 w-full rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"
+                  ></textarea>
+                  <button v-else type="button" @click="openCompanySummaryField('workRules.approvalCycle')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition whitespace-pre-line break-words">
+                    [[ forms.companies.workRules.approvalCycle || 'Не указан' ]]
+                  </button>
                 </div>
                 <div class="py-1 md:col-span-2">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Риски</div>
-                  <textarea v-model="forms.companies.workRules.risks" rows="2" class="mt-1 w-full rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"></textarea>
+                  <textarea
+                    v-if="isCompanySummaryEditing('workRules.risks')"
+                    v-model="forms.companies.workRules.risks"
+                    rows="2"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('workRules.risks')"
+                    @blur="stopCompanySummaryEdit('workRules.risks')"
+                    class="mt-1 w-full rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"
+                  ></textarea>
+                  <button v-else type="button" @click="openCompanySummaryField('workRules.risks')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition whitespace-pre-line break-words">
+                    [[ forms.companies.workRules.risks || 'Не указаны' ]]
+                  </button>
                 </div>
                 <div class="py-1 md:col-span-2">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Предпочтения</div>
-                  <textarea v-model="forms.companies.workRules.preferences" rows="2" class="mt-1 w-full rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"></textarea>
+                  <textarea
+                    v-if="isCompanySummaryEditing('workRules.preferences')"
+                    v-model="forms.companies.workRules.preferences"
+                    rows="2"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('workRules.preferences')"
+                    @blur="stopCompanySummaryEdit('workRules.preferences')"
+                    class="mt-1 w-full rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"
+                  ></textarea>
+                  <button v-else type="button" @click="openCompanySummaryField('workRules.preferences')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition whitespace-pre-line break-words">
+                    [[ forms.companies.workRules.preferences || 'Не указаны' ]]
+                  </button>
                 </div>
               </div>
               <div v-if="showCompanyContactsPanel && editingCompanyId" class="mt-4 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-4">
@@ -2033,15 +2104,16 @@
                     <input v-model="companyContactForm.email" type="email" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" />
                   </label>
                   <label class="block">
-                    <span class="text-sm text-crm-muted">Telegram / WhatsApp</span>
-                    <input v-model="companyContactForm.telegramWhatsapp" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" />
+                    <span class="text-sm text-crm-muted">Telegram</span>
+                    <input v-model="companyContactForm.telegram" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" />
                   </label>
                   <label class="block">
-                    <span class="text-sm text-crm-muted">Статус контакта</span>
-                    <select v-model="companyContactForm.contactStatusId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent">
-                      <option :value="null">Не выбран</option>
-                      <option v-for="status in metaOptions.contactStatuses" :key="`company-contact-status-${status.id}`" :value="status.id">[[ status.name ]]</option>
-                    </select>
+                    <span class="text-sm text-crm-muted">WhatsApp</span>
+                    <input v-model="companyContactForm.whatsapp" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" />
+                  </label>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Max</span>
+                    <input v-model="companyContactForm.maxContact" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" />
                   </label>
                   <label class="block md:col-span-2">
                     <span class="text-sm text-crm-muted">Примечание по человеку</span>
@@ -2077,9 +2149,10 @@
                           <div v-if="contact.position" class="text-xs text-crm-muted">Должность: [[ contact.position ]]</div>
                           <div class="text-xs text-crm-muted">Телефон: [[ contact.phone || '—' ]]</div>
                           <div class="text-xs text-crm-muted">Email: [[ contact.email || '—' ]]</div>
-                          <div class="text-xs text-crm-muted">Telegram / WhatsApp: [[ contact.telegramWhatsapp || '—' ]]</div>
+                          <div class="text-xs text-crm-muted">Telegram: [[ contact.telegram || '—' ]]</div>
+                          <div class="text-xs text-crm-muted">WhatsApp: [[ contact.whatsapp || '—' ]]</div>
+                          <div class="text-xs text-crm-muted">Max: [[ contact.maxContact || '—' ]]</div>
                           <div class="text-xs text-crm-muted">Роль: [[ contact.role || '—' ]]</div>
-                          <div class="text-xs text-crm-muted">Статус контакта: [[ contact.contactStatus || '—' ]]</div>
                           <div v-if="contact.personNote" class="text-xs text-crm-text break-words">[[ contact.personNote ]]</div>
                         </div>
                         <span class="inline-flex items-center rounded-full px-2 py-1 text-[11px] font-medium border" :class="contact.isPrimary ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-sky-400/30 bg-sky-400/10 text-sky-300'">

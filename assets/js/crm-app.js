@@ -147,11 +147,11 @@
               position: "",
               phone: "",
               email: "",
-              telegramWhatsapp: "",
+              telegram: "",
+              whatsapp: "",
+              maxContact: "",
               roleId: null,
               role: "",
-              contactStatusId: null,
-              contactStatus: "",
               personNote: "",
               isPrimary: false
             },
@@ -276,9 +276,11 @@
             position: "",
             phone: "",
             email: "",
-            telegramWhatsapp: "",
+            telegram: "",
+            whatsapp: "",
+            maxContact: "",
+            roleId: null,
             role: "",
-            contactStatus: "",
             personNote: "",
             isPrimary: false
           },
@@ -1822,17 +1824,48 @@
         toggleCompanyEvents() {
           this.showCompanyEvents = !this.showCompanyEvents;
         },
+        closeCompanyPanels(exceptKey = "") {
+          const normalized = String(exceptKey || "");
+          this.showCompanyRequisites = normalized === "requisites" ? this.showCompanyRequisites : false;
+          this.showCompanyContactsPanel = normalized === "contacts" ? this.showCompanyContactsPanel : false;
+          this.showCompanyWorkRules = normalized === "workRules" ? this.showCompanyWorkRules : false;
+          this.showCompanyDealsPanel = normalized === "deals" ? this.showCompanyDealsPanel : false;
+          this.showCompanyLeadsPanel = normalized === "leads" ? this.showCompanyLeadsPanel : false;
+        },
+        toggleExclusiveCompanyPanel(panelKey) {
+          const normalized = String(panelKey || "");
+          const currentState = normalized === "requisites"
+            ? this.showCompanyRequisites
+            : normalized === "contacts"
+              ? this.showCompanyContactsPanel
+              : normalized === "workRules"
+                ? this.showCompanyWorkRules
+                : normalized === "deals"
+                  ? this.showCompanyDealsPanel
+                  : normalized === "leads"
+                    ? this.showCompanyLeadsPanel
+                    : false;
+          this.closeCompanyPanels();
+          if (currentState) {
+            return;
+          }
+          if (normalized === "requisites") this.showCompanyRequisites = true;
+          if (normalized === "contacts") this.showCompanyContactsPanel = true;
+          if (normalized === "workRules") this.showCompanyWorkRules = true;
+          if (normalized === "deals") this.showCompanyDealsPanel = true;
+          if (normalized === "leads") this.showCompanyLeadsPanel = true;
+        },
         toggleCompanyRequisites() {
-          this.showCompanyRequisites = !this.showCompanyRequisites;
+          this.toggleExclusiveCompanyPanel("requisites");
         },
         toggleCompanyWorkRules() {
-          this.showCompanyWorkRules = !this.showCompanyWorkRules;
+          this.toggleExclusiveCompanyPanel("workRules");
         },
         toggleCompanyDealsPanel() {
-          this.showCompanyDealsPanel = !this.showCompanyDealsPanel;
+          this.toggleExclusiveCompanyPanel("deals");
         },
         toggleCompanyLeadsPanel() {
-          this.showCompanyLeadsPanel = !this.showCompanyLeadsPanel;
+          this.toggleExclusiveCompanyPanel("leads");
         },
         toggleCompanyNoteDraft() {
           this.showCompanyNoteDraft = !this.showCompanyNoteDraft;
@@ -2469,11 +2502,11 @@
             position: item.position || "",
             phone: item.phone || "",
             email: item.email || "",
-            telegramWhatsapp: item.telegramWhatsapp || "",
+            telegram: item.telegram || "",
+            whatsapp: item.whatsapp || "",
+            maxContact: item.maxContact || "",
             roleId: this.toIntOrNull(item.roleId),
             role: item.role || "",
-            contactStatusId: this.toIntOrNull(item.contactStatusId),
-            contactStatus: item.contactStatus || "",
             personNote: item.personNote || "",
             isPrimary: !!item.isPrimary
           };
@@ -2961,6 +2994,19 @@
           if (!fieldKey || this.isCompanySummaryEditing(fieldKey)) {
             this.companySummaryEditingField = "";
           }
+        },
+        companyWorkRuleDecisionMakerLabel() {
+          const decisionMakerId = this.toIntOrNull(this.forms.companies.workRules.decisionMakerId);
+          if (!decisionMakerId) return "Не выбран";
+          const contact = (this.companyContactsForActiveCompany || []).find((item) => String(item.id) === String(decisionMakerId));
+          return contact?.fullName || "Не выбран";
+        },
+        companyWorkRuleChannelsLabel() {
+          const selectedIds = Array.isArray(this.forms.companies.workRules.communicationChannelIds)
+            ? this.forms.companies.workRules.communicationChannelIds.map((value) => String(value))
+            : [];
+          const selected = (this.metaOptions.communicationChannels || []).filter((channel) => selectedIds.includes(String(channel.id)));
+          return selected.length ? selected.map((channel) => channel.name).join(", ") : "Не выбраны";
         },
         openCompanySummaryField(fieldKey) {
           if (fieldKey === "activeDeal") {
@@ -3505,11 +3551,11 @@
               position: item.position || "",
               phone: item.phone || "",
               email: item.email || "",
-              telegramWhatsapp: item.telegram_whatsapp || "",
+              telegram: item.telegram || "",
+              whatsapp: item.whatsapp || "",
+              maxContact: item.max_contact || "",
               roleId: item.role || null,
               role: item.role_name || "",
-              contactStatusId: item.contact_status || null,
-              contactStatus: item.contact_status_name || "",
               personNote: item.person_note || "",
               isPrimary: !!item.is_primary,
               clientId: item.client || companyId
@@ -3530,17 +3576,17 @@
             position: contact.position || "",
             phone: contact.phone || "",
             email: contact.email || "",
-            telegramWhatsapp: contact.telegramWhatsapp || "",
+            telegram: contact.telegram || "",
+            whatsapp: contact.whatsapp || "",
+            maxContact: contact.maxContact || "",
             roleId: this.toIntOrNull(contact.roleId),
             role: contact.role || "",
-            contactStatusId: this.toIntOrNull(contact.contactStatusId),
-            contactStatus: contact.contactStatus || "",
             personNote: contact.personNote || "",
             isPrimary: !!contact.isPrimary
           });
         },
         toggleCompanyContactsPanel() {
-          this.showCompanyContactsPanel = !this.showCompanyContactsPanel;
+          this.toggleExclusiveCompanyPanel("contacts");
         },
         toggleCompanyContactForm() {
           this.showCompanyContactForm = !this.showCompanyContactForm;
@@ -3551,11 +3597,11 @@
             position: "",
             phone: "",
             email: "",
-            telegramWhatsapp: "",
+            telegram: "",
+            whatsapp: "",
+            maxContact: "",
             roleId: null,
             role: "",
-            contactStatusId: null,
-            contactStatus: "",
             personNote: "",
             isPrimary: false
           };
@@ -3577,11 +3623,11 @@
               position: item.position || "",
               phone: item.phone || "",
               email: item.email || "",
-              telegramWhatsapp: item.telegram_whatsapp || "",
+              telegram: item.telegram || "",
+              whatsapp: item.whatsapp || "",
+              maxContact: item.max_contact || "",
               roleId: item.role || null,
               role: item.role_name || "",
-              contactStatusId: item.contact_status || null,
-              contactStatus: item.contact_status_name || "",
               personNote: item.person_note || "",
               isPrimary: !!item.is_primary,
               clientId: item.client || null
@@ -3610,11 +3656,11 @@
             position: contact.position || "",
             phone: contact.phone || "",
             email: contact.email || "",
-            telegramWhatsapp: contact.telegramWhatsapp || "",
+            telegram: contact.telegram || "",
+            whatsapp: contact.whatsapp || "",
+            maxContact: contact.maxContact || "",
             roleId: this.toIntOrNull(contact.roleId),
             role: contact.role || "",
-            contactStatusId: this.toIntOrNull(contact.contactStatusId),
-            contactStatus: contact.contactStatus || "",
             personNote: contact.personNote || "",
             isPrimary: !!contact.isPrimary
           });
@@ -3709,11 +3755,11 @@
             company: item.client_name || "",
             phone: item.phone || "",
             email: item.email || "",
-            telegramWhatsapp: item.telegram_whatsapp || "",
+            telegram: item.telegram || "",
+            whatsapp: item.whatsapp || "",
+            maxContact: item.max_contact || "",
             roleId: item.role || null,
             role: item.role_name || "",
-            contactStatusId: item.contact_status || null,
-            contactStatus: item.contact_status_name || "",
             personNote: item.person_note || "",
             status: normalized.status,
             statusLabel: normalized.label,
@@ -4089,11 +4135,11 @@
               position: "",
               phone: "",
               email: "",
-              telegramWhatsapp: "",
+              telegram: "",
+              whatsapp: "",
+              maxContact: "",
               roleId: null,
               role: "",
-              contactStatusId: null,
-              contactStatus: "",
               personNote: "",
               isPrimary: false
             };
@@ -4474,13 +4520,14 @@
                 last_name: lastName,
                 position: form.position.trim(),
                 phone: form.phone.trim(),
-              email: form.email.trim(),
-              telegram_whatsapp: form.telegramWhatsapp.trim(),
-              role: this.toIntOrNull(form.roleId),
-              contact_status: this.toIntOrNull(form.contactStatusId),
-              person_note: form.personNote.trim(),
-              is_primary: !!form.isPrimary
-            }
+                email: form.email.trim(),
+                telegram: form.telegram.trim(),
+                whatsapp: form.whatsapp.trim(),
+                max_contact: form.maxContact.trim(),
+                role: this.toIntOrNull(form.roleId),
+                person_note: form.personNote.trim(),
+                is_primary: !!form.isPrimary
+              }
             });
         },
         async updateContact() {
@@ -4506,13 +4553,14 @@
                 last_name: lastName,
                 position: form.position.trim(),
                 phone: form.phone.trim(),
-              email: form.email.trim(),
-              telegram_whatsapp: form.telegramWhatsapp.trim(),
-              role: this.toIntOrNull(form.roleId),
-              contact_status: this.toIntOrNull(form.contactStatusId),
-              person_note: form.personNote.trim(),
-              is_primary: !!form.isPrimary
-            }
+                email: form.email.trim(),
+                telegram: form.telegram.trim(),
+                whatsapp: form.whatsapp.trim(),
+                max_contact: form.maxContact.trim(),
+                role: this.toIntOrNull(form.roleId),
+                person_note: form.personNote.trim(),
+                is_primary: !!form.isPrimary
+              }
             });
         },
         async createCompany() {
@@ -4601,9 +4649,10 @@
                 position: this.companyContactForm.position.trim(),
                 phone: this.companyContactForm.phone.trim(),
                 email: this.companyContactForm.email.trim(),
-                telegram_whatsapp: this.companyContactForm.telegramWhatsapp.trim(),
+                telegram: this.companyContactForm.telegram.trim(),
+                whatsapp: this.companyContactForm.whatsapp.trim(),
+                max_contact: this.companyContactForm.maxContact.trim(),
                 role: this.toIntOrNull(this.companyContactForm.roleId),
-                contact_status: this.toIntOrNull(this.companyContactForm.contactStatusId),
                 person_note: this.companyContactForm.personNote.trim(),
                 is_primary: !!this.companyContactForm.isPrimary
               }

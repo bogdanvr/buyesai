@@ -32,7 +32,7 @@ class ClientAdmin(admin.ModelAdmin):
 class ContactAdmin(admin.ModelAdmin):
     list_display = ("id", "first_name", "last_name", "client", "position", "role", "contact_status", "phone", "email", "is_primary")
     list_filter = ("is_primary", "role", "contact_status")
-    search_fields = ("first_name", "last_name", "phone", "email", "telegram_whatsapp", "role__name", "contact_status__name", "client__name")
+    search_fields = ("first_name", "last_name", "phone", "email", "telegram", "whatsapp", "max_contact", "role__name", "contact_status__name", "client__name")
     autocomplete_fields = ("client", "role", "contact_status")
 
 
