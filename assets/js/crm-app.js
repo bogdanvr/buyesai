@@ -84,9 +84,12 @@
           isTouchDocumentUploading: false,
           isCompanyContactSaving: false,
           isCompanyContactsLoading: false,
+          isCompanyDocumentsLoading: false,
+          isCompanyDocumentUploading: false,
           isTaskTouchesLoading: false,
           showCompanyContactForm: false,
           showCompanyContactsPanel: false,
+          showCompanyDocumentsPanel: false,
           showCompanyDealsPanel: false,
           showCompanyLeadsPanel: false,
           showCompanyWorkRules: false,
@@ -299,6 +302,8 @@
             isPrimary: false
           },
           companyContactsForActiveCompany: [],
+          companyDocumentsForActiveCompany: [],
+          companyDealDocumentGroups: [],
           metaOptions: {
             leadStatuses: [],
             dealStages: [],
@@ -1968,6 +1973,7 @@
           const normalized = String(exceptKey || "");
           this.showCompanyRequisites = normalized === "requisites" ? this.showCompanyRequisites : false;
           this.showCompanyContactsPanel = normalized === "contacts" ? this.showCompanyContactsPanel : false;
+          this.showCompanyDocumentsPanel = normalized === "documents" ? this.showCompanyDocumentsPanel : false;
           this.showCompanyWorkRules = normalized === "workRules" ? this.showCompanyWorkRules : false;
           this.showCompanyDealsPanel = normalized === "deals" ? this.showCompanyDealsPanel : false;
           this.showCompanyLeadsPanel = normalized === "leads" ? this.showCompanyLeadsPanel : false;
@@ -1978,6 +1984,8 @@
             ? this.showCompanyRequisites
             : normalized === "contacts"
               ? this.showCompanyContactsPanel
+              : normalized === "documents"
+                ? this.showCompanyDocumentsPanel
               : normalized === "workRules"
                 ? this.showCompanyWorkRules
                 : normalized === "deals"
@@ -1991,6 +1999,7 @@
           }
           if (normalized === "requisites") this.showCompanyRequisites = true;
           if (normalized === "contacts") this.showCompanyContactsPanel = true;
+          if (normalized === "documents") this.showCompanyDocumentsPanel = true;
           if (normalized === "workRules") this.showCompanyWorkRules = true;
           if (normalized === "deals") this.showCompanyDealsPanel = true;
           if (normalized === "leads") this.showCompanyLeadsPanel = true;
@@ -2000,6 +2009,13 @@
         },
         toggleCompanyWorkRules() {
           this.toggleExclusiveCompanyPanel("workRules");
+        },
+        async toggleCompanyDocumentsPanel() {
+          const wasOpen = this.showCompanyDocumentsPanel;
+          this.toggleExclusiveCompanyPanel("documents");
+          if (!wasOpen && this.showCompanyDocumentsPanel) {
+            await this.loadCompanyDocuments();
+          }
         },
         toggleCompanyDealsPanel() {
           this.toggleExclusiveCompanyPanel("deals");
@@ -2682,6 +2698,14 @@
           this.loadTasksForDeal();
           this.showModal = true;
         },
+        openDealEditorById(dealId) {
+          const normalizedId = this.toIntOrNull(dealId);
+          if (!normalizedId) return;
+          const deal = (this.datasets.deals || []).find((item) => String(item.id) === String(normalizedId));
+          if (deal) {
+            this.openDealEditor(deal);
+          }
+        },
         openContactEditor(item) {
           this.clearUiErrors({ modalOnly: true });
           this.activeSection = "contacts";
@@ -2721,10 +2745,13 @@
           this.showCompanyRequisites = false;
           this.showCompanyWorkRules = false;
           this.showCompanyContactsPanel = false;
+          this.showCompanyDocumentsPanel = false;
           this.showCompanyDealsPanel = false;
           this.showCompanyLeadsPanel = false;
           this.showCompanyLeadsPanel = false;
           this.showCompanyNoteDraft = false;
+          this.companyDocumentsForActiveCompany = [];
+          this.companyDealDocumentGroups = [];
           this.resetExpandedOptionalFields();
           const normalizedOkveds = this.normalizeCompanyOkveds(item.okveds, item.okved, item.industry);
           const resolvedIndustry = this.resolvePrimaryIndustry(item.industry, item.okved, normalizedOkveds);
@@ -2755,6 +2782,7 @@
           this.resetCompanyContactForm();
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
+          this.showCompanyDocumentsPanel = false;
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
           this.showCompanyLeadsPanel = false;
@@ -3219,6 +3247,77 @@
             this.dealDocumentsForActiveDeal = records.map((item) => this.mapDealDocument(item));
           } finally {
             this.isDealDocumentsLoading = false;
+          }
+        },
+        async loadCompanyDocuments() {
+          const companyId = this.toIntOrNull(this.editingCompanyId);
+          if (!companyId) {
+            this.companyDocumentsForActiveCompany = [];
+            this.companyDealDocumentGroups = [];
+            return;
+          }
+          this.isCompanyDocumentsLoading = true;
+          try {
+            const [companyPayload] = await Promise.all([
+              this.apiRequest(`/api/v1/client-documents/?client=${companyId}&page_size=100`),
+            ]);
+            const companyRecords = Array.isArray(companyPayload?.results) ? companyPayload.results : (Array.isArray(companyPayload) ? companyPayload : []);
+            this.companyDocumentsForActiveCompany = companyRecords.map((item) => this.mapClientDocument(item));
+
+            const deals = (this.datasets.deals || [])
+              .filter((deal) => String(deal.clientId || "") === String(companyId))
+              .slice()
+              .sort((left, right) => String(left.title || left.name || "").localeCompare(String(right.title || right.name || ""), "ru"));
+
+            const groups = await Promise.all(deals.map(async (deal) => {
+              const payload = await this.apiRequest(`/api/v1/deal-documents/?deal=${deal.id}&page_size=100`);
+              const records = Array.isArray(payload?.results) ? payload.results : (Array.isArray(payload) ? payload : []);
+              return {
+                dealId: deal.id,
+                dealTitle: deal.title || deal.name || `Сделка #${deal.id}`,
+                documents: records.map((item) => this.mapDealDocument(item)),
+              };
+            }));
+            this.companyDealDocumentGroups = groups;
+          } finally {
+            this.isCompanyDocumentsLoading = false;
+          }
+        },
+        openCompanyDocumentPicker() {
+          if (!this.editingCompanyId || this.isCompanyDocumentUploading) {
+            return;
+          }
+          const input = this.$refs.companyDocumentInput;
+          if (input) {
+            input.click();
+          }
+        },
+        async handleCompanyDocumentInput(event) {
+          const input = event?.target;
+          const file = input?.files && input.files[0] ? input.files[0] : null;
+          const companyId = this.toIntOrNull(this.editingCompanyId);
+          if (!file || !companyId) {
+            if (input) input.value = "";
+            return;
+          }
+          const formData = new FormData();
+          formData.append("client", String(companyId));
+          formData.append("file", file);
+          formData.append("original_name", file.name || "");
+          this.isCompanyDocumentUploading = true;
+          try {
+            const created = await this.apiRequest("/api/v1/client-documents/", {
+              method: "POST",
+              body: formData,
+            });
+            this.companyDocumentsForActiveCompany = [
+              this.mapClientDocument(created),
+              ...this.companyDocumentsForActiveCompany,
+            ];
+            this.showCompanyDocumentsPanel = true;
+          } finally {
+            this.isCompanyDocumentUploading = false;
+            if (input) input.value = "";
           }
         },
         sanitizeTouchDocumentSelection() {
@@ -4464,6 +4563,7 @@
           this.touchCompanyDocuments = [];
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
+          this.showCompanyDocumentsPanel = false;
           this.showCompanyRequisites = false;
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
@@ -4471,6 +4571,8 @@
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
+          this.companyDocumentsForActiveCompany = [];
+          this.companyDealDocumentGroups = [];
           if (!this.datasets[section].length) {
             this.reloadActiveSection();
           }
@@ -4512,6 +4614,7 @@
           this.touchCompanyDocuments = [];
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
+          this.showCompanyDocumentsPanel = false;
           this.showCompanyRequisites = false;
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
@@ -4520,6 +4623,8 @@
           this.showCompanyOkvedDetails = false;
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
+          this.companyDocumentsForActiveCompany = [];
+          this.companyDealDocumentGroups = [];
         },
         openCreateModal() {
           this.clearUiErrors({ modalOnly: true });

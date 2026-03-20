@@ -2164,6 +2164,14 @@
                 </button>
                 <button
                   type="button"
+                  @click="toggleCompanyDocumentsPanel"
+                  class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                >
+                  <span>Документы</span>
+                  <span class="text-crm-accent text-xs">[[ showCompanyDocumentsPanel ? '−' : '+' ]]</span>
+                </button>
+                <button
+                  type="button"
                   @click="toggleCompanyWorkRules"
                   class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
                 >
@@ -2325,6 +2333,104 @@
                     [[ forms.companies.okved || 'Не указан' ]]
                   </button>
                 </div>
+              </div>
+              <div v-if="showCompanyDocumentsPanel && editingCompanyId" class="mt-4 rounded-2xl border border-crm-border bg-[#102f4a] p-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div class="text-sm font-semibold text-white">Документы компании</div>
+                    <div class="text-xs text-crm-muted">[[ forms.companies.name || `Компания #${editingCompanyId}` ]]</div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <input
+                      ref="companyDocumentInput"
+                      type="file"
+                      class="hidden"
+                      @change="handleCompanyDocumentInput"
+                    />
+                    <button
+                      type="button"
+                      @click="openCompanyDocumentPicker"
+                      :disabled="isCompanyDocumentUploading"
+                      class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span class="text-crm-accent">+</span>
+                      <span>[[ isCompanyDocumentUploading ? 'Загружаем...' : 'Загрузить документ' ]]</span>
+                    </button>
+                  </div>
+                </div>
+                <div v-if="isCompanyDocumentsLoading" class="mt-3 text-sm text-crm-muted">Загрузка документов...</div>
+                <template v-else>
+                  <div class="mt-4">
+                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Документы компании</div>
+                    <div v-if="companyDocumentsForActiveCompany.length === 0" class="mt-2 text-sm text-crm-muted">
+                      Документы компании пока не загружены.
+                    </div>
+                    <div v-else class="mt-2 space-y-2">
+                      <a
+                        v-for="documentItem in companyDocumentsForActiveCompany"
+                        :key="`company-document-${documentItem.id}`"
+                        :href="documentItem.fileUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="flex min-w-0 items-start justify-between gap-3 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 py-3 hover:border-crm-accent transition"
+                      >
+                        <div class="min-w-0">
+                          <div class="text-sm font-medium text-white [overflow-wrap:anywhere]">[[ documentItem.originalName || 'Документ без названия' ]]</div>
+                          <div class="mt-1 text-xs text-crm-muted">
+                            [[ formatFileSize(documentItem.fileSize) ]]
+                            <span v-if="documentItem.uploadedByName"> • [[ documentItem.uploadedByName ]]</span>
+                            <span v-if="documentItem.createdAt"> • [[ formatEventTimestamp(documentItem.createdAt) ]]</span>
+                          </div>
+                        </div>
+                        <span class="shrink-0 text-crm-accent text-sm">Открыть</span>
+                      </a>
+                    </div>
+                  </div>
+                  <div class="mt-5 space-y-4">
+                    <div
+                      v-for="dealGroup in companyDealDocumentGroups"
+                      :key="`company-deal-documents-${dealGroup.dealId}`"
+                      class="rounded-xl border border-crm-border bg-[#0f2f4a] p-4"
+                    >
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Документы сделки</div>
+                        <button
+                          type="button"
+                          @click="openDealEditorById(dealGroup.dealId)"
+                          class="text-sm font-medium text-white hover:text-crm-accent transition"
+                        >
+                          [[ dealGroup.dealTitle ]]
+                        </button>
+                      </div>
+                      <div v-if="dealGroup.documents.length === 0" class="mt-2 text-sm text-crm-muted">
+                        По этой сделке документы пока не загружены.
+                      </div>
+                      <div v-else class="mt-2 space-y-2">
+                        <a
+                          v-for="documentItem in dealGroup.documents"
+                          :key="`company-deal-document-${dealGroup.dealId}-${documentItem.id}`"
+                          :href="documentItem.fileUrl"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="flex min-w-0 items-start justify-between gap-3 rounded-xl border border-crm-border/80 bg-[#102f4a] px-3 py-3 hover:border-crm-accent transition"
+                        >
+                          <div class="min-w-0">
+                            <div class="text-sm font-medium text-white [overflow-wrap:anywhere]">[[ documentItem.originalName || 'Документ без названия' ]]</div>
+                            <div class="mt-1 text-xs text-crm-muted">
+                              [[ formatFileSize(documentItem.fileSize) ]]
+                              <span v-if="documentItem.uploadedByName"> • [[ documentItem.uploadedByName ]]</span>
+                              <span v-if="documentItem.createdAt"> • [[ formatEventTimestamp(documentItem.createdAt) ]]</span>
+                            </div>
+                          </div>
+                          <span class="shrink-0 text-crm-accent text-sm">Открыть</span>
+                        </a>
+                      </div>
+                    </div>
+                    <div v-if="companyDealDocumentGroups.length === 0" class="text-sm text-crm-muted">
+                      У компании пока нет сделок с документами.
+                    </div>
+                  </div>
+                </template>
               </div>
               <div v-if="showCompanyWorkRules" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                 <div class="py-1">
