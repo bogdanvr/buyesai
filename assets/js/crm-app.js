@@ -3066,7 +3066,7 @@
             id: item.id,
             dealId: this.toIntOrNull(item.deal),
             originalName: item.original_name || item.originalName || "",
-            fileUrl: item.file_url || item.fileUrl || "",
+            fileUrl: item.download_url || item.downloadUrl || item.file_url || item.fileUrl || "",
             fileSize: Number.parseInt(item.file_size || item.fileSize || 0, 10) || 0,
             uploadedByName: item.uploaded_by_name || item.uploadedByName || "",
             createdAt: item.created_at || item.createdAt || "",

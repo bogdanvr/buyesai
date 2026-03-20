@@ -1,3 +1,4 @@
+from django.urls import reverse
 from rest_framework import serializers
 
 from crm.models import DealDocument
@@ -6,6 +7,7 @@ from crm.models import DealDocument
 class DealDocumentSerializer(serializers.ModelSerializer):
     uploaded_by_name = serializers.SerializerMethodField()
     file_url = serializers.SerializerMethodField()
+    download_url = serializers.SerializerMethodField()
     file_size = serializers.SerializerMethodField()
 
     def get_uploaded_by_name(self, obj):
@@ -33,6 +35,11 @@ class DealDocumentSerializer(serializers.ModelSerializer):
         except Exception:
             return 0
 
+    def get_download_url(self, obj):
+        request = self.context.get("request")
+        relative_url = reverse("deal-documents-download", kwargs={"pk": obj.pk})
+        return request.build_absolute_uri(relative_url) if request is not None else relative_url
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
         uploaded_file = attrs.get("file")
@@ -49,6 +56,7 @@ class DealDocumentSerializer(serializers.ModelSerializer):
             "deal",
             "file",
             "file_url",
+            "download_url",
             "original_name",
             "file_size",
             "uploaded_by",
