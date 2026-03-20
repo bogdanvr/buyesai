@@ -75,8 +75,11 @@
           isSourceSaving: false,
           showDealCompanyForm: false,
           showDealContactsPanel: false,
+          showDealDocumentsPanel: false,
           showDealContactForm: false,
           isDealContactsLoading: false,
+          isDealDocumentsLoading: false,
+          isDealDocumentUploading: false,
           isCompanyContactSaving: false,
           isCompanyContactsLoading: false,
           isTaskTouchesLoading: false,
@@ -272,6 +275,7 @@
             isPrimary: true
           },
           dealTasksForActiveDeal: [],
+          dealDocumentsForActiveDeal: [],
           dealCompanyContacts: [],
           companyContactForm: {
             fullName: "",
@@ -1948,15 +1952,18 @@
         async apiRequest(url, options = {}) {
           const headers = { ...(options.headers || {}) };
           const hasBody = options.body !== undefined;
+          const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
           if (hasBody) {
-            headers["Content-Type"] = "application/json";
             headers["X-CSRFToken"] = this.getCsrfToken();
+            if (!isFormData) {
+              headers["Content-Type"] = "application/json";
+            }
           }
           const response = await fetch(url, {
             method: options.method || "GET",
             credentials: "same-origin",
             headers,
-            body: hasBody ? JSON.stringify(options.body) : undefined
+            body: hasBody ? (isFormData ? options.body : JSON.stringify(options.body)) : undefined
           });
           let payload = null;
           try {
@@ -2549,6 +2556,8 @@
           this.resetDealTaskForm();
           this.resetTaskFollowUpForm();
           this.showDealTaskForm = false;
+          this.showDealDocumentsPanel = false;
+          this.dealDocumentsForActiveDeal = [];
           this.resetDealCompanyForm();
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
@@ -3043,11 +3052,86 @@
           });
         },
         quickOpenDealDocuments() {
-          const companyId = this.toIntOrNull(this.forms.deals.companyId);
-          if (!companyId) return;
-          const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId));
-          if (!company) return;
-          this.openCompanyEditor(company);
+          this.toggleDealDocumentsPanel();
+        },
+        formatFileSize(bytes) {
+          const size = Number.parseInt(bytes, 10);
+          if (!Number.isFinite(size) || size <= 0) return "0 Б";
+          if (size < 1024) return `${size} Б`;
+          if (size < 1024 * 1024) return `${(size / 1024).toFixed(1).replace(".0", "")} КБ`;
+          return `${(size / (1024 * 1024)).toFixed(1).replace(".0", "")} МБ`;
+        },
+        mapDealDocument(item) {
+          return {
+            id: item.id,
+            dealId: this.toIntOrNull(item.deal),
+            originalName: item.original_name || item.originalName || "",
+            fileUrl: item.file_url || item.fileUrl || "",
+            fileSize: Number.parseInt(item.file_size || item.fileSize || 0, 10) || 0,
+            uploadedByName: item.uploaded_by_name || item.uploadedByName || "",
+            createdAt: item.created_at || item.createdAt || "",
+          };
+        },
+        async loadDealDocuments() {
+          const dealId = this.toIntOrNull(this.editingDealId);
+          if (!dealId) {
+            this.dealDocumentsForActiveDeal = [];
+            return;
+          }
+          this.isDealDocumentsLoading = true;
+          try {
+            const payload = await this.apiRequest(`/api/v1/deal-documents/?deal=${dealId}&page_size=100`);
+            const records = Array.isArray(payload?.results) ? payload.results : (Array.isArray(payload) ? payload : []);
+            this.dealDocumentsForActiveDeal = records.map((item) => this.mapDealDocument(item));
+          } finally {
+            this.isDealDocumentsLoading = false;
+          }
+        },
+        async toggleDealDocumentsPanel() {
+          if (!this.editingDealId) {
+            return;
+          }
+          this.showDealDocumentsPanel = !this.showDealDocumentsPanel;
+          if (this.showDealDocumentsPanel) {
+            this.showDealContactsPanel = false;
+            await this.loadDealDocuments();
+          }
+        },
+        openDealDocumentPicker() {
+          if (!this.editingDealId || this.isDealDocumentUploading) {
+            return;
+          }
+          const input = this.$refs.dealDocumentInput;
+          if (input) {
+            input.click();
+          }
+        },
+        async handleDealDocumentInput(event) {
+          const input = event?.target;
+          const file = input?.files && input.files[0] ? input.files[0] : null;
+          if (!file || !this.editingDealId) {
+            if (input) input.value = "";
+            return;
+          }
+          const formData = new FormData();
+          formData.append("deal", String(this.editingDealId));
+          formData.append("file", file);
+          formData.append("original_name", file.name || "");
+          this.isDealDocumentUploading = true;
+          try {
+            const created = await this.apiRequest("/api/v1/deal-documents/", {
+              method: "POST",
+              body: formData,
+            });
+            this.dealDocumentsForActiveDeal = [
+              this.mapDealDocument(created),
+              ...this.dealDocumentsForActiveDeal,
+            ];
+            this.showDealDocumentsPanel = true;
+          } finally {
+            this.isDealDocumentUploading = false;
+            if (input) input.value = "";
+          }
         },
         quickAddLeadTouch() {
           this.activeSection = "touches";
@@ -4130,10 +4214,12 @@
           this.cancelSourceCreate();
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
+          this.showDealDocumentsPanel = false;
           this.showDealContactForm = false;
           this.resetDealCompanyForm();
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
+          this.dealDocumentsForActiveDeal = [];
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyRequisites = false;
@@ -4173,10 +4259,12 @@
           this.cancelSourceCreate();
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
+          this.showDealDocumentsPanel = false;
           this.showDealContactForm = false;
           this.resetDealCompanyForm();
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
+          this.dealDocumentsForActiveDeal = [];
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyRequisites = false;

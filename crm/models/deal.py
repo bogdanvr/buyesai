@@ -67,3 +67,33 @@ class Deal(TimestampedModel):
 
     def __str__(self):
         return self.title
+
+
+class DealDocument(TimestampedModel):
+    deal = models.ForeignKey(
+        "crm.Deal",
+        related_name="documents",
+        on_delete=models.CASCADE,
+        verbose_name="Сделка",
+    )
+    file = models.FileField(upload_to="deal_documents/%Y/%m/%d/", verbose_name="Файл")
+    original_name = models.CharField(max_length=255, blank=True, default="", verbose_name="Название файла")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="crm_deal_documents",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Загрузил",
+    )
+
+    class Meta:
+        verbose_name = "Документ сделки"
+        verbose_name_plural = "Документы сделок"
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(fields=["deal"]),
+        ]
+
+    def __str__(self):
+        return self.original_name or self.file.name.rsplit("/", 1)[-1] or f"Документ #{self.pk}"

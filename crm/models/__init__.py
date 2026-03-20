@@ -1,7 +1,7 @@
 from crm.models.activity import Activity, TaskType
 from crm.models.client import Client, CommunicationChannel
 from crm.models.contact import Contact, ContactRole, ContactStatus
-from crm.models.deal import Deal
+from crm.models.deal import Deal, DealDocument
 from crm.models.lead import Lead
 from crm.models.source import LeadSource
 from crm.models.status import DealStage, LeadStatus
@@ -16,6 +16,7 @@ __all__ = [
     "ContactRole",
     "ContactStatus",
     "Deal",
+    "DealDocument",
     "Lead",
     "LeadSource",
     "LeadStatus",
