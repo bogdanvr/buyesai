@@ -148,7 +148,7 @@ STATICFILES_DIRS = [
 
 STATIC_ROOT = env("STATIC_ROOT")
 MEDIA_URL = "/media/"
-MEDIA_ROOT = env("MEDIA_ROOT", default=str(BASE_DIR / "media"))
+MEDIA_ROOT = env("MEDIA_ROOT")
 
 # DaData API key (stored in .env as DADATA_KEY)
 DADATA_KEY = env("DADATA_KEY", default="")

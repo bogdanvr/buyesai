@@ -1,7 +1,19 @@
 from django.conf import settings
 from django.db import models
+from pathlib import Path
 
 from crm.models.common import TimestampedModel
+
+
+def deal_document_upload_to(instance, filename: str) -> str:
+    deal_id = getattr(instance, "deal_id", None) or getattr(getattr(instance, "deal", None), "id", None) or "new"
+    client_id = (
+        getattr(getattr(instance, "deal", None), "client_id", None)
+        or getattr(getattr(instance, "deal", None), "client", None) and getattr(instance.deal.client, "id", None)
+        or "unassigned"
+    )
+    safe_name = Path(str(filename or "document")).name or "document"
+    return f"company_{client_id}/deal_{deal_id}/{safe_name}"
 
 
 class Deal(TimestampedModel):
@@ -76,7 +88,7 @@ class DealDocument(TimestampedModel):
         on_delete=models.CASCADE,
         verbose_name="Сделка",
     )
-    file = models.FileField(upload_to="deal_documents/%Y/%m/%d/", verbose_name="Файл")
+    file = models.FileField(upload_to=deal_document_upload_to, verbose_name="Файл")
     original_name = models.CharField(max_length=255, blank=True, default="", verbose_name="Название файла")
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
