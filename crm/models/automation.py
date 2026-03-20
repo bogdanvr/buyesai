@@ -16,9 +16,9 @@ class AutomationRule(models.Model):
         default=AutomationTouchpointMode.NONE,
         verbose_name="Режим создания касания",
     )
-    default_outcome_code = models.CharField(max_length=64, blank=True, default="", verbose_name="Код результата по умолчанию")
+    default_outcome_code = models.CharField(max_length=64, blank=True, null=True, default="", verbose_name="Код результата по умолчанию")
     require_manager_confirmation = models.BooleanField(default=False, verbose_name="Требовать подтверждение менеджера")
-    suggest_next_step_template = models.CharField(max_length=128, blank=True, default="", verbose_name="Шаблон следующего шага")
+    suggest_next_step_template = models.CharField(max_length=128, blank=True, null=True, default="", verbose_name="Шаблон следующего шага")
     is_active = models.BooleanField(default=True, verbose_name="Активно")
 
     class Meta:
