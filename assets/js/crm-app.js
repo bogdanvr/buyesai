@@ -80,6 +80,8 @@
           isDealContactsLoading: false,
           isDealDocumentsLoading: false,
           isDealDocumentUploading: false,
+          isTouchDocumentsLoading: false,
+          isTouchDocumentUploading: false,
           isCompanyContactSaving: false,
           isCompanyContactsLoading: false,
           isTaskTouchesLoading: false,
@@ -222,7 +224,10 @@
               contactId: null,
               taskId: null,
               leadId: null,
-              dealId: null
+              dealId: null,
+              dealDocumentIds: [],
+              clientDocumentIds: [],
+              documentUploadTarget: ""
             }
           },
           dealTaskForm: {
@@ -277,6 +282,8 @@
           },
           dealTasksForActiveDeal: [],
           dealDocumentsForActiveDeal: [],
+          touchDealDocuments: [],
+          touchCompanyDocuments: [],
           dealCompanyContacts: [],
           companyContactForm: {
             fullName: "",
@@ -1231,20 +1238,43 @@
                 this.forms.touches.taskId = null;
               }
             }
+            if (this.activeSection === "touches" && this.showModal) {
+              const companyId = this.toIntOrNull(this.forms.touches.companyId);
+              if (!companyId) {
+                this.touchCompanyDocuments = [];
+                this.forms.touches.clientDocumentIds = [];
+                if (this.forms.touches.documentUploadTarget === "company") {
+                  this.forms.touches.documentUploadTarget = this.toIntOrNull(this.forms.touches.dealId) ? "deal" : "";
+                }
+              }
+              this.loadTouchDocuments();
+            }
           }
         },
         "forms.touches.dealId": {
           handler() {
             const selectedTaskId = this.toIntOrNull(this.forms.touches.taskId);
-            if (!selectedTaskId) {
-              return;
+            if (selectedTaskId) {
+              const taskStillAvailable = (this.datasets.tasks || []).some(
+                (task) => String(task.id) === String(selectedTaskId)
+                  && String(task.dealId || "") === String(this.forms.touches.dealId || "")
+              );
+              if (!taskStillAvailable) {
+                this.forms.touches.taskId = null;
+              }
             }
-            const taskStillAvailable = (this.datasets.tasks || []).some(
-              (task) => String(task.id) === String(selectedTaskId)
-                && String(task.dealId || "") === String(this.forms.touches.dealId || "")
-            );
-            if (!taskStillAvailable) {
-              this.forms.touches.taskId = null;
+            if (this.activeSection === "touches" && this.showModal) {
+              const dealId = this.toIntOrNull(this.forms.touches.dealId);
+              if (!dealId) {
+                this.touchDealDocuments = [];
+                this.forms.touches.dealDocumentIds = [];
+                if (this.forms.touches.documentUploadTarget === "deal") {
+                  this.forms.touches.documentUploadTarget = this.toIntOrNull(this.forms.touches.companyId) ? "company" : "";
+                }
+              } else if (!this.forms.touches.documentUploadTarget) {
+                this.forms.touches.documentUploadTarget = "deal";
+              }
+              this.loadTouchDocuments();
             }
           }
         },
@@ -2789,8 +2819,12 @@
             taskId: this.toIntOrNull(item.taskId),
             leadId: this.toIntOrNull(item.leadId),
             dealId: this.toIntOrNull(item.dealId),
+            dealDocumentIds: (item.dealDocuments || []).map((document) => this.toIntOrNull(document.id)).filter(Boolean),
+            clientDocumentIds: (item.clientDocuments || []).map((document) => this.toIntOrNull(document.id)).filter(Boolean),
+            documentUploadTarget: this.toIntOrNull(item.dealId) ? "deal" : (this.toIntOrNull(item.clientId) ? "company" : ""),
           };
           this.resetTouchFollowUpForm();
+          this.loadTouchDocuments();
           this.showModal = true;
         },
         openTaskFromDeal(task) {
@@ -3107,7 +3141,9 @@
               companyId: this.toIntOrNull(this.forms.deals.companyId),
               dealId: this.toIntOrNull(this.editingDealId),
               ownerId: this.toIntOrNull(this.forms.deals.ownerId),
+              documentUploadTarget: this.toIntOrNull(this.editingDealId) ? "deal" : (this.toIntOrNull(this.forms.deals.companyId) ? "company" : ""),
             };
+            this.loadTouchDocuments();
             this.showModal = true;
             return;
           }
@@ -3122,7 +3158,9 @@
             companyId: this.toIntOrNull(this.forms.deals.companyId),
             dealId: this.toIntOrNull(this.editingDealId),
             ownerId: this.toIntOrNull(this.forms.deals.ownerId),
+            documentUploadTarget: this.toIntOrNull(this.editingDealId) ? "deal" : (this.toIntOrNull(this.forms.deals.companyId) ? "company" : ""),
           };
+          this.loadTouchDocuments();
           this.showModal = true;
         },
         quickToggleDealTaskForm() {
@@ -3147,7 +3185,20 @@
         mapDealDocument(item) {
           return {
             id: item.id,
+            scope: "deal",
             dealId: this.toIntOrNull(item.deal),
+            originalName: item.original_name || item.originalName || "",
+            fileUrl: item.download_url || item.downloadUrl || item.file_url || item.fileUrl || "",
+            fileSize: Number.parseInt(item.file_size || item.fileSize || 0, 10) || 0,
+            uploadedByName: item.uploaded_by_name || item.uploadedByName || "",
+            createdAt: item.created_at || item.createdAt || "",
+          };
+        },
+        mapClientDocument(item) {
+          return {
+            id: item.id,
+            scope: "company",
+            clientId: this.toIntOrNull(item.client),
             originalName: item.original_name || item.originalName || "",
             fileUrl: item.download_url || item.downloadUrl || item.file_url || item.fileUrl || "",
             fileSize: Number.parseInt(item.file_size || item.fileSize || 0, 10) || 0,
@@ -3168,6 +3219,86 @@
             this.dealDocumentsForActiveDeal = records.map((item) => this.mapDealDocument(item));
           } finally {
             this.isDealDocumentsLoading = false;
+          }
+        },
+        sanitizeTouchDocumentSelection() {
+          const allowedDealIds = new Set(this.touchDealDocuments.map((item) => String(item.id)));
+          const allowedClientIds = new Set(this.touchCompanyDocuments.map((item) => String(item.id)));
+          this.forms.touches.dealDocumentIds = (this.forms.touches.dealDocumentIds || []).filter((id) => allowedDealIds.has(String(id)));
+          this.forms.touches.clientDocumentIds = (this.forms.touches.clientDocumentIds || []).filter((id) => allowedClientIds.has(String(id)));
+        },
+        async loadTouchDocuments() {
+          const companyId = this.toIntOrNull(this.forms.touches.companyId);
+          const dealId = this.toIntOrNull(this.forms.touches.dealId);
+          this.isTouchDocumentsLoading = true;
+          try {
+            const [companyPayload, dealPayload] = await Promise.all([
+              companyId ? this.apiRequest(`/api/v1/client-documents/?client=${companyId}&page_size=100`) : Promise.resolve([]),
+              dealId ? this.apiRequest(`/api/v1/deal-documents/?deal=${dealId}&page_size=100`) : Promise.resolve([]),
+            ]);
+            const companyRecords = Array.isArray(companyPayload?.results) ? companyPayload.results : (Array.isArray(companyPayload) ? companyPayload : []);
+            const dealRecords = Array.isArray(dealPayload?.results) ? dealPayload.results : (Array.isArray(dealPayload) ? dealPayload : []);
+            this.touchCompanyDocuments = companyRecords.map((item) => this.mapClientDocument(item));
+            this.touchDealDocuments = dealRecords.map((item) => this.mapDealDocument(item));
+            this.sanitizeTouchDocumentSelection();
+            if (!this.forms.touches.documentUploadTarget) {
+              this.forms.touches.documentUploadTarget = dealId ? "deal" : (companyId ? "company" : "");
+            }
+          } finally {
+            this.isTouchDocumentsLoading = false;
+          }
+        },
+        openTouchDocumentPicker() {
+          if (this.isTouchDocumentUploading) {
+            return;
+          }
+          const input = this.$refs.touchDocumentInput;
+          if (input) {
+            input.click();
+          }
+        },
+        async handleTouchDocumentInput(event) {
+          const input = event?.target;
+          const file = input?.files && input.files[0] ? input.files[0] : null;
+          const uploadTarget = String(this.forms.touches.documentUploadTarget || "");
+          const dealId = this.toIntOrNull(this.forms.touches.dealId);
+          const companyId = this.toIntOrNull(this.forms.touches.companyId);
+          if (!file || (uploadTarget !== "deal" && uploadTarget !== "company")) {
+            if (input) input.value = "";
+            return;
+          }
+          if (uploadTarget === "deal" && !dealId) {
+            this.setUiError("Для загрузки документа в сделку выберите сделку.", { modal: true });
+            if (input) input.value = "";
+            return;
+          }
+          if (uploadTarget === "company" && !companyId) {
+            this.setUiError("Для загрузки документа в компанию выберите компанию.", { modal: true });
+            if (input) input.value = "";
+            return;
+          }
+          const formData = new FormData();
+          formData.append(uploadTarget === "deal" ? "deal" : "client", String(uploadTarget === "deal" ? dealId : companyId));
+          formData.append("file", file);
+          formData.append("original_name", file.name || "");
+          this.isTouchDocumentUploading = true;
+          try {
+            const created = await this.apiRequest(uploadTarget === "deal" ? "/api/v1/deal-documents/" : "/api/v1/client-documents/", {
+              method: "POST",
+              body: formData,
+            });
+            if (uploadTarget === "deal") {
+              const mapped = this.mapDealDocument(created);
+              this.touchDealDocuments = [mapped, ...this.touchDealDocuments];
+              this.forms.touches.dealDocumentIds = [mapped.id, ...(this.forms.touches.dealDocumentIds || [])];
+            } else {
+              const mapped = this.mapClientDocument(created);
+              this.touchCompanyDocuments = [mapped, ...this.touchCompanyDocuments];
+              this.forms.touches.clientDocumentIds = [mapped.id, ...(this.forms.touches.clientDocumentIds || [])];
+            }
+          } finally {
+            this.isTouchDocumentUploading = false;
+            if (input) input.value = "";
           }
         },
         async toggleDealDocumentsPanel() {
@@ -3225,7 +3356,9 @@
             companyId: this.toIntOrNull(this.editingLeadItem?.clientId),
             leadId: this.toIntOrNull(this.editingLeadId),
             ownerId: this.toIntOrNull(this.forms.leads.assignedToId),
+            documentUploadTarget: this.toIntOrNull(this.editingLeadItem?.clientId) ? "company" : "",
           };
+          this.loadTouchDocuments();
           this.showModal = true;
         },
         quickAddLeadTask() {
@@ -4206,6 +4339,8 @@
             dealId: item.deal || null,
             deal: item.deal_title || "",
             dealTitle: item.deal_title || "",
+            dealDocuments: Array.isArray(item.deal_documents) ? item.deal_documents.map((document) => this.mapDealDocument(document)) : [],
+            clientDocuments: Array.isArray(item.client_documents) ? item.client_documents.map((document) => this.mapClientDocument(document)) : [],
           };
         },
         async loadSection(section) {
@@ -4325,6 +4460,8 @@
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.dealDocumentsForActiveDeal = [];
+          this.touchDealDocuments = [];
+          this.touchCompanyDocuments = [];
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyRequisites = false;
@@ -4371,6 +4508,8 @@
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.dealDocumentsForActiveDeal = [];
+          this.touchDealDocuments = [];
+          this.touchCompanyDocuments = [];
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyRequisites = false;
@@ -4415,6 +4554,8 @@
           this.resetDealCompanyForm();
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
+          this.touchDealDocuments = [];
+          this.touchCompanyDocuments = [];
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyWorkRules = false;
@@ -4538,6 +4679,9 @@
               taskId: null,
               leadId: null,
               dealId: null,
+              dealDocumentIds: [],
+              clientDocumentIds: [],
+              documentUploadTarget: "",
             };
           }
           return {};
@@ -5179,6 +5323,8 @@
               task: this.toIntOrNull(form.taskId),
               lead: this.toIntOrNull(form.leadId),
               deal: this.toIntOrNull(form.dealId),
+              deal_document_ids: (form.dealDocumentIds || []).map((id) => this.toIntOrNull(id)).filter(Boolean),
+              client_document_ids: (form.clientDocumentIds || []).map((id) => this.toIntOrNull(id)).filter(Boolean),
               has_follow_up_task: this.hasValidTouchFollowUp(),
             }
           });
@@ -5208,6 +5354,8 @@
               task: this.toIntOrNull(form.taskId),
               lead: this.toIntOrNull(form.leadId),
               deal: this.toIntOrNull(form.dealId),
+              deal_document_ids: (form.dealDocumentIds || []).map((id) => this.toIntOrNull(id)).filter(Boolean),
+              client_document_ids: (form.clientDocumentIds || []).map((id) => this.toIntOrNull(id)).filter(Boolean),
               has_follow_up_task: this.hasValidTouchFollowUp(),
             }
           });

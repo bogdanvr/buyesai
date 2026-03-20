@@ -1,6 +1,24 @@
+from django.conf import settings
 from django.db import models
+from pathlib import Path
 
 from crm.models.common import TimestampedModel
+
+
+def truncate_upload_filename(filename: str, max_stem_length: int = 120) -> str:
+    safe_name = Path(str(filename or "document")).name or "document"
+    path = Path(safe_name)
+    suffix = path.suffix or ""
+    stem = path.stem or "document"
+    if len(stem) <= max_stem_length:
+        return f"{stem}{suffix}"
+    return f"{stem[:max_stem_length]}{suffix}"
+
+
+def client_document_upload_to(instance, filename: str) -> str:
+    client_id = getattr(instance, "client_id", None) or getattr(getattr(instance, "client", None), "id", None) or "new"
+    safe_name = truncate_upload_filename(filename)
+    return f"company_{client_id}/company/{safe_name}"
 
 
 class Client(TimestampedModel):
@@ -76,3 +94,30 @@ class CommunicationChannel(TimestampedModel):
 
     def __str__(self):
         return self.name
+
+
+class ClientDocument(TimestampedModel):
+    client = models.ForeignKey(
+        "crm.Client",
+        related_name="documents",
+        on_delete=models.CASCADE,
+        verbose_name="Компания",
+    )
+    file = models.FileField(upload_to=client_document_upload_to, max_length=500, verbose_name="Файл")
+    original_name = models.CharField(max_length=255, blank=True, default="", verbose_name="Название файла")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="crm_client_documents",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Загрузил",
+    )
+
+    class Meta:
+        verbose_name = "Документ компании"
+        verbose_name_plural = "Документы компаний"
+        ordering = ("-created_at", "-id")
+
+    def __str__(self):
+        return self.original_name or self.file.name.rsplit("/", 1)[-1] or f"Документ #{self.pk}"

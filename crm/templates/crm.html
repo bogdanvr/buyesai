@@ -1895,6 +1895,67 @@
                 <option v-for="task in touchTaskOptions" :key="task.id" :value="task.id">[[ task.title ]]</option>
               </select>
             </label>
+            <div class="md:col-span-2 rounded-xl border border-crm-border bg-[#0f2f4a] p-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold text-white">Документы</div>
+                  <div class="text-xs text-crm-muted">Выберите уже загруженные документы компании или сделки, либо загрузите новый.</div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input ref="touchDocumentInput" type="file" class="hidden" @change="handleTouchDocumentInput" />
+                  <select
+                    v-model="forms.touches.documentUploadTarget"
+                    class="h-9 rounded-xl border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                    :disabled="!toIntOrNull(forms.touches.companyId) && !toIntOrNull(forms.touches.dealId)"
+                  >
+                    <option value="">Куда загрузить</option>
+                    <option v-if="toIntOrNull(forms.touches.companyId)" value="company">В компанию</option>
+                    <option v-if="toIntOrNull(forms.touches.dealId)" value="deal">В сделку</option>
+                  </select>
+                  <button
+                    type="button"
+                    @click="openTouchDocumentPicker"
+                    :disabled="isTouchDocumentUploading || (!toIntOrNull(forms.touches.companyId) && !toIntOrNull(forms.touches.dealId))"
+                    class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span class="text-crm-accent">+</span>
+                    <span>[[ isTouchDocumentUploading ? 'Загружаем...' : 'Загрузить новый' ]]</span>
+                  </button>
+                </div>
+              </div>
+              <div v-if="isTouchDocumentsLoading" class="mt-3 text-sm text-crm-muted">Загрузка документов...</div>
+              <div v-else class="mt-3 space-y-4">
+                <div v-if="toIntOrNull(forms.touches.companyId)">
+                  <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Документы компании</div>
+                  <div v-if="touchCompanyDocuments.length" class="mt-2 space-y-2">
+                    <label v-for="documentItem in touchCompanyDocuments" :key="`touch-company-document-${documentItem.id}`" class="flex items-start gap-3 rounded-xl border border-crm-border bg-[#102f4a] px-3 py-3">
+                      <input v-model="forms.touches.clientDocumentIds" :value="documentItem.id" type="checkbox" class="mt-1 w-4 h-4 rounded border-crm-border bg-transparent" />
+                      <div class="min-w-0 flex-1">
+                        <a :href="documentItem.fileUrl" target="_blank" rel="noopener noreferrer" class="block truncate text-sm font-medium text-white hover:text-crm-accent">[[ documentItem.originalName ]]</a>
+                        <div class="mt-1 text-xs text-crm-muted">[[ formatFileSize(documentItem.fileSize) ]]<span v-if="documentItem.uploadedByName"> · [[ documentItem.uploadedByName ]]</span></div>
+                      </div>
+                    </label>
+                  </div>
+                  <div v-else class="mt-2 text-sm text-crm-muted">У компании пока нет загруженных документов.</div>
+                </div>
+                <div v-if="toIntOrNull(forms.touches.dealId)">
+                  <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Документы сделки</div>
+                  <div v-if="touchDealDocuments.length" class="mt-2 space-y-2">
+                    <label v-for="documentItem in touchDealDocuments" :key="`touch-deal-document-${documentItem.id}`" class="flex items-start gap-3 rounded-xl border border-crm-border bg-[#102f4a] px-3 py-3">
+                      <input v-model="forms.touches.dealDocumentIds" :value="documentItem.id" type="checkbox" class="mt-1 w-4 h-4 rounded border-crm-border bg-transparent" />
+                      <div class="min-w-0 flex-1">
+                        <a :href="documentItem.fileUrl" target="_blank" rel="noopener noreferrer" class="block truncate text-sm font-medium text-white hover:text-crm-accent">[[ documentItem.originalName ]]</a>
+                        <div class="mt-1 text-xs text-crm-muted">[[ formatFileSize(documentItem.fileSize) ]]<span v-if="documentItem.uploadedByName"> · [[ documentItem.uploadedByName ]]</span></div>
+                      </div>
+                    </label>
+                  </div>
+                  <div v-else class="mt-2 text-sm text-crm-muted">У сделки пока нет загруженных документов.</div>
+                </div>
+                <div v-if="!toIntOrNull(forms.touches.companyId) && !toIntOrNull(forms.touches.dealId)" class="text-sm text-crm-muted">
+                  Чтобы выбрать или загрузить документы, укажите компанию или сделку.
+                </div>
+              </div>
+            </div>
           </template>
 
           <template v-if="activeSection === 'companies'">

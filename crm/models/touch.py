@@ -139,6 +139,18 @@ class Touch(TimestampedModel):
         on_delete=models.SET_NULL,
         verbose_name="Задача",
     )
+    deal_documents = models.ManyToManyField(
+        "crm.DealDocument",
+        related_name="touches",
+        blank=True,
+        verbose_name="Документы сделки",
+    )
+    client_documents = models.ManyToManyField(
+        "crm.ClientDocument",
+        related_name="touches",
+        blank=True,
+        verbose_name="Документы компании",
+    )
 
     class Meta:
         verbose_name = "Касание"

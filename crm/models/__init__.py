@@ -1,6 +1,6 @@
 from crm.models.activity import Activity, TaskType
 from crm.models.automation import AutomationRule, NextStepTemplate, OutcomeCatalog
-from crm.models.client import Client, CommunicationChannel
+from crm.models.client import Client, ClientDocument, CommunicationChannel
 from crm.models.contact import Contact, ContactRole, ContactStatus
 from crm.models.deal import Deal, DealDocument
 from crm.models.lead import Lead
@@ -14,6 +14,7 @@ __all__ = [
     "AutomationRule",
     "NextStepTemplate",
     "Client",
+    "ClientDocument",
     "CommunicationChannel",
     "Contact",
     "ContactRole",

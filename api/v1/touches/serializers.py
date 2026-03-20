@@ -1,13 +1,29 @@
 from rest_framework import serializers
 from django.utils import timezone
 
-from crm.models import Touch
+from django.urls import reverse
+
+from crm.models import ClientDocument, DealDocument, Touch
 from crm.models.activity import ActivityType, TaskStatus
 from crm.models.touch import normalize_touch_channel_code
 
 
 class TouchSerializer(serializers.ModelSerializer):
     has_follow_up_task = serializers.BooleanField(write_only=True, required=False, default=False)
+    deal_document_ids = serializers.PrimaryKeyRelatedField(
+        source="deal_documents",
+        queryset=DealDocument.objects.all(),
+        many=True,
+        write_only=True,
+        required=False,
+    )
+    client_document_ids = serializers.PrimaryKeyRelatedField(
+        source="client_documents",
+        queryset=ClientDocument.objects.all(),
+        many=True,
+        write_only=True,
+        required=False,
+    )
     channel_name = serializers.CharField(source="channel.name", read_only=True)
     result_option_name = serializers.CharField(source="result_option.name", read_only=True)
     result_option_code = serializers.CharField(source="result_option.code", read_only=True)
@@ -21,6 +37,29 @@ class TouchSerializer(serializers.ModelSerializer):
     task_subject = serializers.CharField(source="task.subject", read_only=True)
     company_name = serializers.SerializerMethodField()
     direction_label = serializers.CharField(source="get_direction_display", read_only=True)
+    deal_documents = serializers.SerializerMethodField()
+    client_documents = serializers.SerializerMethodField()
+
+    def _document_payload(self, document, scope):
+        request = self.context.get("request")
+        if scope == "deal":
+            relative_url = reverse("deal-documents-download", kwargs={"pk": document.pk})
+        else:
+            relative_url = reverse("client-documents-download", kwargs={"pk": document.pk})
+        try:
+            file_size = int(document.file.size or 0)
+        except Exception:
+            file_size = 0
+        uploaded_by = getattr(document, "uploaded_by", None)
+        full_name = uploaded_by.get_full_name() if uploaded_by and hasattr(uploaded_by, "get_full_name") else ""
+        return {
+            "id": document.pk,
+            "scope": scope,
+            "original_name": str(document.original_name or "").strip() or document.file.name.rsplit("/", 1)[-1],
+            "download_url": request.build_absolute_uri(relative_url) if request is not None else relative_url,
+            "file_size": file_size,
+            "uploaded_by_name": str(full_name or getattr(uploaded_by, "username", "") or "").strip(),
+        }
 
     def get_owner_name(self, obj):
         owner = obj.owner
@@ -48,9 +87,17 @@ class TouchSerializer(serializers.ModelSerializer):
             return ""
         return f"{contact.first_name} {contact.last_name}".strip() or contact.phone or f"Контакт #{contact.pk}"
 
+    def get_deal_documents(self, obj):
+        return [self._document_payload(document, "deal") for document in obj.deal_documents.all()]
+
+    def get_client_documents(self, obj):
+        return [self._document_payload(document, "company") for document in obj.client_documents.all()]
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
         has_follow_up_task = bool(attrs.pop("has_follow_up_task", False))
+        deal_documents = list(attrs.get("deal_documents", []))
+        client_documents = list(attrs.get("client_documents", []))
         lead = attrs.get("lead", getattr(self.instance, "lead", None))
         deal = attrs.get("deal", getattr(self.instance, "deal", None))
         client = attrs.get("client", getattr(self.instance, "client", None))
@@ -66,9 +113,45 @@ class TouchSerializer(serializers.ModelSerializer):
         if task is not None and task.type != ActivityType.TASK:
             raise serializers.ValidationError({"task": "Можно привязать только задачу."})
         self._validate_result_option_channel(result_option, channel)
+        self._validate_documents(deal_documents, client_documents, deal, client)
         if deal is not None:
             self._validate_deal_next_activity(attrs, deal, has_follow_up_task)
         return attrs
+
+    def _validate_documents(self, deal_documents, client_documents, deal, client):
+        if deal_documents:
+            if deal is None:
+                raise serializers.ValidationError({"deal_document_ids": "Документы сделки можно выбрать только при выбранной сделке."})
+            invalid_deal_documents = [document.pk for document in deal_documents if document.deal_id != deal.pk]
+            if invalid_deal_documents:
+                raise serializers.ValidationError({"deal_document_ids": "Выбран документ другой сделки."})
+        resolved_client = client or getattr(deal, "client", None)
+        if client_documents:
+            if resolved_client is None:
+                raise serializers.ValidationError({"client_document_ids": "Документы компании можно выбрать только при выбранной компании."})
+            invalid_client_documents = [document.pk for document in client_documents if document.client_id != resolved_client.pk]
+            if invalid_client_documents:
+                raise serializers.ValidationError({"client_document_ids": "Выбран документ другой компании."})
+
+    def create(self, validated_data):
+        deal_documents = validated_data.pop("deal_documents", [])
+        client_documents = validated_data.pop("client_documents", [])
+        instance = super().create(validated_data)
+        if deal_documents:
+            instance.deal_documents.set(deal_documents)
+        if client_documents:
+            instance.client_documents.set(client_documents)
+        return instance
+
+    def update(self, instance, validated_data):
+        deal_documents = validated_data.pop("deal_documents", None)
+        client_documents = validated_data.pop("client_documents", None)
+        instance = super().update(instance, validated_data)
+        if deal_documents is not None:
+            instance.deal_documents.set(deal_documents)
+        if client_documents is not None:
+            instance.client_documents.set(client_documents)
+        return instance
 
     def _validate_result_option_channel(self, result_option, channel):
         if result_option is None:
@@ -156,5 +239,9 @@ class TouchSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "has_follow_up_task",
+            "deal_document_ids",
+            "client_document_ids",
+            "deal_documents",
+            "client_documents",
         ]
         read_only_fields = ("created_at", "updated_at")

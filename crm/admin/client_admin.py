@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from crm.models import Client, CommunicationChannel, Contact, ContactRole, ContactStatus
+from crm.models import Client, ClientDocument, CommunicationChannel, Contact, ContactRole, ContactStatus
 
 
 class ContactInline(admin.TabularInline):
@@ -55,3 +55,12 @@ class CommunicationChannelAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "is_active", "created_at")
     list_filter = ("is_active",)
     search_fields = ("name",)
+
+
+@admin.register(ClientDocument)
+class ClientDocumentAdmin(admin.ModelAdmin):
+    list_display = ("id", "original_name", "client", "uploaded_by", "created_at")
+    list_filter = ("created_at",)
+    search_fields = ("original_name", "client__name", "uploaded_by__username")
+    autocomplete_fields = ("client", "uploaded_by")
+    readonly_fields = ("created_at", "updated_at")

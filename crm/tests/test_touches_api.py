@@ -1,11 +1,12 @@
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 from datetime import timedelta
 
-from crm.models import Activity, Client, CommunicationChannel, Contact, Deal, DealStage, Lead, Touch, TouchResult
+from crm.models import Activity, Client, ClientDocument, CommunicationChannel, Contact, Deal, DealDocument, DealStage, Lead, Touch, TouchResult
 from crm.models.activity import ActivityType
 
 
@@ -148,3 +149,38 @@ class TouchesApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("result_option", response.data)
+
+    def test_can_attach_company_and_deal_documents_to_touch(self):
+        company_document = ClientDocument.objects.create(
+            client=self.company,
+            file=SimpleUploadedFile("company.txt", b"company", content_type="text/plain"),
+            original_name="company.txt",
+        )
+        deal_document = DealDocument.objects.create(
+            deal=self.deal,
+            file=SimpleUploadedFile("deal.txt", b"deal", content_type="text/plain"),
+            original_name="deal.txt",
+        )
+
+        response = self.client.post(
+            reverse("touches-list"),
+            {
+                "happened_at": timezone.now().isoformat(),
+                "direction": "incoming",
+                "summary": "Отправили документы",
+                "next_step_at": (timezone.now() + timedelta(days=1)).isoformat(),
+                "client": self.company.pk,
+                "deal": self.deal.pk,
+                "client_document_ids": [company_document.pk],
+                "deal_document_ids": [deal_document.pk],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.data["client_documents"]), 1)
+        self.assertEqual(len(response.data["deal_documents"]), 1)
+
+        touch = Touch.objects.get(pk=response.data["id"])
+        self.assertEqual(touch.client_documents.count(), 1)
+        self.assertEqual(touch.deal_documents.count(), 1)

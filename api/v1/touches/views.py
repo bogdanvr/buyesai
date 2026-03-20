@@ -11,6 +11,9 @@ class TouchViewSet(ModelViewSet):
     def get_queryset(self):
         queryset = Touch.objects.select_related(
             "channel", "owner", "lead", "lead__client", "deal", "deal__client", "client", "contact", "contact__client", "task"
+        ).prefetch_related(
+            "deal_documents",
+            "client_documents",
         ).order_by("-happened_at", "-id")
         lead_id = self.request.query_params.get("lead")
         deal_id = self.request.query_params.get("deal")
