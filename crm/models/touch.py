@@ -89,13 +89,6 @@ class TouchResult(models.Model):
         super().save(*args, **kwargs)
 
 
-class OutcomeCatalog(TouchResult):
-    class Meta:
-        proxy = True
-        verbose_name = "Каталог результата"
-        verbose_name_plural = "Каталог результатов"
-
-
 class Touch(TimestampedModel):
     happened_at = models.DateTimeField(verbose_name="Дата и время")
     channel = models.ForeignKey(

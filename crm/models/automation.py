@@ -20,6 +20,19 @@ class NextStepTemplate(models.Model):
         return self.name
 
 
+class OutcomeCatalog(models.Model):
+    code = models.CharField(max_length=64, unique=True, verbose_name="Код")
+    name = models.CharField(max_length=255, verbose_name="Название")
+
+    class Meta:
+        verbose_name = "Каталог результата"
+        verbose_name_plural = "Каталог результатов"
+        ordering = ("name",)
+
+    def __str__(self):
+        return self.name
+
+
 class AutomationRule(models.Model):
     event_type = models.CharField(max_length=64, unique=True, verbose_name="Тип события")
     write_timeline = models.BooleanField(default=True, verbose_name="Писать в ленту")
@@ -31,7 +44,7 @@ class AutomationRule(models.Model):
         verbose_name="Режим создания касания",
     )
     default_outcome = models.ForeignKey(
-        "crm.TouchResult",
+        "crm.OutcomeCatalog",
         related_name="automation_rules",
         blank=True,
         null=True,

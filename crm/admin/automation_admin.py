@@ -1,10 +1,16 @@
 from django.contrib import admin
 
-from crm.models import AutomationRule, NextStepTemplate
+from crm.models import AutomationRule, NextStepTemplate, OutcomeCatalog
 
 
 @admin.register(NextStepTemplate)
 class NextStepTemplateAdmin(admin.ModelAdmin):
+    list_display = ("id", "code", "name")
+    search_fields = ("code", "name")
+
+
+@admin.register(OutcomeCatalog)
+class OutcomeCatalogAdmin(admin.ModelAdmin):
     list_display = ("id", "code", "name")
     search_fields = ("code", "name")
 
