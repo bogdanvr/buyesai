@@ -97,9 +97,15 @@ class TaskTypeSerializer(serializers.ModelSerializer):
 
 
 class TouchResultSerializer(serializers.ModelSerializer):
-    group_label = serializers.CharField(source="get_group_display", read_only=True)
+    group_label = serializers.SerializerMethodField()
     result_class = serializers.CharField(read_only=True)
-    result_class_label = serializers.CharField(source="get_result_class_display", read_only=True)
+    result_class_label = serializers.SerializerMethodField()
+
+    def get_group_label(self, obj):
+        return str(getattr(obj, "group", "") or "").strip()
+
+    def get_result_class_label(self, obj):
+        return str(getattr(obj, "result_class", "") or "").strip()
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

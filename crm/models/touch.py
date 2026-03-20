@@ -10,20 +10,6 @@ class TouchDirection(models.TextChoices):
     OUTGOING = "outgoing", "Исходящее"
 
 
-class TouchResultGroup(models.TextChoices):
-    NO_CONTACT = "no_contact", "Нет контакта"
-    CONTACT = "contact", "Контакт состоялся"
-    FOLLOW_UP = "follow_up", "Следующий шаг"
-    LOSS = "loss", "Потеря"
-    OTHER = "other", "Другое"
-
-
-class TouchResultClass(models.TextChoices):
-    POSITIVE = "positive", "Позитивный"
-    NEUTRAL = "neutral", "Нейтральный"
-    NEGATIVE = "negative", "Негативный"
-
-
 def normalize_touch_channel_code(value: str) -> str:
     normalized = str(value or "").strip().lower()
     aliases = {
@@ -51,18 +37,8 @@ def normalize_touch_channel_code(value: str) -> str:
 class TouchResult(models.Model):
     code = models.CharField(max_length=64, unique=True, blank=True, null=True, verbose_name="Код")
     name = models.CharField(max_length=128, unique=True, verbose_name="Результат касания")
-    group = models.CharField(
-        max_length=32,
-        choices=TouchResultGroup.choices,
-        default=TouchResultGroup.OTHER,
-        verbose_name="Группа",
-    )
-    result_class = models.CharField(
-        max_length=16,
-        choices=TouchResultClass.choices,
-        default=TouchResultClass.NEUTRAL,
-        verbose_name="Класс",
-    )
+    group = models.CharField(max_length=64, blank=True, default="", verbose_name="Группа")
+    result_class = models.CharField(max_length=32, blank=True, default="", verbose_name="Класс")
     requires_next_step = models.BooleanField(default=False, verbose_name="Требует следующий шаг")
     requires_loss_reason = models.BooleanField(default=False, verbose_name="Требует причину потери")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
