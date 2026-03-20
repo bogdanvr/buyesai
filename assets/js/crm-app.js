@@ -93,6 +93,7 @@
           showCompanyRequisites: false,
           leadSummaryEditingField: "",
           dealSummaryEditingField: "",
+          taskSummaryEditingField: "",
           companySummaryEditingField: "",
           expandedOptionalFields: {
             leads: {},
@@ -444,6 +445,11 @@
         },
         isCreatingTask() {
           return this.activeSection === "tasks" && !this.editingTaskId;
+        },
+        editingTaskItem() {
+          const taskId = this.toIntOrNull(this.editingTaskId);
+          if (!taskId) return null;
+          return (this.datasets.tasks || []).find((task) => String(task.id) === String(taskId)) || null;
         },
         editingLeadItem() {
           const leadId = this.toIntOrNull(this.editingLeadId);
@@ -803,6 +809,34 @@
         },
         showTaskResultField() {
           return this.isTaskDoneStatus(this.forms.tasks.status) || !!String(this.forms.tasks.result || "").trim();
+        },
+        taskSummaryStatusLabel() {
+          return this.taskStatusMeta(this.forms.tasks.status).label || "Не выбран";
+        },
+        taskSummaryPriorityLabel() {
+          const value = String(this.forms.tasks.priority || "").trim();
+          return (this.taskPriorityOptions || []).find((option) => option.value === value)?.label || "Не выбран";
+        },
+        taskSummaryTaskTypeGroupLabel() {
+          const value = this.normalizeTaskTypeGroup(this.forms.tasks.taskTypeGroup);
+          return (this.taskTypeGroupOptions || []).find((option) => option.value === value)?.label || "Не выбрана";
+        },
+        taskSummaryTaskTypeLabel() {
+          const taskType = this.resolveTaskTypeById(this.forms.tasks.taskTypeId);
+          return taskType?.name || "Не выбран";
+        },
+        taskSummaryCompanyLabel() {
+          const companyId = this.toIntOrNull(this.forms.tasks.companyId);
+          if (!companyId) return "Не выбрана";
+          return (this.datasets.companies || []).find((company) => String(company.id) === String(companyId))?.name || "Не выбрана";
+        },
+        taskSummaryDealLabel() {
+          const dealId = this.toIntOrNull(this.forms.tasks.dealId);
+          if (!dealId) return "Не выбрана";
+          return (this.datasets.deals || []).find((deal) => String(deal.id) === String(dealId))?.title || "Не выбрана";
+        },
+        taskSummaryDueLabel() {
+          return this.forms.tasks.dueAt ? this.formatDueLabel(this.forms.tasks.dueAt) : "Не указан";
         },
         currentTaskTypeGroup() {
           return this.normalizeTaskTypeGroup(
@@ -2504,6 +2538,7 @@
         openLeadEditor(item) {
           this.clearUiErrors({ modalOnly: true });
           this.leadSummaryEditingField = "";
+          this.taskSummaryEditingField = "";
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
@@ -2534,6 +2569,7 @@
         },
         openDealEditor(item) {
           this.clearUiErrors({ modalOnly: true });
+          this.taskSummaryEditingField = "";
           this.editingContactId = null;
           this.editingCompanyId = null;
           this.editingTaskId = null;
@@ -2654,6 +2690,7 @@
         openTaskEditor(item) {
           this.clearUiErrors({ modalOnly: true });
           this.activeSection = "tasks";
+          this.taskSummaryEditingField = "";
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
@@ -3189,6 +3226,17 @@
             this.leadSummaryEditingField = "";
           }
         },
+        isTaskSummaryEditing(fieldKey) {
+          return String(this.taskSummaryEditingField || "") === String(fieldKey || "");
+        },
+        startTaskSummaryEdit(fieldKey) {
+          this.taskSummaryEditingField = String(fieldKey || "");
+        },
+        stopTaskSummaryEdit(fieldKey = "") {
+          if (!fieldKey || this.isTaskSummaryEditing(fieldKey)) {
+            this.taskSummaryEditingField = "";
+          }
+        },
         openLeadSummaryField(fieldKey) {
           if (fieldKey === "lastTouch") {
             if (this.leadSummaryLastTouch) {
@@ -3208,6 +3256,16 @@
             }
           }
           this.startLeadSummaryEdit(fieldKey);
+        },
+        openTaskSummaryField(fieldKey) {
+          if (fieldKey === "relatedTouchId") {
+            const touchId = this.toIntOrNull(this.forms.tasks.relatedTouchId);
+            if (touchId) {
+              this.openTouchFromEvent(touchId);
+              return;
+            }
+          }
+          this.startTaskSummaryEdit(fieldKey);
         },
         companyWorkRuleDecisionMakerLabel() {
           const decisionMakerId = this.toIntOrNull(this.forms.companies.workRules.decisionMakerId);
@@ -4188,6 +4246,7 @@
           this.activeSection = section;
           window.localStorage.setItem("crm_active_section", section);
           this.leadSummaryEditingField = "";
+          this.taskSummaryEditingField = "";
           this.companySummaryEditingField = "";
           this.search = "";
           this.showStatusFilter = false;
@@ -4239,6 +4298,7 @@
         closeModal() {
           this.showModal = false;
           this.leadSummaryEditingField = "";
+          this.taskSummaryEditingField = "";
           this.companySummaryEditingField = "";
           this.cancelSourceCreate();
           this.clearUiErrors({ globalOnly: true });
@@ -4279,6 +4339,7 @@
         openCreateModal() {
           this.clearUiErrors({ modalOnly: true });
           this.leadSummaryEditingField = "";
+          this.taskSummaryEditingField = "";
           this.companySummaryEditingField = "";
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;

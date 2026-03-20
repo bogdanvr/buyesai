@@ -5,6 +5,16 @@ from pathlib import Path
 from crm.models.common import TimestampedModel
 
 
+def truncate_upload_filename(filename: str, max_stem_length: int = 120) -> str:
+    safe_name = Path(str(filename or "document")).name or "document"
+    path = Path(safe_name)
+    suffix = path.suffix or ""
+    stem = path.stem or "document"
+    if len(stem) <= max_stem_length:
+        return f"{stem}{suffix}"
+    return f"{stem[:max_stem_length]}{suffix}"
+
+
 def deal_document_upload_to(instance, filename: str) -> str:
     deal_id = getattr(instance, "deal_id", None) or getattr(getattr(instance, "deal", None), "id", None) or "new"
     client_id = (
@@ -12,7 +22,7 @@ def deal_document_upload_to(instance, filename: str) -> str:
         or getattr(getattr(instance, "deal", None), "client", None) and getattr(instance.deal.client, "id", None)
         or "unassigned"
     )
-    safe_name = Path(str(filename or "document")).name or "document"
+    safe_name = truncate_upload_filename(filename)
     return f"company_{client_id}/deal_{deal_id}/{safe_name}"
 
 
@@ -88,7 +98,7 @@ class DealDocument(TimestampedModel):
         on_delete=models.CASCADE,
         verbose_name="Сделка",
     )
-    file = models.FileField(upload_to=deal_document_upload_to, verbose_name="Файл")
+    file = models.FileField(upload_to=deal_document_upload_to, max_length=500, verbose_name="Файл")
     original_name = models.CharField(max_length=255, blank=True, default="", verbose_name="Название файла")
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

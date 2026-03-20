@@ -1442,10 +1442,29 @@
               v-else-if="forms.deals.description.trim()"
               class="md:col-span-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3"
             >
-              <div class="text-sm text-crm-muted">Описание сделки</div>
-              <div class="mt-2 text-sm text-white whitespace-pre-line break-words">
+              <button
+                type="button"
+                @click="toggleOptionalField('deals', 'description')"
+                class="w-full text-left"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-sm text-crm-muted">Описание сделки</span>
+                  <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent text-xs shrink-0">
+                    [[ isOptionalFieldExpanded('deals', 'description') ? '−' : '✎' ]]
+                  </span>
+                </div>
+              </button>
+              <div v-if="!isOptionalFieldExpanded('deals', 'description')" class="mt-2 text-sm text-white whitespace-pre-line break-words">
                 [[ forms.deals.description ]]
               </div>
+              <textarea
+                v-else
+                id="deal-description-textarea"
+                v-model="forms.deals.description"
+                rows="1"
+                @input="autoResizeTextarea"
+                class="mt-3 w-full overflow-hidden resize-none rounded-xl border border-crm-border bg-[#0d2942] px-4 py-3 outline-none focus:border-crm-accent"
+              ></textarea>
             </div>
             <div v-if="showDealCompanyForm || dealHasSelectedCompany" class="md:col-span-2">
               <div v-if="showDealCompanyForm" class="mt-3 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
@@ -2744,28 +2763,134 @@
           </template>
 
           <template v-if="activeSection === 'tasks'">
-            <label class="block md:col-span-2">
-              <span class="text-sm text-crm-muted">Название задачи</span>
-              <input v-model="forms.tasks.subject" type="text" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-            </label>
-            <label v-if="shouldShowTaskField('taskTypeGroup', forms.tasks.taskTypeGroup)" class="block">
-              <span class="text-sm text-crm-muted">Категория задачи</span>
-              <select v-model="forms.tasks.taskTypeGroup" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option value="">Не выбрана</option>
-                <option v-for="option in taskTypeGroupOptions" :key="`task-type-group-${option.value}`" :value="option.value">[[ option.label ]]</option>
-              </select>
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'taskTypeGroup')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Категория задачи</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
-            <label v-if="showTaskTypeSelector" class="block">
-              <span class="text-sm text-crm-muted">Тип задачи</span>
-              <select v-model="forms.tasks.taskTypeId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option :value="null">Не выбран</option>
-                <option v-for="taskType in filteredTaskTypeOptions" :key="taskType.id" :value="taskType.id">[[ taskType.name ]]</option>
-              </select>
-              <div v-if="forms.tasks.taskTypeGroup && !filteredTaskTypeOptions.length" class="mt-2 text-xs text-crm-muted">Для выбранной категории пока нет типов задач. Добавьте их в Django admin.</div>
-            </label>
+            <div class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                <div class="py-1 md:col-span-2">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Название задачи</div>
+                  <button v-if="editingTaskId && !isTaskSummaryEditing('subject')" type="button" @click="openTaskSummaryField('subject')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.tasks.subject || taskSummaryTaskTypeLabel || 'Не указано' ]]
+                  </button>
+                  <input
+                    v-else
+                    v-model="forms.tasks.subject"
+                    type="text"
+                    @keydown.enter.prevent="stopTaskSummaryEdit('subject')"
+                    @keydown.esc.prevent="stopTaskSummaryEdit('subject')"
+                    @blur="stopTaskSummaryEdit('subject')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                </div>
+                <div class="rounded-xl border border-crm-accent/40 bg-crm-accent/10 px-3 py-2">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-accent">Статус</div>
+                  <button v-if="editingTaskId && !isTaskSummaryEditing('status')" type="button" @click="openTaskSummaryField('status')" class="mt-1 text-left text-sm font-medium text-white hover:text-crm-accent transition">
+                    [[ taskSummaryStatusLabel ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.tasks.status"
+                    @change="stopTaskSummaryEdit('status')"
+                    @blur="stopTaskSummaryEdit('status')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-accent/40 bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option v-for="option in taskStatusOptions" :key="`task-summary-status-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                  </select>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Приоритет</div>
+                  <button v-if="editingTaskId && !isTaskSummaryEditing('priority')" type="button" @click="openTaskSummaryField('priority')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ taskSummaryPriorityLabel ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.tasks.priority"
+                    @change="stopTaskSummaryEdit('priority')"
+                    @blur="stopTaskSummaryEdit('priority')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option v-for="option in taskPriorityOptions" :key="`task-summary-priority-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                  </select>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Категория задачи</div>
+                  <button v-if="editingTaskId && !isTaskSummaryEditing('taskTypeGroup')" type="button" @click="openTaskSummaryField('taskTypeGroup')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ taskSummaryTaskTypeGroupLabel ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.tasks.taskTypeGroup"
+                    @change="stopTaskSummaryEdit('taskTypeGroup')"
+                    @blur="stopTaskSummaryEdit('taskTypeGroup')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option value="">Не выбрана</option>
+                    <option v-for="option in taskTypeGroupOptions" :key="`task-summary-group-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                  </select>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Тип задачи</div>
+                  <button v-if="editingTaskId && !isTaskSummaryEditing('taskTypeId')" type="button" @click="openTaskSummaryField('taskTypeId')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ taskSummaryTaskTypeLabel ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.tasks.taskTypeId"
+                    @change="stopTaskSummaryEdit('taskTypeId')"
+                    @blur="stopTaskSummaryEdit('taskTypeId')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option :value="null">Не выбран</option>
+                    <option v-for="taskType in filteredTaskTypeOptions" :key="`task-summary-type-${taskType.id}`" :value="taskType.id">[[ taskType.name ]]</option>
+                  </select>
+                  <div v-if="forms.tasks.taskTypeGroup && !filteredTaskTypeOptions.length" class="mt-2 text-xs text-crm-muted">Для выбранной категории пока нет типов задач.</div>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Компания</div>
+                  <button v-if="editingTaskId && !isTaskSummaryEditing('companyId')" type="button" @click="openTaskSummaryField('companyId')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ taskSummaryCompanyLabel ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.tasks.companyId"
+                    @change="stopTaskSummaryEdit('companyId')"
+                    @blur="stopTaskSummaryEdit('companyId')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option :value="null">Не выбрана</option>
+                    <option v-for="company in companyOptions" :key="`task-summary-company-${company.id}`" :value="company.id">[[ company.name ]]</option>
+                  </select>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Сделка</div>
+                  <button v-if="editingTaskId && !isTaskSummaryEditing('dealId')" type="button" @click="openTaskSummaryField('dealId')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ taskSummaryDealLabel ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.tasks.dealId"
+                    @change="stopTaskSummaryEdit('dealId')"
+                    @blur="stopTaskSummaryEdit('dealId')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option :value="null">Не выбрана</option>
+                    <option v-for="deal in filteredTaskDealOptions" :key="`task-summary-deal-${deal.id}`" :value="deal.id">[[ deal.title || deal.name ]]</option>
+                  </select>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Срок</div>
+                  <button v-if="editingTaskId && !isTaskSummaryEditing('dueAt')" type="button" @click="openTaskSummaryField('dueAt')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ taskSummaryDueLabel ]]
+                  </button>
+                  <div v-if="editingTaskId && !isTaskSummaryEditing('dueAt') && taskFormRemainingLabel" class="mt-1 text-xs text-crm-muted">[[ taskFormRemainingLabel ]]</div>
+                  <input
+                    v-else
+                    v-model="forms.tasks.dueAt"
+                    type="datetime-local"
+                    @blur="stopTaskSummaryEdit('dueAt')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                </div>
+              </div>
+            </div>
             <label v-if="showTaskCommunicationChannelField" class="block">
               <span class="text-sm text-crm-muted">Тип канала</span>
               <select v-model="forms.tasks.communicationChannelId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
@@ -2773,52 +2898,6 @@
                 <option v-for="channel in metaOptions.communicationChannels" :key="`task-channel-${channel.id}`" :value="channel.id">[[ channel.name ]]</option>
               </select>
             </label>
-            <label v-if="shouldShowTaskField('status', forms.tasks.status)" class="block rounded-xl border border-crm-accent/35 bg-crm-accent/8 px-4 py-3">
-              <div class="flex items-center gap-3">
-                <span class="inline-flex shrink-0 items-center rounded-md border border-crm-accent/35 bg-crm-accent/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-crm-accent">Статус задачи</span>
-                <select v-model="forms.tasks.status" class="min-w-0 flex-1 h-10 rounded-lg border border-crm-accent/30 bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
-                  <option v-for="option in taskStatusOptions" :key="`task-status-${option.value}`" :value="option.value">[[ option.label ]]</option>
-                </select>
-              </div>
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'status')" class="crm-inline-field-toggle crm-inline-field-toggle-accent">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-accent">Статус задачи</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
-            <label v-if="shouldShowTaskField('priority', forms.tasks.priority)" class="block">
-              <span class="text-sm text-crm-muted">Приоритет</span>
-              <select v-model="forms.tasks.priority" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option v-for="option in taskPriorityOptions" :key="`task-priority-${option.value}`" :value="option.value">[[ option.label ]]</option>
-              </select>
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'priority')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Приоритет</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
-            <label v-if="shouldShowTaskField('companyId', forms.tasks.companyId)" class="block">
-              <span class="text-sm text-crm-muted">Компания</span>
-              <select v-model="forms.tasks.companyId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option :value="null">Не выбрана</option>
-                <option v-for="company in companyOptions" :key="company.id" :value="company.id">[[ company.name ]]</option>
-              </select>
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'companyId')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Компания</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
-            <label v-if="showTaskDealSelector" class="block">
-              <span class="text-sm text-crm-muted">Сделка</span>
-              <select v-model="forms.tasks.dealId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option :value="null">Не выбрана</option>
-                <option v-for="deal in filteredTaskDealOptions" :key="`task-deal-${deal.id}`" :value="deal.id">[[ deal.title || deal.name ]]</option>
-              </select>
-              <div v-if="forms.tasks.companyId && !filteredTaskDealOptions.length" class="mt-2 text-xs text-crm-muted">У выбранной компании пока нет сделок.</div>
-            </label>
-            <label v-if="shouldShowTaskField('dueAt', forms.tasks.dueAt)" class="block">
-              <span class="text-sm text-crm-muted">Срок</span>
-              <input v-model="forms.tasks.dueAt" type="datetime-local" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent" />
-              <div v-if="taskFormRemainingLabel" class="mt-2 text-xs text-crm-muted">[[ taskFormRemainingLabel ]]</div>
-            </label>
-            <button v-else type="button" @click="toggleOptionalField('tasks', 'dueAt')" class="crm-inline-field-toggle">
-              <div class="flex items-center justify-between gap-3"><span class="text-sm text-crm-muted">Срок</span><span class="text-crm-accent text-xs">+</span></div>
-            </button>
             <label v-if="shouldShowTaskField('reminderOffsetMinutes', forms.tasks.reminderOffsetMinutes)" class="block">
               <span class="text-sm text-crm-muted">Напомнить за</span>
               <select v-model="forms.tasks.reminderOffsetMinutes" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
