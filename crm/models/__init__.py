@@ -6,7 +6,7 @@ from crm.models.deal import Deal, DealDocument
 from crm.models.lead import Lead
 from crm.models.source import LeadSource
 from crm.models.status import DealStage, LeadStatus
-from crm.models.touch import Touch, TouchResult
+from crm.models.touch import OutcomeCatalog, Touch, TouchResult
 
 __all__ = [
     "Activity",
@@ -24,6 +24,7 @@ __all__ = [
     "LeadSource",
     "LeadStatus",
     "DealStage",
+    "OutcomeCatalog",
     "Touch",
     "TouchResult",
 ]
