@@ -1,15 +1,12 @@
 from django.db import models
 
-from crm.models.common import TimestampedModel
-
-
 class AutomationTouchpointMode(models.TextChoices):
     NONE = "none", "Не создавать"
     DRAFT = "draft", "Черновик"
     CREATE = "create", "Создать"
 
 
-class AutomationRule(TimestampedModel):
+class AutomationRule(models.Model):
     event_type = models.CharField(max_length=64, unique=True, verbose_name="Тип события")
     write_timeline = models.BooleanField(default=True, verbose_name="Писать в ленту")
     create_message = models.BooleanField(default=False, verbose_name="Создавать сообщение")
