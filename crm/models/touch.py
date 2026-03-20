@@ -48,7 +48,7 @@ def normalize_touch_channel_code(value: str) -> str:
     return aliases.get(slug, slug)
 
 
-class TouchResult(TimestampedModel):
+class TouchResult(models.Model):
     code = models.CharField(max_length=64, unique=True, blank=True, null=True, verbose_name="Код")
     name = models.CharField(max_length=128, unique=True, verbose_name="Результат касания")
     group = models.CharField(
