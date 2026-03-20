@@ -167,6 +167,132 @@
               [[ filteredItems.length ]] элементов
             </div>
 
+            <div class="relative" data-manager-notifications>
+              <button
+                type="button"
+                @click="toggleManagerNotifications"
+                class="relative h-8 md:h-11 px-2.5 md:px-4 rounded-lg md:rounded-xl border border-crm-border bg-[#13314e] text-[12px] md:text-sm font-medium hover:border-crm-accent hover:text-white transition whitespace-nowrap"
+              >
+                <span class="inline-flex items-center gap-2">
+                  <span>Уведомления</span>
+                  <span
+                    v-if="managerNotificationsCount"
+                    class="inline-flex min-w-[20px] items-center justify-center rounded-full bg-crm-accent px-1.5 py-0.5 text-[11px] font-semibold text-white"
+                  >
+                    [[ managerNotificationsCount ]]
+                  </span>
+                </span>
+              </button>
+
+              <div
+                v-if="showManagerNotifications"
+                class="absolute right-0 top-[calc(100%+8px)] z-30 w-[min(92vw,420px)] rounded-2xl border border-crm-border bg-[#0d2c47] shadow-panel p-3"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <div class="text-sm font-semibold text-white">Панель менеджера</div>
+                    <div class="text-xs text-crm-muted">Требует внимания и подтверждения</div>
+                  </div>
+                  <div class="text-xs text-crm-muted">[[ managerNotificationsCount ]] шт.</div>
+                </div>
+
+                <div v-if="!managerNotifications.length" class="mt-3 text-sm text-crm-muted">
+                  Сейчас нет элементов, требующих реакции менеджера.
+                </div>
+
+                <div v-else class="mt-3 space-y-2 max-h-[60vh] overflow-auto pr-1">
+                  <button
+                    v-for="notification in managerNotifications"
+                    :key="notification.id"
+                    type="button"
+                    @click="openManagerNotification(notification)"
+                    class="w-full rounded-xl border p-3 text-left transition hover:border-crm-accent"
+                    :class="managerNotificationCardClass(notification)"
+                  >
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span class="text-sm font-semibold text-white [overflow-wrap:anywhere]">[[ notification.title ]]</span>
+                      <span class="text-[11px] text-crm-muted">[[ eventShortTimestamp(notification.happenedAt) || 'Без даты' ]]</span>
+                    </div>
+                    <div class="mt-1 text-xs text-crm-muted [overflow-wrap:anywhere]">
+                      [[ notification.dealTitle || notification.companyName || 'Без привязки' ]]
+                    </div>
+                    <div v-if="notification.recommendedAction" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
+                      Рекомендовано: [[ notification.recommendedAction ]]
+                    </div>
+                    <div class="mt-2 flex flex-wrap gap-2 text-[11px] text-crm-text">
+                      <span v-if="notification.deadline">Срок: [[ formatDueLabel(notification.deadline) ]]</span>
+                      <span v-if="notification.needsConfirmation">Требует подтверждения</span>
+                      <span v-if="notification.isDraft">Есть черновик</span>
+                    </div>
+                    <div
+                      v-if="notification.sourceType === 'queue' && notification.availableActions && notification.availableActions.length"
+                      class="mt-3 flex flex-wrap gap-2"
+                    >
+                      <button
+                        v-for="action in notification.availableActions"
+                        :key="`notification-action-${notification.id}-${action.id}`"
+                        type="button"
+                        @click.stop="handleAutomationQuickAction(notification, action.id)"
+                        class="inline-flex h-8 items-center rounded-lg border border-sky-400/30 bg-sky-400/10 px-3 text-xs font-semibold text-white transition hover:border-sky-300"
+                      >
+                        [[ action.label ]]
+                      </button>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <button
+                        v-if="notification.sourceType === 'queue'"
+                        type="button"
+                        @click.stop="confirmAutomationQueueItem(notification.sourceId)"
+                        class="inline-flex h-8 items-center rounded-lg border border-crm-accent/40 bg-crm-accent/15 px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Обработано
+                      </button>
+                      <button
+                        v-if="notification.sourceType === 'queue'"
+                        type="button"
+                        @click.stop="dismissAutomationQueueItem(notification.sourceId)"
+                        class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Скрыть
+                      </button>
+                      <button
+                        v-if="notification.sourceType === 'draft'"
+                        type="button"
+                        @click.stop="confirmAutomationDraft(notification.sourceId)"
+                        class="inline-flex h-8 items-center rounded-lg border border-crm-accent/40 bg-crm-accent/15 px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Подтвердить
+                      </button>
+                      <button
+                        v-if="notification.sourceType === 'draft'"
+                        type="button"
+                        @click.stop="dismissAutomationDraft(notification.sourceId)"
+                        class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Отклонить
+                      </button>
+                      <button
+                        v-if="notification.sourceType === 'message_draft'"
+                        type="button"
+                        @click.stop="confirmAutomationMessageDraft(notification.sourceId)"
+                        class="inline-flex h-8 items-center rounded-lg border border-crm-accent/40 bg-crm-accent/15 px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Подтвердить
+                      </button>
+                      <button
+                        v-if="notification.sourceType === 'message_draft'"
+                        type="button"
+                        @click.stop="dismissAutomationMessageDraft(notification.sourceId)"
+                        class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Отклонить
+                      </button>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <button
               @click="reloadActiveSection"
               class="h-8 md:h-11 px-2.5 md:px-4 rounded-lg md:rounded-xl border border-crm-border bg-[#13314e] text-[12px] md:text-sm font-medium hover:border-crm-accent hover:text-white transition whitespace-nowrap"
@@ -979,94 +1105,115 @@
                   </span>
                 </div>
               </div>
-              <div v-if="parseEventLog(leadEventLog(forms.leads)).length">
+              <div v-if="leadTimelineItems.length">
                 <div class="text-sm text-crm-muted">События</div>
                 <div class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
                   <div class="space-y-3">
                     <div
-                      v-for="(eventItem, eventIndex) in parseEventLog(leadEventLog(forms.leads))"
-                      :key="`lead-event-${editingLeadId || 'new'}-${eventIndex}`"
-                      :class="dealEventCardClass(eventItem)"
+                      v-for="(timelineItem, eventIndex) in leadTimelineItems"
+                      :key="`lead-event-${editingLeadId || 'new'}-${timelineItem.id || eventIndex}`"
+                      :class="dealEventCardClass(dealTimelinePrimaryEvent(timelineItem))"
                       class="rounded-xl border p-3"
                     >
-                      <template v-if="eventItem.eventType === 'touch'">
+                      <div v-if="timelineItem.type === 'chain'" class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
+                        <div class="min-w-0">
+                          <div class="text-xs uppercase tracking-[0.14em] text-crm-muted">[[ timelineItem.title ]]</div>
+                          <div class="mt-1 text-xs text-crm-muted [overflow-wrap:anywhere]">[[ dealTimelineChainSummary(timelineItem) ]]</div>
+                        </div>
+                        <div class="shrink-0 rounded-full border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-white">
+                          [[ timelineItem.items.length ]] события
+                        </div>
+                      </div>
+                      <template v-if="dealTimelinePrimaryEvent(timelineItem)?.eventType === 'touch'">
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
-                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || eventItem.result ]]</span>
-                          <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
-                          <span v-if="eventItem.actorName" class="text-crm-muted shrink-0">[[ eventItem.actorName ]]</span>
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(dealTimelinePrimaryEvent(timelineItem)) ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).title || dealTimelinePrimaryEvent(timelineItem).result ]]</span>
+                          <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(dealTimelinePrimaryEvent(timelineItem).timestamp) || 'Без даты' ]]</span>
+                          <span v-if="dealTimelinePrimaryEvent(timelineItem).actorName" class="text-crm-muted shrink-0">[[ dealTimelinePrimaryEvent(timelineItem).actorName ]]</span>
                           <button
-                            v-if="eventItem.touchId"
+                            v-if="dealTimelinePrimaryEvent(timelineItem).touchId"
                             type="button"
-                            @click.stop="openTouchFromEvent(eventItem.touchId)"
+                            @click.stop="openTouchFromEvent(dealTimelinePrimaryEvent(timelineItem).touchId)"
                             class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                           >
-                            Касание #[[ eventItem.touchId ]]
+                            Касание #[[ dealTimelinePrimaryEvent(timelineItem).touchId ]]
                           </button>
                           <button
-                            v-if="eventItem.dealId"
+                            v-if="dealTimelinePrimaryEvent(timelineItem).dealId"
                             type="button"
-                            @click.stop="openDealFromEvent(eventItem.dealId)"
+                            @click.stop="openDealFromEvent(dealTimelinePrimaryEvent(timelineItem).dealId)"
                             class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                           >
-                            Сделка #[[ eventItem.dealId ]]
+                            Сделка #[[ dealTimelinePrimaryEvent(timelineItem).dealId ]]
                           </button>
                         </div>
-                      <div v-if="eventItem.summaryText || eventItem.touchResult" class="mt-2 text-sm text-white whitespace-pre-line [overflow-wrap:anywhere]">[[ eventItem.summaryText || eventItem.touchResult ]]</div>
-                      <div v-if="eventItem.nextStep" class="mt-2 text-sm text-crm-muted [overflow-wrap:anywhere]">
-                        Следующий шаг: [[ eventItem.nextStep ]][[ eventItem.nextStepAt ? ` до ${formatEventTimestamp(eventItem.nextStepAt)}` : '' ]]
+                      <div v-if="dealTimelinePrimaryEvent(timelineItem).summaryText || dealTimelinePrimaryEvent(timelineItem).touchResult" class="mt-2 text-sm text-white whitespace-pre-line [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).summaryText || dealTimelinePrimaryEvent(timelineItem).touchResult ]]</div>
+                      <div v-if="dealTimelinePrimaryEvent(timelineItem).documents && dealTimelinePrimaryEvent(timelineItem).documents.length" class="mt-2 space-y-2">
+                        <a
+                          v-for="(documentItem, documentIndex) in dealTimelinePrimaryEvent(timelineItem).documents"
+                          :key="`lead-touch-doc-${eventIndex}-${documentIndex}`"
+                          :href="documentItem.url"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex max-w-full items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent [overflow-wrap:anywhere]"
+                        >
+                          [[ documentItem.name || 'Документ' ]]
+                        </a>
+                      </div>
+                      <div v-if="dealTimelinePrimaryEvent(timelineItem).nextStep" class="mt-2 text-sm text-crm-muted [overflow-wrap:anywhere]">
+                        Следующий шаг: [[ dealTimelinePrimaryEvent(timelineItem).nextStep ]][[ dealTimelinePrimaryEvent(timelineItem).nextStepAt ? ` до ${formatEventTimestamp(dealTimelinePrimaryEvent(timelineItem).nextStepAt)}` : '' ]]
                       </div>
                       </template>
-                      <template v-else-if="eventItem.eventType === 'task'">
+                      <template v-else-if="dealTimelinePrimaryEvent(timelineItem)?.renderType === 'task'">
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
-                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || eventItem.result ]]</span>
-                          <span v-if="eventItem.taskTypeName" class="text-crm-muted shrink-0">Тип: [[ eventItem.taskTypeName ]]</span>
-                          <span v-if="eventItem.dueAt" class="text-crm-muted shrink-0">Срок: [[ eventShortTimestamp(eventItem.dueAt) ]]</span>
-                          <span v-if="eventItem.taskStatusLabel" class="text-crm-muted shrink-0">Статус: [[ eventItem.taskStatusLabel.toLowerCase() ]]</span>
-                          <span v-if="eventItem.ownerName" class="text-crm-muted shrink-0">[[ eventItem.ownerName ]]</span>
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(dealTimelinePrimaryEvent(timelineItem)) ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).title || dealTimelinePrimaryEvent(timelineItem).result ]]</span>
+                          <span v-if="dealTimelinePrimaryEvent(timelineItem).taskTypeName" class="text-crm-muted shrink-0">Тип: [[ dealTimelinePrimaryEvent(timelineItem).taskTypeName ]]</span>
+                          <span v-if="dealTimelinePrimaryEvent(timelineItem).dueAt" class="text-crm-muted shrink-0">Срок: [[ eventShortTimestamp(dealTimelinePrimaryEvent(timelineItem).dueAt) ]]</span>
+                          <span v-if="dealTimelinePrimaryEvent(timelineItem).taskStatusLabel" class="text-crm-muted shrink-0">Статус: [[ dealTimelinePrimaryEvent(timelineItem).taskStatusLabel.toLowerCase() ]]</span>
+                          <span v-if="dealTimelinePrimaryEvent(timelineItem).ownerName" class="text-crm-muted shrink-0">[[ dealTimelinePrimaryEvent(timelineItem).ownerName ]]</span>
                           <button
-                            v-if="eventItem.taskId"
+                            v-if="dealTimelinePrimaryEvent(timelineItem).taskId"
                             type="button"
-                            @click.stop="openTaskFromEvent(eventItem.taskId)"
+                            @click.stop="openTaskFromEvent(dealTimelinePrimaryEvent(timelineItem).taskId)"
                             class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                           >
-                            Задача #[[ eventItem.taskId ]]
+                            Задача #[[ dealTimelinePrimaryEvent(timelineItem).taskId ]]
                           </button>
                           <button
-                            v-if="eventItem.dealId"
+                            v-if="dealTimelinePrimaryEvent(timelineItem).dealId"
                             type="button"
-                            @click.stop="openDealFromEvent(eventItem.dealId)"
+                            @click.stop="openDealFromEvent(dealTimelinePrimaryEvent(timelineItem).dealId)"
                             class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                           >
-                            Сделка #[[ eventItem.dealId ]]
+                            Сделка #[[ dealTimelinePrimaryEvent(timelineItem).dealId ]]
                           </button>
                         </div>
-                      <div v-if="eventItem.taskResult" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
-                        Результат: [[ eventItem.taskResult ]]
+                      <div v-if="dealTimelinePrimaryEvent(timelineItem).taskResult" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
+                        Результат: [[ dealTimelinePrimaryEvent(timelineItem).taskResult ]]
                       </div>
                       </template>
-                    <template v-else-if="eventItem.eventType === 'document'">
+                    <template v-else-if="dealTimelinePrimaryEvent(timelineItem)?.eventType === 'document'">
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
-                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || 'Документ' ]]</span>
-                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
-                        <span v-if="eventItem.actorName" class="text-crm-muted shrink-0">[[ eventItem.actorName ]]</span>
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(dealTimelinePrimaryEvent(timelineItem)) ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).title || 'Документ' ]]</span>
+                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(dealTimelinePrimaryEvent(timelineItem).timestamp) || 'Без даты' ]]</span>
+                        <span v-if="dealTimelinePrimaryEvent(timelineItem).actorName" class="text-crm-muted shrink-0">[[ dealTimelinePrimaryEvent(timelineItem).actorName ]]</span>
                         <button
-                          v-if="eventItem.dealId"
+                          v-if="dealTimelinePrimaryEvent(timelineItem).dealId"
                           type="button"
-                          @click.stop="openDealFromEvent(eventItem.dealId)"
+                          @click.stop="openDealFromEvent(dealTimelinePrimaryEvent(timelineItem).dealId)"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                         >
-                          Сделка #[[ eventItem.dealId ]]
+                          Сделка #[[ dealTimelinePrimaryEvent(timelineItem).dealId ]]
                         </button>
                       </div>
                       <div class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
-                        [[ eventItem.documentName || eventItem.result ]]
+                        [[ dealTimelinePrimaryEvent(timelineItem).documentName || dealTimelinePrimaryEvent(timelineItem).result ]]
                       </div>
-                      <div v-if="eventItem.documentUrl" class="mt-2">
+                      <div v-if="dealTimelinePrimaryEvent(timelineItem).documentUrl" class="mt-2">
                         <a
-                          :href="eventItem.documentUrl"
+                          :href="dealTimelinePrimaryEvent(timelineItem).documentUrl"
                           target="_blank"
                           rel="noopener noreferrer"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent"
@@ -1077,11 +1224,11 @@
                     </template>
                     <template v-else>
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-crm-muted">
-                        <span class="text-[11px] uppercase tracking-[0.16em] shrink-0">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
-                        <span class="text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.result || eventItem.title || 'Системное событие' ]]</span>
-                        </div>
-                      </template>
-                    </div>
+                        <span class="text-[11px] uppercase tracking-[0.16em] shrink-0">[[ formatEventTimestamp(dealTimelinePrimaryEvent(timelineItem).timestamp) || 'Без даты' ]]</span>
+                        <span class="text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).result || dealTimelinePrimaryEvent(timelineItem).title || 'Системное событие' ]]</span>
+                      </div>
+                    </template>
+                  </div>
                   </div>
                 </div>
               </div>
@@ -1253,11 +1400,11 @@
                 </div>
                 <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Следующий шаг</div>
-                  <div class="text-sm text-white">[[ dealSummaryNextStepTask?.subject || dealSummaryNextTouch?.nextStep || 'Не указан' ]]</div>
+                  <div class="text-sm text-white">[[ dealSummaryNextStepLabel ]]</div>
                 </button>
                 <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дата следующего шага</div>
-                  <div class="text-sm text-white">[[ dealSummaryNextStepTask?.dueAtRaw ? formatDueLabel(dealSummaryNextStepTask.dueAtRaw) : (dealSummaryNextTouch?.nextStepAtRaw ? formatDueLabel(dealSummaryNextTouch.nextStepAtRaw) : 'Не указана') ]]</div>
+                  <div class="text-sm text-white">[[ dealSummaryNextStepAtLabel ]]</div>
                 </button>
                 <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Последнее касание</div>
@@ -1299,6 +1446,255 @@
                 <span class="text-crm-accent">+</span>
                 <span>Документы</span>
               </button>
+            </div>
+            <div v-if="editingDealId && hasDealAutomationSummaryBlocks" class="md:col-span-2 grid grid-cols-1 gap-3 xl:grid-cols-2">
+              <div v-if="dealAutomationNextAction" class="rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Следующее действие</div>
+                    <div class="mt-1 text-base font-semibold text-white">[[ dealAutomationNextAction.title || 'Не указано' ]]</div>
+                  </div>
+                  <div v-if="dealAutomationNextAction.at" class="rounded-full border border-crm-border bg-[#102f4a] px-2.5 py-1 text-xs text-white">
+                    [[ formatDueLabel(dealAutomationNextAction.at) ]]
+                  </div>
+                </div>
+                <div class="mt-3 grid grid-cols-1 gap-2 text-sm text-white md:grid-cols-2">
+                  <div><span class="text-crm-muted">Ответственный:</span> [[ dealAutomationNextAction.ownerName || 'Не назначен' ]]</div>
+                  <div><span class="text-crm-muted">Источник:</span> [[ dealAutomationNextAction.sourceLabel || '—' ]]</div>
+                  <div v-if="dealAutomationNextAction.recommendedAction" class="md:col-span-2"><span class="text-crm-muted">Рекомендация:</span> [[ dealAutomationNextAction.recommendedAction ]]</div>
+                </div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <button
+                    v-if="dealAutomationNextAction.sourceTouchId"
+                    type="button"
+                    @click="openTouchFromEvent(dealAutomationNextAction.sourceTouchId)"
+                    class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                  >
+                    Открыть событие
+                  </button>
+                  <button
+                    v-if="dealAutomationNextAction.canConfirm && dealAutomationNextAction.queueId"
+                    type="button"
+                    @click="confirmAutomationQueueItem(dealAutomationNextAction.queueId)"
+                    class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                  >
+                    Подтвердить
+                  </button>
+                  <button
+                    v-if="dealAutomationNextAction.canConfirm && dealAutomationNextAction.queueId"
+                    type="button"
+                    @click="dismissAutomationQueueItem(dealAutomationNextAction.queueId)"
+                    class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                  >
+                    Отклонить
+                  </button>
+                  <button
+                    v-if="dealAutomationNextAction.canCreateTask"
+                    type="button"
+                    @click="prepareDealTaskFromAutomation(dealAutomationNextAction)"
+                    class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                  >
+                    Создать задачу
+                  </button>
+                </div>
+              </div>
+              <div v-if="dealLatestSignificantItem" :class="['rounded-2xl border p-4', dealAutomationCardClass(dealLatestSignificantItem)]">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Последнее значимое событие</div>
+                    <div class="mt-1 text-base font-semibold text-white">[[ dealLatestSignificantItem.eventLabel ]]</div>
+                  </div>
+                  <div class="rounded-full border border-current/20 px-2.5 py-1 text-xs text-white/90">
+                    [[ formatEventTimestamp(dealLatestSignificantItem.happenedAtRaw) ]]
+                  </div>
+                </div>
+                <div class="mt-3 text-sm text-white [overflow-wrap:anywhere]">
+                  [[ dealLatestSignificantItem.summary || dealLatestSignificantItem.resultName || 'Без описания' ]]
+                </div>
+                <div class="mt-2 text-sm text-crm-muted">
+                  [[ dealLatestSignificantItem.ownerName || 'Менеджер не указан' ]]
+                </div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    @click="openTouchFromEvent(dealLatestSignificantItem.touchId)"
+                    class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                  >
+                    Открыть касание
+                  </button>
+                  <button
+                    v-if="dealLatestSignificantItem.hasSuggestedNextStep"
+                    type="button"
+                    @click="prepareDealTaskFromAutomation({ title: dealLatestSignificantItem.suggestedNextStep, at: dealLatestSignificantItem.suggestedNextStepAt, taskTypeGroup: dealLatestSignificantItem.defaultTaskTypeGroup, communicationChannelId: dealLatestSignificantItem.defaultCommunicationChannelId })"
+                    class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                  >
+                    Следующая задача
+                  </button>
+                </div>
+              </div>
+              <div v-if="dealAttentionChains.length" class="xl:col-span-2 rounded-2xl border border-red-400/30 bg-red-400/10 p-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div class="text-xs uppercase tracking-[0.12em] text-red-100/80">Требует внимания</div>
+                    <div class="mt-1 text-base font-semibold text-white">[[ dealAttentionChains.length ]] [[ dealAttentionChains.length === 1 ? 'цепочка' : 'цепочки' ]] требуют реакции</div>
+                  </div>
+                </div>
+                <div class="mt-3 space-y-3">
+                  <div
+                    v-for="chain in dealAttentionChains"
+                    :key="chain.id"
+                    :class="['rounded-xl border p-3', dealAutomationCardClass(chain.primary)]"
+                  >
+                    <div class="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                      <div class="min-w-0">
+                        <div class="text-sm font-semibold text-white">[[ chain.title ]]</div>
+                        <div class="mt-1 text-xs text-crm-muted">[[ formatEventTimestamp(chain.primary.happenedAtRaw) ]] • [[ chain.primary.ownerName || 'Менеджер не указан' ]]</div>
+                      </div>
+                      <div class="shrink-0 rounded-full border border-current/20 px-2 py-1 text-[11px] text-white/90">
+                        [[ chain.count > 1 ? `${chain.count} события` : (chain.primary.uiPriority || 'low') ]]
+                      </div>
+                    </div>
+                    <div class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
+                      [[ chain.primary.summary || chain.primary.resultName || 'Без описания' ]]
+                    </div>
+                    <div v-if="chain.primary.recommendedAction || chain.primary.suggestedNextStep" class="mt-2 text-sm text-crm-muted [overflow-wrap:anywhere]">
+                      Рекомендованное действие: [[ chain.primary.recommendedAction || chain.primary.suggestedNextStep ]]
+                    </div>
+                    <div v-if="chain.count > 1" class="mt-2 text-xs text-crm-muted">
+                      [[ chain.items.map(item => item.eventLabel).join(' • ') ]]
+                    </div>
+                    <div
+                      v-if="chain.primary.availableActions && chain.primary.availableActions.length"
+                      class="mt-3 flex flex-wrap gap-2"
+                    >
+                      <button
+                        v-for="action in chain.primary.availableActions"
+                        :key="`deal-attention-action-${chain.id}-${action.id}`"
+                        type="button"
+                        @click="handleAutomationQuickAction(chain.primary, action.id)"
+                        class="inline-flex h-9 items-center rounded-xl border border-sky-400/30 bg-sky-400/10 px-3 text-sm font-semibold text-white transition hover:border-sky-300"
+                      >
+                        [[ action.label ]]
+                      </button>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        @click="openTouchFromEvent(chain.primary.touchId)"
+                        class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Открыть
+                      </button>
+                      <button
+                        v-if="chain.primary.hasSuggestedNextStep"
+                        type="button"
+                        @click="prepareDealTaskFromAutomation({ title: chain.primary.suggestedNextStep, at: chain.primary.suggestedNextStepAt, taskTypeGroup: chain.primary.defaultTaskTypeGroup, communicationChannelId: chain.primary.defaultCommunicationChannelId })"
+                        class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Создать задачу
+                      </button>
+                      <button
+                        v-if="chain.primary.queueId"
+                        type="button"
+                        @click="confirmAutomationQueueItem(chain.primary.queueId)"
+                        class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Обработано
+                      </button>
+                      <button
+                        v-if="chain.primary.queueId"
+                        type="button"
+                        @click="dismissAutomationQueueItem(chain.primary.queueId)"
+                        class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Скрыть
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-if="dealSignalChains.length" class="rounded-2xl border border-sky-400/20 bg-sky-400/10 p-4">
+                <div class="text-xs uppercase tracking-[0.12em] text-sky-100/80">Сигналы интереса</div>
+                <div class="mt-3 space-y-2">
+                  <button
+                    v-for="chain in dealSignalChains"
+                    :key="chain.id"
+                    type="button"
+                    @click="openTouchFromEvent(chain.primary.touchId)"
+                    class="flex w-full min-w-0 items-start justify-between gap-3 rounded-xl border border-sky-400/20 bg-[#102f4a] px-3 py-3 text-left transition hover:border-sky-300/40"
+                  >
+                    <div class="min-w-0">
+                      <div class="text-sm font-semibold text-white">[[ chain.title ]]</div>
+                      <div class="mt-1 text-sm text-crm-muted [overflow-wrap:anywhere]">[[ chain.primary.summary || chain.primary.resultName || 'Сигнал зафиксирован' ]]</div>
+                      <div v-if="chain.count > 1" class="mt-1 text-xs text-crm-muted">[[ chain.count ]] события в цепочке</div>
+                    </div>
+                    <div class="shrink-0 text-xs text-crm-muted">[[ formatEventTimestamp(chain.primary.happenedAtRaw) ]]</div>
+                  </button>
+                </div>
+              </div>
+              <div v-if="dealDraftTouchChains.length" class="rounded-2xl border border-amber-400/25 bg-amber-400/10 p-4">
+                <div class="text-xs uppercase tracking-[0.12em] text-amber-100/80">Черновики автоматизации</div>
+                <div class="mt-3 space-y-3">
+                  <div
+                    v-for="chain in dealDraftTouchChains"
+                    :key="chain.id"
+                    class="rounded-xl border border-amber-400/20 bg-[#102f4a] p-3"
+                  >
+                    <div class="text-sm font-semibold text-white">[[ chain.title ]]</div>
+                    <div class="mt-1 text-xs text-crm-muted">[[ formatEventTimestamp(chain.primary.happenedAtRaw) ]] • [[ chain.primary.draftKind === 'message' ? (chain.primary.messageSubject || 'Черновик сообщения') : (chain.primary.resultName || 'Результат не указан') ]]</div>
+                    <div v-if="chain.primary.draftKind === 'message'" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
+                      [[ chain.primary.messageText || 'Текст сообщения не указан' ]]
+                    </div>
+                    <div v-else-if="chain.primary.suggestedNextStep" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
+                      [[ chain.primary.suggestedNextStep ]][[ chain.primary.suggestedNextStepAt ? ` до ${formatDueLabel(chain.primary.suggestedNextStepAt)}` : '' ]]
+                    </div>
+                    <div v-if="chain.count > 1" class="mt-2 text-xs text-crm-muted">
+                      [[ chain.count ]] события в этой цепочке
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <button
+                        v-if="chain.primary.draftKind !== 'message'"
+                        type="button"
+                        @click="confirmAutomationDraft(chain.primary.draftId)"
+                        class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Подтвердить
+                      </button>
+                      <button
+                        v-if="chain.primary.draftKind === 'message'"
+                        type="button"
+                        @click="confirmAutomationMessageDraft(chain.primary.messageDraftId)"
+                        class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Подтвердить
+                      </button>
+                      <button
+                        type="button"
+                        @click="openTouchFromEvent(chain.primary.touchId)"
+                        class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Изменить
+                      </button>
+                      <button
+                        v-if="chain.primary.draftKind !== 'message'"
+                        type="button"
+                        @click="dismissAutomationDraft(chain.primary.draftId)"
+                        class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Отклонить
+                      </button>
+                      <button
+                        v-if="chain.primary.draftKind === 'message'"
+                        type="button"
+                        @click="dismissAutomationMessageDraft(chain.primary.messageDraftId)"
+                        class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Отклонить
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
             <div v-if="editingDealId && showDealDocumentsPanel" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <div class="flex flex-wrap items-center justify-between gap-3">
@@ -1568,81 +1964,102 @@
               <span class="text-sm text-crm-muted">Причина провала</span>
               <textarea v-model="forms.deals.failureReason" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <label v-if="parseEventLog(forms.deals.events).length" class="block md:col-span-2">
+            <label v-if="dealTimelineItems.length" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">События</span>
               <div class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
-                <div v-if="!parseEventLog(forms.deals.events).length" class="text-sm text-crm-muted">
+                <div v-if="!dealTimelineItems.length" class="text-sm text-crm-muted">
                   Событий пока нет.
                 </div>
                 <div v-else class="space-y-3">
                   <div
-                    v-for="(eventItem, eventIndex) in parseEventLog(forms.deals.events)"
-                    :key="`deal-event-${editingDealId || 'new'}-${eventIndex}`"
-                    :class="dealEventCardClass(eventItem)"
+                    v-for="(timelineItem, eventIndex) in dealTimelineItems"
+                    :key="`deal-event-${editingDealId || 'new'}-${timelineItem.id || eventIndex}`"
+                    :class="dealEventCardClass(dealTimelinePrimaryEvent(timelineItem))"
                     class="rounded-xl border p-3"
                   >
-                    <template v-if="eventItem.eventType === 'touch'">
+                    <div v-if="timelineItem.type === 'chain'" class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
+                      <div class="min-w-0">
+                        <div class="text-xs uppercase tracking-[0.14em] text-crm-muted">[[ timelineItem.title ]]</div>
+                        <div class="mt-1 text-xs text-crm-muted [overflow-wrap:anywhere]">[[ dealTimelineChainSummary(timelineItem) ]]</div>
+                      </div>
+                      <div class="shrink-0 rounded-full border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-white">
+                        [[ timelineItem.items.length ]] события
+                      </div>
+                    </div>
+                    <template v-if="dealTimelinePrimaryEvent(timelineItem)?.eventType === 'touch'">
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
-                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || eventItem.result ]]</span>
-                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
-                        <span v-if="eventItem.actorName" class="text-crm-muted shrink-0">[[ eventItem.actorName ]]</span>
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(dealTimelinePrimaryEvent(timelineItem)) ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).title || dealTimelinePrimaryEvent(timelineItem).result ]]</span>
+                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(dealTimelinePrimaryEvent(timelineItem).timestamp) || 'Без даты' ]]</span>
+                        <span v-if="dealTimelinePrimaryEvent(timelineItem).actorName" class="text-crm-muted shrink-0">[[ dealTimelinePrimaryEvent(timelineItem).actorName ]]</span>
                         <button
-                          v-if="eventItem.touchId"
+                          v-if="dealTimelinePrimaryEvent(timelineItem).touchId"
                           type="button"
-                          @click.stop="openTouchFromEvent(eventItem.touchId)"
+                          @click.stop="openTouchFromEvent(dealTimelinePrimaryEvent(timelineItem).touchId)"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                         >
-                          Касание #[[ eventItem.touchId ]]
+                          Касание #[[ dealTimelinePrimaryEvent(timelineItem).touchId ]]
                         </button>
                       </div>
-                        <div v-if="eventItem.summaryText || eventItem.touchResult" class="mt-2 text-sm text-white whitespace-pre-line [overflow-wrap:anywhere]">[[ eventItem.summaryText || eventItem.touchResult ]]</div>
-                        <div v-if="eventItem.nextStep" class="mt-2 text-sm text-crm-muted [overflow-wrap:anywhere]">
-                          Следующий шаг: [[ eventItem.nextStep ]][[ eventItem.nextStepAt ? ` до ${formatEventTimestamp(eventItem.nextStepAt)}` : '' ]]
+                        <div v-if="dealTimelinePrimaryEvent(timelineItem).summaryText || dealTimelinePrimaryEvent(timelineItem).touchResult" class="mt-2 text-sm text-white whitespace-pre-line [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).summaryText || dealTimelinePrimaryEvent(timelineItem).touchResult ]]</div>
+                        <div v-if="dealTimelinePrimaryEvent(timelineItem).documents && dealTimelinePrimaryEvent(timelineItem).documents.length" class="mt-2 space-y-2">
+                          <a
+                            v-for="(documentItem, documentIndex) in dealTimelinePrimaryEvent(timelineItem).documents"
+                            :key="`deal-touch-doc-${eventIndex}-${documentIndex}`"
+                            :href="documentItem.url"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="inline-flex max-w-full items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent [overflow-wrap:anywhere]"
+                          >
+                            [[ documentItem.name || 'Документ' ]]
+                          </a>
+                        </div>
+                        <div v-if="dealTimelinePrimaryEvent(timelineItem).nextStep" class="mt-2 text-sm text-crm-muted [overflow-wrap:anywhere]">
+                          Следующий шаг: [[ dealTimelinePrimaryEvent(timelineItem).nextStep ]][[ dealTimelinePrimaryEvent(timelineItem).nextStepAt ? ` до ${formatEventTimestamp(dealTimelinePrimaryEvent(timelineItem).nextStepAt)}` : '' ]]
                         </div>
                     </template>
-                    <template v-else-if="eventItem.eventType === 'task'">
+                    <template v-else-if="dealTimelinePrimaryEvent(timelineItem)?.renderType === 'task'">
                         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
-                          <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                          <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || eventItem.result ]]</span>
-                        <span v-if="eventItem.taskTypeName" class="text-crm-muted shrink-0">Тип: [[ eventItem.taskTypeName ]]</span>
-                        <span v-if="eventItem.dueAt" class="text-crm-muted shrink-0">Срок: [[ eventShortTimestamp(eventItem.dueAt) ]]</span>
-                        <span v-if="eventItem.taskStatusLabel" class="text-crm-muted shrink-0">Статус: [[ eventItem.taskStatusLabel.toLowerCase() ]]</span>
-                        <span v-if="eventItem.ownerName" class="text-crm-muted shrink-0">[[ eventItem.ownerName ]]</span>
+                          <span class="text-base leading-none shrink-0">[[ dealEventIcon(dealTimelinePrimaryEvent(timelineItem)) ]]</span>
+                          <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).title || dealTimelinePrimaryEvent(timelineItem).result ]]</span>
+                        <span v-if="dealTimelinePrimaryEvent(timelineItem).taskTypeName" class="text-crm-muted shrink-0">Тип: [[ dealTimelinePrimaryEvent(timelineItem).taskTypeName ]]</span>
+                        <span v-if="dealTimelinePrimaryEvent(timelineItem).dueAt" class="text-crm-muted shrink-0">Срок: [[ eventShortTimestamp(dealTimelinePrimaryEvent(timelineItem).dueAt) ]]</span>
+                        <span v-if="dealTimelinePrimaryEvent(timelineItem).taskStatusLabel" class="text-crm-muted shrink-0">Статус: [[ dealTimelinePrimaryEvent(timelineItem).taskStatusLabel.toLowerCase() ]]</span>
+                        <span v-if="dealTimelinePrimaryEvent(timelineItem).ownerName" class="text-crm-muted shrink-0">[[ dealTimelinePrimaryEvent(timelineItem).ownerName ]]</span>
                         <button
-                          v-if="eventItem.taskId"
+                          v-if="dealTimelinePrimaryEvent(timelineItem).taskId"
                           type="button"
-                          @click="openTaskFromEvent(eventItem.taskId)"
+                          @click="openTaskFromEvent(dealTimelinePrimaryEvent(timelineItem).taskId)"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                         >
-                          Задача #[[ eventItem.taskId ]]
+                          Задача #[[ dealTimelinePrimaryEvent(timelineItem).taskId ]]
                         </button>
                       </div>
-                        <div v-if="eventItem.taskResult" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
-                          Результат: [[ eventItem.taskResult ]]
+                        <div v-if="dealTimelinePrimaryEvent(timelineItem).taskResult" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
+                          Результат: [[ dealTimelinePrimaryEvent(timelineItem).taskResult ]]
                         </div>
                     </template>
-                    <template v-else-if="eventItem.eventType === 'document'">
+                    <template v-else-if="dealTimelinePrimaryEvent(timelineItem)?.eventType === 'document'">
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
-                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || 'Документ' ]]</span>
-                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
-                        <span v-if="eventItem.actorName" class="text-crm-muted shrink-0">[[ eventItem.actorName ]]</span>
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(dealTimelinePrimaryEvent(timelineItem)) ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).title || 'Документ' ]]</span>
+                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(dealTimelinePrimaryEvent(timelineItem).timestamp) || 'Без даты' ]]</span>
+                        <span v-if="dealTimelinePrimaryEvent(timelineItem).actorName" class="text-crm-muted shrink-0">[[ dealTimelinePrimaryEvent(timelineItem).actorName ]]</span>
                         <button
-                          v-if="eventItem.dealId"
+                          v-if="dealTimelinePrimaryEvent(timelineItem).dealId"
                           type="button"
-                          @click.stop="openDealFromEvent(eventItem.dealId)"
+                          @click.stop="openDealFromEvent(dealTimelinePrimaryEvent(timelineItem).dealId)"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                         >
-                          Сделка #[[ eventItem.dealId ]]
+                          Сделка #[[ dealTimelinePrimaryEvent(timelineItem).dealId ]]
                         </button>
                       </div>
                       <div class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
-                        [[ eventItem.documentName || eventItem.result ]]
+                        [[ dealTimelinePrimaryEvent(timelineItem).documentName || dealTimelinePrimaryEvent(timelineItem).result ]]
                       </div>
-                      <div v-if="eventItem.documentUrl" class="mt-2">
+                      <div v-if="dealTimelinePrimaryEvent(timelineItem).documentUrl" class="mt-2">
                         <a
-                          :href="eventItem.documentUrl"
+                          :href="dealTimelinePrimaryEvent(timelineItem).documentUrl"
                           target="_blank"
                           rel="noopener noreferrer"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent"
@@ -1653,8 +2070,8 @@
                     </template>
                     <template v-else>
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-crm-muted">
-                        <span class="text-[11px] uppercase tracking-[0.16em] shrink-0">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
-                          <span class="text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.result || eventItem.title || 'Системное событие' ]]</span>
+                        <span class="text-[11px] uppercase tracking-[0.16em] shrink-0">[[ formatEventTimestamp(dealTimelinePrimaryEvent(timelineItem).timestamp) || 'Без даты' ]]</span>
+                          <span class="text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).result || dealTimelinePrimaryEvent(timelineItem).title || 'Системное событие' ]]</span>
                       </div>
                     </template>
                   </div>
@@ -1856,6 +2273,19 @@
                 </option>
               </select>
             </label>
+            <div v-if="matchedTouchAutomationRule" class="md:col-span-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3">
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <div class="text-sm font-semibold text-white">Правило автоматизации</div>
+                <div class="text-xs text-amber-200">[[ matchedTouchAutomationRule.event_type ]]</div>
+              </div>
+              <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-crm-text">
+                <span v-if="matchedTouchAutomationOutcome">Результат: [[ matchedTouchAutomationOutcome.name ]]</span>
+                <span v-if="matchedTouchAutomationNextStepTemplate">Следующий шаг: [[ matchedTouchAutomationNextStepTemplate.name ]]</span>
+                <span>Касание: [[ touchAutomationModeLabel(matchedTouchAutomationRule.create_touchpoint_mode) ]]</span>
+                <span v-if="matchedTouchAutomationRule.require_manager_confirmation">Нужно подтверждение менеджера</span>
+                <span v-if="matchedTouchAutomationRule.create_message">Будет создано сообщение</span>
+              </div>
+            </div>
             <label class="block">
               <span class="text-sm text-crm-muted">Направление</span>
               <select v-model="forms.touches.direction" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
@@ -2892,7 +3322,7 @@
               <textarea v-if="showCompanyNoteDraft" v-model="forms.companies.noteDraft" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
               <textarea v-if="forms.companies.notes.trim()" :value="forms.companies.notes" rows="3" readonly class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none opacity-90 cursor-not-allowed"></textarea>
             </div>
-            <div v-if="parseEventLog(forms.companies.events).length" class="block md:col-span-2">
+            <div v-if="companyTimelineItems.length" class="block md:col-span-2">
               <button
                 type="button"
                 @click="toggleCompanyEvents"
@@ -2906,94 +3336,115 @@
                 </div>
               </button>
               <div v-if="showCompanyEvents" class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
-                <div v-if="!parseEventLog(forms.companies.events).length" class="text-sm text-crm-muted">
+                <div v-if="!companyTimelineItems.length" class="text-sm text-crm-muted">
                   Событий пока нет.
                 </div>
                 <div v-else class="space-y-3">
                   <div
-                    v-for="(eventItem, eventIndex) in parseEventLog(forms.companies.events)"
-                    :key="`company-event-${editingCompanyId || 'new'}-${eventIndex}`"
-                    :class="dealEventCardClass(eventItem)"
+                    v-for="(timelineItem, eventIndex) in companyTimelineItems"
+                    :key="`company-event-${editingCompanyId || 'new'}-${timelineItem.id || eventIndex}`"
+                    :class="dealEventCardClass(dealTimelinePrimaryEvent(timelineItem))"
                     class="rounded-xl border p-3"
                   >
-                    <template v-if="eventItem.eventType === 'touch'">
+                    <div v-if="timelineItem.type === 'chain'" class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
+                      <div class="min-w-0">
+                        <div class="text-xs uppercase tracking-[0.14em] text-crm-muted">[[ timelineItem.title ]]</div>
+                        <div class="mt-1 text-xs text-crm-muted [overflow-wrap:anywhere]">[[ dealTimelineChainSummary(timelineItem) ]]</div>
+                      </div>
+                      <div class="shrink-0 rounded-full border border-crm-border bg-[#123753] px-2.5 py-1 text-[11px] font-semibold text-white">
+                        [[ timelineItem.items.length ]] события
+                      </div>
+                    </div>
+                    <template v-if="dealTimelinePrimaryEvent(timelineItem)?.eventType === 'touch'">
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
-                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || eventItem.result ]]</span>
-                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
-                        <span v-if="eventItem.actorName" class="text-crm-muted shrink-0">[[ eventItem.actorName ]]</span>
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(dealTimelinePrimaryEvent(timelineItem)) ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).title || dealTimelinePrimaryEvent(timelineItem).result ]]</span>
+                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(dealTimelinePrimaryEvent(timelineItem).timestamp) || 'Без даты' ]]</span>
+                        <span v-if="dealTimelinePrimaryEvent(timelineItem).actorName" class="text-crm-muted shrink-0">[[ dealTimelinePrimaryEvent(timelineItem).actorName ]]</span>
                         <button
-                          v-if="eventItem.touchId"
+                          v-if="dealTimelinePrimaryEvent(timelineItem).touchId"
                           type="button"
-                          @click.stop="openTouchFromEvent(eventItem.touchId)"
+                          @click.stop="openTouchFromEvent(dealTimelinePrimaryEvent(timelineItem).touchId)"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                         >
-                          Касание #[[ eventItem.touchId ]]
+                          Касание #[[ dealTimelinePrimaryEvent(timelineItem).touchId ]]
                         </button>
                         <button
-                          v-if="eventItem.dealId"
+                          v-if="dealTimelinePrimaryEvent(timelineItem).dealId"
                           type="button"
-                          @click.stop="openDealFromEvent(eventItem.dealId)"
+                          @click.stop="openDealFromEvent(dealTimelinePrimaryEvent(timelineItem).dealId)"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                         >
-                          Сделка #[[ eventItem.dealId ]]
+                          Сделка #[[ dealTimelinePrimaryEvent(timelineItem).dealId ]]
                         </button>
                       </div>
-                      <div v-if="eventItem.summaryText || eventItem.touchResult" class="mt-2 text-sm text-white whitespace-pre-line [overflow-wrap:anywhere]">[[ eventItem.summaryText || eventItem.touchResult ]]</div>
-                      <div v-if="eventItem.nextStep" class="mt-2 text-sm text-crm-muted [overflow-wrap:anywhere]">
-                        Следующий шаг: [[ eventItem.nextStep ]][[ eventItem.nextStepAt ? ` до ${formatEventTimestamp(eventItem.nextStepAt)}` : '' ]]
+                      <div v-if="dealTimelinePrimaryEvent(timelineItem).summaryText || dealTimelinePrimaryEvent(timelineItem).touchResult" class="mt-2 text-sm text-white whitespace-pre-line [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).summaryText || dealTimelinePrimaryEvent(timelineItem).touchResult ]]</div>
+                      <div v-if="dealTimelinePrimaryEvent(timelineItem).documents && dealTimelinePrimaryEvent(timelineItem).documents.length" class="mt-2 space-y-2">
+                        <a
+                          v-for="(documentItem, documentIndex) in dealTimelinePrimaryEvent(timelineItem).documents"
+                          :key="`company-touch-doc-${eventIndex}-${documentIndex}`"
+                          :href="documentItem.url"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex max-w-full items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent [overflow-wrap:anywhere]"
+                        >
+                          [[ documentItem.name || 'Документ' ]]
+                        </a>
+                      </div>
+                      <div v-if="dealTimelinePrimaryEvent(timelineItem).nextStep" class="mt-2 text-sm text-crm-muted [overflow-wrap:anywhere]">
+                        Следующий шаг: [[ dealTimelinePrimaryEvent(timelineItem).nextStep ]][[ dealTimelinePrimaryEvent(timelineItem).nextStepAt ? ` до ${formatEventTimestamp(dealTimelinePrimaryEvent(timelineItem).nextStepAt)}` : '' ]]
                       </div>
                     </template>
-                    <template v-else-if="eventItem.eventType === 'task'">
+                    <template v-else-if="dealTimelinePrimaryEvent(timelineItem)?.renderType === 'task'">
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
-                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || eventItem.result ]]</span>
-                        <span v-if="eventItem.taskTypeName" class="text-crm-muted shrink-0">Тип: [[ eventItem.taskTypeName ]]</span>
-                        <span v-if="eventItem.dueAt" class="text-crm-muted shrink-0">Срок: [[ eventShortTimestamp(eventItem.dueAt) ]]</span>
-                        <span v-if="eventItem.taskStatusLabel" class="text-crm-muted shrink-0">Статус: [[ eventItem.taskStatusLabel.toLowerCase() ]]</span>
-                        <span v-if="eventItem.ownerName" class="text-crm-muted shrink-0">[[ eventItem.ownerName ]]</span>
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(dealTimelinePrimaryEvent(timelineItem)) ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).title || dealTimelinePrimaryEvent(timelineItem).result ]]</span>
+                        <span v-if="dealTimelinePrimaryEvent(timelineItem).taskTypeName" class="text-crm-muted shrink-0">Тип: [[ dealTimelinePrimaryEvent(timelineItem).taskTypeName ]]</span>
+                        <span v-if="dealTimelinePrimaryEvent(timelineItem).dueAt" class="text-crm-muted shrink-0">Срок: [[ eventShortTimestamp(dealTimelinePrimaryEvent(timelineItem).dueAt) ]]</span>
+                        <span v-if="dealTimelinePrimaryEvent(timelineItem).taskStatusLabel" class="text-crm-muted shrink-0">Статус: [[ dealTimelinePrimaryEvent(timelineItem).taskStatusLabel.toLowerCase() ]]</span>
+                        <span v-if="dealTimelinePrimaryEvent(timelineItem).ownerName" class="text-crm-muted shrink-0">[[ dealTimelinePrimaryEvent(timelineItem).ownerName ]]</span>
                         <button
-                          v-if="eventItem.taskId"
+                          v-if="dealTimelinePrimaryEvent(timelineItem).taskId"
                           type="button"
-                          @click.stop="openTaskFromEvent(eventItem.taskId)"
+                          @click.stop="openTaskFromEvent(dealTimelinePrimaryEvent(timelineItem).taskId)"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                         >
-                          Задача #[[ eventItem.taskId ]]
+                          Задача #[[ dealTimelinePrimaryEvent(timelineItem).taskId ]]
                         </button>
                         <button
-                          v-if="eventItem.dealId"
+                          v-if="dealTimelinePrimaryEvent(timelineItem).dealId"
                           type="button"
-                          @click.stop="openDealFromEvent(eventItem.dealId)"
+                          @click.stop="openDealFromEvent(dealTimelinePrimaryEvent(timelineItem).dealId)"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                         >
-                          Сделка #[[ eventItem.dealId ]]
+                          Сделка #[[ dealTimelinePrimaryEvent(timelineItem).dealId ]]
                         </button>
                       </div>
-                      <div v-if="eventItem.taskResult" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
-                        Результат: [[ eventItem.taskResult ]]
+                      <div v-if="dealTimelinePrimaryEvent(timelineItem).taskResult" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
+                        Результат: [[ dealTimelinePrimaryEvent(timelineItem).taskResult ]]
                       </div>
                     </template>
-                    <template v-else-if="eventItem.eventType === 'document'">
+                    <template v-else-if="dealTimelinePrimaryEvent(timelineItem)?.eventType === 'document'">
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
-                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
-                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || 'Документ' ]]</span>
-                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
-                        <span v-if="eventItem.actorName" class="text-crm-muted shrink-0">[[ eventItem.actorName ]]</span>
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(dealTimelinePrimaryEvent(timelineItem)) ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).title || 'Документ' ]]</span>
+                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(dealTimelinePrimaryEvent(timelineItem).timestamp) || 'Без даты' ]]</span>
+                        <span v-if="dealTimelinePrimaryEvent(timelineItem).actorName" class="text-crm-muted shrink-0">[[ dealTimelinePrimaryEvent(timelineItem).actorName ]]</span>
                         <button
-                          v-if="eventItem.dealId"
+                          v-if="dealTimelinePrimaryEvent(timelineItem).dealId"
                           type="button"
-                          @click.stop="openDealFromEvent(eventItem.dealId)"
+                          @click.stop="openDealFromEvent(dealTimelinePrimaryEvent(timelineItem).dealId)"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                         >
-                          Сделка #[[ eventItem.dealId ]]
+                          Сделка #[[ dealTimelinePrimaryEvent(timelineItem).dealId ]]
                         </button>
                       </div>
                       <div class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
-                        [[ eventItem.documentName || eventItem.result ]]
+                        [[ dealTimelinePrimaryEvent(timelineItem).documentName || dealTimelinePrimaryEvent(timelineItem).result ]]
                       </div>
-                      <div v-if="eventItem.documentUrl" class="mt-2">
+                      <div v-if="dealTimelinePrimaryEvent(timelineItem).documentUrl" class="mt-2">
                         <a
-                          :href="eventItem.documentUrl"
+                          :href="dealTimelinePrimaryEvent(timelineItem).documentUrl"
                           target="_blank"
                           rel="noopener noreferrer"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent"
@@ -3004,15 +3455,15 @@
                     </template>
                     <template v-else>
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-crm-muted">
-                        <span class="text-[11px] uppercase tracking-[0.16em] shrink-0">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
-                          <span class="text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.result || eventItem.title || 'Системное событие' ]]</span>
+                        <span class="text-[11px] uppercase tracking-[0.16em] shrink-0">[[ formatEventTimestamp(dealTimelinePrimaryEvent(timelineItem).timestamp) || 'Без даты' ]]</span>
+                          <span class="text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).result || dealTimelinePrimaryEvent(timelineItem).title || 'Системное событие' ]]</span>
                         <button
-                          v-if="eventItem.dealId"
+                          v-if="dealTimelinePrimaryEvent(timelineItem).dealId"
                           type="button"
-                          @click.stop="openDealFromEvent(eventItem.dealId)"
+                          @click.stop="openDealFromEvent(dealTimelinePrimaryEvent(timelineItem).dealId)"
                           class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
                         >
-                          Сделка #[[ eventItem.dealId ]]
+                          Сделка #[[ dealTimelinePrimaryEvent(timelineItem).dealId ]]
                         </button>
                       </div>
                     </template>

@@ -2,7 +2,19 @@ from rest_framework import serializers
 from django.utils.text import slugify
 from django.contrib.auth import get_user_model
 
-from crm.models import CommunicationChannel, ContactRole, ContactStatus, DealStage, LeadSource, LeadStatus, TaskType, TouchResult
+from crm.models import (
+    AutomationRule,
+    CommunicationChannel,
+    ContactRole,
+    ContactStatus,
+    DealStage,
+    LeadSource,
+    LeadStatus,
+    NextStepTemplate,
+    OutcomeCatalog,
+    TaskType,
+    TouchResult,
+)
 
 
 User = get_user_model()
@@ -46,9 +58,14 @@ class LeadSourceSerializer(serializers.ModelSerializer):
 
 
 class CommunicationChannelSerializer(serializers.ModelSerializer):
+    code = serializers.SerializerMethodField()
+
+    def get_code(self, obj):
+        return slugify(str(getattr(obj, "name", "") or "").strip(), allow_unicode=False).replace("-", "_")
+
     class Meta:
         model = CommunicationChannel
-        fields = ["id", "name", "is_active"]
+        fields = ["id", "name", "code", "is_active"]
 
 
 class ContactRoleSerializer(serializers.ModelSerializer):
@@ -127,4 +144,49 @@ class TouchResultSerializer(serializers.ModelSerializer):
             "is_active",
             "sort_order",
             "allowed_touch_types",
+        ]
+
+
+class OutcomeCatalogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OutcomeCatalog
+        fields = ["id", "code", "name"]
+
+
+class NextStepTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NextStepTemplate
+        fields = ["id", "code", "name"]
+
+
+class AutomationRuleSerializer(serializers.ModelSerializer):
+    default_outcome_code = serializers.CharField(source="default_outcome.code", read_only=True)
+    default_outcome_name = serializers.CharField(source="default_outcome.name", read_only=True)
+    next_step_template_code = serializers.CharField(source="next_step_template.code", read_only=True)
+    next_step_template_name = serializers.CharField(source="next_step_template.name", read_only=True)
+
+    class Meta:
+        model = AutomationRule
+        fields = [
+            "id",
+            "event_type",
+            "ui_mode",
+            "ui_priority",
+            "write_timeline",
+            "show_in_summary",
+            "show_in_attention_queue",
+            "merge_key",
+            "auto_open_panel",
+            "create_message",
+            "create_touchpoint_mode",
+            "default_outcome",
+            "default_outcome_code",
+            "default_outcome_name",
+            "allow_auto_create_task",
+            "require_manager_confirmation",
+            "next_step_template",
+            "next_step_template_code",
+            "next_step_template_name",
+            "is_active",
+            "sort_order",
         ]

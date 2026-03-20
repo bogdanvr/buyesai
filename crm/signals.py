@@ -1,14 +1,28 @@
 import logging
 
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
 
 from audit.services import log_model_event
-from crm.models import Activity, Client, ClientDocument, Deal, DealDocument, DealStage, Lead, Touch, TouchResult
+from crm.models import Activity, AutomationDraft, AutomationMessageDraft, AutomationQueueItem, Client, ClientDocument, Deal, DealDocument, DealStage, Lead, Touch, TouchResult
 from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup
-from crm.models.touch import TouchDirection, normalize_touch_channel_code
+from crm.models.automation import (
+    AutomationDraftKind,
+    AutomationMessageDraftStatus,
+    AutomationDraftStatus,
+    AutomationQueueItemKind,
+    AutomationQueueItemStatus,
+    AutomationRule,
+)
+from crm.models.touch import TouchDirection, normalize_touch_channel_code, resolve_touch_event_type
+from crm.services.automation import (
+    resolve_touch_automation_rule,
+    should_auto_create_touch_follow_up_task,
+    should_write_touch_timeline,
+    upsert_touch_follow_up_task,
+)
 from crm.services.lead_services import convert_lead_to_deal
 
 
@@ -55,6 +69,21 @@ def _format_structured_event_entry(
 def _prepend_event(existing: str, entry: str) -> str:
     current = str(existing or "").strip()
     return entry if not current else f"{entry}\n\n{current}"
+
+
+def _replace_latest_touch_event(existing: str, touch_id: int, entry: str) -> str:
+    current = str(existing or "").strip()
+    if not current or not touch_id:
+        return entry if not current else _prepend_event(current, entry)
+
+    chunks = [chunk.strip() for chunk in current.split("\n\n") if chunk.strip()]
+    target_touch_line = f"touch_id: {touch_id}"
+    for index, chunk in enumerate(chunks):
+        lines = [line.strip() for line in chunk.splitlines() if line.strip()]
+        if target_touch_line in lines and "event_type: touch" in lines:
+          chunks[index] = entry
+          return "\n\n".join(chunks)
+    return _prepend_event(current, entry)
 
 
 def _prepend_note(existing: str, entry: str) -> str:
@@ -114,6 +143,33 @@ def _append_lead_event(lead_id: int | None, entry: str) -> None:
     Lead.objects.filter(pk=lead.pk).update(events=_prepend_event(lead.events, entry))
 
 
+def _replace_touch_event_in_deal(deal_id: int | None, touch_id: int | None, entry: str) -> None:
+    if not deal_id or not touch_id:
+        return
+    deal = Deal.objects.filter(pk=deal_id).only("id", "events").first()
+    if deal is None:
+        return
+    Deal.objects.filter(pk=deal.pk).update(events=_replace_latest_touch_event(deal.events, touch_id, entry))
+
+
+def _replace_touch_event_in_lead(lead_id: int | None, touch_id: int | None, entry: str) -> None:
+    if not lead_id or not touch_id:
+        return
+    lead = Lead.objects.filter(pk=lead_id).only("id", "events").first()
+    if lead is None:
+        return
+    Lead.objects.filter(pk=lead.pk).update(events=_replace_latest_touch_event(lead.events, touch_id, entry))
+
+
+def _replace_touch_event_in_client(client_id: int | None, touch_id: int | None, entry: str) -> None:
+    if not client_id or not touch_id:
+        return
+    client = Client.objects.filter(pk=client_id).only("id", "events").first()
+    if client is None:
+        return
+    Client.objects.filter(pk=client.pk).update(events=_replace_latest_touch_event(client.events, touch_id, entry))
+
+
 def _document_download_url(document) -> str:
     if isinstance(document, DealDocument):
         return reverse("deal-documents-download", kwargs={"pk": document.pk})
@@ -142,6 +198,246 @@ def _touch_title(instance: Touch) -> str:
     return f"{direction_label} касание"
 
 
+def _resolve_touch_event_type(instance: Touch) -> str:
+    return resolve_touch_event_type(
+        channel_code=getattr(getattr(instance, "channel", None), "name", ""),
+        direction=str(instance.direction or "").strip().lower(),
+        result_code=str(getattr(getattr(instance, "result_option", None), "code", "") or "").strip().lower(),
+    )
+
+
+def _resolve_touch_result_from_outcome(rule: AutomationRule | None, instance: Touch) -> TouchResult | None:
+    outcome = getattr(rule, "default_outcome", None)
+    if outcome is None:
+        return getattr(instance, "result_option", None)
+    outcome_code = str(getattr(outcome, "code", "") or "").strip()
+    outcome_name = str(getattr(outcome, "name", "") or "").strip()
+    touch_result = None
+    if outcome_code:
+        touch_result = TouchResult.objects.filter(code=outcome_code).first()
+    if touch_result is None and outcome_name:
+        touch_result = TouchResult.objects.filter(name=outcome_name).first()
+    return touch_result or getattr(instance, "result_option", None)
+
+
+def _resolve_touch_client(instance: Touch):
+    if instance.client_id:
+        return instance.client
+    if instance.deal_id and getattr(instance.deal, "client", None):
+        return instance.deal.client
+    if instance.lead_id and getattr(instance.lead, "client", None):
+        return instance.lead.client
+    if instance.contact_id and getattr(instance.contact, "client", None):
+        return instance.contact.client
+    return None
+
+
+def _draft_defaults_from_touch(instance: Touch, rule: AutomationRule, draft_kind: str) -> dict:
+    resolved_client = _resolve_touch_client(instance)
+    next_step_text = str(getattr(getattr(rule, "next_step_template", None), "name", "") or instance.next_step or "").strip()
+    touch_result = _resolve_touch_result_from_outcome(rule, instance)
+    event_type = _resolve_touch_event_type(instance)
+    if draft_kind == AutomationDraftKind.NEXT_STEP:
+        title = next_step_text or _touch_title(instance)
+        summary = str(instance.summary or "").strip()
+    else:
+        title = _touch_title(instance)
+        summary = str(instance.summary or getattr(touch_result, "name", "") or "").strip()
+    return {
+        "source_event_type": event_type,
+        "title": title,
+        "summary": summary,
+        "outcome": getattr(rule, "default_outcome", None),
+        "touch_result": touch_result,
+        "next_step_template": getattr(rule, "next_step_template", None),
+        "proposed_channel": getattr(instance, "channel", None),
+        "proposed_direction": str(instance.direction or "").strip(),
+        "proposed_next_step": next_step_text,
+        "proposed_next_step_at": getattr(instance, "next_step_at", None),
+        "owner": getattr(instance, "owner", None),
+        "lead": getattr(instance, "lead", None),
+        "deal": getattr(instance, "deal", None),
+        "client": resolved_client,
+        "contact": getattr(instance, "contact", None),
+        "task": getattr(instance, "task", None),
+    }
+
+
+def _upsert_touch_automation_draft(instance: Touch, rule: AutomationRule, draft_kind: str) -> None:
+    acted_queryset = AutomationDraft.objects.filter(
+        source_touch=instance,
+        automation_rule=rule,
+        draft_kind=draft_kind,
+    ).exclude(status=AutomationDraftStatus.PENDING)
+    if acted_queryset.exists():
+        return
+    defaults = _draft_defaults_from_touch(instance, rule, draft_kind)
+    draft = AutomationDraft.objects.filter(
+        source_touch=instance,
+        automation_rule=rule,
+        draft_kind=draft_kind,
+        status=AutomationDraftStatus.PENDING,
+    ).first()
+    if draft is None:
+        AutomationDraft.objects.create(
+            automation_rule=rule,
+            source_touch=instance,
+            draft_kind=draft_kind,
+            status=AutomationDraftStatus.PENDING,
+            **defaults,
+        )
+        return
+    for field_name, value in defaults.items():
+        setattr(draft, field_name, value)
+    draft.save()
+
+
+def _queue_defaults_from_touch(instance: Touch, rule: AutomationRule, item_kind: str) -> dict:
+    resolved_client = _resolve_touch_client(instance)
+    next_step_text = str(getattr(getattr(rule, "next_step_template", None), "name", "") or instance.next_step or "").strip()
+    touch_result = _resolve_touch_result_from_outcome(rule, instance)
+    event_type = _resolve_touch_event_type(instance)
+    if item_kind == AutomationQueueItemKind.NEXT_STEP:
+        title = next_step_text or _touch_title(instance)
+        summary = str(instance.summary or "").strip()
+        recommended_action = next_step_text
+    else:
+        title = _touch_title(instance)
+        summary = str(instance.summary or getattr(touch_result, "name", "") or "").strip()
+        recommended_action = next_step_text or str(getattr(getattr(rule, "next_step_template", None), "name", "") or "").strip()
+    return {
+        "source_event_type": event_type,
+        "title": title,
+        "summary": summary,
+        "recommended_action": recommended_action,
+        "outcome": getattr(rule, "default_outcome", None),
+        "touch_result": touch_result,
+        "next_step_template": getattr(rule, "next_step_template", None),
+        "proposed_channel": getattr(instance, "channel", None),
+        "proposed_direction": str(instance.direction or "").strip(),
+        "proposed_next_step": next_step_text,
+        "proposed_next_step_at": getattr(instance, "next_step_at", None),
+        "owner": getattr(instance, "owner", None),
+        "lead": getattr(instance, "lead", None),
+        "deal": getattr(instance, "deal", None),
+        "client": resolved_client,
+        "contact": getattr(instance, "contact", None),
+        "task": getattr(instance, "task", None),
+    }
+
+
+def _upsert_touch_automation_queue_item(instance: Touch, rule: AutomationRule, item_kind: str) -> None:
+    acted_queryset = AutomationQueueItem.objects.filter(
+        source_touch=instance,
+        automation_rule=rule,
+        item_kind=item_kind,
+    ).exclude(status=AutomationQueueItemStatus.PENDING)
+    if acted_queryset.exists():
+        return
+    defaults = _queue_defaults_from_touch(instance, rule, item_kind)
+    item = AutomationQueueItem.objects.filter(
+        source_touch=instance,
+        automation_rule=rule,
+        item_kind=item_kind,
+        status=AutomationQueueItemStatus.PENDING,
+    ).first()
+    if item is None:
+        AutomationQueueItem.objects.create(
+            automation_rule=rule,
+            source_touch=instance,
+            item_kind=item_kind,
+            status=AutomationQueueItemStatus.PENDING,
+            **defaults,
+        )
+        return
+    for field_name, value in defaults.items():
+        setattr(item, field_name, value)
+    item.save()
+
+
+def _message_draft_defaults_from_touch(instance: Touch, rule: AutomationRule) -> dict:
+    resolved_client = _resolve_touch_client(instance)
+    channel = getattr(instance, "channel", None)
+    event_type = _resolve_touch_event_type(instance)
+    event_title = _touch_title(instance)
+    result_label = _touch_result_label(instance)
+    subject = str(getattr(getattr(rule, "next_step_template", None), "name", "") or result_label or event_title).strip()
+    message_parts = [str(instance.summary or "").strip()]
+    if result_label and result_label not in message_parts:
+        message_parts.append(result_label)
+    next_step_label = str(getattr(getattr(rule, "next_step_template", None), "name", "") or instance.next_step or "").strip()
+    if next_step_label:
+        message_parts.append(f"Следующий шаг: {next_step_label}")
+    message_text = "\n".join(part for part in message_parts if part)
+    return {
+        "source_event_type": event_type,
+        "title": f"Сообщение: {event_title}",
+        "message_subject": subject,
+        "message_text": message_text,
+        "proposed_channel": channel,
+        "owner": getattr(instance, "owner", None),
+        "lead": getattr(instance, "lead", None),
+        "deal": getattr(instance, "deal", None),
+        "client": resolved_client,
+        "contact": getattr(instance, "contact", None),
+    }
+
+
+def _upsert_touch_automation_message_draft(instance: Touch, rule: AutomationRule) -> None:
+    acted_queryset = AutomationMessageDraft.objects.filter(
+        source_touch=instance,
+        automation_rule=rule,
+    ).exclude(status=AutomationMessageDraftStatus.PENDING)
+    if acted_queryset.exists():
+        return
+    defaults = _message_draft_defaults_from_touch(instance, rule)
+    draft = AutomationMessageDraft.objects.filter(
+        source_touch=instance,
+        automation_rule=rule,
+        status=AutomationMessageDraftStatus.PENDING,
+    ).first()
+    if draft is None:
+        AutomationMessageDraft.objects.create(
+            automation_rule=rule,
+            source_touch=instance,
+            status=AutomationMessageDraftStatus.PENDING,
+            **defaults,
+        )
+        return
+    for field_name, value in defaults.items():
+        setattr(draft, field_name, value)
+    draft.save()
+
+
+def _touch_document_event_lines(instance: Touch) -> list[str]:
+    lines: list[str] = []
+    for document in instance.client_documents.all():
+        document_name = str(document.original_name or getattr(document.file, "name", "") or "").strip()
+        if document_name:
+            lines.append(f"document_name: {document_name}")
+            lines.append(f"document_url: {_document_download_url(document)}")
+    for document in instance.deal_documents.all():
+        document_name = str(document.original_name or getattr(document.file, "name", "") or "").strip()
+        if document_name:
+            lines.append(f"document_name: {document_name}")
+            lines.append(f"document_url: {_document_download_url(document)}")
+    return lines
+
+
+def _touch_event_extra_lines(instance: Touch, channel_label: str, result_label: str) -> list[str]:
+    return [
+        f"title: {_touch_title(instance)}",
+        f"actor_name: {_actor_display_name(instance.owner)}",
+        channel_label and f"channel_name: {channel_label}",
+        f"direction_label: {_touch_direction_label(instance.direction)}",
+        result_label and f"touch_result: {result_label}",
+        instance.summary and f"summary: {instance.summary}",
+        instance.next_step and f"next_step: {instance.next_step}",
+        instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
+        *_touch_document_event_lines(instance),
+    ]
+
+
 def _task_status_label(status: str) -> str:
     return TaskStatus(status).label if status in TaskStatus.values else str(status or "").strip()
 
@@ -162,6 +458,19 @@ def _task_related_client_ids(instance: Activity) -> list[int]:
 def _task_type_group(instance: Activity) -> str:
     task_type = getattr(instance, "task_type", None)
     return str(getattr(task_type, "group", "") or "").strip()
+
+
+def _resolve_task_completion_event_type(instance: Activity) -> str:
+    if instance.type != ActivityType.TASK or instance.status != TaskStatus.DONE:
+        return ""
+    if _task_type_group(instance) != TaskTypeGroup.CLIENT_TASK:
+        return "internal_task_completed"
+    channel_code = normalize_touch_channel_code(getattr(getattr(instance, "communication_channel", None), "name", ""))
+    if channel_code == "call":
+        return "client_task_completed_call"
+    if channel_code == "meeting":
+        return "client_task_completed_meeting"
+    return "client_task_completed_email"
 
 
 def _resolve_auto_follow_up_due_at(instance: Activity):
@@ -389,12 +698,13 @@ def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
         return
 
     happened_at = instance.completed_at or timezone.now()
+    completion_event_type = _resolve_task_completion_event_type(instance) or "task"
     entry = _format_structured_event_entry(
         result_text=result_text,
         happened_at=happened_at,
         task_id=instance.pk,
         deal_id=instance.deal_id,
-        event_type="task",
+        event_type=completion_event_type,
         priority="low",
         extra_lines=[
             f"title: Задача: {instance.subject}",
@@ -703,6 +1013,8 @@ def deal_completion_events_signal(sender, instance: Deal, created, **kwargs):
 def touch_deal_events_signal(sender, instance: Touch, created, **kwargs):
     if not instance.deal_id:
         return
+    if not should_write_touch_timeline(instance):
+        return
 
     previous = getattr(instance, "_previous_touch_state", None)
     result_label = _touch_result_label(instance)
@@ -718,16 +1030,7 @@ def touch_deal_events_signal(sender, instance: Touch, created, **kwargs):
             deal_id=instance.deal_id,
             event_type="touch",
             priority="high",
-            extra_lines=[
-                f"title: {_touch_title(instance)}",
-                f"actor_name: {_actor_display_name(instance.owner)}",
-                channel_label and f"channel_name: {channel_label}",
-                f"direction_label: {_touch_direction_label(instance.direction)}",
-                result_label and f"touch_result: {result_label}",
-                instance.summary and f"summary: {instance.summary}",
-                instance.next_step and f"next_step: {instance.next_step}",
-                instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
-            ],
+            extra_lines=_touch_event_extra_lines(instance, channel_label, result_label),
         )
         _append_deal_event(instance.deal_id, entry)
         return
@@ -754,16 +1057,7 @@ def touch_deal_events_signal(sender, instance: Touch, created, **kwargs):
         deal_id=instance.deal_id,
         event_type="touch",
         priority="high",
-        extra_lines=[
-            f"title: {_touch_title(instance)}",
-            f"actor_name: {_actor_display_name(instance.owner)}",
-            channel_label and f"channel_name: {channel_label}",
-            f"direction_label: {_touch_direction_label(instance.direction)}",
-            result_label and f"touch_result: {result_label}",
-            instance.summary and f"summary: {instance.summary}",
-            instance.next_step and f"next_step: {instance.next_step}",
-            instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
-        ],
+        extra_lines=_touch_event_extra_lines(instance, channel_label, result_label),
     )
     _append_deal_event(instance.deal_id, entry)
 
@@ -818,6 +1112,8 @@ def client_document_events_signal(sender, instance: ClientDocument, created, **k
 def touch_lead_events_signal(sender, instance: Touch, created, **kwargs):
     if not instance.lead_id:
         return
+    if not should_write_touch_timeline(instance):
+        return
 
     previous = getattr(instance, "_previous_touch_state", None)
     result_label = _touch_result_label(instance)
@@ -832,16 +1128,7 @@ def touch_lead_events_signal(sender, instance: Touch, created, **kwargs):
             touch_id=instance.pk,
             event_type="touch",
             priority="high",
-            extra_lines=[
-                f"title: {_touch_title(instance)}",
-                f"actor_name: {_actor_display_name(instance.owner)}",
-                channel_label and f"channel_name: {channel_label}",
-                f"direction_label: {_touch_direction_label(instance.direction)}",
-                result_label and f"touch_result: {result_label}",
-                instance.summary and f"summary: {instance.summary}",
-                instance.next_step and f"next_step: {instance.next_step}",
-                instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
-            ],
+            extra_lines=_touch_event_extra_lines(instance, channel_label, result_label),
         )
         _append_lead_event(instance.lead_id, entry)
         return
@@ -867,16 +1154,7 @@ def touch_lead_events_signal(sender, instance: Touch, created, **kwargs):
         touch_id=instance.pk,
         event_type="touch",
         priority="high",
-        extra_lines=[
-            f"title: {_touch_title(instance)}",
-            f"actor_name: {_actor_display_name(instance.owner)}",
-            channel_label and f"channel_name: {channel_label}",
-            f"direction_label: {_touch_direction_label(instance.direction)}",
-            result_label and f"touch_result: {result_label}",
-            instance.summary and f"summary: {instance.summary}",
-            instance.next_step and f"next_step: {instance.next_step}",
-            instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
-        ],
+        extra_lines=_touch_event_extra_lines(instance, channel_label, result_label),
     )
     _append_lead_event(instance.lead_id, entry)
 
@@ -884,6 +1162,8 @@ def touch_lead_events_signal(sender, instance: Touch, created, **kwargs):
 @receiver(post_save, sender=Touch)
 def touch_client_events_signal(sender, instance: Touch, created, **kwargs):
     if not instance.client_id:
+        return
+    if not should_write_touch_timeline(instance):
         return
 
     previous = getattr(instance, "_previous_touch_state", None)
@@ -900,16 +1180,7 @@ def touch_client_events_signal(sender, instance: Touch, created, **kwargs):
             deal_id=instance.deal_id,
             event_type="touch",
             priority="high",
-            extra_lines=[
-                f"title: {_touch_title(instance)}",
-                f"actor_name: {_actor_display_name(instance.owner)}",
-                channel_label and f"channel_name: {channel_label}",
-                f"direction_label: {_touch_direction_label(instance.direction)}",
-                result_label and f"touch_result: {result_label}",
-                instance.summary and f"summary: {instance.summary}",
-                instance.next_step and f"next_step: {instance.next_step}",
-                instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
-            ],
+            extra_lines=_touch_event_extra_lines(instance, channel_label, result_label),
         )
         _append_client_event(instance.client_id, entry)
         return
@@ -936,15 +1207,83 @@ def touch_client_events_signal(sender, instance: Touch, created, **kwargs):
         deal_id=instance.deal_id,
         event_type="touch",
         priority="high",
-        extra_lines=[
-            f"title: {_touch_title(instance)}",
-            f"actor_name: {_actor_display_name(instance.owner)}",
-            channel_label and f"channel_name: {channel_label}",
-            f"direction_label: {_touch_direction_label(instance.direction)}",
-            result_label and f"touch_result: {result_label}",
-            instance.summary and f"summary: {instance.summary}",
-            instance.next_step and f"next_step: {instance.next_step}",
-            instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
-        ],
+        extra_lines=_touch_event_extra_lines(instance, channel_label, result_label),
     )
     _append_client_event(instance.client_id, entry)
+
+
+@receiver(post_save, sender=Touch)
+def touch_automation_drafts_signal(sender, instance: Touch, created, **kwargs):
+    event_type, rule = resolve_touch_automation_rule(instance)
+    if not event_type:
+        return
+    if rule is None:
+        return
+
+    if bool(getattr(rule, "create_message", False)):
+        _upsert_touch_automation_message_draft(instance, rule)
+
+    if str(rule.create_touchpoint_mode or "").strip() == "draft":
+        _upsert_touch_automation_draft(instance, rule, AutomationDraftKind.TOUCH)
+
+    should_create_next_step_draft = bool(
+        getattr(rule, "next_step_template_id", None)
+        and (
+            bool(getattr(rule, "require_manager_confirmation", False))
+            or not bool(getattr(rule, "allow_auto_create_task", False))
+        )
+    )
+    if should_create_next_step_draft:
+        _upsert_touch_automation_draft(instance, rule, AutomationDraftKind.NEXT_STEP)
+
+    ui_mode = str(getattr(rule, "ui_mode", "") or "").strip()
+    should_create_attention_queue_item = bool(
+        getattr(rule, "show_in_attention_queue", False)
+        or getattr(rule, "require_manager_confirmation", False)
+        or ui_mode == "needs_attention"
+    )
+    if should_create_attention_queue_item:
+        _upsert_touch_automation_queue_item(instance, rule, AutomationQueueItemKind.ATTENTION)
+
+    should_create_next_step_queue_item = bool(
+        getattr(rule, "next_step_template_id", None)
+        and (
+            getattr(rule, "require_manager_confirmation", False)
+            or not getattr(rule, "allow_auto_create_task", False)
+        )
+    )
+    if should_create_next_step_queue_item:
+        _upsert_touch_automation_queue_item(instance, rule, AutomationQueueItemKind.NEXT_STEP)
+
+    if should_auto_create_touch_follow_up_task(instance, rule):
+        upsert_touch_follow_up_task(instance, rule)
+
+
+@receiver(m2m_changed, sender=Touch.deal_documents.through)
+@receiver(m2m_changed, sender=Touch.client_documents.through)
+def touch_documents_events_signal(sender, instance: Touch, action, reverse, **kwargs):
+    if reverse or action not in {"post_add", "post_remove", "post_clear"}:
+        return
+    if not should_write_touch_timeline(instance):
+        return
+
+    result_label = _touch_result_label(instance)
+    channel_label = _touch_channel_label(instance)
+    direction_label = _touch_direction_label(instance.direction)
+    base_text = result_label or str(instance.summary or "").strip() or f"{direction_label} касание"
+    entry = _format_structured_event_entry(
+        result_text=f"Касание обновлено: {base_text}",
+        happened_at=instance.happened_at,
+        touch_id=instance.pk,
+        deal_id=instance.deal_id,
+        event_type="touch",
+        priority="high",
+        extra_lines=_touch_event_extra_lines(instance, channel_label, result_label),
+    )
+
+    if instance.deal_id:
+        _replace_touch_event_in_deal(instance.deal_id, instance.pk, entry)
+    if instance.lead_id:
+        _replace_touch_event_in_lead(instance.lead_id, instance.pk, entry)
+    if instance.client_id:
+        _replace_touch_event_in_client(instance.client_id, instance.pk, entry)

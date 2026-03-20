@@ -25,13 +25,70 @@ def normalize_touch_channel_code(value: str) -> str:
         "телеграм": "telegram",
         "meeting": "meeting",
         "встреча": "meeting",
-        "document": "document",
-        "документ": "document",
+        "proposal": "proposal",
+        "предложение": "proposal",
+        "коммерческое предложение": "proposal",
+        "кп": "proposal",
+        "document": "documents",
+        "documents": "documents",
+        "документ": "documents",
+        "документы": "documents",
+        "файлы": "documents",
     }
     if normalized in aliases:
         return aliases[normalized]
     slug = slugify(normalized).replace("-", "_")
     return aliases.get(slug, slug)
+
+
+DIRECT_TOUCH_EVENT_TYPES_BY_RESULT_CODE = {
+    "meeting_scheduled": "meeting_scheduled",
+    "meeting_rescheduled": "meeting_rescheduled",
+    "meeting_cancelled": "meeting_cancelled",
+    "meeting_completed": "meeting_completed",
+    "meeting_no_show": "meeting_no_show",
+    "proposal_requested": "proposal_sent",
+    "proposal_sent": "proposal_sent",
+    "proposal_received": "proposal_received_by_client",
+    "proposal_under_review": "proposal_received_by_client",
+    "proposal_revision_requested": "proposal_revision_requested",
+    "discount_requested": "proposal_revision_requested",
+    "documents_requested": "documents_requested",
+    "contract_sent": "contract_sent",
+    "contract_under_review": "contract_under_review",
+    "contract_revision_requested": "contract_revision_requested",
+    "contract_agreed": "contract_agreed",
+    "invoice_sent": "invoice_sent",
+    "invoice_accepted": "invoice_received_by_client",
+    "waiting_payment": "payment_waiting",
+    "payment_confirmed": "payment_confirmed",
+}
+
+
+def resolve_touch_event_type(*, channel_code: str, direction: str, result_code: str = "") -> str:
+    normalized_channel_code = normalize_touch_channel_code(channel_code)
+    normalized_result_code = str(result_code or "").strip().lower()
+    normalized_direction = str(direction or "").strip().lower()
+
+    if not normalized_channel_code:
+        return ""
+    if normalized_channel_code == "call" and normalized_result_code == "no_answer":
+        return "call_no_answer"
+    if normalized_result_code in DIRECT_TOUCH_EVENT_TYPES_BY_RESULT_CODE:
+        return DIRECT_TOUCH_EVENT_TYPES_BY_RESULT_CODE[normalized_result_code]
+    if normalized_channel_code == "call":
+        return "call_completed"
+    if normalized_channel_code == "meeting":
+        return "meeting_completed"
+    if normalized_channel_code == "email":
+        return f"email_{'received' if normalized_direction == TouchDirection.INCOMING else 'sent'}"
+    if normalized_channel_code == "telegram":
+        return f"telegram_message_{'received' if normalized_direction == TouchDirection.INCOMING else 'sent'}"
+    if normalized_channel_code == "whatsapp":
+        return f"whatsapp_message_{'received' if normalized_direction == TouchDirection.INCOMING else 'sent'}"
+    if normalized_channel_code in {"documents", "proposal"}:
+        return f"{normalized_channel_code}_{'received' if normalized_direction == TouchDirection.INCOMING else 'sent'}"
+    return f"{normalized_channel_code}_{normalized_direction or 'outgoing'}"
 
 
 class TouchResult(models.Model):

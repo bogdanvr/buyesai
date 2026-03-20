@@ -1,0 +1,138 @@
+[
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 1,
+    "fields": {
+      "code": "waiting_feedback",
+      "name": "Ждём обратную связь"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 2,
+    "fields": {
+      "code": "contact_made",
+      "name": "Контакт состоялся"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 3,
+    "fields": {
+      "code": "no_answer",
+      "name": "Не дозвонились / нет ответа"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 4,
+    "fields": {
+      "code": "callback_later",
+      "name": "Попросили связаться позже"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 5,
+    "fields": {
+      "code": "proposal_sent",
+      "name": "КП отправлено"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 6,
+    "fields": {
+      "code": "proposal_received",
+      "name": "КП получено клиентом"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 7,
+    "fields": {
+      "code": "proposal_revision_requested",
+      "name": "Запросили корректировку КП"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 8,
+    "fields": {
+      "code": "proposal_accepted",
+      "name": "КП принято"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 9,
+    "fields": {
+      "code": "documents_requested",
+      "name": "Запросили договор / счёт / документы"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 10,
+    "fields": {
+      "code": "contract_sent",
+      "name": "Договор отправлен"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 11,
+    "fields": {
+      "code": "contract_under_review",
+      "name": "Договор на согласовании"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 12,
+    "fields": {
+      "code": "contract_revision_requested",
+      "name": "Требуются правки договора"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 13,
+    "fields": {
+      "code": "contract_agreed",
+      "name": "Договор согласован"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 14,
+    "fields": {
+      "code": "invoice_sent",
+      "name": "Счёт отправлен"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 15,
+    "fields": {
+      "code": "invoice_accepted",
+      "name": "Счёт принят"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 16,
+    "fields": {
+      "code": "waiting_payment",
+      "name": "Ждём оплату"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 17,
+    "fields": {
+      "code": "payment_confirmed",
+      "name": "Оплата подтверждена"
+    }
+  }
+]

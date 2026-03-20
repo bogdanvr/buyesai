@@ -283,6 +283,60 @@ class TaskResultAndEventsTests(APITestCase):
         task.refresh_from_db()
         self.assertEqual(task.result, "Договор подготовлен")
 
+    def test_client_task_completion_writes_client_task_event_type(self):
+        task_type = TaskType.objects.create(name="Отправить письмо", group=TaskTypeGroup.CLIENT_TASK)
+        channel = CommunicationChannel.objects.create(name="Email")
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Отправить письмо",
+            task_type=task_type,
+            communication_channel=channel,
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "result": "Письмо отправлено",
+                "has_follow_up_task": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.deal.refresh_from_db()
+        self.assertIn("event_type: client_task_completed_email", self.deal.events)
+
+    def test_internal_task_completion_writes_internal_task_event_type(self):
+        task_type = TaskType.objects.create(name="Подготовить договор", group=TaskTypeGroup.INTERNAL_TASK)
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Подготовить договор",
+            task_type=task_type,
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "result": "Договор подготовлен",
+                "has_follow_up_task": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.deal.refresh_from_db()
+        self.assertIn("event_type: internal_task_completed", self.deal.events)
+
     def test_internal_task_completion_requires_follow_up(self):
         task_type = TaskType.objects.create(name="Сверка данных", group=TaskTypeGroup.INTERNAL_TASK)
         task = Activity.objects.create(
@@ -644,7 +698,7 @@ class TaskResultAndEventsTests(APITestCase):
 
         self.assertIn("Результат: Статус сделки изменён: Первичный контакт -> Переговоры", self.deal.events)
         self.assertIn(f"deal_id: {self.deal.pk}", self.deal.events)
-        self.assertNotIn("Статус сделки изменён", self.company.events)
+        self.assertIn("Результат: Статус сделки изменён: Первичный контакт -> Переговоры", self.company.events)
 
     def test_failed_deal_requires_reason(self):
         response = self.client.patch(

@@ -10,17 +10,32 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.meta.serializers import (
+    AutomationRuleSerializer,
     CommunicationChannelSerializer,
     ContactRoleSerializer,
     ContactStatusSerializer,
     DealStageSerializer,
     LeadSourceSerializer,
     LeadStatusSerializer,
+    NextStepTemplateSerializer,
+    OutcomeCatalogSerializer,
     TaskTypeSerializer,
     TouchResultSerializer,
     UserOptionSerializer,
 )
-from crm.models import CommunicationChannel, ContactRole, ContactStatus, DealStage, LeadSource, LeadStatus, TaskType, TouchResult
+from crm.models import (
+    AutomationRule,
+    CommunicationChannel,
+    ContactRole,
+    ContactStatus,
+    DealStage,
+    LeadSource,
+    LeadStatus,
+    NextStepTemplate,
+    OutcomeCatalog,
+    TaskType,
+    TouchResult,
+)
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -146,6 +161,35 @@ class TouchResultListAPIView(ListAPIView):
 
     def get_queryset(self):
         return TouchResult.objects.filter(is_active=True).order_by("sort_order", "name")
+
+
+class OutcomeCatalogListAPIView(ListAPIView):
+    serializer_class = OutcomeCatalogSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return OutcomeCatalog.objects.all().order_by("name")
+
+
+class NextStepTemplateListAPIView(ListAPIView):
+    serializer_class = NextStepTemplateSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return NextStepTemplate.objects.all().order_by("name")
+
+
+class AutomationRuleListAPIView(ListAPIView):
+    serializer_class = AutomationRuleSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return (
+            AutomationRule.objects
+            .filter(is_active=True)
+            .select_related("default_outcome", "next_step_template")
+            .order_by("sort_order", "event_type")
+        )
 
 
 class CurrencyRatesAPIView(APIView):

@@ -59,6 +59,7 @@
           showTaskCompanyFilter: false,
           showTouchCompanyFilter: false,
           showTouchDealFilter: false,
+          showManagerNotifications: false,
           selectedStatusFilters: [],
           selectedTaskCompanyFilters: [],
           selectedTouchCompanyFilters: [],
@@ -311,6 +312,9 @@
             users: [],
             taskTypes: [],
             touchResults: [],
+            outcomes: [],
+            nextStepTemplates: [],
+            automationRules: [],
             communicationChannels: [],
             contactRoles: [],
             contactStatuses: [],
@@ -342,7 +346,10 @@
             contacts: [],
             companies: [],
             tasks: [],
-            touches: []
+            touches: [],
+            automationDrafts: [],
+            automationQueue: [],
+            automationMessageDrafts: []
           }
         };
       },
@@ -468,6 +475,11 @@
           if (!leadId) return null;
           return (this.datasets.leads || []).find((lead) => String(lead.id) === String(leadId)) || null;
         },
+        editingDealItem() {
+          const dealId = this.toIntOrNull(this.editingDealId);
+          if (!dealId) return null;
+          return (this.datasets.deals || []).find((deal) => String(deal.id) === String(dealId)) || null;
+        },
         leadSummaryStatusLabel() {
           const statusId = this.toIntOrNull(this.forms.leads.statusId);
           if (!statusId) return "Не выбран";
@@ -518,6 +530,123 @@
         touchTaskOptions() {
           return this.datasets.tasks.map((task) => ({ id: task.id, title: task.subject || task.name }));
         },
+        selectedTouchChannel() {
+          const channelId = this.toIntOrNull(this.forms.touches.channelId);
+          if (!channelId) return null;
+          return (this.metaOptions.communicationChannels || []).find((item) => String(item.id) === String(channelId)) || null;
+        },
+        selectedTouchResultOption() {
+          const resultOptionId = this.toIntOrNull(this.forms.touches.resultOptionId);
+          if (!resultOptionId) return null;
+          return (this.metaOptions.touchResults || []).find((item) => String(item.id) === String(resultOptionId)) || null;
+        },
+        touchAutomationEventType() {
+          return this.resolveTouchEventTypeFromParts(
+            this.selectedTouchChannel,
+            this.forms.touches.direction,
+            this.selectedTouchResultOption?.code
+          );
+        },
+        matchedTouchAutomationRule() {
+          const eventType = String(this.touchAutomationEventType || "").trim();
+          if (!eventType) return null;
+          return (this.metaOptions.automationRules || []).find((rule) => String(rule.event_type || "").trim() === eventType) || null;
+        },
+        matchedTouchAutomationOutcome() {
+          const outcomeCode = String(this.matchedTouchAutomationRule?.default_outcome_code || "").trim();
+          if (!outcomeCode) return null;
+          return (this.metaOptions.touchResults || []).find((item) => String(item.code || "").trim() === outcomeCode) || null;
+        },
+        matchedTouchAutomationNextStepTemplate() {
+          const templateId = this.toIntOrNull(this.matchedTouchAutomationRule?.next_step_template);
+          if (!templateId) return null;
+          return (this.metaOptions.nextStepTemplates || []).find((item) => String(item.id) === String(templateId)) || null;
+        },
+        pendingAutomationDrafts() {
+          return (this.datasets.automationDrafts || []).filter((item) => String(item.status || "") === "pending");
+        },
+        pendingAutomationMessageDrafts() {
+          return (this.datasets.automationMessageDrafts || []).filter((item) => String(item.status || "") === "pending");
+        },
+        pendingAutomationQueueItems() {
+          return (this.datasets.automationQueue || []).filter((item) => String(item.status || "") === "pending");
+        },
+        managerNotifications() {
+          const notifications = [
+            ...this.pendingAutomationMessageDrafts.map((draft) => ({
+              id: `message-draft-${draft.id}`,
+              sourceType: "message_draft",
+              sourceId: draft.id,
+              touchId: this.toIntOrNull(draft.sourceTouchId),
+              dealId: this.toIntOrNull(draft.dealId),
+              dealTitle: draft.dealTitle || "",
+              companyId: this.toIntOrNull(draft.clientId),
+              companyName: draft.clientName || "",
+              title: draft.title || draft.messageSubject || "Черновик сообщения",
+              eventType: draft.sourceEventType || "",
+              happenedAt: draft.sourceTouchHappenedAt || draft.createdAt || "",
+              deadline: "",
+              recommendedAction: draft.messageText || "",
+              uiPriority: String(draft.automationRuleUiPriority || "medium"),
+              needsConfirmation: true,
+              isDraft: true,
+              isMessageDraft: true,
+            })),
+            ...this.pendingAutomationQueueItems.map((item) => ({
+              id: `queue-${item.id}`,
+              sourceType: "queue",
+              sourceId: item.id,
+              queueKind: item.itemKind || "",
+              touchId: this.toIntOrNull(item.sourceTouchId),
+              dealId: this.toIntOrNull(item.dealId),
+              dealTitle: item.dealTitle || "",
+              companyId: this.toIntOrNull(item.clientId),
+              companyName: item.clientName || "",
+              leadId: this.toIntOrNull(item.leadId),
+              contactId: this.toIntOrNull(item.contactId),
+              ownerId: this.toIntOrNull(item.ownerId),
+              title: item.title || item.summary || "Очередь автоматизации",
+              eventType: item.sourceEventType || "",
+              happenedAt: item.sourceTouchHappenedAt || item.createdAt || "",
+              deadline: item.proposedNextStepAt || "",
+              recommendedAction: item.recommendedAction || item.proposedNextStep || "",
+              uiPriority: String(item.automationRuleUiPriority || "medium"),
+              needsConfirmation: true,
+              isDraft: false,
+              availableActions: Array.isArray(item.availableActions) ? item.availableActions : [],
+            })),
+            ...this.pendingAutomationDrafts.map((draft) => ({
+              id: `draft-${draft.id}`,
+              sourceType: "draft",
+              sourceId: draft.id,
+              touchId: this.toIntOrNull(draft.sourceTouchId),
+              dealId: this.toIntOrNull(draft.dealId),
+              dealTitle: draft.dealTitle || "",
+              companyId: this.toIntOrNull(draft.clientId),
+              companyName: draft.clientName || "",
+              title: draft.title || draft.summary || "Черновик автоматизации",
+              eventType: draft.sourceEventType || "",
+              happenedAt: draft.sourceTouchHappenedAt || draft.createdAt || "",
+              deadline: draft.proposedNextStepAt || "",
+              recommendedAction: draft.proposedNextStep || "",
+              uiPriority: String(draft.automationRuleUiPriority || "medium"),
+              needsConfirmation: true,
+              isDraft: true,
+            })),
+          ];
+
+          notifications.sort((left, right) => {
+            const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+            const leftRank = priorityOrder[left.uiPriority] ?? 99;
+            const rightRank = priorityOrder[right.uiPriority] ?? 99;
+            if (leftRank !== rightRank) return leftRank - rightRank;
+            return (this.parseTaskDueTimestamp(right.happenedAt) || 0) - (this.parseTaskDueTimestamp(left.happenedAt) || 0);
+          });
+          return notifications;
+        },
+        managerNotificationsCount() {
+          return this.managerNotifications.length;
+        },
         dealHasSelectedCompany() {
           return !!this.toIntOrNull(this.forms.deals.companyId);
         },
@@ -558,6 +687,24 @@
         dealSummaryNextStepTask() {
           return this.dealSummaryUpcomingTasks[0] || null;
         },
+        dealSummaryNextStepLabel() {
+          if (this.dealAutomationNextAction?.title) {
+            return this.dealAutomationNextAction.title;
+          }
+          return this.dealSummaryNextStepTask?.subject || this.dealSummaryNextTouch?.nextStep || "Не указан";
+        },
+        dealSummaryNextStepAtLabel() {
+          if (this.dealAutomationNextAction?.at) {
+            return this.formatDueLabel(this.dealAutomationNextAction.at);
+          }
+          if (this.dealSummaryNextStepTask?.dueAtRaw) {
+            return this.formatDueLabel(this.dealSummaryNextStepTask.dueAtRaw);
+          }
+          if (this.dealSummaryNextTouch?.nextStepAtRaw) {
+            return this.formatDueLabel(this.dealSummaryNextTouch.nextStepAtRaw);
+          }
+          return "Не указана";
+        },
         dealSummaryLastTouch() {
           const touches = this.dealSummaryTouches.slice();
           touches.sort((left, right) => (this.parseTaskDueTimestamp(right.happenedAtRaw) || 0) - (this.parseTaskDueTimestamp(left.happenedAtRaw) || 0));
@@ -590,6 +737,209 @@
             return `Без контакта ${daysWithoutContact} дн`;
           }
           return "Без контакта";
+        },
+        dealSummaryOwnerLabel() {
+          const ownerId = this.toIntOrNull(this.forms.deals.ownerId);
+          if (!ownerId) {
+            return this.editingDealItem?.ownerName || "Не назначен";
+          }
+          const user = (this.metaOptions.users || []).find((item) => String(item.id) === String(ownerId));
+          return user ? (user.full_name || user.username) : (this.editingDealItem?.ownerName || "Не назначен");
+        },
+        dealAutomationTouchItems() {
+          return this.dealSummaryTouches
+            .map((touch) => this.buildAutomationTouchEntry(touch))
+            .filter(Boolean)
+            .filter((item) => (
+              item.rule?.show_in_summary
+              || item.uiMode !== "history_only"
+              || item.needsAttention
+              || item.isDraft
+            ))
+            .sort((left, right) => this.compareAutomationEntries(left, right));
+        },
+        dealAttentionItems() {
+          const dealId = this.toIntOrNull(this.editingDealId);
+          if (!dealId) return [];
+          return this.pendingAutomationQueueItems
+            .filter((item) => String(item.dealId || "") === String(dealId) && String(item.itemKind || "") === "attention")
+            .map((item) => this.buildAutomationQueueEntry(item))
+            .filter(Boolean);
+        },
+        dealAttentionChains() {
+          return this.groupAutomationEntries(this.dealAttentionItems);
+        },
+        dealSignalItems() {
+          return this.dealAutomationTouchItems.filter((item) => item.uiMode === "signal");
+        },
+        dealSignalChains() {
+          return this.groupAutomationEntries(this.dealSignalItems);
+        },
+        dealDraftTouchItems() {
+          const dealId = this.toIntOrNull(this.editingDealId);
+          if (!dealId) return [];
+          const draftItems = this.pendingAutomationDrafts
+            .filter((item) => String(item.dealId || "") === String(dealId))
+            .map((item) => this.buildAutomationDraftEntry(item))
+            .filter(Boolean);
+          const messageDraftItems = this.pendingAutomationMessageDrafts
+            .filter((item) => String(item.dealId || "") === String(dealId))
+            .map((item) => this.buildAutomationMessageDraftEntry(item))
+            .filter(Boolean);
+          return [...draftItems, ...messageDraftItems];
+        },
+        dealNextStepQueueItems() {
+          const dealId = this.toIntOrNull(this.editingDealId);
+          if (!dealId) return [];
+          return this.pendingAutomationQueueItems
+            .filter((item) => String(item.dealId || "") === String(dealId) && String(item.itemKind || "") === "next_step")
+            .map((item) => this.buildAutomationQueueEntry(item))
+            .filter(Boolean);
+        },
+        dealDraftTouchChains() {
+          return this.groupAutomationEntries(this.dealDraftTouchItems);
+        },
+        dealLatestSignificantItem() {
+          const items = this.dealAutomationTouchItems
+            .filter((item) => item.isSignificant)
+            .slice()
+            .sort((left, right) => (
+              (this.parseTaskDueTimestamp(right.happenedAtRaw) || 0) - (this.parseTaskDueTimestamp(left.happenedAtRaw) || 0)
+              || this.compareAutomationEntries(left, right)
+            ));
+          return items[0] || null;
+        },
+        dealAutomationNextAction() {
+          const nextStepQueueItem = this.dealNextStepQueueItems
+            .filter((item) => item.hasSuggestedNextStep)
+            .slice()
+            .sort((left, right) => {
+              const leftAt = this.parseTaskDueTimestamp(left.suggestedNextStepAt || left.happenedAtRaw) || Number.MAX_SAFE_INTEGER;
+              const rightAt = this.parseTaskDueTimestamp(right.suggestedNextStepAt || right.happenedAtRaw) || Number.MAX_SAFE_INTEGER;
+              return leftAt - rightAt || this.compareAutomationEntries(left, right);
+            })[0];
+          if (nextStepQueueItem) {
+            return {
+              kind: "automation_queue",
+              title: nextStepQueueItem.suggestedNextStep || nextStepQueueItem.recommendedAction || "Не указан",
+              at: nextStepQueueItem.suggestedNextStepAt || null,
+              ownerName: nextStepQueueItem.ownerName || this.dealSummaryOwnerLabel,
+              sourceLabel: `по автоматизации · ${nextStepQueueItem.eventLabel}`,
+              sourceTouchId: nextStepQueueItem.touchId,
+              recommendedAction: nextStepQueueItem.recommendedAction || "",
+              canConfirm: true,
+              canCreateTask: false,
+              queueId: nextStepQueueItem.queueId,
+            };
+          }
+
+          const nextStepDraft = this.dealDraftTouchItems
+            .filter((item) => item.draftKind === "next_step" && item.hasSuggestedNextStep)
+            .slice()
+            .sort((left, right) => {
+              const leftAt = this.parseTaskDueTimestamp(left.suggestedNextStepAt || left.happenedAtRaw) || Number.MAX_SAFE_INTEGER;
+              const rightAt = this.parseTaskDueTimestamp(right.suggestedNextStepAt || right.happenedAtRaw) || Number.MAX_SAFE_INTEGER;
+              return leftAt - rightAt || this.compareAutomationEntries(left, right);
+            })[0];
+          if (nextStepDraft) {
+            return {
+              kind: "automation_draft",
+              title: nextStepDraft.suggestedNextStep || "Не указан",
+              at: nextStepDraft.suggestedNextStepAt || null,
+              ownerName: nextStepDraft.ownerName || this.dealSummaryOwnerLabel,
+              sourceLabel: `черновик · ${nextStepDraft.eventLabel}`,
+              sourceTouchId: nextStepDraft.touchId,
+              recommendedAction: nextStepDraft.recommendedAction || "",
+              canCreateTask: false,
+            };
+          }
+          const nextTask = this.dealSummaryNextStepTask;
+          if (nextTask) {
+            const relatedTouch = this.toIntOrNull(nextTask.relatedTouchId)
+              ? (this.datasets.touches || []).find((touch) => String(touch.id) === String(nextTask.relatedTouchId))
+              : null;
+            const relatedTouchEntry = relatedTouch ? this.buildAutomationTouchEntry(relatedTouch) : null;
+            return {
+              kind: "task",
+              title: nextTask.subject || nextTask.name || "Не указан",
+              at: nextTask.dueAtRaw || null,
+              ownerName: relatedTouchEntry?.ownerName || this.dealSummaryOwnerLabel,
+              sourceLabel: relatedTouchEntry ? `по автоматизации · ${relatedTouchEntry.eventLabel}` : "вручную",
+              sourceTouchId: this.toIntOrNull(nextTask.relatedTouchId),
+              recommendedAction: relatedTouchEntry?.recommendedAction || "",
+              canCreateTask: false,
+            };
+          }
+
+          const automationPrompt = this.dealAutomationTouchItems
+            .filter((item) => item.hasSuggestedNextStep)
+            .slice()
+            .sort((left, right) => {
+              const leftAt = this.parseTaskDueTimestamp(left.suggestedNextStepAt || left.happenedAtRaw) || Number.MAX_SAFE_INTEGER;
+              const rightAt = this.parseTaskDueTimestamp(right.suggestedNextStepAt || right.happenedAtRaw) || Number.MAX_SAFE_INTEGER;
+              return leftAt - rightAt || this.compareAutomationEntries(left, right);
+            })[0];
+          if (automationPrompt) {
+            return {
+              kind: "automation",
+              title: automationPrompt.suggestedNextStep || "Не указан",
+              at: automationPrompt.suggestedNextStepAt || null,
+              ownerName: automationPrompt.ownerName || this.dealSummaryOwnerLabel,
+              sourceLabel: `по автоматизации · ${automationPrompt.eventLabel}`,
+              sourceTouchId: automationPrompt.touchId,
+              recommendedAction: automationPrompt.recommendedAction || "",
+              canCreateTask: true,
+              touchId: automationPrompt.touchId,
+              taskTypeGroup: automationPrompt.touch?.channelId ? "client_task" : "",
+              communicationChannelId: automationPrompt.touch?.channelId || null,
+            };
+          }
+
+          const nextTouch = this.dealSummaryNextTouch;
+          if (nextTouch) {
+            return {
+              kind: "touch",
+              title: nextTouch.nextStep || nextTouch.summary || nextTouch.resultOptionName || "Не указан",
+              at: nextTouch.nextStepAtRaw || null,
+              ownerName: nextTouch.ownerName || this.dealSummaryOwnerLabel,
+              sourceLabel: "вручную",
+              sourceTouchId: this.toIntOrNull(nextTouch.id),
+              recommendedAction: "",
+              canCreateTask: !!String(nextTouch.nextStep || "").trim(),
+              touchId: this.toIntOrNull(nextTouch.id),
+              taskTypeGroup: nextTouch.channelId ? "client_task" : "",
+              communicationChannelId: nextTouch.channelId || null,
+            };
+          }
+
+          return null;
+        },
+        hasDealAutomationSummaryBlocks() {
+          return !!(
+            this.dealAutomationNextAction
+            || this.dealLatestSignificantItem
+            || this.dealAttentionChains.length
+            || this.dealSignalChains.length
+            || this.dealDraftTouchChains.length
+          );
+        },
+        parsedDealEventItems() {
+          return this.parseEventLog(this.forms.deals.events);
+        },
+        dealTimelineItems() {
+          return this.groupDealTimelineEvents(this.parsedDealEventItems);
+        },
+        parsedLeadEventItems() {
+          return this.parseEventLog(this.leadEventLog(this.forms.leads));
+        },
+        leadTimelineItems() {
+          return this.groupDealTimelineEvents(this.parsedLeadEventItems);
+        },
+        parsedCompanyEventItems() {
+          return this.parseEventLog(this.forms.companies.events);
+        },
+        companyTimelineItems() {
+          return this.groupDealTimelineEvents(this.parsedCompanyEventItems);
         },
         companySummaryDeals() {
           const companyId = this.toIntOrNull(this.editingCompanyId);
@@ -1283,6 +1633,28 @@
             }
           }
         },
+        "forms.touches.channelId": {
+          handler() {
+            const currentResultId = this.toIntOrNull(this.forms.touches.resultOptionId);
+            if (currentResultId) {
+              const availableIds = this.availableTouchResults(this.forms.touches.channelId, currentResultId).map((item) => String(item.id));
+              if (!availableIds.includes(String(currentResultId))) {
+                this.forms.touches.resultOptionId = null;
+              }
+            }
+            this.$nextTick(() => this.applyTouchAutomationRule());
+          }
+        },
+        "forms.touches.direction": {
+          handler() {
+            this.$nextTick(() => this.applyTouchAutomationRule());
+          }
+        },
+        "forms.touches.resultOptionId": {
+          handler() {
+            this.$nextTick(() => this.applyTouchAutomationRule());
+          }
+        },
         "taskFollowUpForm.taskTypeGroup": {
           handler(nextValue) {
             if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
@@ -1460,6 +1832,7 @@
                 documentName: "",
                 documentUrl: "",
                 documentScope: "",
+                documents: [],
                 channelName: "",
                 directionLabel: "",
                 touchResult: "",
@@ -1475,6 +1848,7 @@
               };
               const contentLines = eventItem.timestamp ? lines.slice(1) : lines.slice();
               const extraLines = [];
+              let pendingDocumentName = "";
 
               contentLines.forEach((line) => {
                 if (!line) return;
@@ -1514,11 +1888,21 @@
                   return;
                 }
                 if (line.indexOf("document_name:") === 0) {
-                  eventItem.documentName = line.replace(/^document_name:\s*/u, "").trim();
+                  const parsedDocumentName = line.replace(/^document_name:\s*/u, "").trim();
+                  eventItem.documentName = eventItem.documentName || parsedDocumentName;
+                  pendingDocumentName = parsedDocumentName;
                   return;
                 }
                 if (line.indexOf("document_url:") === 0) {
-                  eventItem.documentUrl = line.replace(/^document_url:\s*/u, "").trim();
+                  const parsedDocumentUrl = line.replace(/^document_url:\s*/u, "").trim();
+                  eventItem.documentUrl = eventItem.documentUrl || parsedDocumentUrl;
+                  if (pendingDocumentName || parsedDocumentUrl) {
+                    eventItem.documents.push({
+                      name: pendingDocumentName || eventItem.documentName || "Документ",
+                      url: parsedDocumentUrl,
+                    });
+                    pendingDocumentName = "";
+                  }
                   return;
                 }
                 if (line.indexOf("document_scope:") === 0) {
@@ -1586,6 +1970,7 @@
                   documentName: "",
                   documentUrl: "",
                   documentScope: "",
+                  documents: [],
                   channelName: "",
                   directionLabel: "",
                   touchResult: "",
@@ -1602,6 +1987,16 @@
               }
 
               eventItem.extra = extraLines.join("\n").trim();
+              eventItem.renderType = "";
+              if (eventItem.touchId) {
+                eventItem.renderType = "touch";
+              } else if (eventItem.taskId || String(eventItem.eventType || "").trim() === "task" || String(eventItem.eventType || "").trim().indexOf("client_task_completed_") === 0 || String(eventItem.eventType || "").trim() === "internal_task_completed") {
+                eventItem.renderType = "task";
+              } else if (String(eventItem.eventType || "").trim() === "document" || eventItem.documentUrl || eventItem.documentName) {
+                eventItem.renderType = "document";
+              } else if (String(eventItem.eventType || "").trim() === "system") {
+                eventItem.renderType = "system";
+              }
               return eventItem;
             })
             .filter(Boolean);
@@ -1740,7 +2135,7 @@
           return "border-crm-border/80 bg-[#0f2f4a]";
         },
         dealEventTypeLabel(eventItem) {
-          const eventType = String(eventItem?.eventType || "").trim();
+          const eventType = String(eventItem?.renderType || eventItem?.eventType || "").trim();
           if (eventType === "touch") return "Касание";
           if (eventType === "task") return "Задача";
           if (eventType === "document") return "Документ";
@@ -1766,7 +2161,7 @@
           }).replace(",", "");
         },
         dealEventIcon(eventItem) {
-          const eventType = String(eventItem?.eventType || "").trim();
+          const eventType = String(eventItem?.renderType || eventItem?.eventType || "").trim();
           if (eventType === "task") return "☑";
           if (eventType === "document") return "▣";
           if (eventType === "system") return "•";
@@ -2111,8 +2506,15 @@
             "телеграм": "telegram",
             "meeting": "meeting",
             "встреча": "meeting",
-            "document": "document",
-            "документ": "document",
+            "proposal": "proposal",
+            "предложение": "proposal",
+            "коммерческое предложение": "proposal",
+            "кп": "proposal",
+            "document": "documents",
+            "documents": "documents",
+            "документ": "documents",
+            "документы": "documents",
+            "файлы": "documents",
           };
           if (aliases[normalized]) {
             return aliases[normalized];
@@ -2120,6 +2522,756 @@
           return normalized
             .replace(/\s+/g, "_")
             .replace(/[^a-zа-я0-9_]/gi, "");
+        },
+        resolveTouchEventTypeFromParts(channelLike, directionValue, resultCodeValue = "") {
+          const channelCode = this.normalizeTouchChannelCode(channelLike);
+          const resultCode = String(resultCodeValue || "").trim().toLowerCase();
+          const direction = String(directionValue || "").trim().toLowerCase();
+          const directEventTypesByResultCode = {
+            meeting_scheduled: "meeting_scheduled",
+            meeting_rescheduled: "meeting_rescheduled",
+            meeting_cancelled: "meeting_cancelled",
+            meeting_completed: "meeting_completed",
+            meeting_no_show: "meeting_no_show",
+            proposal_requested: "proposal_sent",
+            proposal_sent: "proposal_sent",
+            proposal_received: "proposal_received_by_client",
+            proposal_under_review: "proposal_received_by_client",
+            proposal_revision_requested: "proposal_revision_requested",
+            discount_requested: "proposal_revision_requested",
+            documents_requested: "documents_requested",
+            contract_sent: "contract_sent",
+            contract_under_review: "contract_under_review",
+            contract_revision_requested: "contract_revision_requested",
+            contract_agreed: "contract_agreed",
+            invoice_sent: "invoice_sent",
+            invoice_accepted: "invoice_received_by_client",
+            waiting_payment: "payment_waiting",
+            payment_confirmed: "payment_confirmed",
+          };
+          if (!channelCode) return "";
+          if (channelCode === "call" && resultCode === "no_answer") {
+            return "call_no_answer";
+          }
+          if (directEventTypesByResultCode[resultCode]) {
+            return directEventTypesByResultCode[resultCode];
+          }
+          if (channelCode === "call") {
+            return "call_completed";
+          }
+          if (channelCode === "meeting") {
+            return "meeting_completed";
+          }
+          if (channelCode === "email") {
+            return `email_${direction === "incoming" ? "received" : "sent"}`;
+          }
+          if (channelCode === "telegram") {
+            return `telegram_message_${direction === "incoming" ? "received" : "sent"}`;
+          }
+          if (channelCode === "whatsapp") {
+            return `whatsapp_message_${direction === "incoming" ? "received" : "sent"}`;
+          }
+          if (["documents", "proposal"].includes(channelCode)) {
+            return `${channelCode}_${direction === "incoming" ? "received" : "sent"}`;
+          }
+          return `${channelCode}_${direction || "outgoing"}`;
+        },
+        resolveTouchEventTypeFromItem(touch) {
+          if (!touch || typeof touch !== "object") return "";
+          return this.resolveTouchEventTypeFromParts(
+            { code: touch.channelCode, name: touch.channelName },
+            touch.direction,
+            touch.resultOptionCode
+          );
+        },
+        applyTouchAutomationRule() {
+          const matchedRule = this.matchedTouchAutomationRule;
+          if (!matchedRule) {
+            return;
+          }
+
+          const matchedOutcome = this.matchedTouchAutomationOutcome;
+          if (!this.toIntOrNull(this.forms.touches.resultOptionId) && matchedOutcome?.id) {
+            this.forms.touches.resultOptionId = matchedOutcome.id;
+          }
+
+          const matchedTemplate = this.matchedTouchAutomationNextStepTemplate;
+          if (!String(this.forms.touches.nextStep || "").trim() && matchedTemplate?.name) {
+            this.forms.touches.nextStep = matchedTemplate.name;
+          }
+        },
+        touchAutomationModeLabel(value) {
+          const normalized = String(value || "").trim();
+          if (normalized === "draft") return "Черновик касания";
+          if (normalized === "create") return "Создать касание";
+          return "Без автокасания";
+        },
+        automationPriorityRank(priority) {
+          const normalized = String(priority || "").trim();
+          const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+          return priorityOrder[normalized] ?? 99;
+        },
+        findAutomationRuleByEventType(eventType) {
+          const normalized = String(eventType || "").trim();
+          if (!normalized) return null;
+          return (this.metaOptions.automationRules || []).find((item) => (
+            !!item.is_active && String(item.event_type || "").trim() === normalized
+          )) || null;
+        },
+        automationEventLabel(touch) {
+          if (!touch || typeof touch !== "object") return "Событие";
+          const channelName = String(touch.channelName || "").trim();
+          const direction = String(touch.direction || "").trim();
+          if (channelName) {
+            if (direction === "incoming") return `Входящее ${channelName}`;
+            if (direction === "outgoing") return `Исходящее ${channelName}`;
+            return channelName;
+          }
+          return touch.resultOptionName || touch.summary || "Событие";
+        },
+        buildAutomationTouchEntry(touch) {
+          if (!touch || typeof touch !== "object") return null;
+          const eventType = this.resolveTouchEventTypeFromItem(touch);
+          const rule = this.findAutomationRuleByEventType(eventType);
+          if (!rule) return null;
+          const uiMode = String(rule.ui_mode || "history_only").trim();
+          const uiPriority = String(rule.ui_priority || "low").trim();
+          const suggestedNextStep = String(
+            rule.next_step_template_name
+            || touch.nextStep
+            || ""
+          ).trim();
+          return {
+            id: `deal-automation-touch-${touch.id}`,
+            touch,
+            touchId: this.toIntOrNull(touch.id),
+            eventType,
+            eventLabel: this.automationEventLabel(touch),
+            title: touch.summary || touch.resultOptionName || this.automationEventLabel(touch),
+            summary: String(touch.summary || "").trim(),
+            resultName: String(touch.resultOptionName || "").trim(),
+            happenedAtRaw: touch.happenedAtRaw || null,
+            nextStepAtRaw: touch.nextStepAtRaw || null,
+            ownerName: String(touch.ownerName || "").trim(),
+            uiMode,
+            uiPriority,
+            priorityRank: this.automationPriorityRank(uiPriority),
+            rule,
+            recommendedAction: String(rule.next_step_template_name || "").trim(),
+            suggestedNextStep,
+            suggestedNextStepAt: touch.nextStepAtRaw || null,
+            defaultTaskTypeGroup: touch.channelId ? "client_task" : "",
+            defaultCommunicationChannelId: touch.channelId || null,
+            needsAttention: (
+              uiMode === "needs_attention"
+              || !!rule.show_in_attention_queue
+              || !!rule.require_manager_confirmation
+            ),
+            isSignal: uiMode === "signal",
+            isDraft: (
+              uiMode === "draft_touch"
+              || String(rule.create_touchpoint_mode || "").trim() === "draft"
+            ),
+            isSignificant: (
+              this.automationPriorityRank(uiPriority) <= this.automationPriorityRank("high")
+              || ["needs_attention", "next_step_prompt", "draft_touch"].includes(uiMode)
+              || ["call", "meeting"].includes(this.normalizeTouchChannelCode({ code: touch.channelCode, name: touch.channelName }))
+              || String(touch.direction || "").trim() === "incoming"
+            ),
+            hasSuggestedNextStep: !!suggestedNextStep,
+          };
+        },
+        buildAutomationDraftEntry(draft) {
+          if (!draft || typeof draft !== "object") return null;
+          const uiPriority = String(draft.automationRuleUiPriority || "medium").trim();
+          const rule = (this.metaOptions.automationRules || []).find(
+            (item) => String(item.id) === String(draft.automationRuleId || "")
+          ) || null;
+          const eventLabel = this.automationChainLabel({
+            rule: { merge_key: rule?.merge_key || "" },
+            eventLabel: draft.title || draft.sourceEventType || "Черновик",
+          });
+          return {
+            id: `automation-draft-${draft.id}`,
+            draftId: this.toIntOrNull(draft.id),
+            draftKind: String(draft.draftKind || "").trim(),
+            touchId: this.toIntOrNull(draft.sourceTouchId),
+            eventType: String(draft.sourceEventType || "").trim(),
+            eventLabel,
+            title: draft.title || draft.summary || eventLabel,
+            summary: String(draft.summary || "").trim(),
+            resultName: String(draft.touchResultName || draft.outcomeName || "").trim(),
+            happenedAtRaw: draft.sourceTouchHappenedAt || draft.createdAt || null,
+            ownerName: String(draft.ownerName || "").trim(),
+            uiPriority,
+            priorityRank: this.automationPriorityRank(uiPriority),
+            rule,
+            suggestedNextStep: String(draft.proposedNextStep || "").trim(),
+            suggestedNextStepAt: draft.proposedNextStepAt || null,
+            defaultTaskTypeGroup: draft.proposedChannelId ? "client_task" : "",
+            defaultCommunicationChannelId: this.toIntOrNull(draft.proposedChannelId),
+            recommendedAction: String(draft.proposedNextStep || "").trim(),
+            hasSuggestedNextStep: !!String(draft.proposedNextStep || "").trim(),
+            needsAttention: true,
+            isDraft: true,
+          };
+        },
+        buildAutomationQueueEntry(item) {
+          if (!item || typeof item !== "object") return null;
+          const uiPriority = String(item.automationRuleUiPriority || "medium").trim();
+          const rule = (this.metaOptions.automationRules || []).find(
+            (entry) => String(entry.id) === String(item.automationRuleId || "")
+          ) || null;
+          const eventLabel = this.automationChainLabel({
+            rule: { merge_key: rule?.merge_key || "" },
+            eventLabel: item.title || item.sourceEventType || "Событие",
+          });
+          return {
+            id: `automation-queue-${item.id}`,
+            queueId: this.toIntOrNull(item.id),
+            queueKind: String(item.itemKind || "").trim(),
+            touchId: this.toIntOrNull(item.sourceTouchId),
+            ownerId: this.toIntOrNull(item.ownerId),
+            leadId: this.toIntOrNull(item.leadId),
+            dealId: this.toIntOrNull(item.dealId),
+            clientId: this.toIntOrNull(item.clientId),
+            contactId: this.toIntOrNull(item.contactId),
+            eventType: String(item.sourceEventType || "").trim(),
+            eventLabel,
+            title: item.title || item.summary || eventLabel,
+            summary: String(item.summary || "").trim(),
+            resultName: String(item.touchResultName || item.outcomeName || "").trim(),
+            happenedAtRaw: item.sourceTouchHappenedAt || item.createdAt || null,
+            ownerName: String(item.ownerName || "").trim(),
+            uiPriority,
+            priorityRank: this.automationPriorityRank(uiPriority),
+            rule,
+            recommendedAction: String(item.recommendedAction || "").trim(),
+            suggestedNextStep: String(item.proposedNextStep || item.recommendedAction || "").trim(),
+            suggestedNextStepAt: item.proposedNextStepAt || null,
+            defaultTaskTypeGroup: item.proposedChannelId ? "client_task" : "",
+            defaultCommunicationChannelId: this.toIntOrNull(item.proposedChannelId),
+            hasSuggestedNextStep: !!String(item.proposedNextStep || item.recommendedAction || "").trim(),
+            needsAttention: String(item.itemKind || "") === "attention",
+            isDraft: false,
+            createdTaskId: this.toIntOrNull(item.createdTaskId),
+            availableActions: Array.isArray(item.availableActions) ? item.availableActions : [],
+          };
+        },
+        buildAutomationMessageDraftEntry(draft) {
+          if (!draft || typeof draft !== "object") return null;
+          const uiPriority = String(draft.automationRuleUiPriority || "medium").trim();
+          const rule = (this.metaOptions.automationRules || []).find(
+            (item) => String(item.id) === String(draft.automationRuleId || "")
+          ) || null;
+          const eventLabel = this.automationChainLabel({
+            rule: { merge_key: rule?.merge_key || "" },
+            eventLabel: draft.title || draft.sourceEventType || "Черновик сообщения",
+          });
+          return {
+            id: `automation-message-draft-${draft.id}`,
+            messageDraftId: this.toIntOrNull(draft.id),
+            draftKind: "message",
+            touchId: this.toIntOrNull(draft.sourceTouchId),
+            eventType: String(draft.sourceEventType || "").trim(),
+            eventLabel,
+            title: draft.title || draft.messageSubject || eventLabel,
+            summary: String(draft.messageText || "").trim(),
+            resultName: "",
+            happenedAtRaw: draft.sourceTouchHappenedAt || draft.createdAt || null,
+            ownerName: String(draft.ownerName || "").trim(),
+            uiPriority,
+            priorityRank: this.automationPriorityRank(uiPriority),
+            rule,
+            suggestedNextStep: "",
+            suggestedNextStepAt: null,
+            defaultTaskTypeGroup: "",
+            defaultCommunicationChannelId: this.toIntOrNull(draft.proposedChannelId),
+            recommendedAction: String(draft.messageText || "").trim(),
+            hasSuggestedNextStep: false,
+            needsAttention: true,
+            isDraft: true,
+            messageSubject: String(draft.messageSubject || "").trim(),
+            messageText: String(draft.messageText || "").trim(),
+          };
+        },
+        compareAutomationEntries(left, right) {
+          const leftRank = this.automationPriorityRank(left?.uiPriority);
+          const rightRank = this.automationPriorityRank(right?.uiPriority);
+          if (leftRank !== rightRank) {
+            return leftRank - rightRank;
+          }
+          return (this.parseTaskDueTimestamp(right?.happenedAtRaw) || 0) - (this.parseTaskDueTimestamp(left?.happenedAtRaw) || 0);
+        },
+        automationChainLabel(item) {
+          const mergeKey = String(item?.rule?.merge_key || "").trim();
+          const labels = {
+            email: "Email-цепочка",
+            telegram: "Telegram-цепочка",
+            whatsapp: "WhatsApp-цепочка",
+            proposal: "КП / предложение",
+            contract: "Договор",
+            invoice: "Счёт / оплата",
+          };
+          if (labels[mergeKey]) {
+            return labels[mergeKey];
+          }
+          return item?.eventLabel || "Цепочка";
+        },
+        groupAutomationEntries(items) {
+          const groups = new Map();
+          (Array.isArray(items) ? items : []).forEach((item) => {
+            const mergeKey = String(item?.rule?.merge_key || "").trim();
+            const groupKey = mergeKey || `touch-${item?.touchId || Math.random()}`;
+            if (!groups.has(groupKey)) {
+              groups.set(groupKey, []);
+            }
+            groups.get(groupKey).push(item);
+          });
+          return Array.from(groups.entries()).map(([groupKey, entries]) => {
+            const sorted = entries.slice().sort((left, right) => (
+              (this.parseTaskDueTimestamp(right.happenedAtRaw) || 0) - (this.parseTaskDueTimestamp(left.happenedAtRaw) || 0)
+              || this.compareAutomationEntries(left, right)
+            ));
+            const primary = sorted[0] || null;
+            return {
+              id: `automation-chain-${groupKey}`,
+              groupKey,
+              title: this.automationChainLabel(primary),
+              primary,
+              items: sorted,
+              count: sorted.length,
+            };
+          }).sort((left, right) => this.compareAutomationEntries(left.primary, right.primary));
+        },
+        resolveEventTouchAutomationEntry(eventItem) {
+          const touchId = this.toIntOrNull(eventItem?.touchId);
+          if (!touchId) return null;
+          const touch = (this.datasets.touches || []).find((item) => String(item.id) === String(touchId));
+          if (!touch) return null;
+          return this.buildAutomationTouchEntry(touch);
+        },
+        groupDealTimelineEvents(eventItems) {
+          const result = [];
+          const chains = new Map();
+          (Array.isArray(eventItems) ? eventItems : []).forEach((eventItem, index) => {
+            const automationEntry = this.resolveEventTouchAutomationEntry(eventItem);
+            const mergeKey = String(automationEntry?.rule?.merge_key || "").trim();
+            if (!mergeKey) {
+              result.push({
+                id: `deal-event-item-${index}`,
+                type: "single",
+                eventItem,
+              });
+              return;
+            }
+            const existingChain = chains.get(mergeKey);
+            if (existingChain) {
+              existingChain.items.push(eventItem);
+              return;
+            }
+            const chain = {
+              id: `deal-event-chain-${mergeKey}-${index}`,
+              type: "chain",
+              mergeKey,
+              title: this.automationChainLabel(automationEntry),
+              automationEntry,
+              items: [eventItem],
+            };
+            chains.set(mergeKey, chain);
+            result.push(chain);
+          });
+          return result;
+        },
+        dealTimelinePrimaryEvent(item) {
+          if (!item || typeof item !== "object") return null;
+          return item.type === "chain" ? item.items[0] || null : item.eventItem;
+        },
+        dealTimelineChainSummary(item) {
+          if (!item || item.type !== "chain") return "";
+          const labels = (item.items || [])
+            .map((entry) => entry.title || entry.result || "")
+            .filter(Boolean);
+          return labels.join(" • ");
+        },
+        managerNotificationCardClass(item) {
+          const priority = String(item?.uiPriority || "").trim();
+          if (priority === "critical") {
+            return "border-red-400/40 bg-red-400/10";
+          }
+          if (priority === "high") {
+            return "border-amber-400/40 bg-amber-400/10";
+          }
+          if (priority === "medium") {
+            return "border-sky-400/30 bg-sky-400/10";
+          }
+          return "border-crm-border bg-[#102f4a]";
+        },
+        toggleManagerNotifications() {
+          this.showManagerNotifications = !this.showManagerNotifications;
+          if (this.showManagerNotifications) {
+            this.showStatusFilter = false;
+            this.showTaskCompanyFilter = false;
+            this.showTouchCompanyFilter = false;
+            this.showTouchDealFilter = false;
+          }
+        },
+        async openManagerNotification(item) {
+          if (!item) return;
+          this.showManagerNotifications = false;
+          if (item.sourceType === "message_draft" && item.touchId) {
+            await this.openTouchFromEvent(item.touchId);
+            return;
+          }
+          if (item.sourceType === "queue" && item.touchId) {
+            await this.openTouchFromEvent(item.touchId);
+            return;
+          }
+          if (item.sourceType === "draft" && item.touchId) {
+            await this.openTouchFromEvent(item.touchId);
+            return;
+          }
+          if (item.sourceType === "touch" && item.sourceId) {
+            await this.openTouchFromEvent(item.sourceId);
+          }
+        },
+        async confirmAutomationQueueItem(queueId) {
+          const normalizedQueueId = this.toIntOrNull(queueId);
+          if (!normalizedQueueId) return;
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            await this.apiRequest(`/api/v1/automation-queue/${normalizedQueueId}/confirm/`, {
+              method: "POST",
+              body: {},
+            });
+            await Promise.all([
+              this.loadAutomationQueue(),
+              this.loadAutomationMessageDrafts(),
+              this.loadSection("tasks"),
+              this.loadSection("touches"),
+              this.loadSection("deals"),
+              this.loadSection("companies"),
+              this.loadSection("leads"),
+            ]);
+          } catch (error) {
+            this.setUiError(`Ошибка обработки очереди: ${error.message}`, { modal: true });
+          }
+        },
+        async dismissAutomationQueueItem(queueId) {
+          const normalizedQueueId = this.toIntOrNull(queueId);
+          if (!normalizedQueueId) return;
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            await this.apiRequest(`/api/v1/automation-queue/${normalizedQueueId}/dismiss/`, {
+              method: "POST",
+              body: {},
+            });
+            await Promise.all([this.loadAutomationQueue(), this.loadAutomationMessageDrafts()]);
+          } catch (error) {
+            this.setUiError(`Ошибка отклонения элемента очереди: ${error.message}`, { modal: true });
+          }
+        },
+        findCommunicationChannelByCode(channelCode) {
+          const normalizedCode = this.normalizeTouchChannelCode(channelCode);
+          if (!normalizedCode) return null;
+          return (this.metaOptions.communicationChannels || []).find(
+            (item) => this.normalizeTouchChannelCode(item) === normalizedCode
+          ) || null;
+        },
+        openContactEditorById(contactId) {
+          const normalizedId = this.toIntOrNull(contactId);
+          if (!normalizedId) return;
+          const contact = (this.datasets.contacts || []).find((item) => String(item.id) === String(normalizedId));
+          if (contact) {
+            this.openContactEditor(contact);
+          }
+        },
+        openCompanyEditorById(companyId) {
+          const normalizedId = this.toIntOrNull(companyId);
+          if (!normalizedId) return;
+          const company = (this.datasets.companies || []).find((item) => String(item.id) === String(normalizedId));
+          if (company) {
+            this.openCompanyEditor(company);
+          }
+        },
+        automationEventChannelCode(eventType) {
+          const raw = String(eventType || "").trim().toLowerCase();
+          if (!raw) return "";
+          if (raw.startsWith("email_")) return "email";
+          if (raw.startsWith("telegram_")) return "telegram";
+          if (raw.startsWith("whatsapp_")) return "whatsapp";
+          if (raw.startsWith("call_")) return "call";
+          if (raw.startsWith("meeting_")) return "meeting";
+          if (raw.startsWith("proposal_")) return "proposal";
+          if (raw.startsWith("contract_") || raw.startsWith("invoice_")) return "documents";
+          return "";
+        },
+        openAutomationTouchAction(item, { channelCode = "", direction = "outgoing", summary = "" } = {}) {
+          this.activeSection = "touches";
+          this.openCreateModal();
+          const resolvedCompanyId = this.toIntOrNull(item?.clientId || item?.companyId);
+          const resolvedDealId = this.toIntOrNull(item?.dealId);
+          const channel = this.findCommunicationChannelByCode(channelCode || this.automationEventChannelCode(item?.eventType));
+          this.forms.touches = {
+            ...this.getDefaultForm("touches"),
+            happenedAt: this.toDateTimeLocal(new Date().toISOString()),
+            channelId: this.toIntOrNull(channel?.id),
+            direction: direction || "outgoing",
+            summary: String(summary || "").trim(),
+            ownerId: this.toIntOrNull(item?.ownerId),
+            companyId: resolvedCompanyId,
+            contactId: this.toIntOrNull(item?.contactId),
+            taskId: null,
+            leadId: this.toIntOrNull(item?.leadId),
+            dealId: resolvedDealId,
+            documentUploadTarget: resolvedDealId ? "deal" : (resolvedCompanyId ? "company" : ""),
+          };
+          this.showModal = true;
+          this.loadTouchDocuments();
+          this.$nextTick(() => this.applyTouchAutomationRule());
+        },
+        openAutomationTaskAction(item, { title = "", taskTypeGroup = "internal_task", channelCode = "", dueAt = "" } = {}) {
+          const normalizedDealId = this.toIntOrNull(item?.dealId);
+          const resolvedTitle = String(title || item?.recommendedAction || item?.title || "").trim();
+          const resolvedDueAt = dueAt || item?.suggestedNextStepAt || item?.deadline || "";
+          const communicationChannelId = taskTypeGroup === "client_task"
+            ? this.toIntOrNull(this.findCommunicationChannelByCode(channelCode)?.id)
+            : null;
+          if (normalizedDealId) {
+            this.openDealEditorById(normalizedDealId);
+            this.prepareDealTaskFromAutomation({
+              title: resolvedTitle,
+              recommendedAction: resolvedTitle,
+              at: resolvedDueAt,
+              taskTypeGroup,
+              communicationChannelId,
+            });
+            return;
+          }
+          this.activeSection = "tasks";
+          this.openCreateModal();
+          this.forms.tasks = {
+            ...this.getDefaultForm("tasks"),
+            subject: resolvedTitle,
+            taskTypeGroup,
+            taskTypeId: null,
+            communicationChannelId,
+            priority: "medium",
+            companyId: this.toIntOrNull(item?.clientId || item?.companyId),
+            dealId: normalizedDealId,
+            relatedTouchId: this.toIntOrNull(item?.touchId),
+            dueAt: resolvedDueAt ? this.toDateTimeLocal(resolvedDueAt) : "",
+            reminderOffsetMinutes: 30,
+            description: "",
+            result: "",
+            saveCompanyNote: false,
+            companyNote: "",
+            status: "todo",
+          };
+          this.showModal = true;
+        },
+        handleAutomationQuickAction(item, actionId) {
+          const normalizedActionId = String(actionId || "").trim();
+          if (!normalizedActionId || !item) return;
+          if (normalizedActionId === "reply") {
+            this.openAutomationTouchAction(item, {
+              channelCode: this.automationEventChannelCode(item.eventType),
+              direction: "outgoing",
+            });
+            return;
+          }
+          if (normalizedActionId === "call") {
+            this.openAutomationTouchAction(item, { channelCode: "call", direction: "outgoing" });
+            return;
+          }
+          if (normalizedActionId === "check_email") {
+            if (this.toIntOrNull(item.contactId)) {
+              this.openContactEditorById(item.contactId);
+              return;
+            }
+            if (this.toIntOrNull(item.companyId || item.clientId)) {
+              this.openCompanyEditorById(item.companyId || item.clientId);
+            }
+            return;
+          }
+          if (normalizedActionId === "resend_message") {
+            this.openAutomationTouchAction(item, {
+              channelCode: this.automationEventChannelCode(item.eventType),
+              direction: "outgoing",
+            });
+            return;
+          }
+          if (normalizedActionId === "schedule_meeting") {
+            this.openAutomationTaskAction(item, {
+              title: "Назначить встречу",
+              taskTypeGroup: "client_task",
+              channelCode: "meeting",
+            });
+            return;
+          }
+          if (normalizedActionId === "reschedule_meeting") {
+            this.openAutomationTaskAction(item, {
+              title: "Перенести встречу",
+              taskTypeGroup: "client_task",
+              channelCode: "meeting",
+            });
+            return;
+          }
+          if (normalizedActionId === "create_task") {
+            this.openAutomationTaskAction(item, {
+              title: item.recommendedAction || "Создать задачу",
+              taskTypeGroup: "internal_task",
+            });
+            return;
+          }
+          if (normalizedActionId === "change_channel") {
+            this.openAutomationTaskAction(item, {
+              title: "Сменить канал связи",
+              taskTypeGroup: "internal_task",
+            });
+            return;
+          }
+          if (normalizedActionId === "send_proposal") {
+            this.openAutomationTaskAction(item, {
+              title: "Подготовить КП",
+              taskTypeGroup: "internal_task",
+            });
+            return;
+          }
+          if (normalizedActionId === "send_materials") {
+            this.openAutomationTaskAction(item, {
+              title: "Отправить материалы",
+              taskTypeGroup: "internal_task",
+            });
+            return;
+          }
+          if (normalizedActionId === "revise_proposal") {
+            this.openAutomationTaskAction(item, {
+              title: "Скорректировать КП",
+              taskTypeGroup: "internal_task",
+            });
+            return;
+          }
+          if (normalizedActionId === "prepare_documents") {
+            this.openAutomationTaskAction(item, {
+              title: "Подготовить документы",
+              taskTypeGroup: "internal_task",
+            });
+            return;
+          }
+          if (normalizedActionId === "prepare_contract") {
+            this.openAutomationTaskAction(item, {
+              title: "Подготовить договор",
+              taskTypeGroup: "internal_task",
+            });
+            return;
+          }
+          if (normalizedActionId === "issue_invoice") {
+            this.openAutomationTaskAction(item, {
+              title: "Выставить счёт",
+              taskTypeGroup: "internal_task",
+            });
+            return;
+          }
+          if (normalizedActionId === "launch_project") {
+            this.openAutomationTaskAction(item, {
+              title: "Запустить оказание услуги / проект",
+              taskTypeGroup: "internal_task",
+            });
+          }
+        },
+        async confirmAutomationMessageDraft(messageDraftId) {
+          const normalizedDraftId = this.toIntOrNull(messageDraftId);
+          if (!normalizedDraftId) return;
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            const response = await this.apiRequest(`/api/v1/automation-message-drafts/${normalizedDraftId}/confirm/`, {
+              method: "POST",
+              body: {},
+            });
+            await this.loadAutomationMessageDrafts();
+            const outboundStatus = String(response?.last_outbound_status || "").trim();
+            const outboundChannel = String(response?.last_outbound_channel || "").trim();
+            const outboundRecipient = String(response?.last_outbound_recipient || "").trim();
+            const outboundError = String(response?.last_outbound_error || "").trim();
+            if (outboundStatus === "manual_required") {
+              const channelLabel = outboundChannel || "выбранного канала";
+              const recipientLabel = outboundRecipient ? ` Получатель: ${outboundRecipient}.` : "";
+              this.setUiError(
+                `Черновик сообщения подтверждён. Для канала ${channelLabel} нужна ручная отправка.${recipientLabel}`,
+                { modal: true }
+              );
+            } else if (outboundStatus === "failed" && outboundError) {
+              this.setUiError(`Черновик сообщения подтверждён, но отправка не выполнена: ${outboundError}`, {
+                modal: true,
+              });
+            }
+          } catch (error) {
+            this.setUiError(`Ошибка подтверждения черновика сообщения: ${error.message}`, { modal: true });
+          }
+        },
+        async dismissAutomationMessageDraft(messageDraftId) {
+          const normalizedDraftId = this.toIntOrNull(messageDraftId);
+          if (!normalizedDraftId) return;
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            await this.apiRequest(`/api/v1/automation-message-drafts/${normalizedDraftId}/dismiss/`, {
+              method: "POST",
+              body: {},
+            });
+            await this.loadAutomationMessageDrafts();
+          } catch (error) {
+            this.setUiError(`Ошибка отклонения черновика сообщения: ${error.message}`, { modal: true });
+          }
+        },
+        async confirmAutomationDraft(draftId) {
+          const normalizedDraftId = this.toIntOrNull(draftId);
+          if (!normalizedDraftId) return;
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            await this.apiRequest(`/api/v1/automation-drafts/${normalizedDraftId}/confirm/`, {
+              method: "POST",
+              body: {},
+            });
+            await Promise.all([
+              this.loadAutomationDrafts(),
+              this.loadAutomationQueue(),
+              this.loadAutomationMessageDrafts(),
+              this.loadSection("touches"),
+              this.loadSection("deals"),
+              this.loadSection("companies"),
+              this.loadSection("leads"),
+            ]);
+          } catch (error) {
+            this.setUiError(`Ошибка подтверждения черновика: ${error.message}`, { modal: true });
+          }
+        },
+        async dismissAutomationDraft(draftId) {
+          const normalizedDraftId = this.toIntOrNull(draftId);
+          if (!normalizedDraftId) return;
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            await this.apiRequest(`/api/v1/automation-drafts/${normalizedDraftId}/dismiss/`, {
+              method: "POST",
+              body: {},
+            });
+            await Promise.all([this.loadAutomationDrafts(), this.loadAutomationQueue(), this.loadAutomationMessageDrafts()]);
+          } catch (error) {
+            this.setUiError(`Ошибка отклонения черновика: ${error.message}`, { modal: true });
+          }
+        },
+        dealAutomationCardClass(item) {
+          const priority = String(item?.uiPriority || "").trim();
+          if (priority === "critical") {
+            return "border-red-400/50 bg-red-400/10";
+          }
+          if (priority === "high") {
+            return "border-amber-400/50 bg-amber-400/10";
+          }
+          if (priority === "medium") {
+            return "border-sky-400/40 bg-sky-400/10";
+          }
+          return "border-crm-border/80 bg-[#0f2f4a]";
         },
         availableTouchResults(channelId, currentResultId = null) {
           const normalizedChannelId = this.toIntOrNull(channelId);
@@ -2483,13 +3635,19 @@
           return !!this.expandedCompanyCards[String(companyId || "")];
         },
         async handleGlobalKeydown(event) {
-          if (!this.showModal) return;
-
           if (event.key === "Escape") {
+            if (this.showManagerNotifications) {
+              event.preventDefault();
+              this.showManagerNotifications = false;
+              return;
+            }
+            if (!this.showModal) return;
             event.preventDefault();
             this.closeModal();
             return;
           }
+
+          if (!this.showModal) return;
 
           if (event.key !== "Enter" || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
             return;
@@ -2509,6 +3667,10 @@
         },
         handleDocumentClick(event) {
           const target = event.target;
+          if (this.showManagerNotifications) {
+            if (target && target.closest && target.closest("[data-manager-notifications]")) return;
+            this.showManagerNotifications = false;
+          }
           if (this.showStatusFilter) {
             if (target && target.closest && target.closest("[data-status-filter]")) return;
             this.showStatusFilter = false;
@@ -2874,6 +4036,7 @@
           this.resetTouchFollowUpForm();
           this.loadTouchDocuments();
           this.showModal = true;
+          this.$nextTick(() => this.applyTouchAutomationRule());
         },
         openTaskFromDeal(task) {
           this.taskDealFilterId = task.dealId || this.editingDealId || null;
@@ -3210,9 +4373,26 @@
           };
           this.loadTouchDocuments();
           this.showModal = true;
+          this.$nextTick(() => this.applyTouchAutomationRule());
         },
         quickToggleDealTaskForm() {
           this.showDealTaskForm = true;
+          this.$nextTick(() => {
+            const panel = document.getElementById("deal-task-panel");
+            if (panel && typeof panel.scrollIntoView === "function") {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        },
+        prepareDealTaskFromAutomation(item) {
+          if (!item) return;
+          this.showDealTaskForm = true;
+          this.resetDealTaskForm();
+          this.dealTaskForm.subject = String(item.title || item.recommendedAction || "").trim();
+          this.dealTaskForm.taskTypeGroup = String(item.taskTypeGroup || "").trim();
+          this.dealTaskForm.communicationChannelId = this.toIntOrNull(item.communicationChannelId);
+          const dueAt = item.at || item.suggestedNextStepAt || item.nextStepAtRaw || "";
+          this.dealTaskForm.dueAt = dueAt ? this.toDateTimeLocal(dueAt) : "";
           this.$nextTick(() => {
             const panel = document.getElementById("deal-task-panel");
             if (panel && typeof panel.scrollIntoView === "function") {
@@ -3479,6 +4659,7 @@
           };
           this.loadTouchDocuments();
           this.showModal = true;
+          this.$nextTick(() => this.applyTouchAutomationRule());
         },
         quickAddLeadTask() {
           this.activeSection = "tasks";
@@ -4429,6 +5610,7 @@
             summary: item.summary || "",
             resultOptionId: item.result_option || null,
             resultOptionName: item.result_option_name || "",
+            resultOptionCode: item.result_option_code || "",
             company: item.company_name || "",
             phone: item.task_subject
               ? `Задача: ${item.task_subject}`
@@ -4462,6 +5644,138 @@
             clientDocuments: Array.isArray(item.client_documents) ? item.client_documents.map((document) => this.mapClientDocument(document)) : [],
           };
         },
+        mapAutomationDraft(item) {
+          return {
+            id: item.id,
+            draftKind: item.draft_kind || "",
+            status: item.status || "",
+            title: item.title || "",
+            summary: item.summary || "",
+            sourceEventType: item.source_event_type || "",
+            automationRuleId: item.automation_rule || null,
+            automationRuleEventType: item.automation_rule_event_type || "",
+            automationRuleUiMode: item.automation_rule_ui_mode || "",
+            automationRuleUiPriority: item.automation_rule_ui_priority || "medium",
+            sourceTouchId: item.source_touch || null,
+            sourceTouchSummary: item.source_touch_summary || "",
+            sourceTouchHappenedAt: item.source_touch_happened_at || null,
+            outcomeId: item.outcome || null,
+            outcomeName: item.outcome_name || "",
+            touchResultId: item.touch_result || null,
+            touchResultName: item.touch_result_name || "",
+            nextStepTemplateId: item.next_step_template || null,
+            nextStepTemplateName: item.next_step_template_name || "",
+            proposedChannelId: item.proposed_channel || null,
+            proposedChannelName: item.proposed_channel_name || "",
+            proposedDirection: item.proposed_direction || "",
+            proposedNextStep: item.proposed_next_step || "",
+            proposedNextStepAt: item.proposed_next_step_at || null,
+            ownerId: item.owner || null,
+            ownerName: item.owner_name || "",
+            leadId: item.lead || null,
+            leadTitle: item.lead_title || "",
+            dealId: item.deal || null,
+            dealTitle: item.deal_title || "",
+            clientId: item.client || null,
+            clientName: item.client_name || "",
+            contactId: item.contact || null,
+            contactName: item.contact_name || "",
+            taskId: item.task || null,
+            taskSubject: item.task_subject || "",
+            actedById: item.acted_by || null,
+            actedByName: item.acted_by_name || "",
+            actedAt: item.acted_at || null,
+            createdAt: item.created_at || null,
+            updatedAt: item.updated_at || null,
+          };
+        },
+        mapAutomationQueueItem(item) {
+          return {
+            id: item.id,
+            itemKind: item.item_kind || "",
+            status: item.status || "",
+            title: item.title || "",
+            summary: item.summary || "",
+            recommendedAction: item.recommended_action || "",
+            sourceEventType: item.source_event_type || "",
+            automationRuleId: item.automation_rule || null,
+            automationRuleEventType: item.automation_rule_event_type || "",
+            automationRuleUiMode: item.automation_rule_ui_mode || "",
+            automationRuleUiPriority: item.automation_rule_ui_priority || "medium",
+            sourceTouchId: item.source_touch || null,
+            sourceTouchSummary: item.source_touch_summary || "",
+            sourceTouchHappenedAt: item.source_touch_happened_at || null,
+            outcomeId: item.outcome || null,
+            outcomeName: item.outcome_name || "",
+            touchResultId: item.touch_result || null,
+            touchResultName: item.touch_result_name || "",
+            nextStepTemplateId: item.next_step_template || null,
+            nextStepTemplateName: item.next_step_template_name || "",
+            proposedChannelId: item.proposed_channel || null,
+            proposedChannelName: item.proposed_channel_name || "",
+            proposedDirection: item.proposed_direction || "",
+            proposedNextStep: item.proposed_next_step || "",
+            proposedNextStepAt: item.proposed_next_step_at || null,
+            ownerId: item.owner || null,
+            ownerName: item.owner_name || "",
+            leadId: item.lead || null,
+            leadTitle: item.lead_title || "",
+            dealId: item.deal || null,
+            dealTitle: item.deal_title || "",
+            clientId: item.client || null,
+            clientName: item.client_name || "",
+            contactId: item.contact || null,
+            contactName: item.contact_name || "",
+            taskId: item.task || null,
+            taskSubject: item.task_subject || "",
+            createdTaskId: item.created_task || null,
+            createdTaskSubject: item.created_task_subject || "",
+            availableActions: Array.isArray(item.available_actions) ? item.available_actions : [],
+            actedById: item.acted_by || null,
+            actedByName: item.acted_by_name || "",
+            actedAt: item.acted_at || null,
+            createdAt: item.created_at || null,
+            updatedAt: item.updated_at || null,
+          };
+        },
+        mapAutomationMessageDraft(item) {
+          return {
+            id: item.id,
+            status: item.status || "",
+            title: item.title || "",
+            messageSubject: item.message_subject || "",
+            messageText: item.message_text || "",
+            sourceEventType: item.source_event_type || "",
+            automationRuleId: item.automation_rule || null,
+            automationRuleEventType: item.automation_rule_event_type || "",
+            automationRuleUiPriority: item.automation_rule_ui_priority || "medium",
+            sourceTouchId: item.source_touch || null,
+            sourceTouchSummary: item.source_touch_summary || "",
+            sourceTouchHappenedAt: item.source_touch_happened_at || null,
+            proposedChannelId: item.proposed_channel || null,
+            proposedChannelName: item.proposed_channel_name || "",
+            ownerId: item.owner || null,
+            ownerName: item.owner_name || "",
+            leadId: item.lead || null,
+            leadTitle: item.lead_title || "",
+            dealId: item.deal || null,
+            dealTitle: item.deal_title || "",
+            clientId: item.client || null,
+            clientName: item.client_name || "",
+            contactId: item.contact || null,
+            contactName: item.contact_name || "",
+            actedById: item.acted_by || null,
+            actedByName: item.acted_by_name || "",
+            actedAt: item.acted_at || null,
+            lastOutboundStatus: item.last_outbound_status || "",
+            lastOutboundChannel: item.last_outbound_channel || "",
+            lastOutboundRecipient: item.last_outbound_recipient || "",
+            lastOutboundError: item.last_outbound_error || "",
+            lastOutboundSentAt: item.last_outbound_sent_at || null,
+            createdAt: item.created_at || null,
+            updatedAt: item.updated_at || null,
+          };
+        },
         async loadSection(section) {
           const endpoint = SECTION_ENDPOINTS[section];
           if (!endpoint) return;
@@ -4474,6 +5788,21 @@
           if (section === "tasks") this.datasets.tasks = records.map(this.mapTask);
           if (section === "touches") this.datasets.touches = records.map(this.mapTouch);
         },
+        async loadAutomationDrafts() {
+          const payload = await this.apiRequest("/api/v1/automation-drafts/?status=pending&page_size=200");
+          const records = this.normalizePaginatedResponse(payload);
+          this.datasets.automationDrafts = records.map((item) => this.mapAutomationDraft(item));
+        },
+        async loadAutomationQueue() {
+          const payload = await this.apiRequest("/api/v1/automation-queue/?status=pending&page_size=200");
+          const records = this.normalizePaginatedResponse(payload);
+          this.datasets.automationQueue = records.map((item) => this.mapAutomationQueueItem(item));
+        },
+        async loadAutomationMessageDrafts() {
+          const payload = await this.apiRequest("/api/v1/automation-message-drafts/?status=pending&page_size=200");
+          const records = this.normalizePaginatedResponse(payload);
+          this.datasets.automationMessageDrafts = records.map((item) => this.mapAutomationMessageDraft(item));
+        },
         async loadAllSections() {
           this.isLoading = true;
           this.errorMessage = "";
@@ -4481,6 +5810,7 @@
             await Promise.all(
               Object.keys(SECTION_ENDPOINTS).map((section) => this.loadSection(section))
             );
+            await Promise.all([this.loadAutomationDrafts(), this.loadAutomationQueue(), this.loadAutomationMessageDrafts()]);
           } catch (error) {
             this.errorMessage = `Ошибка загрузки данных: ${error.message}`;
           } finally {
@@ -4492,6 +5822,7 @@
           this.errorMessage = "";
           try {
             await this.loadSection(this.activeSection);
+            await Promise.all([this.loadAutomationDrafts(), this.loadAutomationQueue(), this.loadAutomationMessageDrafts()]);
           } catch (error) {
             this.errorMessage = `Ошибка обновления: ${error.message}`;
           } finally {
@@ -4553,6 +5884,7 @@
           this.showTaskCompanyFilter = false;
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
+          this.showManagerNotifications = false;
           this.selectedStatusFilters = [];
           this.selectedTaskCompanyFilters = [];
           this.selectedTouchCompanyFilters = [];
@@ -4609,6 +5941,7 @@
           this.clearUiErrors({ globalOnly: true });
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
+          this.showManagerNotifications = false;
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
@@ -4839,13 +6172,16 @@
           return `${year}-${month}-${day}T${hours}:${minutes}`;
         },
         async loadMetaOptions() {
-          const [leadStatuses, dealStages, leadSources, users, taskTypes, touchResults, communicationChannels, contactRoles, contactStatuses] = await Promise.all([
+          const [leadStatuses, dealStages, leadSources, users, taskTypes, touchResults, outcomes, nextStepTemplates, automationRules, communicationChannels, contactRoles, contactStatuses] = await Promise.all([
             this.apiRequest("/api/v1/meta/lead-statuses/"),
             this.apiRequest("/api/v1/meta/deal-stages/"),
             this.apiRequest("/api/v1/meta/lead-sources/"),
             this.apiRequest("/api/v1/meta/users/"),
             this.apiRequest("/api/v1/meta/task-types/"),
             this.apiRequest("/api/v1/meta/touch-results/"),
+            this.apiRequest("/api/v1/meta/outcomes/"),
+            this.apiRequest("/api/v1/meta/next-step-templates/"),
+            this.apiRequest("/api/v1/meta/automation-rules/"),
             this.apiRequest("/api/v1/meta/communication-channels/"),
             this.apiRequest("/api/v1/meta/contact-roles/"),
             this.apiRequest("/api/v1/meta/contact-statuses/")
@@ -4856,6 +6192,9 @@
           this.metaOptions.users = this.normalizePaginatedResponse(users);
           this.metaOptions.taskTypes = this.normalizePaginatedResponse(taskTypes);
           this.metaOptions.touchResults = this.normalizePaginatedResponse(touchResults);
+          this.metaOptions.outcomes = this.normalizePaginatedResponse(outcomes);
+          this.metaOptions.nextStepTemplates = this.normalizePaginatedResponse(nextStepTemplates);
+          this.metaOptions.automationRules = this.normalizePaginatedResponse(automationRules);
           this.metaOptions.communicationChannels = this.normalizePaginatedResponse(communicationChannels);
           this.metaOptions.contactRoles = this.normalizePaginatedResponse(contactRoles);
           this.metaOptions.contactStatuses = this.normalizePaginatedResponse(contactStatuses);
@@ -5595,13 +6934,13 @@
             this.resetCompanyContactForm();
             this.companyContactsForActiveCompany = [];
             if (this.activeSection === "leads") {
-              await Promise.all([this.loadSection("leads"), this.loadSection("deals")]);
+              await Promise.all([this.loadSection("leads"), this.loadSection("deals"), this.loadAutomationDrafts(), this.loadAutomationQueue(), this.loadAutomationMessageDrafts()]);
             } else if (this.activeSection === "deals") {
-              await Promise.all([this.loadSection("deals"), this.loadSection("companies")]);
+              await Promise.all([this.loadSection("deals"), this.loadSection("companies"), this.loadAutomationDrafts(), this.loadAutomationQueue(), this.loadAutomationMessageDrafts()]);
             } else if (this.activeSection === "tasks") {
-              await Promise.all([this.loadSection("tasks"), this.loadSection("deals"), this.loadSection("companies")]);
+              await Promise.all([this.loadSection("tasks"), this.loadSection("deals"), this.loadSection("companies"), this.loadAutomationDrafts(), this.loadAutomationQueue(), this.loadAutomationMessageDrafts()]);
             } else if (this.activeSection === "touches") {
-              await Promise.all([this.loadSection("touches"), this.loadSection("leads"), this.loadSection("deals")]);
+              await Promise.all([this.loadSection("touches"), this.loadSection("leads"), this.loadSection("deals"), this.loadSection("companies"), this.loadAutomationDrafts(), this.loadAutomationQueue(), this.loadAutomationMessageDrafts()]);
             } else {
               await this.reloadActiveSection();
             }

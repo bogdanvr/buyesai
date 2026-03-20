@@ -1,6 +1,7 @@
 from django.urls import path
 
 from api.v1.meta.views import (
+    AutomationRuleListAPIView,
     CommunicationChannelListAPIView,
     ContactRoleListAPIView,
     ContactStatusListAPIView,
@@ -8,6 +9,8 @@ from api.v1.meta.views import (
     DealStageListAPIView,
     LeadSourceListAPIView,
     LeadStatusListAPIView,
+    NextStepTemplateListAPIView,
+    OutcomeCatalogListAPIView,
     TaskTypeListAPIView,
     TouchResultListAPIView,
     UserOptionListAPIView,
@@ -23,5 +26,8 @@ urlpatterns = [
     path("users/", UserOptionListAPIView.as_view(), name="meta-users"),
     path("task-types/", TaskTypeListAPIView.as_view(), name="meta-task-types"),
     path("touch-results/", TouchResultListAPIView.as_view(), name="meta-touch-results"),
+    path("outcomes/", OutcomeCatalogListAPIView.as_view(), name="meta-outcomes"),
+    path("next-step-templates/", NextStepTemplateListAPIView.as_view(), name="meta-next-step-templates"),
+    path("automation-rules/", AutomationRuleListAPIView.as_view(), name="meta-automation-rules"),
     path("currency-rates/", CurrencyRatesAPIView.as_view(), name="meta-currency-rates"),
 ]

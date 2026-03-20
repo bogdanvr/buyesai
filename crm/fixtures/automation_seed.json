@@ -1,0 +1,2138 @@
+[
+  {
+    "model": "crm.touchresult",
+    "pk": 1,
+    "fields": {
+      "code": "no_answer",
+      "name": "Не дозвонились / нет ответа",
+      "group": "no_contact",
+      "result_class": "neutral",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 10,
+      "allowed_touch_types": [
+        "call"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 2,
+    "fields": {
+      "code": "callback_later",
+      "name": "Попросили связаться позже",
+      "group": "postponed",
+      "result_class": "neutral",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 20,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 3,
+    "fields": {
+      "code": "contact_made",
+      "name": "Контакт состоялся",
+      "group": "contact_no_progress",
+      "result_class": "neutral",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 30,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 4,
+    "fields": {
+      "code": "thinking",
+      "name": "Думают",
+      "group": "waiting",
+      "result_class": "neutral",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 40,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 5,
+    "fields": {
+      "code": "postponed_by_client",
+      "name": "Отложили решение",
+      "group": "postponed",
+      "result_class": "risk",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 50,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 6,
+    "fields": {
+      "code": "interest_confirmed",
+      "name": "Интерес подтверждён",
+      "group": "progress",
+      "result_class": "progress",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 60,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 7,
+    "fields": {
+      "code": "meeting_scheduled",
+      "name": "Назначена встреча",
+      "group": "progress",
+      "result_class": "progress",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 70,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 8,
+    "fields": {
+      "code": "followup_call_scheduled",
+      "name": "Назначен повторный звонок",
+      "group": "progress",
+      "result_class": "progress",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 80,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 9,
+    "fields": {
+      "code": "proposal_requested",
+      "name": "Запросили КП",
+      "group": "progress",
+      "result_class": "progress",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 90,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 10,
+    "fields": {
+      "code": "calculation_requested",
+      "name": "Запросили расчёт",
+      "group": "progress",
+      "result_class": "progress",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 100,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 11,
+    "fields": {
+      "code": "details_requested",
+      "name": "Запросили уточнение",
+      "group": "progress",
+      "result_class": "progress",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 110,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 12,
+    "fields": {
+      "code": "decision_maker_requested",
+      "name": "Нужно подключить ЛПР",
+      "group": "progress",
+      "result_class": "progress",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 120,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 13,
+    "fields": {
+      "code": "technical_review_requested",
+      "name": "Нужна техническая проработка",
+      "group": "progress",
+      "result_class": "progress",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 130,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 14,
+    "fields": {
+      "code": "proposal_sent",
+      "name": "КП отправлено",
+      "group": "waiting",
+      "result_class": "neutral",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 140,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 15,
+    "fields": {
+      "code": "proposal_received",
+      "name": "КП получено клиентом",
+      "group": "waiting",
+      "result_class": "neutral",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 150,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 16,
+    "fields": {
+      "code": "proposal_under_review",
+      "name": "КП на рассмотрении",
+      "group": "waiting",
+      "result_class": "neutral",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 160,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 17,
+    "fields": {
+      "code": "proposal_revision_requested",
+      "name": "Запросили корректировку КП",
+      "group": "progress",
+      "result_class": "progress",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 170,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 18,
+    "fields": {
+      "code": "discount_requested",
+      "name": "Запросили скидку",
+      "group": "waiting",
+      "result_class": "risk",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 180,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 19,
+    "fields": {
+      "code": "documents_requested",
+      "name": "Запросили договор / счёт / документы",
+      "group": "progress",
+      "result_class": "progress",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 190,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "documents",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 20,
+    "fields": {
+      "code": "contract_sent",
+      "name": "Договор отправлен",
+      "group": "waiting",
+      "result_class": "neutral",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 200,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "documents",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 21,
+    "fields": {
+      "code": "contract_under_review",
+      "name": "Договор на согласовании",
+      "group": "waiting",
+      "result_class": "neutral",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 210,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "documents",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 22,
+    "fields": {
+      "code": "contract_revision_requested",
+      "name": "Требуются правки договора",
+      "group": "waiting",
+      "result_class": "risk",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 220,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "documents",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 23,
+    "fields": {
+      "code": "contract_agreed",
+      "name": "Договор согласован",
+      "group": "won_signal",
+      "result_class": "won_signal",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 230,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "documents",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 24,
+    "fields": {
+      "code": "invoice_sent",
+      "name": "Счёт отправлен",
+      "group": "waiting",
+      "result_class": "neutral",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 240,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "documents",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 25,
+    "fields": {
+      "code": "invoice_accepted",
+      "name": "Счёт принят",
+      "group": "won_signal",
+      "result_class": "won_signal",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 250,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "documents",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 26,
+    "fields": {
+      "code": "waiting_feedback",
+      "name": "Ждём обратную связь",
+      "group": "waiting",
+      "result_class": "neutral",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 260,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "documents",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 27,
+    "fields": {
+      "code": "internal_approval",
+      "name": "Внутреннее согласование у клиента",
+      "group": "waiting",
+      "result_class": "neutral",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 270,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "documents",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 28,
+    "fields": {
+      "code": "waiting_payment",
+      "name": "Ждём оплату",
+      "group": "won_signal",
+      "result_class": "won_signal",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 280,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "documents",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 29,
+    "fields": {
+      "code": "payment_confirmed",
+      "name": "Оплата подтверждена",
+      "group": "won_signal",
+      "result_class": "won_signal",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 290,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "documents",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 30,
+    "fields": {
+      "code": "rejected_price",
+      "name": "Отказ — дорого",
+      "group": "lost",
+      "result_class": "lost",
+      "requires_next_step": false,
+      "requires_loss_reason": true,
+      "is_active": true,
+      "sort_order": 300,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal",
+        "documents"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 31,
+    "fields": {
+      "code": "rejected_timing",
+      "name": "Отказ — не устроили сроки",
+      "group": "lost",
+      "result_class": "lost",
+      "requires_next_step": false,
+      "requires_loss_reason": true,
+      "is_active": true,
+      "sort_order": 310,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal",
+        "documents"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 32,
+    "fields": {
+      "code": "rejected_no_need",
+      "name": "Отказ — неактуально",
+      "group": "lost",
+      "result_class": "lost",
+      "requires_next_step": false,
+      "requires_loss_reason": true,
+      "is_active": true,
+      "sort_order": 320,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal",
+        "documents"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 33,
+    "fields": {
+      "code": "rejected_competitor",
+      "name": "Отказ — выбрали конкурента",
+      "group": "lost",
+      "result_class": "lost",
+      "requires_next_step": false,
+      "requires_loss_reason": true,
+      "is_active": true,
+      "sort_order": 330,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal",
+        "documents"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 34,
+    "fields": {
+      "code": "rejected_no_budget",
+      "name": "Отказ — нет бюджета",
+      "group": "lost",
+      "result_class": "lost",
+      "requires_next_step": false,
+      "requires_loss_reason": true,
+      "is_active": true,
+      "sort_order": 340,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal",
+        "documents"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 35,
+    "fields": {
+      "code": "rejected_decision_frozen",
+      "name": "Потеря — проект заморожен",
+      "group": "lost",
+      "result_class": "lost",
+      "requires_next_step": false,
+      "requires_loss_reason": true,
+      "is_active": true,
+      "sort_order": 350,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal",
+        "documents"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 36,
+    "fields": {
+      "code": "rejected_no_response_after_proposal",
+      "name": "Потеря — нет ответа после КП",
+      "group": "lost",
+      "result_class": "lost",
+      "requires_next_step": false,
+      "requires_loss_reason": true,
+      "is_active": true,
+      "sort_order": 360,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal",
+        "documents"
+      ]
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 1,
+    "fields": {
+      "code": "waiting_feedback",
+      "name": "Ждём обратную связь"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 2,
+    "fields": {
+      "code": "contact_made",
+      "name": "Контакт состоялся"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 3,
+    "fields": {
+      "code": "no_answer",
+      "name": "Не дозвонились / нет ответа"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 4,
+    "fields": {
+      "code": "callback_later",
+      "name": "Попросили связаться позже"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 5,
+    "fields": {
+      "code": "proposal_sent",
+      "name": "КП отправлено"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 6,
+    "fields": {
+      "code": "proposal_received",
+      "name": "КП получено клиентом"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 7,
+    "fields": {
+      "code": "proposal_revision_requested",
+      "name": "Запросили корректировку КП"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 8,
+    "fields": {
+      "code": "proposal_accepted",
+      "name": "КП принято"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 9,
+    "fields": {
+      "code": "documents_requested",
+      "name": "Запросили договор / счёт / документы"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 10,
+    "fields": {
+      "code": "contract_sent",
+      "name": "Договор отправлен"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 11,
+    "fields": {
+      "code": "contract_under_review",
+      "name": "Договор на согласовании"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 12,
+    "fields": {
+      "code": "contract_revision_requested",
+      "name": "Требуются правки договора"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 13,
+    "fields": {
+      "code": "contract_agreed",
+      "name": "Договор согласован"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 14,
+    "fields": {
+      "code": "invoice_sent",
+      "name": "Счёт отправлен"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 15,
+    "fields": {
+      "code": "invoice_accepted",
+      "name": "Счёт принят"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 16,
+    "fields": {
+      "code": "waiting_payment",
+      "name": "Ждём оплату"
+    }
+  },
+  {
+    "model": "crm.outcomecatalog",
+    "pk": 17,
+    "fields": {
+      "code": "payment_confirmed",
+      "name": "Оплата подтверждена"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 1,
+    "fields": {
+      "code": "followup_after_2_days",
+      "name": "Фоллоу-ап через 2 дня"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 2,
+    "fields": {
+      "code": "followup_after_1_day",
+      "name": "Фоллоу-ап через 1 день"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 3,
+    "fields": {
+      "code": "followup_after_call",
+      "name": "Следующий шаг после звонка"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 4,
+    "fields": {
+      "code": "retry_call_after_1_day",
+      "name": "Повторить звонок через 1 день"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 5,
+    "fields": {
+      "code": "prepare_meeting",
+      "name": "Подготовить встречу"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 6,
+    "fields": {
+      "code": "reschedule_meeting",
+      "name": "Перенести встречу"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 7,
+    "fields": {
+      "code": "followup_after_meeting",
+      "name": "Фоллоу-ап после встречи"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 8,
+    "fields": {
+      "code": "prepare_updated_proposal",
+      "name": "Подготовить обновлённое КП"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 9,
+    "fields": {
+      "code": "prepare_contract",
+      "name": "Подготовить договор"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 10,
+    "fields": {
+      "code": "prepare_documents",
+      "name": "Подготовить документы"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 11,
+    "fields": {
+      "code": "followup_contract_after_2_days",
+      "name": "Фоллоу-ап по договору через 2 дня"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 12,
+    "fields": {
+      "code": "followup_contract_after_3_days",
+      "name": "Фоллоу-ап по договору через 3 дня"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 13,
+    "fields": {
+      "code": "revise_contract",
+      "name": "Доработать договор"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 14,
+    "fields": {
+      "code": "issue_invoice",
+      "name": "Выставить счёт"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 15,
+    "fields": {
+      "code": "payment_control_next_day",
+      "name": "Контроль оплаты на следующий день"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 16,
+    "fields": {
+      "code": "start_delivery_or_project",
+      "name": "Запустить оказание услуги / проект"
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 1,
+    "fields": {
+      "event_type": "email_sent",
+      "ui_mode": "draft_touch",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "email",
+      "auto_open_panel": true,
+      "create_message": true,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": 1,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 1,
+      "is_active": true,
+      "sort_order": 10
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 2,
+    "fields": {
+      "event_type": "email_received",
+      "ui_mode": "needs_attention",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": true,
+      "merge_key": "email",
+      "auto_open_panel": true,
+      "create_message": true,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 20
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 3,
+    "fields": {
+      "event_type": "email_delivered",
+      "ui_mode": "history_only",
+      "ui_priority": "low",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "email",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 30
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 4,
+    "fields": {
+      "event_type": "email_opened",
+      "ui_mode": "signal",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": true,
+      "show_in_attention_queue": false,
+      "merge_key": "email",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 40
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 5,
+    "fields": {
+      "event_type": "email_link_clicked",
+      "ui_mode": "signal",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": true,
+      "show_in_attention_queue": false,
+      "merge_key": "email",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 50
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 6,
+    "fields": {
+      "event_type": "email_bounced",
+      "ui_mode": "needs_attention",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": true,
+      "merge_key": "email",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 60
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 7,
+    "fields": {
+      "event_type": "telegram_message_sent",
+      "ui_mode": "draft_touch",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "telegram",
+      "auto_open_panel": true,
+      "create_message": true,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": 1,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 2,
+      "is_active": true,
+      "sort_order": 70
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 8,
+    "fields": {
+      "event_type": "telegram_message_received",
+      "ui_mode": "needs_attention",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": true,
+      "merge_key": "telegram",
+      "auto_open_panel": true,
+      "create_message": true,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 80
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 9,
+    "fields": {
+      "event_type": "telegram_message_delivered",
+      "ui_mode": "history_only",
+      "ui_priority": "low",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "telegram",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 90
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 10,
+    "fields": {
+      "event_type": "telegram_message_read",
+      "ui_mode": "signal",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": true,
+      "show_in_attention_queue": false,
+      "merge_key": "telegram",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 100
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 11,
+    "fields": {
+      "event_type": "telegram_reaction_received",
+      "ui_mode": "signal",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": true,
+      "show_in_attention_queue": false,
+      "merge_key": "telegram",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 110
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 12,
+    "fields": {
+      "event_type": "whatsapp_message_sent",
+      "ui_mode": "draft_touch",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "whatsapp",
+      "auto_open_panel": true,
+      "create_message": true,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": 1,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 2,
+      "is_active": true,
+      "sort_order": 120
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 13,
+    "fields": {
+      "event_type": "whatsapp_message_received",
+      "ui_mode": "needs_attention",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": true,
+      "merge_key": "whatsapp",
+      "auto_open_panel": true,
+      "create_message": true,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 130
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 14,
+    "fields": {
+      "event_type": "whatsapp_message_delivered",
+      "ui_mode": "history_only",
+      "ui_priority": "low",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "whatsapp",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 140
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 15,
+    "fields": {
+      "event_type": "whatsapp_message_read",
+      "ui_mode": "signal",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": true,
+      "show_in_attention_queue": false,
+      "merge_key": "whatsapp",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 150
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 16,
+    "fields": {
+      "event_type": "call_started",
+      "ui_mode": "history_only",
+      "ui_priority": "low",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "call",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 160
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 17,
+    "fields": {
+      "event_type": "call_completed",
+      "ui_mode": "draft_touch",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "call",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": 2,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 3,
+      "is_active": true,
+      "sort_order": 170
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 18,
+    "fields": {
+      "event_type": "call_missed",
+      "ui_mode": "history_only",
+      "ui_priority": "low",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "call",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 180
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 19,
+    "fields": {
+      "event_type": "call_failed",
+      "ui_mode": "history_only",
+      "ui_priority": "low",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "call",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 190
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 20,
+    "fields": {
+      "event_type": "call_no_answer",
+      "ui_mode": "draft_touch",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "call",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": 3,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 4,
+      "is_active": true,
+      "sort_order": 200
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 21,
+    "fields": {
+      "event_type": "call_recording_uploaded",
+      "ui_mode": "history_only",
+      "ui_priority": "low",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "call",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 210
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 22,
+    "fields": {
+      "event_type": "meeting_scheduled",
+      "ui_mode": "next_step_prompt",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "meeting",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": true,
+      "next_step_template": 5,
+      "is_active": true,
+      "sort_order": 220
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 23,
+    "fields": {
+      "event_type": "meeting_rescheduled",
+      "ui_mode": "next_step_prompt",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "meeting",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": true,
+      "next_step_template": 5,
+      "is_active": true,
+      "sort_order": 230
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 24,
+    "fields": {
+      "event_type": "meeting_cancelled",
+      "ui_mode": "needs_attention",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": true,
+      "merge_key": "meeting",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": 4,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 6,
+      "is_active": true,
+      "sort_order": 240
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 25,
+    "fields": {
+      "event_type": "meeting_completed",
+      "ui_mode": "draft_touch",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "meeting",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": 2,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 7,
+      "is_active": true,
+      "sort_order": 250
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 26,
+    "fields": {
+      "event_type": "meeting_no_show",
+      "ui_mode": "needs_attention",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": true,
+      "merge_key": "meeting",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": 4,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 6,
+      "is_active": true,
+      "sort_order": 260
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 27,
+    "fields": {
+      "event_type": "proposal_sent",
+      "ui_mode": "next_step_prompt",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "proposal",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": 5,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 1,
+      "is_active": true,
+      "sort_order": 270
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 28,
+    "fields": {
+      "event_type": "proposal_received_by_client",
+      "ui_mode": "signal",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": true,
+      "show_in_attention_queue": false,
+      "merge_key": "proposal",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": 6,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 1,
+      "is_active": true,
+      "sort_order": 280
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 29,
+    "fields": {
+      "event_type": "proposal_opened",
+      "ui_mode": "signal",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": true,
+      "show_in_attention_queue": false,
+      "merge_key": "proposal",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 290
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 30,
+    "fields": {
+      "event_type": "proposal_revision_requested",
+      "ui_mode": "needs_attention",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": true,
+      "merge_key": "proposal",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": 7,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 8,
+      "is_active": true,
+      "sort_order": 300
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 31,
+    "fields": {
+      "event_type": "proposal_accepted",
+      "ui_mode": "needs_attention",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": true,
+      "merge_key": "proposal",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": 8,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 9,
+      "is_active": true,
+      "sort_order": 310
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 32,
+    "fields": {
+      "event_type": "proposal_rejected",
+      "ui_mode": "needs_attention",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": true,
+      "merge_key": "proposal",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 320
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 33,
+    "fields": {
+      "event_type": "documents_requested",
+      "ui_mode": "needs_attention",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": true,
+      "merge_key": "",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": 9,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 10,
+      "is_active": true,
+      "sort_order": 330
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 34,
+    "fields": {
+      "event_type": "contract_sent",
+      "ui_mode": "next_step_prompt",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "contract",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": 10,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 11,
+      "is_active": true,
+      "sort_order": 340
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 35,
+    "fields": {
+      "event_type": "contract_under_review",
+      "ui_mode": "next_step_prompt",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "contract",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": 11,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 12,
+      "is_active": true,
+      "sort_order": 350
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 36,
+    "fields": {
+      "event_type": "contract_revision_requested",
+      "ui_mode": "needs_attention",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": true,
+      "merge_key": "contract",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": 12,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 13,
+      "is_active": true,
+      "sort_order": 360
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 37,
+    "fields": {
+      "event_type": "contract_agreed",
+      "ui_mode": "needs_attention",
+      "ui_priority": "critical",
+      "write_timeline": true,
+      "show_in_summary": true,
+      "show_in_attention_queue": true,
+      "merge_key": "contract",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": 13,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 14,
+      "is_active": true,
+      "sort_order": 370
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 38,
+    "fields": {
+      "event_type": "invoice_sent",
+      "ui_mode": "next_step_prompt",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "invoice",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": 14,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 15,
+      "is_active": true,
+      "sort_order": 380
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 39,
+    "fields": {
+      "event_type": "invoice_received_by_client",
+      "ui_mode": "signal",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": true,
+      "show_in_attention_queue": false,
+      "merge_key": "invoice",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": 15,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 15,
+      "is_active": true,
+      "sort_order": 390
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 40,
+    "fields": {
+      "event_type": "payment_waiting",
+      "ui_mode": "next_step_prompt",
+      "ui_priority": "medium",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "invoice",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": 16,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 15,
+      "is_active": true,
+      "sort_order": 400
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 41,
+    "fields": {
+      "event_type": "payment_confirmed",
+      "ui_mode": "needs_attention",
+      "ui_priority": "critical",
+      "write_timeline": true,
+      "show_in_summary": true,
+      "show_in_attention_queue": true,
+      "merge_key": "invoice",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": 17,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 16,
+      "is_active": true,
+      "sort_order": 410
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 42,
+    "fields": {
+      "event_type": "client_task_completed_call",
+      "ui_mode": "draft_touch",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "call",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": 2,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 3,
+      "is_active": true,
+      "sort_order": 420
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 43,
+    "fields": {
+      "event_type": "client_task_completed_email",
+      "ui_mode": "draft_touch",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "email",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": 1,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 1,
+      "is_active": true,
+      "sort_order": 430
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 44,
+    "fields": {
+      "event_type": "client_task_completed_meeting",
+      "ui_mode": "draft_touch",
+      "ui_priority": "high",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "meeting",
+      "auto_open_panel": true,
+      "create_message": false,
+      "create_touchpoint_mode": "draft",
+      "default_outcome": 2,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": 7,
+      "is_active": true,
+      "sort_order": 440
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 45,
+    "fields": {
+      "event_type": "internal_task_completed",
+      "ui_mode": "history_only",
+      "ui_priority": "low",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 450
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 46,
+    "fields": {
+      "event_type": "deal_stage_changed",
+      "ui_mode": "history_only",
+      "ui_priority": "low",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 460
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 47,
+    "fields": {
+      "event_type": "responsible_changed",
+      "ui_mode": "history_only",
+      "ui_priority": "low",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 470
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 48,
+    "fields": {
+      "event_type": "file_uploaded",
+      "ui_mode": "history_only",
+      "ui_priority": "low",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 480
+    }
+  },
+  {
+    "model": "crm.automationrule",
+    "pk": 49,
+    "fields": {
+      "event_type": "comment_added",
+      "ui_mode": "history_only",
+      "ui_priority": "low",
+      "write_timeline": true,
+      "show_in_summary": false,
+      "show_in_attention_queue": false,
+      "merge_key": "",
+      "auto_open_panel": false,
+      "create_message": false,
+      "create_touchpoint_mode": "none",
+      "default_outcome": null,
+      "require_manager_confirmation": false,
+      "allow_auto_create_task": false,
+      "next_step_template": null,
+      "is_active": true,
+      "sort_order": 490
+    }
+  }
+]

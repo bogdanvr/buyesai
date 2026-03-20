@@ -1,0 +1,130 @@
+[
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 1,
+    "fields": {
+      "code": "followup_after_2_days",
+      "name": "Фоллоу-ап через 2 дня"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 2,
+    "fields": {
+      "code": "followup_after_1_day",
+      "name": "Фоллоу-ап через 1 день"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 3,
+    "fields": {
+      "code": "followup_after_call",
+      "name": "Следующий шаг после звонка"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 4,
+    "fields": {
+      "code": "retry_call_after_1_day",
+      "name": "Повторить звонок через 1 день"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 5,
+    "fields": {
+      "code": "prepare_meeting",
+      "name": "Подготовить встречу"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 6,
+    "fields": {
+      "code": "reschedule_meeting",
+      "name": "Перенести встречу"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 7,
+    "fields": {
+      "code": "followup_after_meeting",
+      "name": "Фоллоу-ап после встречи"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 8,
+    "fields": {
+      "code": "prepare_updated_proposal",
+      "name": "Подготовить обновлённое КП"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 9,
+    "fields": {
+      "code": "prepare_contract",
+      "name": "Подготовить договор"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 10,
+    "fields": {
+      "code": "prepare_documents",
+      "name": "Подготовить документы"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 11,
+    "fields": {
+      "code": "followup_contract_after_2_days",
+      "name": "Фоллоу-ап по договору через 2 дня"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 12,
+    "fields": {
+      "code": "followup_contract_after_3_days",
+      "name": "Фоллоу-ап по договору через 3 дня"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 13,
+    "fields": {
+      "code": "revise_contract",
+      "name": "Доработать договор"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 14,
+    "fields": {
+      "code": "issue_invoice",
+      "name": "Выставить счёт"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 15,
+    "fields": {
+      "code": "payment_control_next_day",
+      "name": "Контроль оплаты на следующий день"
+    }
+  },
+  {
+    "model": "crm.nextsteptemplate",
+    "pk": 16,
+    "fields": {
+      "code": "start_delivery_or_project",
+      "name": "Запустить оказание услуги / проект"
+    }
+  }
+]
