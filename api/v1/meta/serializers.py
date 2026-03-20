@@ -97,6 +97,28 @@ class TaskTypeSerializer(serializers.ModelSerializer):
 
 
 class TouchResultSerializer(serializers.ModelSerializer):
+    group_label = serializers.CharField(source="get_group_display", read_only=True)
+    result_class = serializers.CharField(read_only=True)
+    result_class_label = serializers.CharField(source="get_result_class_display", read_only=True)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["class"] = data.pop("result_class", "")
+        return data
+
     class Meta:
         model = TouchResult
-        fields = ["id", "name", "is_active"]
+        fields = [
+            "id",
+            "code",
+            "name",
+            "group",
+            "group_label",
+            "result_class",
+            "result_class_label",
+            "requires_next_step",
+            "requires_loss_reason",
+            "is_active",
+            "sort_order",
+            "allowed_touch_types",
+        ]

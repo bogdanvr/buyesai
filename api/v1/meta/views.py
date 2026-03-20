@@ -145,7 +145,7 @@ class TouchResultListAPIView(ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        return TouchResult.objects.filter(is_active=True).order_by("name")
+        return TouchResult.objects.filter(is_active=True).order_by("sort_order", "name")
 
 
 class CurrencyRatesAPIView(APIView):

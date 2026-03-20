@@ -3,12 +3,16 @@ from django.utils import timezone
 
 from crm.models import Touch
 from crm.models.activity import ActivityType, TaskStatus
+from crm.models.touch import normalize_touch_channel_code
 
 
 class TouchSerializer(serializers.ModelSerializer):
     has_follow_up_task = serializers.BooleanField(write_only=True, required=False, default=False)
     channel_name = serializers.CharField(source="channel.name", read_only=True)
     result_option_name = serializers.CharField(source="result_option.name", read_only=True)
+    result_option_code = serializers.CharField(source="result_option.code", read_only=True)
+    result_option_group = serializers.CharField(source="result_option.group", read_only=True)
+    result_option_class = serializers.CharField(source="result_option.result_class", read_only=True)
     owner_name = serializers.SerializerMethodField()
     contact_name = serializers.SerializerMethodField()
     lead_title = serializers.CharField(source="lead.title", read_only=True)
@@ -53,15 +57,36 @@ class TouchSerializer(serializers.ModelSerializer):
         contact = attrs.get("contact", getattr(self.instance, "contact", None))
         task = attrs.get("task", getattr(self.instance, "task", None))
         happened_at = attrs.get("happened_at", getattr(self.instance, "happened_at", None))
+        channel = attrs.get("channel", getattr(self.instance, "channel", None))
+        result_option = attrs.get("result_option", getattr(self.instance, "result_option", None))
         if not happened_at:
             raise serializers.ValidationError({"happened_at": "Укажите дату и время касания."})
         if lead is None and deal is None and client is None and contact is None and task is None:
             raise serializers.ValidationError({"lead": "Привяжите касание хотя бы к одному объекту CRM."})
         if task is not None and task.type != ActivityType.TASK:
             raise serializers.ValidationError({"task": "Можно привязать только задачу."})
+        self._validate_result_option_channel(result_option, channel)
         if deal is not None:
             self._validate_deal_next_activity(attrs, deal, has_follow_up_task)
         return attrs
+
+    def _validate_result_option_channel(self, result_option, channel):
+        if result_option is None:
+            return
+        allowed_touch_types = list(getattr(result_option, "allowed_touch_types", []) or [])
+        if not allowed_touch_types or channel is None:
+            return
+        channel_code = normalize_touch_channel_code(getattr(channel, "name", ""))
+        if channel_code and channel_code in allowed_touch_types:
+            return
+        raise serializers.ValidationError(
+            {
+                "result_option": (
+                    f'Результат "{result_option.name}" нельзя использовать с каналом '
+                    f'"{getattr(channel, "name", "")}".'
+                )
+            }
+        )
 
     def _validate_deal_next_activity(self, attrs, deal, has_follow_up_task=False):
         stage_code = str(getattr(getattr(deal, "stage", None), "code", "") or "").strip().lower()
@@ -107,6 +132,9 @@ class TouchSerializer(serializers.ModelSerializer):
             "channel_name",
             "result_option",
             "result_option_name",
+            "result_option_code",
+            "result_option_group",
+            "result_option_class",
             "direction",
             "direction_label",
             "summary",

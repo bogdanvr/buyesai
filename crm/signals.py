@@ -7,7 +7,7 @@ from django.utils import timezone
 from audit.services import log_model_event
 from crm.models import Activity, Client, Deal, DealStage, Lead, Touch, TouchResult
 from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup
-from crm.models.touch import TouchDirection
+from crm.models.touch import TouchDirection, normalize_touch_channel_code
 from crm.services.lead_services import convert_lead_to_deal
 
 
@@ -418,9 +418,10 @@ def activity_client_task_touch_signal(sender, instance: Activity, created, **kwa
     touch_result_name = str(getattr(task_type, "touch_result", "") or "").strip()
     result_option = None
     if touch_result_name:
+        touch_result_code = normalize_touch_channel_code(touch_result_name) or "touch_result"
         result_option, _ = TouchResult.objects.get_or_create(
-            name=touch_result_name,
-            defaults={"is_active": True},
+            code=touch_result_code,
+            defaults={"name": touch_result_name, "is_active": True},
         )
 
     Touch.objects.create(

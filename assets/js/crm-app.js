@@ -2027,6 +2027,52 @@
         isTaskCanceledStatus(status) {
           return String(status || "").trim() === "canceled";
         },
+        normalizeTouchChannelCode(channelOrName) {
+          const raw = typeof channelOrName === "string"
+            ? channelOrName
+            : (channelOrName?.code || channelOrName?.name || "");
+          const normalized = String(raw || "").trim().toLowerCase();
+          const aliases = {
+            "телефон": "call",
+            "звонок": "call",
+            "call": "call",
+            "email": "email",
+            "e-mail": "email",
+            "почта": "email",
+            "whatsapp": "whatsapp",
+            "ватсап": "whatsapp",
+            "telegram": "telegram",
+            "телеграм": "telegram",
+            "meeting": "meeting",
+            "встреча": "meeting",
+            "document": "document",
+            "документ": "document",
+          };
+          if (aliases[normalized]) {
+            return aliases[normalized];
+          }
+          return normalized
+            .replace(/\s+/g, "_")
+            .replace(/[^a-zа-я0-9_]/gi, "");
+        },
+        availableTouchResults(channelId, currentResultId = null) {
+          const normalizedChannelId = this.toIntOrNull(channelId);
+          const currentId = this.toIntOrNull(currentResultId);
+          const selectedChannel = (this.metaOptions.communicationChannels || []).find(
+            (channel) => String(channel.id) === String(normalizedChannelId || "")
+          );
+          const selectedChannelCode = this.normalizeTouchChannelCode(selectedChannel);
+          return (this.metaOptions.touchResults || []).filter((option) => {
+            const allowedTypes = Array.isArray(option.allowed_touch_types) ? option.allowed_touch_types : [];
+            if (currentId && String(option.id) === String(currentId)) {
+              return true;
+            }
+            if (!allowedTypes.length || !selectedChannelCode) {
+              return true;
+            }
+            return allowedTypes.includes(selectedChannelCode);
+          });
+        },
         isTaskActiveStatus(status) {
           const normalized = String(status || "").trim();
           return normalized === "todo" || normalized === "in_progress";
@@ -5056,6 +5102,13 @@
           }
           if (this.hasPreparedTouchFollowUp() && !this.hasValidTouchFollowUp()) {
             throw new Error("Для следующей задачи укажите название или тип задачи и срок");
+          }
+          const selectedResult = (this.metaOptions.touchResults || []).find(
+            (option) => String(option.id) === String(this.toIntOrNull(form.resultOptionId) || "")
+          );
+          const availableResultIds = this.availableTouchResults(form.channelId, form.resultOptionId).map((option) => String(option.id));
+          if (selectedResult && !availableResultIds.includes(String(selectedResult.id))) {
+            throw new Error(`Результат "${selectedResult.name}" нельзя использовать с выбранным типом канала`);
           }
           this.validateTouchNextActivityRequirement(form);
         },

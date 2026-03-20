@@ -18,7 +18,14 @@ class TouchesApiTests(APITestCase):
         )
         self.client.force_authenticate(user=self.user)
         self.channel = CommunicationChannel.objects.create(name="Телефон")
-        self.touch_result = TouchResult.objects.create(name="Назначен следующий шаг")
+        self.touch_result = TouchResult.objects.create(
+            name="Назначен следующий шаг",
+            group="follow_up",
+            result_class="neutral",
+            requires_next_step=True,
+            allowed_touch_types=["call"],
+            sort_order=10,
+        )
         self.company = Client.objects.create(name="Acme")
         self.contact = Contact.objects.create(client=self.company, first_name="Иван", last_name="Иванов")
         self.lead = Lead.objects.create(title="Лид для касания", company="Acme")
@@ -50,16 +57,18 @@ class TouchesApiTests(APITestCase):
         self.assertIn("lead", response.data)
 
     def test_can_create_touch_for_deal(self):
+        happened_at = timezone.now() - timedelta(hours=1)
+        next_step_at = timezone.now() + timedelta(days=1)
         response = self.client.post(
             reverse("touches-list"),
             {
-                "happened_at": "2026-03-18T10:00:00+06:00",
+                "happened_at": happened_at.isoformat(),
                 "channel": self.channel.pk,
                 "result_option": self.touch_result.pk,
                 "direction": "outgoing",
                 "summary": "Обсудили условия поставки",
                 "next_step": "Подготовить КП",
-                "next_step_at": "2026-03-19T12:00:00+06:00",
+                "next_step_at": next_step_at.isoformat(),
                 "owner": self.user.pk,
                 "deal": self.deal.pk,
             },
@@ -69,6 +78,8 @@ class TouchesApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["channel_name"], "Телефон")
         self.assertEqual(response.data["result_option_name"], "Назначен следующий шаг")
+        self.assertEqual(response.data["result_option_group"], "follow_up")
+        self.assertEqual(response.data["result_option_class"], "neutral")
         self.assertEqual(response.data["direction_label"], "Исходящее")
         self.assertEqual(response.data["deal_title"], "Сделка для касания")
 
@@ -108,3 +119,32 @@ class TouchesApiTests(APITestCase):
         self.assertEqual(response.data["client_name"], "Acme")
         self.assertEqual(response.data["contact_name"], "Иван Иванов")
         self.assertEqual(response.data["task_subject"], "Задача для касания")
+
+    def test_touch_result_meta_returns_structured_fields(self):
+        response = self.client.get(reverse("meta-touch-results"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[0]["code"], self.touch_result.code)
+        self.assertEqual(response.data[0]["group"], "follow_up")
+        self.assertEqual(response.data[0]["class"], "neutral")
+        self.assertEqual(response.data[0]["requires_next_step"], True)
+        self.assertEqual(response.data[0]["allowed_touch_types"], ["call"])
+
+    def test_cannot_use_touch_result_with_unsupported_channel(self):
+        email_channel = CommunicationChannel.objects.create(name="Email")
+
+        response = self.client.post(
+            reverse("touches-list"),
+            {
+                "happened_at": "2026-03-18T10:00:00+06:00",
+                "channel": email_channel.pk,
+                "result_option": self.touch_result.pk,
+                "direction": "outgoing",
+                "summary": "Письмо отправлено",
+                "deal": self.deal.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("result_option", response.data)
