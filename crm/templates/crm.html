@@ -1046,9 +1046,38 @@
                         Результат: [[ eventItem.taskResult ]]
                       </div>
                       </template>
-                      <template v-else>
-                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-crm-muted">
-                          <span class="text-[11px] uppercase tracking-[0.16em] shrink-0">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
+                    <template v-else-if="eventItem.eventType === 'document'">
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || 'Документ' ]]</span>
+                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
+                        <span v-if="eventItem.actorName" class="text-crm-muted shrink-0">[[ eventItem.actorName ]]</span>
+                        <button
+                          v-if="eventItem.dealId"
+                          type="button"
+                          @click.stop="openDealFromEvent(eventItem.dealId)"
+                          class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                        >
+                          Сделка #[[ eventItem.dealId ]]
+                        </button>
+                      </div>
+                      <div class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
+                        [[ eventItem.documentName || eventItem.result ]]
+                      </div>
+                      <div v-if="eventItem.documentUrl" class="mt-2">
+                        <a
+                          :href="eventItem.documentUrl"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent"
+                        >
+                          Открыть документ
+                        </a>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-crm-muted">
+                        <span class="text-[11px] uppercase tracking-[0.16em] shrink-0">[[ formatEventTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
                         <span class="text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.result || eventItem.title || 'Системное событие' ]]</span>
                         </div>
                       </template>
@@ -1592,6 +1621,35 @@
                         <div v-if="eventItem.taskResult" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
                           Результат: [[ eventItem.taskResult ]]
                         </div>
+                    </template>
+                    <template v-else-if="eventItem.eventType === 'document'">
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || 'Документ' ]]</span>
+                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
+                        <span v-if="eventItem.actorName" class="text-crm-muted shrink-0">[[ eventItem.actorName ]]</span>
+                        <button
+                          v-if="eventItem.dealId"
+                          type="button"
+                          @click.stop="openDealFromEvent(eventItem.dealId)"
+                          class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                        >
+                          Сделка #[[ eventItem.dealId ]]
+                        </button>
+                      </div>
+                      <div class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
+                        [[ eventItem.documentName || eventItem.result ]]
+                      </div>
+                      <div v-if="eventItem.documentUrl" class="mt-2">
+                        <a
+                          :href="eventItem.documentUrl"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent"
+                        >
+                          Открыть документ
+                        </a>
+                      </div>
                     </template>
                     <template v-else>
                       <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-crm-muted">
@@ -2913,6 +2971,35 @@
                       </div>
                       <div v-if="eventItem.taskResult" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
                         Результат: [[ eventItem.taskResult ]]
+                      </div>
+                    </template>
+                    <template v-else-if="eventItem.eventType === 'document'">
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
+                        <span class="text-base leading-none shrink-0">[[ dealEventIcon(eventItem) ]]</span>
+                        <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ eventItem.title || 'Документ' ]]</span>
+                        <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(eventItem.timestamp) || 'Без даты' ]]</span>
+                        <span v-if="eventItem.actorName" class="text-crm-muted shrink-0">[[ eventItem.actorName ]]</span>
+                        <button
+                          v-if="eventItem.dealId"
+                          type="button"
+                          @click.stop="openDealFromEvent(eventItem.dealId)"
+                          class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                        >
+                          Сделка #[[ eventItem.dealId ]]
+                        </button>
+                      </div>
+                      <div class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
+                        [[ eventItem.documentName || eventItem.result ]]
+                      </div>
+                      <div v-if="eventItem.documentUrl" class="mt-2">
+                        <a
+                          :href="eventItem.documentUrl"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-1 text-[11px] font-semibold text-crm-accent hover:border-crm-accent"
+                        >
+                          Открыть документ
+                        </a>
                       </div>
                     </template>
                     <template v-else>

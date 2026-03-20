@@ -2,10 +2,11 @@ import logging
 
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.urls import reverse
 from django.utils import timezone
 
 from audit.services import log_model_event
-from crm.models import Activity, Client, Deal, DealStage, Lead, Touch, TouchResult
+from crm.models import Activity, Client, ClientDocument, Deal, DealDocument, DealStage, Lead, Touch, TouchResult
 from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup
 from crm.models.touch import TouchDirection, normalize_touch_channel_code
 from crm.services.lead_services import convert_lead_to_deal
@@ -111,6 +112,14 @@ def _append_lead_event(lead_id: int | None, entry: str) -> None:
     if lead is None:
         return
     Lead.objects.filter(pk=lead.pk).update(events=_prepend_event(lead.events, entry))
+
+
+def _document_download_url(document) -> str:
+    if isinstance(document, DealDocument):
+        return reverse("deal-documents-download", kwargs={"pk": document.pk})
+    if isinstance(document, ClientDocument):
+        return reverse("client-documents-download", kwargs={"pk": document.pk})
+    return ""
 
 
 def _touch_result_label(instance: Touch) -> str:
@@ -757,6 +766,52 @@ def touch_deal_events_signal(sender, instance: Touch, created, **kwargs):
         ],
     )
     _append_deal_event(instance.deal_id, entry)
+
+
+@receiver(post_save, sender=DealDocument)
+def deal_document_events_signal(sender, instance: DealDocument, created, **kwargs):
+    if not created:
+        return
+
+    document_name = str(instance.original_name or getattr(instance.file, "name", "") or "").strip() or f"Документ #{instance.pk}"
+    entry = _format_structured_event_entry(
+        result_text=f"Загружен документ: {document_name}",
+        happened_at=instance.created_at,
+        deal_id=instance.deal_id,
+        event_type="document",
+        priority="medium",
+        extra_lines=[
+            "title: Документ сделки",
+            f"actor_name: {_actor_display_name(instance.uploaded_by)}",
+            f"document_name: {document_name}",
+            f"document_url: {_document_download_url(instance)}",
+            "document_scope: deal",
+        ],
+    )
+    _append_deal_event(instance.deal_id, entry)
+    _append_client_event(instance.deal.client_id if instance.deal_id and instance.deal else None, entry)
+
+
+@receiver(post_save, sender=ClientDocument)
+def client_document_events_signal(sender, instance: ClientDocument, created, **kwargs):
+    if not created:
+        return
+
+    document_name = str(instance.original_name or getattr(instance.file, "name", "") or "").strip() or f"Документ #{instance.pk}"
+    entry = _format_structured_event_entry(
+        result_text=f"Загружен документ: {document_name}",
+        happened_at=instance.created_at,
+        event_type="document",
+        priority="medium",
+        extra_lines=[
+            "title: Документ компании",
+            f"actor_name: {_actor_display_name(instance.uploaded_by)}",
+            f"document_name: {document_name}",
+            f"document_url: {_document_download_url(instance)}",
+            "document_scope: company",
+        ],
+    )
+    _append_client_event(instance.client_id, entry)
 
 
 @receiver(post_save, sender=Touch)

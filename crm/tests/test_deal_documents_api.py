@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from crm.models import Client, Deal
+from crm.models import Client, ClientDocument, Deal, DealDocument
 
 
 class DealDocumentsApiTests(APITestCase):
@@ -37,3 +37,36 @@ class DealDocumentsApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content.decode())
         self.assertEqual(response.data["deal"], self.deal.pk)
         self.assertIn(f"company_{self.company.pk}/deal_{self.deal.pk}/", response.data["file_url"])
+
+    def test_deal_document_writes_event_to_deal_and_company(self):
+        document = DealDocument.objects.create(
+            deal=self.deal,
+            file=SimpleUploadedFile("proposal.pdf", b"pdf", content_type="application/pdf"),
+            original_name="proposal.pdf",
+            uploaded_by=self.user,
+        )
+
+        self.deal.refresh_from_db()
+        self.company.refresh_from_db()
+
+        expected_url = reverse("deal-documents-download", kwargs={"pk": document.pk})
+        self.assertIn("event_type: document", self.deal.events)
+        self.assertIn("document_name: proposal.pdf", self.deal.events)
+        self.assertIn(f"document_url: {expected_url}", self.deal.events)
+        self.assertIn("event_type: document", self.company.events)
+        self.assertIn("document_name: proposal.pdf", self.company.events)
+
+    def test_company_document_writes_event_to_company(self):
+        document = ClientDocument.objects.create(
+            client=self.company,
+            file=SimpleUploadedFile("brief.docx", b"doc", content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+            original_name="brief.docx",
+            uploaded_by=self.user,
+        )
+
+        self.company.refresh_from_db()
+
+        expected_url = reverse("client-documents-download", kwargs={"pk": document.pk})
+        self.assertIn("event_type: document", self.company.events)
+        self.assertIn("document_name: brief.docx", self.company.events)
+        self.assertIn(f"document_url: {expected_url}", self.company.events)

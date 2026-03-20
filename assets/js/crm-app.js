@@ -1457,6 +1457,9 @@
                 priority: "",
                 title: "",
                 actorName: "",
+                documentName: "",
+                documentUrl: "",
+                documentScope: "",
                 channelName: "",
                 directionLabel: "",
                 touchResult: "",
@@ -1508,6 +1511,18 @@
                 }
                 if (line.indexOf("actor_name:") === 0) {
                   eventItem.actorName = line.replace(/^actor_name:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("document_name:") === 0) {
+                  eventItem.documentName = line.replace(/^document_name:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("document_url:") === 0) {
+                  eventItem.documentUrl = line.replace(/^document_url:\s*/u, "").trim();
+                  return;
+                }
+                if (line.indexOf("document_scope:") === 0) {
+                  eventItem.documentScope = line.replace(/^document_scope:\s*/u, "").trim();
                   return;
                 }
                 if (line.indexOf("channel_name:") === 0) {
@@ -1568,6 +1583,9 @@
                   priority: "",
                   title: "",
                   actorName: "",
+                  documentName: "",
+                  documentUrl: "",
+                  documentScope: "",
                   channelName: "",
                   directionLabel: "",
                   touchResult: "",
@@ -1725,6 +1743,7 @@
           const eventType = String(eventItem?.eventType || "").trim();
           if (eventType === "touch") return "Касание";
           if (eventType === "task") return "Задача";
+          if (eventType === "document") return "Документ";
           if (eventType === "system") return "Система";
           return "";
         },
@@ -1749,6 +1768,7 @@
         dealEventIcon(eventItem) {
           const eventType = String(eventItem?.eventType || "").trim();
           if (eventType === "task") return "☑";
+          if (eventType === "document") return "▣";
           if (eventType === "system") return "•";
           const channel = String(eventItem?.channelName || eventItem?.title || "").toLowerCase();
           if (channel.includes("звон")) return "☎";
