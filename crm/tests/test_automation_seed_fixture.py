@@ -8,7 +8,7 @@ class AutomationSeedFixtureTests(TestCase):
     def test_full_automation_seed_fixture_loads_successfully(self):
         call_command("loaddata", "automation_seed", verbosity=0)
 
-        self.assertEqual(TouchResult.objects.count(), 36)
+        self.assertEqual(TouchResult.objects.count(), 37)
         self.assertEqual(OutcomeCatalog.objects.count(), 17)
         self.assertEqual(NextStepTemplate.objects.count(), 16)
         self.assertEqual(AutomationRule.objects.count(), 49)
@@ -18,6 +18,10 @@ class AutomationSeedFixtureTests(TestCase):
             "Отказ — выбрали конкурента",
         )
         self.assertTrue(TouchResult.objects.get(code="rejected_competitor").requires_loss_reason)
+        self.assertEqual(
+            TouchResult.objects.get(code="proposal_accepted").name,
+            "КП принято",
+        )
         self.assertEqual(
             OutcomeCatalog.objects.get(code="invoice_accepted").name,
             "Счёт принят",

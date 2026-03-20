@@ -359,6 +359,28 @@
   },
   {
     "model": "crm.touchresult",
+    "pk": 37,
+    "fields": {
+      "code": "proposal_accepted",
+      "name": "КП принято",
+      "group": "won_signal",
+      "result_class": "won_signal",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 175,
+      "allowed_touch_types": [
+        "call",
+        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "proposal"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
     "pk": 18,
     "fields": {
       "code": "discount_requested",

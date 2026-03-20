@@ -1,4 +1,6 @@
     const { createApp } = Vue;
+    const appRootElement = document.getElementById("app");
+    const appRootTemplate = appRootElement ? String(appRootElement.innerHTML || "") : "";
 
     const SECTION_ENDPOINTS = {
       leads: "/api/v1/leads/?page_size=100",
@@ -46,8 +48,11 @@
       { value: "client_task", label: "Клиентская задача" }
     ];
 
-    createApp({
-      delimiters: ["[[", "]]"],
+    const app = createApp({
+      compilerOptions: {
+        delimiters: ["[[", "]]"]
+      },
+      ...(appRootTemplate ? { template: appRootTemplate } : {}),
       data() {
         return {
           activeSection: "leads",
@@ -6991,4 +6996,7 @@
         document.removeEventListener("click", this.handleDocumentClick);
         document.removeEventListener("keydown", this.handleGlobalKeydown);
       }
-    }).mount("#app");
+    });
+
+    app.config.compilerOptions.delimiters = ["[[", "]]"];
+    app.mount("#app");
