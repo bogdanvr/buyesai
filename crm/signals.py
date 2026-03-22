@@ -935,6 +935,8 @@ def touch_previous_state_signal(sender, instance: Touch, **kwargs):
         .select_related("channel", "result_option", "owner")
         .only(
             "deal_id",
+            "lead_id",
+            "client_id",
             "happened_at",
             "channel_id",
             "channel__name",
@@ -1216,6 +1218,18 @@ def touch_lead_events_signal(sender, instance: Touch, created, **kwargs):
     if previous is None:
         return
 
+    if previous.lead_id != instance.lead_id:
+        entry = _format_structured_event_entry(
+            result_text=f"Касание: {base_text}",
+            happened_at=instance.happened_at,
+            touch_id=instance.pk,
+            event_type="touch",
+            priority="high",
+            extra_lines=_touch_event_extra_lines(instance, channel_label, result_label),
+        )
+        _append_lead_event(instance.lead_id, entry)
+        return
+
     changed = (
         previous.channel_id != instance.channel_id
         or previous.direction != instance.direction
@@ -1266,6 +1280,19 @@ def touch_client_events_signal(sender, instance: Touch, created, **kwargs):
         return
 
     if previous is None:
+        return
+
+    if previous.client_id != instance.client_id:
+        entry = _format_structured_event_entry(
+            result_text=f"Касание: {base_text}",
+            happened_at=instance.happened_at,
+            touch_id=instance.pk,
+            deal_id=instance.deal_id,
+            event_type="touch",
+            priority="high",
+            extra_lines=_touch_event_extra_lines(instance, channel_label, result_label),
+        )
+        _append_client_event(instance.client_id, entry)
         return
 
     changed = (
