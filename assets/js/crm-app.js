@@ -65,6 +65,7 @@
           showTouchCompanyFilter: false,
           showTouchDealFilter: false,
           showManagerNotifications: false,
+          managerNotificationDraftPreviewId: "",
           isUnboundCommunicationsLoading: false,
           isUnboundConversationMessagesLoading: false,
           isUnboundConversationBinding: false,
@@ -3585,7 +3586,17 @@
             this.showTouchCompanyFilter = false;
             this.showTouchDealFilter = false;
             this.loadUnboundCommunications({ preserveSelection: true, silent: true }).catch(() => {});
+          } else {
+            this.managerNotificationDraftPreviewId = "";
           }
+        },
+        isManagerNotificationDraftPreviewOpen(notificationId) {
+          return String(this.managerNotificationDraftPreviewId || "") === String(notificationId || "");
+        },
+        toggleManagerNotificationDraftPreview(notificationId) {
+          const normalizedId = String(notificationId || "").trim();
+          if (!normalizedId) return;
+          this.managerNotificationDraftPreviewId = this.isManagerNotificationDraftPreviewOpen(normalizedId) ? "" : normalizedId;
         },
         resetUnboundCommunicationsState() {
           this.isUnboundCommunicationsLoading = false;
@@ -6832,6 +6843,7 @@
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.showManagerNotifications = false;
+          this.managerNotificationDraftPreviewId = "";
           this.resetUnboundCommunicationsState();
           this.selectedStatusFilters = [];
           this.selectedTaskCompanyFilters = [];
@@ -6892,6 +6904,7 @@
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.showManagerNotifications = false;
+          this.managerNotificationDraftPreviewId = "";
           this.resetUnboundCommunicationsState();
           this.editingLeadId = null;
           this.editingDealId = null;
