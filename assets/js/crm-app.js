@@ -3710,6 +3710,27 @@
         groupDealTimelineEvents(eventItems) {
           const result = [];
           const chains = new Map();
+          const eventKey = (eventItem) => {
+            if (!eventItem || typeof eventItem !== "object") return "";
+            if (this.toIntOrNull(eventItem.touchId)) {
+              return `touch:${this.toIntOrNull(eventItem.touchId)}`;
+            }
+            if (this.toIntOrNull(eventItem.taskId)) {
+              return `task:${this.toIntOrNull(eventItem.taskId)}`;
+            }
+            if (this.toIntOrNull(eventItem.communicationMessageId)) {
+              return `message:${this.toIntOrNull(eventItem.communicationMessageId)}`;
+            }
+            if (String(eventItem.documentUrl || "").trim()) {
+              return `document:${String(eventItem.documentUrl || "").trim()}`;
+            }
+            return [
+              String(eventItem.eventType || "").trim(),
+              String(eventItem.timestamp || "").trim(),
+              String(eventItem.result || "").trim(),
+              String(eventItem.title || "").trim(),
+            ].join("::");
+          };
           (Array.isArray(eventItems) ? eventItems : []).forEach((eventItem, index) => {
             const automationEntry = this.resolveEventTouchAutomationEntry(eventItem);
             const mergeKey = String(automationEntry?.rule?.merge_key || "").trim();
@@ -3723,7 +3744,11 @@
             }
             const existingChain = chains.get(mergeKey);
             if (existingChain) {
-              existingChain.items.push(eventItem);
+              const nextKey = eventKey(eventItem);
+              if (!existingChain.itemKeys.has(nextKey)) {
+                existingChain.itemKeys.add(nextKey);
+                existingChain.items.push(eventItem);
+              }
               return;
             }
             const chain = {
@@ -3733,9 +3758,17 @@
               title: this.automationChainLabel(automationEntry),
               automationEntry,
               items: [eventItem],
+              itemKeys: new Set([eventKey(eventItem)]),
             };
             chains.set(mergeKey, chain);
             result.push(chain);
+          });
+          result.forEach((item) => {
+            if (item?.type !== "chain") return;
+            item.items = (Array.isArray(item.items) ? item.items.slice() : []).sort((left, right) => (
+              (this.parseTaskDueTimestamp(right?.timestamp) || 0) - (this.parseTaskDueTimestamp(left?.timestamp) || 0)
+            ));
+            delete item.itemKeys;
           });
           return result;
         },
