@@ -1144,6 +1144,36 @@ class EmailOutboundMessageServiceTests(TestCase):
         email_cls_mock.assert_not_called()
 
     @patch("crm_communications.email_outbound.EmailMultiAlternatives")
+    def test_send_message_uses_latest_incoming_sender_when_context_has_no_email(self, email_cls_mock):
+        email_instance = email_cls_mock.return_value
+        email_instance.send.return_value = 1
+        self.contact.email = ""
+        self.contact.save(update_fields=["email"])
+        self.client_company.email = ""
+        self.client_company.save(update_fields=["email"])
+        inbound = (
+            Message.objects.filter(
+                conversation=self.conversation,
+                channel=CommunicationChannelCode.EMAIL,
+                direction=MessageDirection.INCOMING,
+            )
+            .order_by("-id")
+            .first()
+        )
+        inbound.external_sender_key = "email:reply-target@example.com"
+        inbound.save(update_fields=["external_sender_key", "updated_at"])
+        message = self.create_outgoing_message()
+        MessageQueueService.enqueue_message(message=message)
+
+        processed = EmailOutboundMessageService.send_message(message=message)
+        processed.refresh_from_db()
+
+        self.assertEqual(processed.status, MessageStatus.SENT)
+        self.assertEqual(processed.external_recipient_key, "email:reply-target@example.com")
+        _, kwargs = email_cls_mock.call_args
+        self.assertEqual(kwargs["to"], ["reply-target@example.com"])
+
+    @patch("crm_communications.email_outbound.EmailMultiAlternatives")
     def test_send_due_messages_processes_only_due_email_messages(self, email_cls_mock):
         email_instance = email_cls_mock.return_value
         email_instance.send.return_value = 1

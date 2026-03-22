@@ -34,15 +34,23 @@ def _clean_message_id(value: str) -> str:
 
 class EmailOutboundMessageService:
     @staticmethod
+    def _normalize_recipient_key(value: str) -> str:
+        normalized = str(value or "").strip()
+        if not normalized:
+            return ""
+        if normalized.startswith("email:"):
+            normalized = normalized.removeprefix("email:")
+        normalized = normalize_email(normalized)
+        if normalized and "@" in normalized:
+            return normalized
+        return ""
+
+    @staticmethod
     def _resolve_recipient_email(*, message: Message) -> str:
         explicit_recipient = str(message.external_recipient_key or "").strip()
         if explicit_recipient:
-            if explicit_recipient.startswith("email:"):
-                normalized = normalize_email(explicit_recipient.removeprefix("email:"))
-                if normalized:
-                    return normalized
-            normalized = normalize_email(explicit_recipient)
-            if normalized and "@" in normalized:
+            normalized = EmailOutboundMessageService._normalize_recipient_key(explicit_recipient)
+            if normalized:
                 return normalized
 
         candidates = [
@@ -53,6 +61,22 @@ class EmailOutboundMessageService:
         for candidate in candidates:
             if candidate:
                 return candidate
+
+        latest_incoming = (
+            Message.objects.filter(
+                conversation=message.conversation,
+                channel=CommunicationChannelCode.EMAIL,
+                direction=MessageDirection.INCOMING,
+            )
+            .exclude(external_sender_key="")
+            .order_by("-received_at", "-created_at", "-id")
+            .first()
+        )
+        fallback_sender = EmailOutboundMessageService._normalize_recipient_key(
+            getattr(latest_incoming, "external_sender_key", "")
+        )
+        if fallback_sender:
+            return fallback_sender
         return ""
 
     @staticmethod
