@@ -3885,9 +3885,45 @@
           this.loadTouchDocuments();
           this.$nextTick(() => this.applyTouchAutomationRule());
         },
+        scrollToCommunicationComposer(target) {
+          const selectorMap = {
+            unbound: {
+              panel: "[data-unbound-communication-composer]",
+              body: "[data-unbound-communication-body]",
+            },
+            deal: {
+              panel: "[data-deal-communication-composer]",
+              body: "[data-deal-communication-body]",
+            },
+            company: {
+              panel: "[data-company-communication-composer]",
+              body: "[data-company-communication-body]",
+            },
+          };
+          const selectors = selectorMap[String(target || "").trim()];
+          if (!selectors) return;
+          this.$nextTick(() => {
+            const panel = document.querySelector(selectors.panel);
+            if (panel && typeof panel.scrollIntoView === "function") {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+            window.setTimeout(() => {
+              const body = document.querySelector(selectors.body);
+              if (body && typeof body.focus === "function") {
+                body.focus();
+              }
+            }, 180);
+          });
+        },
+        async openAutomationMessageReply(messageDraftId) {
+          const target = await this.previewAutomationMessageDraft(messageDraftId);
+          if (target === "deal" || target === "company" || target === "unbound") {
+            this.scrollToCommunicationComposer(target);
+          }
+        },
         async previewAutomationMessageDraft(messageDraftId) {
           const draft = this.getAutomationMessageDraftById(messageDraftId);
-          if (!draft) return;
+          if (!draft) return "";
           const conversationId = this.toIntOrNull(draft.conversationId);
           const channelCode = this.automationEventChannelCode(draft.sourceEventType) || this.normalizeTouchChannelCode(draft.proposedChannelName);
           const recipient = this.deriveCommunicationRecipient(channelCode, draft.contactId);
@@ -3915,7 +3951,7 @@
               };
               this.activeAutomationMessageDraftPreview = previewPayload;
               this.ensureCommunicationsPolling();
-              return;
+              return "deal";
             }
             if (companyId) {
               const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId));
@@ -3932,7 +3968,7 @@
                 };
                 this.activeAutomationMessageDraftPreview = previewPayload;
                 this.ensureCommunicationsPolling();
-                return;
+                return "company";
               }
             }
 
@@ -3945,7 +3981,7 @@
               recipient,
             };
             this.activeAutomationMessageDraftPreview = previewPayload;
-            return;
+            return "unbound";
           }
 
           if (this.toIntOrNull(draft.dealId)) {
@@ -3962,13 +3998,15 @@
               bodyText: String(draft.messageText || "").trim(),
             };
             this.activeAutomationMessageDraftPreview = previewPayload;
-            return;
+            return "deal";
           }
 
           if (draft.sourceTouchId) {
             this.showManagerNotifications = false;
             await this.openTouchFromEvent(draft.sourceTouchId);
+            return "touch";
           }
+          return "";
         },
         openAutomationTaskAction(item, { title = "", taskTypeGroup = "internal_task", channelCode = "", dueAt = "" } = {}) {
           const normalizedDealId = this.toIntOrNull(item?.dealId);
