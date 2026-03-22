@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "about",
     "chat",
     "crm.apps.CrmConfig",
+    "crm_communications.apps.CrmCommunicationsConfig",
     "integrations.apps.IntegrationsConfig",
     "audit.apps.AuditConfig",
     "api.apps.ApiConfig",
