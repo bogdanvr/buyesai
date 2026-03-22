@@ -66,6 +66,13 @@
           showTouchDealFilter: false,
           showManagerNotifications: false,
           managerNotificationDraftPreviewId: "",
+          managerNotificationReplyDraftId: "",
+          isManagerNotificationReplySending: false,
+          managerNotificationReplyComposer: {
+            subject: "",
+            bodyText: "",
+            recipient: "",
+          },
           isUnboundCommunicationsLoading: false,
           isUnboundConversationMessagesLoading: false,
           isUnboundConversationBinding: false,
@@ -3594,10 +3601,27 @@
             this.loadUnboundCommunications({ preserveSelection: true, silent: true }).catch(() => {});
           } else {
             this.managerNotificationDraftPreviewId = "";
+            this.managerNotificationReplyDraftId = "";
+            this.managerNotificationReplyComposer = {
+              subject: "",
+              bodyText: "",
+              recipient: "",
+            };
           }
         },
         isManagerNotificationDraftPreviewOpen(notificationId) {
           return String(this.managerNotificationDraftPreviewId || "") === String(notificationId || "");
+        },
+        isManagerNotificationReplyOpen(messageDraftId) {
+          return String(this.managerNotificationReplyDraftId || "") === String(messageDraftId || "");
+        },
+        managerNotificationReplyDraft(messageDraftId) {
+          return this.getAutomationMessageDraftById(messageDraftId);
+        },
+        managerNotificationReplyChannel(messageDraftId) {
+          const draft = this.managerNotificationReplyDraft(messageDraftId);
+          if (!draft) return "";
+          return this.automationEventChannelCode(draft.sourceEventType) || this.normalizeTouchChannelCode(draft.proposedChannelName);
         },
         toggleManagerNotificationDraftPreview(notificationId) {
           const normalizedId = String(notificationId || "").trim();
@@ -3904,6 +3928,14 @@
           this.loadTouchDocuments();
           this.$nextTick(() => this.applyTouchAutomationRule());
         },
+        initializeManagerNotificationReplyComposer(draft) {
+          const channelCode = this.automationEventChannelCode(draft?.sourceEventType) || this.normalizeTouchChannelCode(draft?.proposedChannelName);
+          this.managerNotificationReplyComposer = {
+            subject: String(draft?.messageSubject || "").trim(),
+            bodyText: String(draft?.messageText || "").trim(),
+            recipient: this.deriveCommunicationRecipient(channelCode, draft?.contactId),
+          };
+        },
         scrollToCommunicationComposer(target) {
           const selectorMap = {
             unbound: {
@@ -3935,10 +3967,25 @@
           });
         },
         async openAutomationMessageReply(messageDraftId) {
-          const target = await this.previewAutomationMessageDraft(messageDraftId);
-          if (target === "deal" || target === "company" || target === "unbound") {
-            this.scrollToCommunicationComposer(target);
-          }
+          const draft = this.getAutomationMessageDraftById(messageDraftId);
+          if (!draft) return;
+          const normalizedDraftId = this.toIntOrNull(messageDraftId);
+          if (!normalizedDraftId) return;
+          this.managerNotificationReplyDraftId = this.isManagerNotificationReplyOpen(normalizedDraftId) ? "" : normalizedDraftId;
+          if (!this.managerNotificationReplyDraftId) return;
+          this.initializeManagerNotificationReplyComposer(draft);
+          this.$nextTick(() => {
+            const panel = document.querySelector("[data-manager-notification-reply-panel]");
+            if (panel && typeof panel.scrollIntoView === "function") {
+              panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+            window.setTimeout(() => {
+              const body = document.querySelector("[data-manager-notification-reply-body]");
+              if (body && typeof body.focus === "function") {
+                body.focus();
+              }
+            }, 180);
+          });
         },
         async previewAutomationMessageDraft(messageDraftId) {
           const draft = this.getAutomationMessageDraftById(messageDraftId);
@@ -4230,6 +4277,42 @@
             await this.loadAutomationMessageDrafts();
           } catch (error) {
             this.setUiError(`Ошибка отклонения черновика сообщения: ${error.message}`, { modal: true });
+          }
+        },
+        async sendManagerNotificationReply(messageDraftId) {
+          const draft = this.getAutomationMessageDraftById(messageDraftId);
+          const conversationId = this.toIntOrNull(draft?.conversationId);
+          if (!draft || !conversationId || this.isManagerNotificationReplySending) return;
+          this.clearUiErrors({ modalOnly: true });
+          this.isManagerNotificationReplySending = true;
+          try {
+            await this.apiRequest(`/api/v1/communications/conversations/${conversationId}/send/`, {
+              method: "POST",
+              body: {
+                subject: this.managerNotificationReplyComposer.subject,
+                body_text: this.managerNotificationReplyComposer.bodyText,
+                recipient: this.managerNotificationReplyComposer.recipient,
+              }
+            });
+            await this.apiRequest(`/api/v1/automation-message-drafts/${draft.id}/dismiss/`, {
+              method: "POST",
+              body: {},
+            });
+            this.managerNotificationReplyDraftId = "";
+            this.managerNotificationDraftPreviewId = "";
+            this.managerNotificationReplyComposer = {
+              subject: "",
+              bodyText: "",
+              recipient: "",
+            };
+            await Promise.all([
+              this.loadAutomationMessageDrafts(),
+              this.loadAutomationQueue(),
+            ]);
+          } catch (error) {
+            this.setUiError(`Ошибка отправки ответа: ${error.message}`, { modal: true });
+          } finally {
+            this.isManagerNotificationReplySending = false;
           }
         },
         async confirmAutomationDraft(draftId) {
@@ -6956,6 +7039,12 @@
           this.showTouchDealFilter = false;
           this.showManagerNotifications = false;
           this.managerNotificationDraftPreviewId = "";
+          this.managerNotificationReplyDraftId = "";
+          this.managerNotificationReplyComposer = {
+            subject: "",
+            bodyText: "",
+            recipient: "",
+          };
           this.resetUnboundCommunicationsState();
           this.selectedStatusFilters = [];
           this.selectedTaskCompanyFilters = [];
@@ -7017,6 +7106,12 @@
           this.showTouchDealFilter = false;
           this.showManagerNotifications = false;
           this.managerNotificationDraftPreviewId = "";
+          this.managerNotificationReplyDraftId = "";
+          this.managerNotificationReplyComposer = {
+            subject: "",
+            bodyText: "",
+            recipient: "",
+          };
           this.resetUnboundCommunicationsState();
           this.editingLeadId = null;
           this.editingDealId = null;
