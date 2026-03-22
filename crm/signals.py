@@ -409,6 +409,59 @@ def _upsert_touch_automation_message_draft(instance: Touch, rule: AutomationRule
     draft.save()
 
 
+def _dismiss_pending_touch_automation_artifacts(
+    instance: Touch,
+    *,
+    rule: AutomationRule | None,
+    allowed_draft_kinds: set[str] | None = None,
+    allowed_queue_kinds: set[str] | None = None,
+    allow_message_draft: bool = False,
+) -> None:
+    acted_at = timezone.now()
+
+    draft_queryset = AutomationDraft.objects.filter(
+        source_touch=instance,
+        status=AutomationDraftStatus.PENDING,
+    )
+    if rule is not None and allowed_draft_kinds:
+        draft_queryset = draft_queryset.exclude(
+            automation_rule=rule,
+            draft_kind__in=list(allowed_draft_kinds),
+        )
+    draft_queryset.update(
+        status=AutomationDraftStatus.DISMISSED,
+        acted_at=acted_at,
+        updated_at=acted_at,
+    )
+
+    queue_queryset = AutomationQueueItem.objects.filter(
+        source_touch=instance,
+        status=AutomationQueueItemStatus.PENDING,
+    )
+    if rule is not None and allowed_queue_kinds:
+        queue_queryset = queue_queryset.exclude(
+            automation_rule=rule,
+            item_kind__in=list(allowed_queue_kinds),
+        )
+    queue_queryset.update(
+        status=AutomationQueueItemStatus.DISMISSED,
+        acted_at=acted_at,
+        updated_at=acted_at,
+    )
+
+    message_draft_queryset = AutomationMessageDraft.objects.filter(
+        source_touch=instance,
+        status=AutomationMessageDraftStatus.PENDING,
+    )
+    if rule is not None and allow_message_draft:
+        message_draft_queryset = message_draft_queryset.exclude(automation_rule=rule)
+    message_draft_queryset.update(
+        status=AutomationMessageDraftStatus.DISMISSED,
+        acted_at=acted_at,
+        updated_at=acted_at,
+    )
+
+
 def _touch_document_event_lines(instance: Touch) -> list[str]:
     lines: list[str] = []
     for document in instance.client_documents.all():
@@ -1230,6 +1283,55 @@ def touch_client_events_signal(sender, instance: Touch, created, **kwargs):
 @receiver(post_save, sender=Touch)
 def touch_automation_drafts_signal(sender, instance: Touch, created, **kwargs):
     event_type, rule = resolve_touch_automation_rule(instance)
+
+    allowed_draft_kinds: set[str] = set()
+    allowed_queue_kinds: set[str] = set()
+    allow_message_draft = False
+
+    if event_type and rule is not None:
+        if bool(getattr(rule, "create_message", False)):
+            allow_message_draft = True
+
+        if str(rule.create_touchpoint_mode or "").strip() == "draft":
+            allowed_draft_kinds.add(AutomationDraftKind.TOUCH)
+
+        should_create_next_step_draft = bool(
+            getattr(rule, "next_step_template_id", None)
+            and (
+                bool(getattr(rule, "require_manager_confirmation", False))
+                or not bool(getattr(rule, "allow_auto_create_task", False))
+            )
+        )
+        if should_create_next_step_draft:
+            allowed_draft_kinds.add(AutomationDraftKind.NEXT_STEP)
+
+        ui_mode = str(getattr(rule, "ui_mode", "") or "").strip()
+        should_create_attention_queue_item = bool(
+            getattr(rule, "show_in_attention_queue", False)
+            or getattr(rule, "require_manager_confirmation", False)
+            or ui_mode == "needs_attention"
+        )
+        if should_create_attention_queue_item:
+            allowed_queue_kinds.add(AutomationQueueItemKind.ATTENTION)
+
+        should_create_next_step_queue_item = bool(
+            getattr(rule, "next_step_template_id", None)
+            and (
+                getattr(rule, "require_manager_confirmation", False)
+                or not getattr(rule, "allow_auto_create_task", False)
+            )
+        )
+        if should_create_next_step_queue_item:
+            allowed_queue_kinds.add(AutomationQueueItemKind.NEXT_STEP)
+
+    _dismiss_pending_touch_automation_artifacts(
+        instance,
+        rule=rule if event_type else None,
+        allowed_draft_kinds=allowed_draft_kinds,
+        allowed_queue_kinds=allowed_queue_kinds,
+        allow_message_draft=allow_message_draft,
+    )
+
     if not event_type:
         return
     if rule is None:
@@ -1241,32 +1343,15 @@ def touch_automation_drafts_signal(sender, instance: Touch, created, **kwargs):
     if str(rule.create_touchpoint_mode or "").strip() == "draft":
         _upsert_touch_automation_draft(instance, rule, AutomationDraftKind.TOUCH)
 
-    should_create_next_step_draft = bool(
-        getattr(rule, "next_step_template_id", None)
-        and (
-            bool(getattr(rule, "require_manager_confirmation", False))
-            or not bool(getattr(rule, "allow_auto_create_task", False))
-        )
-    )
+    should_create_next_step_draft = AutomationDraftKind.NEXT_STEP in allowed_draft_kinds
     if should_create_next_step_draft:
         _upsert_touch_automation_draft(instance, rule, AutomationDraftKind.NEXT_STEP)
 
-    ui_mode = str(getattr(rule, "ui_mode", "") or "").strip()
-    should_create_attention_queue_item = bool(
-        getattr(rule, "show_in_attention_queue", False)
-        or getattr(rule, "require_manager_confirmation", False)
-        or ui_mode == "needs_attention"
-    )
+    should_create_attention_queue_item = AutomationQueueItemKind.ATTENTION in allowed_queue_kinds
     if should_create_attention_queue_item:
         _upsert_touch_automation_queue_item(instance, rule, AutomationQueueItemKind.ATTENTION)
 
-    should_create_next_step_queue_item = bool(
-        getattr(rule, "next_step_template_id", None)
-        and (
-            getattr(rule, "require_manager_confirmation", False)
-            or not getattr(rule, "allow_auto_create_task", False)
-        )
-    )
+    should_create_next_step_queue_item = AutomationQueueItemKind.NEXT_STEP in allowed_queue_kinds
     if should_create_next_step_queue_item:
         _upsert_touch_automation_queue_item(instance, rule, AutomationQueueItemKind.NEXT_STEP)
 

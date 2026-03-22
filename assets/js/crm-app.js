@@ -65,6 +65,9 @@
           showTouchCompanyFilter: false,
           showTouchDealFilter: false,
           showManagerNotifications: false,
+          isUnboundCommunicationsLoading: false,
+          isUnboundConversationMessagesLoading: false,
+          isUnboundConversationBinding: false,
           selectedStatusFilters: [],
           selectedTaskCompanyFilters: [],
           selectedTouchCompanyFilters: [],
@@ -347,6 +350,14 @@
             recipient: ""
           },
           activeAutomationMessageDraftPreview: null,
+          unboundConversations: [],
+          unboundConversationMessages: [],
+          activeUnboundConversationId: null,
+          unboundConversationBindForm: {
+            clientId: null,
+            contactId: null,
+            dealId: null,
+          },
           communicationsPollTimer: null,
           metaOptions: {
             leadStatuses: [],
@@ -615,6 +626,41 @@
           return (this.datasets.automationQueue || []).filter((item) => String(item.status || "") === "pending");
         },
         managerNotifications() {
+          const queueNotifications = this.pendingAutomationQueueItems.map((item) => ({
+            id: `queue-${item.id}`,
+            sourceType: "queue",
+            sourceId: item.id,
+            queueKind: item.itemKind || "",
+            touchId: this.toIntOrNull(item.sourceTouchId),
+            dealId: this.toIntOrNull(item.dealId),
+            dealTitle: item.dealTitle || "",
+            companyId: this.toIntOrNull(item.clientId),
+            companyName: item.clientName || "",
+            leadId: this.toIntOrNull(item.leadId),
+            contactId: this.toIntOrNull(item.contactId),
+            ownerId: this.toIntOrNull(item.ownerId),
+            title: item.title || item.summary || "Очередь автоматизации",
+            eventType: item.sourceEventType || "",
+            happenedAt: item.sourceTouchHappenedAt || item.createdAt || "",
+            deadline: item.proposedNextStepAt || "",
+            recommendedAction: item.recommendedAction || item.proposedNextStep || "",
+            uiPriority: String(item.automationRuleUiPriority || "medium"),
+            needsConfirmation: true,
+            isDraft: false,
+            availableActions: Array.isArray(item.availableActions) ? item.availableActions : [],
+          }));
+          const queueNextStepKeys = new Set(
+            queueNotifications
+              .filter((item) => String(item.queueKind || "") === "next_step")
+              .map((item) => `${this.toIntOrNull(item.touchId) || 0}::${String(item.eventType || "").trim()}`)
+          );
+          const filteredQueueNotifications = queueNotifications.filter((item) => {
+            if (String(item.queueKind || "") !== "attention") {
+              return true;
+            }
+            const dedupeKey = `${this.toIntOrNull(item.touchId) || 0}::${String(item.eventType || "").trim()}`;
+            return !queueNextStepKeys.has(dedupeKey);
+          });
           const notifications = [
             ...this.pendingAutomationMessageDrafts.map((draft) => ({
               id: `message-draft-${draft.id}`,
@@ -635,29 +681,7 @@
               isDraft: true,
               isMessageDraft: true,
             })),
-            ...this.pendingAutomationQueueItems.map((item) => ({
-              id: `queue-${item.id}`,
-              sourceType: "queue",
-              sourceId: item.id,
-              queueKind: item.itemKind || "",
-              touchId: this.toIntOrNull(item.sourceTouchId),
-              dealId: this.toIntOrNull(item.dealId),
-              dealTitle: item.dealTitle || "",
-              companyId: this.toIntOrNull(item.clientId),
-              companyName: item.clientName || "",
-              leadId: this.toIntOrNull(item.leadId),
-              contactId: this.toIntOrNull(item.contactId),
-              ownerId: this.toIntOrNull(item.ownerId),
-              title: item.title || item.summary || "Очередь автоматизации",
-              eventType: item.sourceEventType || "",
-              happenedAt: item.sourceTouchHappenedAt || item.createdAt || "",
-              deadline: item.proposedNextStepAt || "",
-              recommendedAction: item.recommendedAction || item.proposedNextStep || "",
-              uiPriority: String(item.automationRuleUiPriority || "medium"),
-              needsConfirmation: true,
-              isDraft: false,
-              availableActions: Array.isArray(item.availableActions) ? item.availableActions : [],
-            })),
+            ...filteredQueueNotifications,
             ...this.pendingAutomationDrafts.map((draft) => ({
               id: `draft-${draft.id}`,
               sourceType: "draft",
@@ -689,6 +713,36 @@
         },
         managerNotificationsCount() {
           return this.managerNotifications.length;
+        },
+        activeUnboundConversation() {
+          const conversationId = this.toIntOrNull(this.activeUnboundConversationId);
+          if (!conversationId) return null;
+          return (this.unboundConversations || []).find((item) => String(item.id) === String(conversationId)) || null;
+        },
+        unboundConversationCompanyOptions() {
+          return this.companyOptions;
+        },
+        unboundConversationContactOptions() {
+          const companyId = this.toIntOrNull(this.unboundConversationBindForm.clientId);
+          if (!companyId) return [];
+          return (this.datasets.contacts || [])
+            .filter((contact) => String(contact.clientId || "") === String(companyId))
+            .map((contact) => ({
+              id: this.toIntOrNull(contact.id),
+              title: contact.fullName || contact.name || contact.email || `Контакт #${contact.id}`,
+            }));
+        },
+        unboundConversationDealOptions() {
+          const companyId = this.toIntOrNull(this.unboundConversationBindForm.clientId);
+          if (!companyId) return [];
+          return (this.datasets.deals || [])
+            .filter((deal) => String(deal.clientId || "") === String(companyId))
+            .map((deal) => ({
+              id: this.toIntOrNull(deal.id),
+              title: deal.title || deal.name || `Сделка #${deal.id}`,
+              isActive: this.isDealOpen(deal.stageStatus),
+            }))
+            .sort((left, right) => (left.isActive === right.isActive ? 0 : (left.isActive ? -1 : 1)));
         },
         dealHasSelectedCompany() {
           return !!this.toIntOrNull(this.forms.deals.companyId);
@@ -1711,6 +1765,26 @@
               this.setTouchResultPrompt("");
             }
             this.$nextTick(() => this.applyTouchAutomationRule());
+          }
+        },
+        "unboundConversationBindForm.clientId": {
+          handler(nextValue) {
+            const companyId = this.toIntOrNull(nextValue);
+            if (!companyId) {
+              this.unboundConversationBindForm.contactId = null;
+              this.unboundConversationBindForm.dealId = null;
+              return;
+            }
+            const availableContactIds = this.unboundConversationContactOptions.map((item) => String(item.id));
+            const selectedContactId = String(this.toIntOrNull(this.unboundConversationBindForm.contactId) || "");
+            if (selectedContactId && !availableContactIds.includes(selectedContactId)) {
+              this.unboundConversationBindForm.contactId = null;
+            }
+            const availableDealIds = this.unboundConversationDealOptions.map((item) => String(item.id));
+            const selectedDealId = String(this.toIntOrNull(this.unboundConversationBindForm.dealId) || "");
+            if (selectedDealId && !availableDealIds.includes(selectedDealId)) {
+              this.unboundConversationBindForm.dealId = null;
+            }
           }
         },
         "taskFollowUpForm.taskTypeGroup": {
@@ -3533,6 +3607,137 @@
             this.showTaskCompanyFilter = false;
             this.showTouchCompanyFilter = false;
             this.showTouchDealFilter = false;
+            this.loadUnboundCommunications({ preserveSelection: true, silent: true }).catch(() => {});
+          }
+        },
+        resetUnboundCommunicationsState() {
+          this.isUnboundCommunicationsLoading = false;
+          this.isUnboundConversationMessagesLoading = false;
+          this.isUnboundConversationBinding = false;
+          this.unboundConversations = [];
+          this.unboundConversationMessages = [];
+          this.activeUnboundConversationId = null;
+          this.unboundConversationBindForm = {
+            clientId: null,
+            contactId: null,
+            dealId: null,
+          };
+        },
+        syncUnboundConversationBindFormFromConversation(conversation) {
+          const clientId = this.toIntOrNull(conversation?.clientId);
+          const contactId = this.toIntOrNull(conversation?.contactId);
+          const dealId = this.toIntOrNull(conversation?.dealId);
+          this.unboundConversationBindForm = {
+            clientId,
+            contactId,
+            dealId,
+          };
+        },
+        async loadUnboundConversationMessages(conversationId, options = {}) {
+          const normalizedConversationId = this.toIntOrNull(conversationId);
+          if (!normalizedConversationId) {
+            this.unboundConversationMessages = [];
+            return;
+          }
+          if (!options.silent) {
+            this.isUnboundConversationMessagesLoading = true;
+          }
+          try {
+            const payload = await this.apiRequest(`/api/v1/communications/conversations/${normalizedConversationId}/messages/`);
+            const records = Array.isArray(payload) ? payload : this.normalizePaginatedResponse(payload);
+            this.unboundConversationMessages = records.map((item) => this.mapCommunicationMessage(item));
+          } finally {
+            this.isUnboundConversationMessagesLoading = false;
+          }
+        },
+        async selectUnboundConversation(conversationId, options = {}) {
+          const normalizedConversationId = this.toIntOrNull(conversationId);
+          this.activeUnboundConversationId = normalizedConversationId;
+          const conversation = this.activeUnboundConversation;
+          this.syncUnboundConversationBindFormFromConversation(conversation);
+          if (normalizedConversationId) {
+            await this.loadUnboundConversationMessages(normalizedConversationId, options);
+          } else {
+            this.unboundConversationMessages = [];
+          }
+        },
+        async loadUnboundCommunications(options = {}) {
+          const previousConversationId = this.toIntOrNull(this.activeUnboundConversationId);
+          if (!options.silent) {
+            this.isUnboundCommunicationsLoading = true;
+          }
+          try {
+            const payload = await this.apiRequest("/api/v1/communications/conversations/?requires_manual_binding=true&page_size=100");
+            const records = this.normalizePaginatedResponse(payload)
+              .map((item) => this.mapConversation(item))
+              .filter((item) => item.requiresManualBinding);
+            this.unboundConversations = records;
+            let nextConversationId = options.preserveSelection ? previousConversationId : null;
+            if (!nextConversationId || !records.some((item) => String(item.id) === String(nextConversationId))) {
+              nextConversationId = records[0]?.id || null;
+            }
+            const shouldReloadMessages = !!nextConversationId && (
+              options.forceReloadMessages
+              || String(nextConversationId) !== String(previousConversationId || "")
+              || !this.unboundConversationMessages.length
+            );
+            this.activeUnboundConversationId = nextConversationId;
+            this.syncUnboundConversationBindFormFromConversation(this.activeUnboundConversation);
+            if (shouldReloadMessages) {
+              await this.loadUnboundConversationMessages(nextConversationId, { silent: options.silent });
+            } else if (!nextConversationId) {
+              this.unboundConversationMessages = [];
+            }
+          } finally {
+            this.isUnboundCommunicationsLoading = false;
+          }
+        },
+        async bindSelectedUnboundConversation() {
+          const conversationId = this.toIntOrNull(this.activeUnboundConversationId);
+          if (!conversationId || this.isUnboundConversationBinding) return;
+          this.clearUiErrors({ modalOnly: true });
+          this.isUnboundConversationBinding = true;
+          try {
+            const clientId = this.toIntOrNull(this.unboundConversationBindForm.clientId);
+            const contactId = this.toIntOrNull(this.unboundConversationBindForm.contactId);
+            const dealId = this.toIntOrNull(this.unboundConversationBindForm.dealId);
+            await this.apiRequest(`/api/v1/communications/conversations/${conversationId}/bind/`, {
+              method: "POST",
+              body: {
+                client: clientId,
+                contact: contactId,
+                deal: dealId,
+              }
+            });
+            await this.loadUnboundCommunications({ preserveSelection: false, forceReloadMessages: true, silent: true });
+            await Promise.all([
+              this.loadAutomationQueue(),
+              this.loadAutomationMessageDrafts(),
+              this.loadAutomationDrafts(),
+            ]);
+          } catch (error) {
+            this.setUiError(`Ошибка привязки переписки: ${error.message}`, { modal: true });
+          } finally {
+            this.isUnboundConversationBinding = false;
+          }
+        },
+        async openActiveUnboundConversationContext() {
+          const conversation = this.activeUnboundConversation;
+          if (!conversation) return;
+          this.showManagerNotifications = false;
+          if (this.toIntOrNull(conversation.dealId)) {
+            const deal = await this.fetchDealById(conversation.dealId);
+            this.openDealEditor(deal);
+            this.showDealCommunicationsPanel = true;
+            await this.loadDealCommunications({ preserveSelection: false, forceReloadMessages: true });
+            await this.selectDealConversation(conversation.id, { silent: true });
+            return;
+          }
+          if (this.toIntOrNull(conversation.clientId)) {
+            this.openCompanyEditorById(conversation.clientId);
+            this.showCompanyCommunicationsPanel = true;
+            await this.loadCompanyCommunications({ preserveSelection: false, forceReloadMessages: true });
+            await this.selectCompanyConversation(conversation.id, { silent: true });
           }
         },
         async openManagerNotification(item) {
@@ -3540,6 +3745,13 @@
           this.showManagerNotifications = false;
           if (item.sourceType === "message_draft" && item.sourceId) {
             await this.previewAutomationMessageDraft(item.sourceId);
+            return;
+          }
+          if (item.sourceType === "queue" && String(item.queueKind || "") === "next_step") {
+            this.openAutomationTaskAction(item, {
+              title: item.recommendedAction || item.title || "",
+              taskTypeGroup: "internal_task",
+            });
             return;
           }
           if (item.sourceType === "queue" && item.touchId) {
@@ -6640,6 +6852,7 @@
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.showManagerNotifications = false;
+          this.resetUnboundCommunicationsState();
           this.selectedStatusFilters = [];
           this.selectedTaskCompanyFilters = [];
           this.selectedTouchCompanyFilters = [];
@@ -6699,6 +6912,7 @@
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.showManagerNotifications = false;
+          this.resetUnboundCommunicationsState();
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
@@ -6777,6 +6991,7 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.resetCompanyCommunicationsState();
+          this.resetUnboundCommunicationsState();
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
           this.showCompanyLeadsPanel = false;

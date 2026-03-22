@@ -141,3 +141,61 @@ class AutomationQueueApiTests(APITestCase):
         self.assertIn("schedule_meeting", action_ids)
         self.assertIn("create_task", action_ids)
         self.assertEqual(incoming_rule.event_type, "email_received")
+
+    def test_touch_result_change_dismisses_stale_pending_queue_items(self):
+        incoming_rule = AutomationRule.objects.create(
+            event_type="email_received",
+            ui_mode="needs_attention",
+            ui_priority="high",
+            show_in_attention_queue=True,
+            is_active=True,
+            sort_order=20,
+        )
+        payment_outcome = OutcomeCatalog.objects.create(code="payment_confirmed", name="Оплата подтверждена")
+        payment_result = TouchResult.objects.create(
+            code="payment_confirmed",
+            name="Оплата подтверждена",
+            group="won_signal",
+            result_class="won_signal",
+        )
+        payment_rule = AutomationRule.objects.create(
+            event_type="payment_confirmed",
+            ui_mode="needs_attention",
+            ui_priority="critical",
+            show_in_attention_queue=True,
+            default_outcome=payment_outcome,
+            next_step_template=self.template,
+            is_active=True,
+            sort_order=30,
+        )
+
+        touch = Touch.objects.create(
+            happened_at=timezone.now(),
+            channel=self.channel,
+            direction="incoming",
+            summary="Клиент подтвердил оплату",
+            owner=self.user,
+            deal=self.deal,
+        )
+
+        stale_item = AutomationQueueItem.objects.get(
+            source_touch=touch,
+            automation_rule=incoming_rule,
+            item_kind="attention",
+        )
+        self.assertEqual(stale_item.status, "pending")
+
+        touch.result_option = payment_result
+        touch.next_step_at = timezone.now() + timedelta(days=1)
+        touch.save(update_fields=["result_option", "next_step_at", "updated_at"])
+
+        stale_item.refresh_from_db()
+        self.assertEqual(stale_item.status, "dismissed")
+
+        current_items = AutomationQueueItem.objects.filter(
+            source_touch=touch,
+            automation_rule=payment_rule,
+            status="pending",
+        )
+        self.assertEqual(current_items.count(), 2)
+        self.assertEqual(set(current_items.values_list("item_kind", flat=True)), {"attention", "next_step"})
