@@ -4636,10 +4636,27 @@
           }
         },
         async sendManagerNotificationReply(messageDraftId) {
-          const draft = this.getAutomationMessageDraftById(messageDraftId);
-          const conversationId = this.toIntOrNull(draft?.conversationId);
-          if (!draft || !conversationId || this.isManagerNotificationReplySending) return;
           this.clearUiErrors({ modalOnly: true });
+          if (this.isManagerNotificationReplySending) return;
+          const normalizedDraftId = this.toIntOrNull(messageDraftId);
+          if (!normalizedDraftId) {
+            this.setUiError("Не найдено сообщение для ответа.", { modal: true });
+            return;
+          }
+          const draft = this.getAutomationMessageDraftById(normalizedDraftId);
+          if (!draft) {
+            this.setUiError("Черновик ответа не найден. Обновите уведомления и попробуйте снова.", { modal: true });
+            return;
+          }
+          const conversationId = this.toIntOrNull(draft?.conversationId) || this.toIntOrNull(this.activeUnboundConversationId);
+          if (!conversationId) {
+            this.setUiError("Не удалось определить диалог для ответа. Сначала откройте или привяжите переписку.", { modal: true });
+            return;
+          }
+          if (!String(this.managerNotificationReplyComposer.bodyText || "").trim()) {
+            this.setUiError("Введите текст ответа.", { modal: true });
+            return;
+          }
           this.isManagerNotificationReplySending = true;
           try {
             const response = await this.apiRequest(`/api/v1/communications/conversations/${conversationId}/send/`, {
