@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from crm_communications.models import Conversation, DeliveryFailureQueue, Message, MessageAttachment, MessageAttemptLog
+from crm_communications.models import CommunicationChannelCode, Conversation, DeliveryFailureQueue, Message, MessageAttachment, MessageAttemptLog
 
 
 class ConversationSerializer(serializers.ModelSerializer):
@@ -217,6 +217,13 @@ class ConversationSendSerializer(serializers.Serializer):
         if not str(attrs.get("subject") or "").strip() and not str(attrs.get("body_text") or attrs.get("body_html") or "").strip():
             raise serializers.ValidationError("Укажите тему или текст сообщения.")
         return attrs
+
+
+class ConversationStartSerializer(ConversationSendSerializer):
+    channel = serializers.ChoiceField(choices=CommunicationChannelCode.choices)
+    client = serializers.IntegerField(required=False, allow_null=True)
+    contact = serializers.IntegerField(required=False, allow_null=True)
+    deal = serializers.IntegerField(required=False, allow_null=True)
 
 
 class DeliveryFailureRetrySerializer(serializers.Serializer):

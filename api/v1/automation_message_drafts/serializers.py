@@ -8,6 +8,7 @@ class AutomationMessageDraftSerializer(serializers.ModelSerializer):
     automation_rule_ui_priority = serializers.CharField(source="automation_rule.ui_priority", read_only=True)
     source_touch_summary = serializers.CharField(source="source_touch.summary", read_only=True)
     source_touch_happened_at = serializers.DateTimeField(source="source_touch.happened_at", read_only=True)
+    conversation_id = serializers.IntegerField(source="source_touch.communication_message.conversation_id", read_only=True)
     proposed_channel_name = serializers.CharField(source="proposed_channel.name", read_only=True)
     owner_name = serializers.SerializerMethodField()
     acted_by_name = serializers.SerializerMethodField()
@@ -81,6 +82,7 @@ class AutomationMessageDraftSerializer(serializers.ModelSerializer):
             "source_touch",
             "source_touch_summary",
             "source_touch_happened_at",
+            "conversation_id",
             "proposed_channel",
             "proposed_channel_name",
             "owner",

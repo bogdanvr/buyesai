@@ -1029,6 +1029,38 @@ class CommunicationsApiTests(TestCase):
         self.assertEqual(message.status, MessageStatus.SENT)
         email_cls_mock.assert_called_once()
 
+    @patch("crm_communications.email_outbound.EmailMultiAlternatives")
+    def test_start_conversation_from_deal(self, email_cls_mock):
+        email_instance = email_cls_mock.return_value
+        email_instance.send.return_value = 1
+
+        response = self.client.post(
+            reverse("communications-conversations-start"),
+            data={
+                "channel": "email",
+                "deal": self.deal.pk,
+                "client": self.client_company.pk,
+                "contact": self.contact.pk,
+                "recipient": "email:sveta@example.com",
+                "subject": "Старт переписки",
+                "body_text": "Первое сообщение по сделке",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        conversation_id = response.json()["conversation"]["id"]
+        message_id = response.json()["message"]["id"]
+        conversation = Conversation.objects.get(pk=conversation_id)
+        message = Message.objects.get(pk=message_id)
+        self.assertEqual(conversation.deal, self.deal)
+        self.assertEqual(conversation.client, self.client_company)
+        self.assertEqual(conversation.contact, self.contact)
+        self.assertEqual(message.status, MessageStatus.SENT)
+        self.assertEqual(message.conversation, conversation)
+        self.assertEqual(message.external_recipient_key, "email:sveta@example.com")
+        email_cls_mock.assert_called_once()
+
     def test_manual_bind_updates_conversation(self):
         second_deal = Deal.objects.create(
             title="Second API Deal",

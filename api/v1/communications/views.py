@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from api.v1.communications.serializers import (
     ConversationBindSerializer,
     ConversationSendSerializer,
+    ConversationStartSerializer,
     ConversationSerializer,
     DeliveryFailureQueueSerializer,
     DeliveryFailureResolutionSerializer,
@@ -18,7 +19,7 @@ from api.v1.communications.serializers import (
 from crm.models import Client, Contact, Deal
 from crm_communications.email_outbound import EmailOutboundMessageService
 from crm_communications.models import Conversation, ConversationRoute, DeliveryFailureQueue, Message, MessageAttemptLog
-from crm_communications.services import ConversationBindingService, MessageQueueService, TelegramOutboundMessageService
+from crm_communications.services import ConversationBindingService, MessageQueueService, TelegramOutboundMessageService, normalize_telegram_key
 
 
 def dispatch_outgoing_message(*, message: Message) -> Message:
@@ -136,6 +137,84 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
 
         message.refresh_from_db()
         return Response(MessageSerializer(message, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["post"])
+    def start(self, request):
+        serializer = ConversationStartSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        deal = Deal.objects.filter(pk=payload.get("deal")).select_related("client").first() if payload.get("deal") else None
+        client = Client.objects.filter(pk=payload.get("client")).first() if payload.get("client") else getattr(deal, "client", None)
+        contact = Contact.objects.filter(pk=payload.get("contact")).first() if payload.get("contact") else None
+        channel = str(payload.get("channel") or "").strip()
+        recipient = str(payload.get("recipient") or "").strip()
+        subject = str(payload.get("subject") or "").strip()
+        body_text = str(payload.get("body_text") or "").strip()
+        body_html = str(payload.get("body_html") or "").strip()
+
+        conversation = Conversation.objects.create(
+            channel=channel,
+            subject=subject or getattr(deal, "title", "") or "Новый диалог",
+            client=client,
+            contact=contact,
+            deal=deal,
+            status="active",
+            requires_manual_binding=False,
+        )
+        if channel == "telegram" and recipient:
+            chat_id = recipient.removeprefix("telegram:").strip()
+            if chat_id.isdigit():
+                ConversationBindingService.bind_conversation(
+                    conversation=conversation,
+                    channel=channel,
+                    route_type="telegram_chat",
+                    route_key=chat_id,
+                    client=client,
+                    contact=contact,
+                    deal=deal,
+                    resolved_by=request.user if request.user.is_authenticated else None,
+                    resolution_source="api_start_conversation",
+                )
+                if contact or client:
+                    ConversationBindingService.ensure_participant_binding(
+                        channel=channel,
+                        external_participant_key=normalize_telegram_key(chat_id),
+                        client=client,
+                        contact=contact,
+                        external_display_name="",
+                    )
+
+        message = Message.objects.create(
+            conversation=conversation,
+            channel=channel,
+            direction="outgoing",
+            status="draft",
+            client=client,
+            contact=contact,
+            deal=deal,
+            author_user=request.user if request.user.is_authenticated else None,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+            body_preview=str(body_text or subject or "").strip()[:500],
+            external_recipient_key=recipient,
+        )
+        MessageQueueService.enqueue_message(message=message)
+        try:
+            message = dispatch_outgoing_message(message=message)
+        except ValueError:
+            return Response({"detail": f"Канал {channel} не поддерживается."}, status=status.HTTP_400_BAD_REQUEST)
+
+        conversation.refresh_from_db()
+        message.refresh_from_db()
+        return Response(
+            {
+                "conversation": ConversationSerializer(conversation, context={"request": request}).data,
+                "message": MessageSerializer(message, context={"request": request}).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class MessageViewSet(viewsets.ReadOnlyModelViewSet):

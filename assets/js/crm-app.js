@@ -89,9 +89,12 @@
           isDealCommunicationsLoading: false,
           isDealConversationMessagesLoading: false,
           isDealCommunicationSending: false,
+          isDealCommunicationStarting: false,
           isDealDocumentUploading: false,
           isTouchDocumentsLoading: false,
           isTouchDocumentUploading: false,
+          touchResultPromptVisible: false,
+          touchResultPromptText: "",
           isCompanyContactSaving: false,
           isCompanyContactsLoading: false,
           isCompanyDocumentsLoading: false,
@@ -303,10 +306,18 @@
           dealManualBindingConversations: [],
           dealConversationMessages: [],
           activeDealConversationId: null,
+          showDealCommunicationStartForm: false,
           dealCommunicationComposer: {
             subject: "",
             bodyText: "",
             recipient: ""
+          },
+          dealCommunicationStartForm: {
+            channel: "email",
+            contactId: null,
+            recipient: "",
+            subject: "",
+            bodyText: ""
           },
           touchDealDocuments: [],
           touchCompanyDocuments: [],
@@ -335,6 +346,7 @@
             bodyText: "",
             recipient: ""
           },
+          activeAutomationMessageDraftPreview: null,
           communicationsPollTimer: null,
           metaOptions: {
             leadStatuses: [],
@@ -693,6 +705,18 @@
           const contacts = (this.dealCompanyContacts.length ? this.dealCompanyContacts : this.datasets.contacts)
             .filter((contact) => String(contact.clientId || "") === String(companyId));
           return contacts.find((contact) => contact.isPrimary) || contacts[0] || null;
+        },
+        dealCommunicationContactOptions() {
+          const companyId = this.toIntOrNull(this.forms.deals.companyId);
+          if (!companyId) return [];
+          const contacts = (this.dealCompanyContacts.length ? this.dealCompanyContacts : this.datasets.contacts)
+            .filter((contact) => String(contact.clientId || "") === String(companyId));
+          return contacts.map((contact) => ({
+            id: this.toIntOrNull(contact.id),
+            title: contact.fullName || contact.name || contact.email || `Контакт #${contact.id}`,
+            email: contact.email || "",
+            telegram: contact.telegram || "",
+          }));
         },
         dealSummaryTouches() {
           const dealId = this.toIntOrNull(this.editingDealId);
@@ -1683,6 +1707,9 @@
         },
         "forms.touches.resultOptionId": {
           handler() {
+            if (this.toIntOrNull(this.forms.touches.resultOptionId)) {
+              this.setTouchResultPrompt("");
+            }
             this.$nextTick(() => this.applyTouchAutomationRule());
           }
         },
@@ -2647,11 +2674,72 @@
             recipient: "",
           };
         },
+        getAutomationMessageDraftById(messageDraftId) {
+          const normalizedDraftId = this.toIntOrNull(messageDraftId);
+          if (!normalizedDraftId) return null;
+          return (this.datasets.automationMessageDrafts || []).find((item) => String(item.id) === String(normalizedDraftId)) || null;
+        },
+        deriveCommunicationRecipient(channelCode, contactId) {
+          const normalizedChannel = String(channelCode || "").trim().toLowerCase();
+          const normalizedContactId = this.toIntOrNull(contactId);
+          const contact = (this.datasets.contacts || []).find((item) => String(item.id) === String(normalizedContactId || ""));
+          if (!contact) return "";
+          if (normalizedChannel === "telegram") {
+            return contact.telegram ? `telegram:${String(contact.telegram).trim()}` : "";
+          }
+          if (normalizedChannel === "email") {
+            return contact.email ? `email:${String(contact.email).trim()}` : "";
+          }
+          return "";
+        },
+        setTouchResultPrompt(text = "") {
+          this.touchResultPromptVisible = !!String(text || "").trim();
+          this.touchResultPromptText = String(text || "").trim();
+        },
+        focusTouchResultField() {
+          this.$nextTick(() => {
+            const field = document.getElementById("touch-result-option");
+            if (field && typeof field.focus === "function") {
+              field.focus();
+            }
+          });
+        },
+        getDefaultDealCommunicationStartForm() {
+          return {
+            channel: "email",
+            contactId: this.toIntOrNull(this.dealSummaryContact?.id),
+            recipient: "",
+            subject: this.forms.deals.title ? `По сделке: ${this.forms.deals.title}` : "",
+            bodyText: "",
+          };
+        },
+        syncDealCommunicationStartRecipient() {
+          const channel = String(this.dealCommunicationStartForm.channel || "email").trim().toLowerCase();
+          const contactId = this.toIntOrNull(this.dealCommunicationStartForm.contactId);
+          const contact = (this.dealCommunicationContactOptions || []).find((item) => String(item.id) === String(contactId || ""));
+          if (!contact) {
+            this.dealCommunicationStartForm.recipient = "";
+            return;
+          }
+          if (channel === "telegram") {
+            this.dealCommunicationStartForm.recipient = contact.telegram ? `telegram:${String(contact.telegram).trim()}` : "";
+            return;
+          }
+          this.dealCommunicationStartForm.recipient = contact.email ? `email:${String(contact.email).trim()}` : "";
+        },
+        toggleDealCommunicationStartForm() {
+          this.showDealCommunicationStartForm = !this.showDealCommunicationStartForm;
+          if (this.showDealCommunicationStartForm) {
+            this.dealCommunicationStartForm = this.getDefaultDealCommunicationStartForm();
+            this.syncDealCommunicationStartRecipient();
+          }
+        },
         resetCompanyCommunicationsState() {
           this.showCompanyCommunicationsPanel = false;
           this.isCompanyCommunicationsLoading = false;
           this.isCompanyConversationMessagesLoading = false;
           this.isCompanyCommunicationSending = false;
+          this.activeAutomationMessageDraftPreview = null;
           this.companyCommunications = [];
           this.companyConversationMessages = [];
           this.activeCompanyConversationId = null;
@@ -2663,11 +2751,15 @@
           this.isDealCommunicationsLoading = false;
           this.isDealConversationMessagesLoading = false;
           this.isDealCommunicationSending = false;
+          this.isDealCommunicationStarting = false;
           this.dealCommunications = [];
           this.dealManualBindingConversations = [];
           this.dealConversationMessages = [];
           this.activeDealConversationId = null;
+          this.activeAutomationMessageDraftPreview = null;
+          this.showDealCommunicationStartForm = false;
           this.dealCommunicationComposer = this.getDefaultCommunicationComposer(null);
+          this.dealCommunicationStartForm = this.getDefaultDealCommunicationStartForm();
           this.stopCommunicationsPollingIfIdle();
         },
         ensureCommunicationsPolling() {
@@ -2751,6 +2843,7 @@
         async selectCompanyConversation(conversationId, options = {}) {
           const normalizedConversationId = this.toIntOrNull(conversationId);
           this.activeCompanyConversationId = normalizedConversationId;
+          this.activeAutomationMessageDraftPreview = null;
           const conversation = this.getActiveCompanyConversation();
           this.companyCommunicationComposer = this.getDefaultCommunicationComposer(conversation);
           if (normalizedConversationId) {
@@ -2762,6 +2855,7 @@
         async selectDealConversation(conversationId, options = {}) {
           const normalizedConversationId = this.toIntOrNull(conversationId);
           this.activeDealConversationId = normalizedConversationId;
+          this.activeAutomationMessageDraftPreview = null;
           const conversation = this.getActiveDealConversation();
           this.dealCommunicationComposer = this.getDefaultCommunicationComposer(conversation);
           if (normalizedConversationId) {
@@ -2930,6 +3024,34 @@
             await this.loadDealCommunications({ preserveSelection: true, forceReloadMessages: true });
           } finally {
             this.isDealCommunicationSending = false;
+          }
+        },
+        async startDealCommunicationConversation() {
+          if (this.isDealCommunicationStarting || !this.toIntOrNull(this.editingDealId)) return;
+          this.clearUiErrors({ modalOnly: true });
+          this.isDealCommunicationStarting = true;
+          try {
+            const response = await this.apiRequest("/api/v1/communications/conversations/start/", {
+              method: "POST",
+              body: {
+                channel: this.dealCommunicationStartForm.channel,
+                deal: this.toIntOrNull(this.editingDealId),
+                client: this.toIntOrNull(this.forms.deals.companyId),
+                contact: this.toIntOrNull(this.dealCommunicationStartForm.contactId),
+                recipient: this.dealCommunicationStartForm.recipient,
+                subject: this.dealCommunicationStartForm.subject,
+                body_text: this.dealCommunicationStartForm.bodyText,
+              }
+            });
+            const createdConversationId = this.toIntOrNull(response?.conversation?.id);
+            this.showDealCommunicationStartForm = false;
+            this.dealCommunicationStartForm = this.getDefaultDealCommunicationStartForm();
+            await this.loadDealCommunications({ preserveSelection: false, forceReloadMessages: true });
+            if (createdConversationId) {
+              await this.selectDealConversation(createdConversationId, { silent: true });
+            }
+          } finally {
+            this.isDealCommunicationStarting = false;
           }
         },
         async quickOpenDealCommunications() {
@@ -3416,11 +3538,20 @@
         async openManagerNotification(item) {
           if (!item) return;
           this.showManagerNotifications = false;
-          if (item.sourceType === "message_draft" && item.touchId) {
-            await this.openTouchFromEvent(item.touchId);
+          if (item.sourceType === "message_draft" && item.sourceId) {
+            await this.previewAutomationMessageDraft(item.sourceId);
             return;
           }
           if (item.sourceType === "queue" && item.touchId) {
+            const shouldPromptResult = Array.isArray(item.availableActions)
+              && item.availableActions.some((action) => String(action?.id || "").trim() === "reply");
+            if (shouldPromptResult) {
+              await this.openTouchWithResultPrompt(
+                item.touchId,
+                "Сначала заполните результат входящего касания, затем при необходимости ответьте клиенту."
+              );
+              return;
+            }
             await this.openTouchFromEvent(item.touchId);
             return;
           }
@@ -3475,6 +3606,12 @@
             (item) => this.normalizeTouchChannelCode(item) === normalizedCode
           ) || null;
         },
+        async openTouchWithResultPrompt(touchId, promptText = "Заполните результат касания") {
+          const normalizedTouchId = this.toIntOrNull(touchId);
+          if (!normalizedTouchId) return;
+          await this.openTouchFromEvent(normalizedTouchId);
+          this.setTouchResultPrompt(promptText);
+        },
         openContactEditorById(contactId) {
           const normalizedId = this.toIntOrNull(contactId);
           if (!normalizedId) return;
@@ -3527,6 +3664,84 @@
           this.loadTouchDocuments();
           this.$nextTick(() => this.applyTouchAutomationRule());
         },
+        async previewAutomationMessageDraft(messageDraftId) {
+          const draft = this.getAutomationMessageDraftById(messageDraftId);
+          if (!draft) return;
+          const conversationId = this.toIntOrNull(draft.conversationId);
+          const channelCode = this.automationEventChannelCode(draft.sourceEventType) || this.normalizeTouchChannelCode(draft.proposedChannelName);
+          const recipient = this.deriveCommunicationRecipient(channelCode, draft.contactId);
+          this.showManagerNotifications = false;
+
+          if (conversationId) {
+            const conversation = await this.fetchConversationById(conversationId);
+            const dealId = this.toIntOrNull(conversation.dealId || draft.dealId);
+            const companyId = this.toIntOrNull(conversation.clientId || draft.clientId);
+            if (dealId) {
+              const deal = await this.fetchDealById(dealId);
+              this.openDealEditor(deal);
+              this.showDealCommunicationsPanel = true;
+              await this.loadDealCommunications({ preserveSelection: false, forceReloadMessages: true });
+              await this.selectDealConversation(conversationId, { silent: true });
+              this.dealCommunicationComposer = {
+                subject: String(draft.messageSubject || "").trim(),
+                bodyText: String(draft.messageText || "").trim(),
+                recipient: recipient,
+              };
+              this.activeAutomationMessageDraftPreview = {
+                id: draft.id,
+                title: draft.title || draft.messageSubject || "Черновик сообщения",
+                messageText: String(draft.messageText || "").trim(),
+              };
+              this.ensureCommunicationsPolling();
+              return;
+            }
+            if (companyId) {
+              const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId));
+              if (company) {
+                this.openCompanyEditor(company);
+                this.showCompanyCommunicationsPanel = true;
+                await this.loadCompanyCommunications({ preserveSelection: false, forceReloadMessages: true });
+                await this.selectCompanyConversation(conversationId, { silent: true });
+                this.companyCommunicationComposer = {
+                  subject: String(draft.messageSubject || "").trim(),
+                  bodyText: String(draft.messageText || "").trim(),
+                  recipient: recipient,
+                };
+                this.activeAutomationMessageDraftPreview = {
+                  id: draft.id,
+                  title: draft.title || draft.messageSubject || "Черновик сообщения",
+                  messageText: String(draft.messageText || "").trim(),
+                };
+                this.ensureCommunicationsPolling();
+                return;
+              }
+            }
+          }
+
+          if (this.toIntOrNull(draft.dealId)) {
+            const deal = await this.fetchDealById(draft.dealId);
+            this.openDealEditor(deal);
+            this.showDealCommunicationsPanel = true;
+            this.showDealCommunicationStartForm = true;
+            this.dealCommunicationStartForm = {
+              channel: channelCode || "email",
+              contactId: this.toIntOrNull(draft.contactId),
+              recipient,
+              subject: String(draft.messageSubject || "").trim(),
+              bodyText: String(draft.messageText || "").trim(),
+            };
+            this.activeAutomationMessageDraftPreview = {
+              id: draft.id,
+              title: draft.title || draft.messageSubject || "Черновик сообщения",
+              messageText: String(draft.messageText || "").trim(),
+            };
+            return;
+          }
+
+          if (draft.sourceTouchId) {
+            await this.openTouchFromEvent(draft.sourceTouchId);
+          }
+        },
         openAutomationTaskAction(item, { title = "", taskTypeGroup = "internal_task", channelCode = "", dueAt = "" } = {}) {
           const normalizedDealId = this.toIntOrNull(item?.dealId);
           const resolvedTitle = String(title || item?.recommendedAction || item?.title || "").trim();
@@ -3570,7 +3785,12 @@
         handleAutomationQuickAction(item, actionId) {
           const normalizedActionId = String(actionId || "").trim();
           if (!normalizedActionId || !item) return;
+          this.showManagerNotifications = false;
           if (normalizedActionId === "reply") {
+            if (this.toIntOrNull(item.touchId)) {
+              this.openTouchWithResultPrompt(item.touchId, "Сначала заполните результат входящего касания, затем при необходимости ответьте клиенту.");
+              return;
+            }
             this.openAutomationTouchAction(item, {
               channelCode: this.automationEventChannelCode(item.eventType),
               direction: "outgoing",
@@ -4515,6 +4735,7 @@
         },
         openTouchEditor(item) {
           this.clearUiErrors({ modalOnly: true });
+          this.setTouchResultPrompt("");
           this.activeSection = "touches";
           this.editingLeadId = null;
           this.editingDealId = null;
@@ -6285,6 +6506,7 @@
             sourceTouchId: item.source_touch || null,
             sourceTouchSummary: item.source_touch_summary || "",
             sourceTouchHappenedAt: item.source_touch_happened_at || null,
+            conversationId: this.toIntOrNull(item.conversation_id),
             proposedChannelId: item.proposed_channel || null,
             proposedChannelName: item.proposed_channel_name || "",
             ownerId: item.owner || null,
