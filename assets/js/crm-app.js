@@ -694,7 +694,50 @@
             const dedupeKey = `${this.toIntOrNull(item.touchId) || 0}::${String(item.eventType || "").trim()}`;
             return !queueNextStepKeys.has(dedupeKey);
           });
-          const notifications = [...filteredQueueNotifications];
+          const dedupedQueueNotifications = [];
+          const notificationIndexByKey = new Map();
+          filteredQueueNotifications.forEach((item) => {
+            const dedupeKey = [
+              String(item.sourceType || ""),
+              String(item.queueKind || ""),
+              String(this.toIntOrNull(item.touchId) || this.toIntOrNull(item.sourceId) || 0),
+              String(item.eventType || "").trim(),
+            ].join("::");
+            const existingIndex = notificationIndexByKey.get(dedupeKey);
+            if (existingIndex === undefined) {
+              notificationIndexByKey.set(dedupeKey, dedupedQueueNotifications.length);
+              dedupedQueueNotifications.push({
+                ...item,
+                availableActions: Array.isArray(item.availableActions) ? [...item.availableActions] : [],
+              });
+              return;
+            }
+            const existingItem = dedupedQueueNotifications[existingIndex];
+            const mergedActions = [...(existingItem.availableActions || [])];
+            (item.availableActions || []).forEach((action) => {
+              const actionId = String(action?.id || "").trim();
+              if (!actionId || mergedActions.some((entry) => String(entry?.id || "").trim() === actionId)) {
+                return;
+              }
+              mergedActions.push(action);
+            });
+            const existingTimestamp = this.parseTaskDueTimestamp(existingItem.happenedAt) || 0;
+            const currentTimestamp = this.parseTaskDueTimestamp(item.happenedAt) || 0;
+            const shouldReplace = currentTimestamp > existingTimestamp || (
+              currentTimestamp === existingTimestamp
+              && this.toIntOrNull(item.sourceId) > this.toIntOrNull(existingItem.sourceId)
+            );
+            dedupedQueueNotifications[existingIndex] = {
+              ...(shouldReplace ? item : existingItem),
+              availableActions: mergedActions,
+              messageDraft: existingItem.messageDraft || item.messageDraft,
+              hasMessageDraft: !!(existingItem.messageDraft || item.messageDraft),
+              messageDraftId: this.toIntOrNull(existingItem.messageDraftId || item.messageDraftId),
+              messageDraftTitle: existingItem.messageDraftTitle || item.messageDraftTitle || "",
+              messageDraftText: existingItem.messageDraftText || item.messageDraftText || "",
+            };
+          });
+          const notifications = [...dedupedQueueNotifications];
 
           notifications.sort((left, right) => {
             const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
