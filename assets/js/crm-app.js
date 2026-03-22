@@ -3712,23 +3712,18 @@
           const chains = new Map();
           const eventKey = (eventItem) => {
             if (!eventItem || typeof eventItem !== "object") return "";
-            if (this.toIntOrNull(eventItem.touchId)) {
-              return `touch:${this.toIntOrNull(eventItem.touchId)}`;
-            }
-            if (this.toIntOrNull(eventItem.taskId)) {
-              return `task:${this.toIntOrNull(eventItem.taskId)}`;
-            }
-            if (this.toIntOrNull(eventItem.communicationMessageId)) {
-              return `message:${this.toIntOrNull(eventItem.communicationMessageId)}`;
-            }
-            if (String(eventItem.documentUrl || "").trim()) {
-              return `document:${String(eventItem.documentUrl || "").trim()}`;
-            }
             return [
+              this.toIntOrNull(eventItem.touchId) ? `touch:${this.toIntOrNull(eventItem.touchId)}` : "",
+              this.toIntOrNull(eventItem.taskId) ? `task:${this.toIntOrNull(eventItem.taskId)}` : "",
+              this.toIntOrNull(eventItem.communicationMessageId) ? `message:${this.toIntOrNull(eventItem.communicationMessageId)}` : "",
+              String(eventItem.documentUrl || "").trim() ? `document:${String(eventItem.documentUrl || "").trim()}` : "",
               String(eventItem.eventType || "").trim(),
               String(eventItem.timestamp || "").trim(),
               String(eventItem.result || "").trim(),
               String(eventItem.title || "").trim(),
+              String(eventItem.summaryText || "").trim(),
+              String(eventItem.touchResult || "").trim(),
+              String(eventItem.directionLabel || "").trim(),
             ].join("::");
           };
           (Array.isArray(eventItems) ? eventItems : []).forEach((eventItem, index) => {
