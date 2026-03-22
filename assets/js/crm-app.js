@@ -69,6 +69,7 @@
           isUnboundCommunicationsLoading: false,
           isUnboundConversationMessagesLoading: false,
           isUnboundConversationBinding: false,
+          isUnboundCommunicationSending: false,
           selectedStatusFilters: [],
           selectedTaskCompanyFilters: [],
           selectedTouchCompanyFilters: [],
@@ -358,6 +359,11 @@
             clientId: null,
             contactId: null,
             dealId: null,
+          },
+          unboundCommunicationComposer: {
+            subject: "",
+            bodyText: "",
+            recipient: "",
           },
           communicationsPollTimer: null,
           metaOptions: {
@@ -3602,6 +3608,7 @@
           this.isUnboundCommunicationsLoading = false;
           this.isUnboundConversationMessagesLoading = false;
           this.isUnboundConversationBinding = false;
+          this.isUnboundCommunicationSending = false;
           this.unboundConversations = [];
           this.unboundConversationMessages = [];
           this.activeUnboundConversationId = null;
@@ -3610,6 +3617,7 @@
             contactId: null,
             dealId: null,
           };
+          this.unboundCommunicationComposer = this.getDefaultCommunicationComposer(null);
         },
         syncUnboundConversationBindFormFromConversation(conversation) {
           const clientId = this.toIntOrNull(conversation?.clientId);
@@ -3644,11 +3652,23 @@
           this.activeAutomationMessageDraftPreview = null;
           const conversation = this.activeUnboundConversation;
           this.syncUnboundConversationBindFormFromConversation(conversation);
+          this.unboundCommunicationComposer = this.getDefaultCommunicationComposer(conversation);
           if (normalizedConversationId) {
             await this.loadUnboundConversationMessages(normalizedConversationId, options);
           } else {
             this.unboundConversationMessages = [];
           }
+        },
+        visibleManagerNotificationActions(notification) {
+          const actions = Array.isArray(notification?.availableActions) ? notification.availableActions : [];
+          return actions.filter((action) => String(action?.id || "").trim() !== "call");
+        },
+        managerNotificationActionLabel(action) {
+          const actionId = String(action?.id || "").trim();
+          if (actionId === "reply") {
+            return "Заполнить результат касания";
+          }
+          return action?.label || "";
         },
         async loadUnboundCommunications(options = {}) {
           const previousConversationId = this.toIntOrNull(this.activeUnboundConversationId);
@@ -3919,6 +3939,11 @@
             this.showManagerNotifications = true;
             await this.loadUnboundCommunications({ preserveSelection: false, forceReloadMessages: true, silent: true });
             await this.selectUnboundConversation(conversationId, { silent: true });
+            this.unboundCommunicationComposer = {
+              subject: String(draft.messageSubject || "").trim(),
+              bodyText: String(draft.messageText || "").trim(),
+              recipient,
+            };
             this.activeAutomationMessageDraftPreview = previewPayload;
             return;
           }
@@ -4178,6 +4203,30 @@
             await Promise.all([this.loadAutomationDrafts(), this.loadAutomationQueue(), this.loadAutomationMessageDrafts()]);
           } catch (error) {
             this.setUiError(`Ошибка отклонения черновика: ${error.message}`, { modal: true });
+          }
+        },
+        async sendUnboundCommunicationMessage() {
+          const conversation = this.activeUnboundConversation;
+          if (!conversation?.id || this.isUnboundCommunicationSending) return;
+          this.clearUiErrors({ modalOnly: true });
+          this.isUnboundCommunicationSending = true;
+          try {
+            await this.apiRequest(`/api/v1/communications/conversations/${conversation.id}/send/`, {
+              method: "POST",
+              body: {
+                subject: this.unboundCommunicationComposer.subject,
+                body_text: this.unboundCommunicationComposer.bodyText,
+                recipient: this.unboundCommunicationComposer.recipient,
+              }
+            });
+            this.unboundCommunicationComposer = this.getDefaultCommunicationComposer(conversation);
+            await Promise.all([
+              this.loadUnboundCommunications({ preserveSelection: true, forceReloadMessages: true, silent: true }),
+              this.loadAutomationMessageDrafts(),
+              this.loadAutomationQueue(),
+            ]);
+          } finally {
+            this.isUnboundCommunicationSending = false;
           }
         },
         dealAutomationCardClass(item) {
