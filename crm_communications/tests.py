@@ -1107,6 +1107,23 @@ class EmailOutboundMessageServiceTests(TestCase):
         email_instance.send.assert_called_once_with(fail_silently=False)
 
     @patch("crm_communications.email_outbound.EmailMultiAlternatives")
+    def test_send_message_accepts_plain_email_recipient_without_prefix(self, email_cls_mock):
+        email_instance = email_cls_mock.return_value
+        email_instance.send.return_value = 1
+        message = self.create_outgoing_message()
+        message.external_recipient_key = "alt-recipient@example.com"
+        message.save(update_fields=["external_recipient_key", "updated_at"])
+        MessageQueueService.enqueue_message(message=message)
+
+        processed = EmailOutboundMessageService.send_message(message=message)
+        processed.refresh_from_db()
+
+        self.assertEqual(processed.status, MessageStatus.SENT)
+        self.assertEqual(processed.external_recipient_key, "email:alt-recipient@example.com")
+        _, kwargs = email_cls_mock.call_args
+        self.assertEqual(kwargs["to"], ["alt-recipient@example.com"])
+
+    @patch("crm_communications.email_outbound.EmailMultiAlternatives")
     def test_send_message_without_recipient_moves_to_manual_retry(self, email_cls_mock):
         self.contact.email = ""
         self.contact.save(update_fields=["email"])

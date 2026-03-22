@@ -36,9 +36,13 @@ class EmailOutboundMessageService:
     @staticmethod
     def _resolve_recipient_email(*, message: Message) -> str:
         explicit_recipient = str(message.external_recipient_key or "").strip()
-        if explicit_recipient.startswith("email:"):
-            normalized = normalize_email(explicit_recipient.removeprefix("email:"))
-            if normalized:
+        if explicit_recipient:
+            if explicit_recipient.startswith("email:"):
+                normalized = normalize_email(explicit_recipient.removeprefix("email:"))
+                if normalized:
+                    return normalized
+            normalized = normalize_email(explicit_recipient)
+            if normalized and "@" in normalized:
                 return normalized
 
         candidates = [
