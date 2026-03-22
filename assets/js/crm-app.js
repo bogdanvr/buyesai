@@ -626,25 +626,13 @@
           return (this.datasets.automationQueue || []).filter((item) => String(item.status || "") === "pending");
         },
         managerNotifications() {
-          const messageDraftNotifications = this.pendingAutomationMessageDrafts.map((draft) => ({
-            id: `message-draft-${draft.id}`,
-            sourceType: "message_draft",
-            sourceId: draft.id,
-            touchId: this.toIntOrNull(draft.sourceTouchId),
-            dealId: this.toIntOrNull(draft.dealId),
-            dealTitle: draft.dealTitle || "",
-            companyId: this.toIntOrNull(draft.clientId),
-            companyName: draft.clientName || "",
-            title: draft.title || draft.messageSubject || "Черновик сообщения",
-            eventType: draft.sourceEventType || "",
-            happenedAt: draft.sourceTouchHappenedAt || draft.createdAt || "",
-            deadline: "",
-            recommendedAction: draft.messageText || "",
-            uiPriority: String(draft.automationRuleUiPriority || "medium"),
-            needsConfirmation: true,
-            isDraft: true,
-            isMessageDraft: true,
-          }));
+          const messageDraftsByTouchEventKey = new Map();
+          (this.pendingAutomationMessageDrafts || []).forEach((draft) => {
+            const key = `${this.toIntOrNull(draft.sourceTouchId) || 0}::${String(draft.sourceEventType || "").trim()}`;
+            if (!messageDraftsByTouchEventKey.has(key)) {
+              messageDraftsByTouchEventKey.set(key, draft);
+            }
+          });
           const queueNotifications = this.pendingAutomationQueueItems.map((item) => ({
             id: `queue-${item.id}`,
             sourceType: "queue",
@@ -667,6 +655,15 @@
             needsConfirmation: true,
             isDraft: false,
             availableActions: Array.isArray(item.availableActions) ? item.availableActions : [],
+            messageDraft: messageDraftsByTouchEventKey.get(
+              `${this.toIntOrNull(item.sourceTouchId) || 0}::${String(item.sourceEventType || "").trim()}`
+            ) || null,
+          })).map((item) => ({
+            ...item,
+            hasMessageDraft: !!item.messageDraft,
+            messageDraftId: this.toIntOrNull(item.messageDraft?.id),
+            messageDraftTitle: item.messageDraft?.title || item.messageDraft?.messageSubject || "",
+            messageDraftText: item.messageDraft?.messageText || "",
           }));
           const queueNextStepKeys = new Set(
             queueNotifications
@@ -680,41 +677,7 @@
             const dedupeKey = `${this.toIntOrNull(item.touchId) || 0}::${String(item.eventType || "").trim()}`;
             return !queueNextStepKeys.has(dedupeKey);
           });
-          const occupiedTouchEventKeys = new Set([
-            ...messageDraftNotifications.map((item) => `${this.toIntOrNull(item.touchId) || 0}::${String(item.eventType || "").trim()}`),
-            ...filteredQueueNotifications.map((item) => `${this.toIntOrNull(item.touchId) || 0}::${String(item.eventType || "").trim()}`),
-          ]);
-          const filteredAutomationDraftNotifications = this.pendingAutomationDrafts
-            .filter((draft) => {
-              if (String(draft.draftKind || "").trim() !== "touch") {
-                return true;
-              }
-              const dedupeKey = `${this.toIntOrNull(draft.sourceTouchId) || 0}::${String(draft.sourceEventType || "").trim()}`;
-              return !occupiedTouchEventKeys.has(dedupeKey);
-            })
-            .map((draft) => ({
-              id: `draft-${draft.id}`,
-              sourceType: "draft",
-              sourceId: draft.id,
-              touchId: this.toIntOrNull(draft.sourceTouchId),
-              dealId: this.toIntOrNull(draft.dealId),
-              dealTitle: draft.dealTitle || "",
-              companyId: this.toIntOrNull(draft.clientId),
-              companyName: draft.clientName || "",
-              title: draft.title || draft.summary || "Черновик автоматизации",
-              eventType: draft.sourceEventType || "",
-              happenedAt: draft.sourceTouchHappenedAt || draft.createdAt || "",
-              deadline: draft.proposedNextStepAt || "",
-              recommendedAction: draft.proposedNextStep || "",
-              uiPriority: String(draft.automationRuleUiPriority || "medium"),
-              needsConfirmation: true,
-              isDraft: true,
-            }));
-          const notifications = [
-            ...messageDraftNotifications,
-            ...filteredQueueNotifications,
-            ...filteredAutomationDraftNotifications,
-          ];
+          const notifications = [...filteredQueueNotifications];
 
           notifications.sort((left, right) => {
             const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
