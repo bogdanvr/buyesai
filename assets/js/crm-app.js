@@ -1313,6 +1313,15 @@
           }
           return deals.filter((deal) => String(deal.clientId || "") === String(companyId));
         },
+        taskLeadOptions() {
+          return (this.datasets.leads || [])
+            .slice()
+            .sort((left, right) => String(left.title || left.name || "").localeCompare(String(right.title || right.name || ""), "ru"))
+            .map((lead) => ({
+              id: lead.id,
+              title: lead.title || lead.name || `Лид #${lead.id}`,
+            }));
+        },
         showTaskDealSelector() {
           return !!this.toIntOrNull(this.forms.tasks.companyId)
             || !!this.toIntOrNull(this.forms.tasks.dealId)
@@ -1342,6 +1351,11 @@
         taskSummaryTaskTypeLabel() {
           const taskType = this.resolveTaskTypeById(this.forms.tasks.taskTypeId);
           return taskType?.name || "Не выбран";
+        },
+        taskSummaryLeadLabel() {
+          const leadId = this.toIntOrNull(this.forms.tasks.leadId);
+          if (!leadId) return "Не выбран";
+          return (this.datasets.leads || []).find((lead) => String(lead.id) === String(leadId))?.title || "Не выбран";
         },
         taskSummaryCompanyLabel() {
           const companyId = this.toIntOrNull(this.forms.tasks.companyId);
@@ -1685,6 +1699,20 @@
         },
         "forms.tasks.dealId": {
           handler() {
+            if (this.toIntOrNull(this.forms.tasks.dealId)) {
+              this.forms.tasks.leadId = null;
+            }
+            if (this.activeSection === "tasks" && this.showModal) {
+              this.loadTaskTouchOptions();
+            }
+          }
+        },
+        "forms.tasks.leadId": {
+          handler(nextValue) {
+            if (this.toIntOrNull(nextValue)) {
+              this.forms.tasks.companyId = null;
+              this.forms.tasks.dealId = null;
+            }
             if (this.activeSection === "tasks" && this.showModal) {
               this.loadTaskTouchOptions();
             }
@@ -1692,6 +1720,9 @@
         },
         "forms.tasks.companyId": {
           handler() {
+            if (this.toIntOrNull(this.forms.tasks.companyId)) {
+              this.forms.tasks.leadId = null;
+            }
             const selectedDealId = this.toIntOrNull(this.forms.tasks.dealId);
             if (selectedDealId) {
               const dealStillAvailable = this.filteredTaskDealOptions.some(
@@ -6812,7 +6843,8 @@
         async loadTaskTouchOptions() {
           const dealId = this.toIntOrNull(this.forms.tasks.dealId);
           const clientId = this.toIntOrNull(this.forms.tasks.companyId);
-          if (!dealId && !clientId) {
+          const leadId = this.toIntOrNull(this.forms.tasks.leadId);
+          if (!dealId && !clientId && !leadId) {
             this.taskTouchOptions = [];
             return;
           }
@@ -6820,6 +6852,7 @@
           const params = new URLSearchParams({ page_size: "100", exclude_type: "task" });
           if (dealId) params.set("deal", String(dealId));
           if (clientId) params.set("client", String(clientId));
+          if (leadId) params.set("lead", String(leadId));
 
           this.isTaskTouchesLoading = true;
           try {

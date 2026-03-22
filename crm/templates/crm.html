@@ -4253,6 +4253,23 @@
                   <div v-if="forms.tasks.taskTypeGroup && !filteredTaskTypeOptions.length" class="mt-2 text-xs text-crm-muted">Для выбранной категории пока нет типов задач.</div>
                 </div>
                 <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Лид</div>
+                  <button v-if="editingTaskId && !isTaskSummaryEditing('leadId')" type="button" @click="openTaskSummaryField('leadId')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ taskSummaryLeadLabel ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.tasks.leadId"
+                    @change="stopTaskSummaryEdit('leadId')"
+                    @blur="stopTaskSummaryEdit('leadId')"
+                    :disabled="toIntOrNull(forms.tasks.companyId) || toIntOrNull(forms.tasks.dealId)"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option :value="null">Не выбран</option>
+                    <option v-for="lead in taskLeadOptions" :key="`task-summary-lead-${lead.id}`" :value="lead.id">[[ lead.title ]]</option>
+                  </select>
+                </div>
+                <div class="py-1">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Компания</div>
                   <button v-if="editingTaskId && !isTaskSummaryEditing('companyId')" type="button" @click="openTaskSummaryField('companyId')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
                     [[ taskSummaryCompanyLabel ]]
@@ -4262,7 +4279,8 @@
                     v-model="forms.tasks.companyId"
                     @change="stopTaskSummaryEdit('companyId')"
                     @blur="stopTaskSummaryEdit('companyId')"
-                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                    :disabled="toIntOrNull(forms.tasks.leadId)"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option :value="null">Не выбрана</option>
                     <option v-for="company in companyOptions" :key="`task-summary-company-${company.id}`" :value="company.id">[[ company.name ]]</option>
@@ -4278,7 +4296,8 @@
                     v-model="forms.tasks.dealId"
                     @change="stopTaskSummaryEdit('dealId')"
                     @blur="stopTaskSummaryEdit('dealId')"
-                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                    :disabled="toIntOrNull(forms.tasks.leadId)"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option :value="null">Не выбрана</option>
                     <option v-for="deal in filteredTaskDealOptions" :key="`task-summary-deal-${deal.id}`" :value="deal.id">[[ deal.title || deal.name ]]</option>
