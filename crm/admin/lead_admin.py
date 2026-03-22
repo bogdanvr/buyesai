@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from crm.models import Lead, LeadSource, LeadStatus
+from crm.models import Lead, LeadDocument, LeadSource, LeadStatus
 
 
 @admin.register(LeadSource)
@@ -26,3 +26,11 @@ class LeadAdmin(admin.ModelAdmin):
     autocomplete_fields = ("client", "assigned_to", "created_by", "website_session")
     filter_horizontal = ("sources",)
     readonly_fields = ("created_at", "updated_at", "converted_at", "history")
+
+
+@admin.register(LeadDocument)
+class LeadDocumentAdmin(admin.ModelAdmin):
+    list_display = ("id", "lead", "original_name", "uploaded_by", "created_at")
+    list_filter = ("created_at",)
+    search_fields = ("original_name", "lead__title", "lead__company", "lead__email")
+    autocomplete_fields = ("lead", "uploaded_by")

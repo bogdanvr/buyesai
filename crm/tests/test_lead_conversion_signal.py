@@ -1,8 +1,11 @@
+import tempfile
+
+from django.core.files.base import ContentFile
 from django.utils import timezone
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
-from crm.models import Activity, Deal, DealStage, Lead, LeadStatus, Touch
+from crm.models import Activity, ClientDocument, Deal, DealStage, Lead, LeadDocument, LeadStatus, Touch
 from crm.models.activity import ActivityType, TaskStatus
 from crm.models.touch import TouchDirection
 
@@ -163,3 +166,29 @@ class LeadAutoConvertSignalTests(TestCase):
         lead.refresh_from_db()
         self.assertIn("Создана задача: Позвонить клиенту", lead.events)
         self.assertIn("Касание: Обсудили следующие шаги", lead.events)
+
+    def test_converted_lead_documents_are_copied_to_company_documents(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with override_settings(MEDIA_ROOT=tmpdir):
+                lead = Lead.objects.create(
+                    title="Lead with document",
+                    company="Acme",
+                    status=self.in_progress_status,
+                    assigned_to=self.user,
+                )
+                document = LeadDocument.objects.create(
+                    lead=lead,
+                    original_name="brief.pdf",
+                    uploaded_by=self.user,
+                )
+                document.file.save("brief.pdf", ContentFile(b"lead-doc-content"), save=True)
+
+                lead.status = self.converted_status
+                lead.save(update_fields=["status", "updated_at"])
+
+                company_documents = ClientDocument.objects.filter(client=lead.client)
+                self.assertEqual(company_documents.count(), 1)
+                company_document = company_documents.first()
+                self.assertEqual(company_document.original_name, "brief.pdf")
+                self.assertEqual(company_document.uploaded_by, self.user)
+                self.assertTrue(company_document.file.name.endswith("brief.pdf"))

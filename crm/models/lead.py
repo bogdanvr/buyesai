@@ -1,8 +1,26 @@
 from django.conf import settings
+from pathlib import Path
 from django.db import models
 import uuid
 
 from crm.models.common import TimestampedModel
+
+
+def truncate_upload_filename(filename: str, max_stem_length: int = 120) -> str:
+    safe_name = Path(str(filename or "document")).name or "document"
+    path = Path(safe_name)
+    suffix = path.suffix or ""
+    stem = path.stem or "document"
+    if len(stem) <= max_stem_length:
+        return f"{stem}{suffix}"
+    return f"{stem[:max_stem_length]}{suffix}"
+
+
+def lead_document_upload_to(instance, filename: str) -> str:
+    lead_id = getattr(instance, "lead_id", None) or getattr(getattr(instance, "lead", None), "id", None) or "new"
+    client_id = getattr(getattr(instance, "lead", None), "client_id", None) or "unassigned"
+    safe_name = truncate_upload_filename(filename)
+    return f"company_{client_id}/lead_{lead_id}/{safe_name}"
 
 
 def normalize_lead_phone(value: str) -> str:
@@ -171,3 +189,33 @@ class Lead(TimestampedModel):
         if not self.assignment_notification_token:
             self.assignment_notification_token = uuid.uuid4().hex
         return self.assignment_notification_token
+
+
+class LeadDocument(TimestampedModel):
+    lead = models.ForeignKey(
+        "crm.Lead",
+        related_name="documents",
+        on_delete=models.CASCADE,
+        verbose_name="Лид",
+    )
+    file = models.FileField(upload_to=lead_document_upload_to, max_length=500, verbose_name="Файл")
+    original_name = models.CharField(max_length=255, blank=True, default="", verbose_name="Название файла")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="crm_lead_documents",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Загрузил",
+    )
+
+    class Meta:
+        verbose_name = "Документ лида"
+        verbose_name_plural = "Документы лидов"
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(fields=["lead"]),
+        ]
+
+    def __str__(self):
+        return self.original_name or self.file.name.rsplit("/", 1)[-1] or f"Документ #{self.pk}"

@@ -11,7 +11,7 @@ from crm.models.automation import (
 from crm.models.client import Client, ClientDocument, CommunicationChannel
 from crm.models.contact import Contact, ContactRole, ContactStatus
 from crm.models.deal import Deal, DealDocument
-from crm.models.lead import Lead
+from crm.models.lead import Lead, LeadDocument
 from crm.models.source import LeadSource
 from crm.models.status import DealStage, LeadStatus
 from crm.models.touch import Touch, TouchResult
@@ -34,6 +34,7 @@ __all__ = [
     "Deal",
     "DealDocument",
     "Lead",
+    "LeadDocument",
     "LeadSource",
     "LeadStatus",
     "DealStage",

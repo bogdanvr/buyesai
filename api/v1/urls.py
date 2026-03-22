@@ -6,6 +6,7 @@ urlpatterns = [
     path("deals/", include("api.v1.deals.urls")),
     path("deal-documents/", include("api.v1.deal_documents.urls")),
     path("client-documents/", include("api.v1.client_documents.urls")),
+    path("lead-documents/", include("api.v1.lead_documents.urls")),
     path("automation-drafts/", include("api.v1.automation_drafts.urls")),
     path("automation-message-drafts/", include("api.v1.automation_message_drafts.urls")),
     path("automation-queue/", include("api.v1.automation_queue.urls")),

@@ -70,6 +70,7 @@
           managerNotificationSidebarMode: "overview",
           managerNotificationDraftPreviewId: "",
           managerNotificationReplyDraftId: "",
+          managerNotificationReplyStates: {},
           isManagerNotificationReplySending: false,
           managerNotificationReplyComposer: {
             subject: "",
@@ -97,6 +98,7 @@
           showDealCompanyForm: false,
           showDealContactsPanel: false,
           showDealDocumentsPanel: false,
+          showLeadDocumentsPanel: false,
           showDealCommunicationsPanel: false,
           showDealContactForm: false,
           isDealContactsLoading: false,
@@ -113,10 +115,12 @@
           isCompanyContactSaving: false,
           isCompanyContactsLoading: false,
           isCompanyDocumentsLoading: false,
+          isLeadDocumentsLoading: false,
           isCompanyCommunicationsLoading: false,
           isCompanyConversationMessagesLoading: false,
           isCompanyCommunicationSending: false,
           isCompanyDocumentUploading: false,
+          isLeadDocumentUploading: false,
           isTaskTouchesLoading: false,
           showCompanyContactForm: false,
           showCompanyContactsPanel: false,
@@ -317,6 +321,7 @@
           },
           dealTasksForActiveDeal: [],
           dealDocumentsForActiveDeal: [],
+          leadDocumentsForActiveLead: [],
           dealCommunications: [],
           dealManualBindingConversations: [],
           dealConversationMessages: [],
@@ -1755,6 +1760,7 @@
               }
               this.loadTouchDocuments();
             }
+            this.applyTouchOwnerFromContext();
           }
         },
         "forms.touches.dealId": {
@@ -1782,6 +1788,17 @@
               }
               this.loadTouchDocuments();
             }
+            this.applyTouchOwnerFromContext();
+          }
+        },
+        "forms.touches.leadId": {
+          handler() {
+            this.applyTouchOwnerFromContext();
+          }
+        },
+        "forms.touches.taskId": {
+          handler() {
+            this.applyTouchOwnerFromContext();
           }
         },
         "forms.touches.channelId": {
@@ -3765,6 +3782,41 @@
           }
           return action?.label || "";
         },
+        managerNotificationReplyState(notification) {
+          const queueId = this.toIntOrNull(notification?.sourceId);
+          if (!queueId) return "";
+          return String(this.managerNotificationReplyStates[String(queueId)] || "").trim();
+        },
+        managerNotificationReplyButtonVisible(notification) {
+          if (String(notification?.sourceType || "") !== "queue") return false;
+          if (String(notification?.queueKind || "") === "next_step") return false;
+          if (this.managerNotificationReplyState(notification) === "answered") return true;
+          return !!this.toIntOrNull(notification?.messageDraftId);
+        },
+        managerNotificationReplyButtonLabel(notification) {
+          return this.managerNotificationReplyState(notification) === "answered" ? "Отвечено" : "Ответить";
+        },
+        managerNotificationReplyButtonDisabled(notification) {
+          if (this.managerNotificationReplyState(notification) === "answered") {
+            return true;
+          }
+          return this.isManagerNotificationReplySending && String(this.activeManagerNotificationId || "") === String(notification?.id || "");
+        },
+        setManagerNotificationReplyState(queueId, state) {
+          const normalizedQueueId = this.toIntOrNull(queueId);
+          if (!normalizedQueueId) return;
+          this.managerNotificationReplyStates = {
+            ...this.managerNotificationReplyStates,
+            [String(normalizedQueueId)]: String(state || "").trim(),
+          };
+        },
+        clearManagerNotificationReplyState(queueId) {
+          const normalizedQueueId = this.toIntOrNull(queueId);
+          if (!normalizedQueueId) return;
+          const nextStates = { ...(this.managerNotificationReplyStates || {}) };
+          delete nextStates[String(normalizedQueueId)];
+          this.managerNotificationReplyStates = nextStates;
+        },
         notificationNeedsBinding(notification) {
           if (!notification || String(notification.sourceType || "") !== "queue") return false;
           const hasClient = !!this.toIntOrNull(notification.clientId || notification.companyId);
@@ -4048,6 +4100,82 @@
             this.openCompanyEditor(company);
           }
         },
+        touchOwnerIdByDealId(dealId) {
+          const normalizedDealId = this.toIntOrNull(dealId);
+          if (!normalizedDealId) return null;
+          const deal = (this.datasets.deals || []).find((item) => String(item.id) === String(normalizedDealId));
+          return this.toIntOrNull(deal?.ownerId);
+        },
+        touchOwnerIdByLeadId(leadId) {
+          const normalizedLeadId = this.toIntOrNull(leadId);
+          if (!normalizedLeadId) return null;
+          const lead = (this.datasets.leads || []).find((item) => String(item.id) === String(normalizedLeadId));
+          return this.toIntOrNull(lead?.assignedToId);
+        },
+        touchOwnerIdByCompanyId(companyId) {
+          const normalizedCompanyId = this.toIntOrNull(companyId);
+          if (!normalizedCompanyId) return null;
+          const activeDeals = (this.datasets.deals || [])
+            .filter((deal) => (
+              String(deal.clientId || "") === String(normalizedCompanyId)
+              && this.getDealStatusBucket(deal) !== "done"
+            ))
+            .slice()
+            .sort((left, right) => {
+              const leftTs = this.parseTaskDueTimestamp(left.closeDate) || Number.MAX_SAFE_INTEGER;
+              const rightTs = this.parseTaskDueTimestamp(right.closeDate) || Number.MAX_SAFE_INTEGER;
+              return leftTs - rightTs || Number(left.id || 0) - Number(right.id || 0);
+            });
+          const dealOwnerId = this.toIntOrNull(activeDeals.find((deal) => this.toIntOrNull(deal.ownerId))?.ownerId);
+          if (dealOwnerId) {
+            return dealOwnerId;
+          }
+          const activeLeadCodes = new Set(["new", "in_progress", "attempting_contact", "qualified"]);
+          const activeLead = (this.datasets.leads || []).find((lead) => (
+            String(lead.clientId || "") === String(normalizedCompanyId)
+            && activeLeadCodes.has(String(lead.statusCode || lead.status || "").trim())
+            && this.toIntOrNull(lead.assignedToId)
+          ));
+          return this.toIntOrNull(activeLead?.assignedToId);
+        },
+        touchOwnerIdByTaskId(taskId) {
+          const normalizedTaskId = this.toIntOrNull(taskId);
+          if (!normalizedTaskId) return null;
+          const task = (this.datasets.tasks || []).find((item) => String(item.id) === String(normalizedTaskId));
+          if (!task) return null;
+          return (
+            this.touchOwnerIdByDealId(task.dealId)
+            || this.touchOwnerIdByLeadId(task.leadId)
+            || this.touchOwnerIdByCompanyId(task.clientId)
+          );
+        },
+        resolveTouchOwnerIdFromContext(context = {}) {
+          const dealId = this.toIntOrNull(context.dealId);
+          const leadId = this.toIntOrNull(context.leadId);
+          const taskId = this.toIntOrNull(context.taskId);
+          const companyId = this.toIntOrNull(context.companyId);
+          return (
+            this.touchOwnerIdByDealId(dealId)
+            || this.touchOwnerIdByLeadId(leadId)
+            || this.touchOwnerIdByTaskId(taskId)
+            || this.touchOwnerIdByCompanyId(companyId)
+            || null
+          );
+        },
+        applyTouchOwnerFromContext() {
+          if (this.activeSection !== "touches") {
+            return;
+          }
+          const resolvedOwnerId = this.resolveTouchOwnerIdFromContext({
+            dealId: this.forms.touches.dealId,
+            leadId: this.forms.touches.leadId,
+            taskId: this.forms.touches.taskId,
+            companyId: this.forms.touches.companyId,
+          });
+          if (resolvedOwnerId) {
+            this.forms.touches.ownerId = resolvedOwnerId;
+          }
+        },
         automationEventChannelCode(eventType) {
           const raw = String(eventType || "").trim().toLowerCase();
           if (!raw) return "";
@@ -4065,6 +4193,7 @@
           this.openCreateModal();
           const resolvedCompanyId = this.toIntOrNull(item?.clientId || item?.companyId);
           const resolvedDealId = this.toIntOrNull(item?.dealId);
+          const resolvedLeadId = this.toIntOrNull(item?.leadId);
           const channel = this.findCommunicationChannelByCode(channelCode || this.automationEventChannelCode(item?.eventType));
           this.forms.touches = {
             ...this.getDefaultForm("touches"),
@@ -4072,11 +4201,15 @@
             channelId: this.toIntOrNull(channel?.id),
             direction: direction || "outgoing",
             summary: String(summary || "").trim(),
-            ownerId: this.toIntOrNull(item?.ownerId),
+            ownerId: this.toIntOrNull(item?.ownerId) || this.resolveTouchOwnerIdFromContext({
+              dealId: resolvedDealId,
+              leadId: resolvedLeadId,
+              companyId: resolvedCompanyId,
+            }),
             companyId: resolvedCompanyId,
             contactId: this.toIntOrNull(item?.contactId),
             taskId: null,
-            leadId: this.toIntOrNull(item?.leadId),
+            leadId: resolvedLeadId,
             dealId: resolvedDealId,
             documentUploadTarget: resolvedDealId ? "deal" : (resolvedCompanyId ? "company" : ""),
           };
@@ -4445,7 +4578,7 @@
           this.clearUiErrors({ modalOnly: true });
           this.isManagerNotificationReplySending = true;
           try {
-            await this.apiRequest(`/api/v1/communications/conversations/${conversationId}/send/`, {
+            const response = await this.apiRequest(`/api/v1/communications/conversations/${conversationId}/send/`, {
               method: "POST",
               body: {
                 subject: this.managerNotificationReplyComposer.subject,
@@ -4453,21 +4586,41 @@
                 recipient: this.managerNotificationReplyComposer.recipient,
               }
             });
-            await this.apiRequest(`/api/v1/automation-message-drafts/${draft.id}/dismiss/`, {
-              method: "POST",
-              body: {},
-            });
-            this.managerNotificationReplyDraftId = "";
-            this.managerNotificationDraftPreviewId = "";
-            this.managerNotificationReplyComposer = {
-              subject: "",
-              bodyText: "",
-              recipient: "",
-            };
-            await Promise.all([
-              this.loadAutomationMessageDrafts(),
-              this.loadAutomationQueue(),
-            ]);
+            const messageStatus = String(response?.status || "").trim();
+            const queueId = this.toIntOrNull(this.activeManagerNotification?.sourceId);
+            if (messageStatus === "sent") {
+              await this.apiRequest(`/api/v1/automation-message-drafts/${draft.id}/dismiss/`, {
+                method: "POST",
+                body: {},
+              });
+              if (queueId) {
+                this.setManagerNotificationReplyState(queueId, "answered");
+              }
+              this.managerNotificationReplyDraftId = "";
+              this.managerNotificationDraftPreviewId = "";
+              this.managerNotificationReplyComposer = {
+                subject: "",
+                bodyText: "",
+                recipient: "",
+              };
+              await Promise.all([
+                this.loadAutomationMessageDrafts(),
+                this.loadAutomationQueue(),
+                this.loadUnboundCommunications({ preserveSelection: true, forceReloadMessages: true, silent: true }),
+              ]);
+              return;
+            }
+            const errorText = String(response?.last_error_message || "").trim();
+            if (messageStatus === "requires_manual_retry") {
+              throw new Error(errorText || "Сообщение не отправлено автоматически и требует ручной обработки.");
+            }
+            if (messageStatus === "failed") {
+              throw new Error(errorText || "Сообщение не удалось отправить.");
+            }
+            if (messageStatus === "queued" || messageStatus === "sending") {
+              throw new Error("Сообщение поставлено в очередь, но ещё не подтверждено как отправленное.");
+            }
+            throw new Error("CRM не получила подтверждение успешной отправки сообщения.");
           } catch (error) {
             this.setUiError(`Ошибка отправки ответа: ${error.message}`, { modal: true });
           } finally {
@@ -5094,6 +5247,8 @@
           this.editingDealId = null;
           this.resetExpandedOptionalFields();
           this.editingLeadId = item.id;
+          this.showLeadDocumentsPanel = false;
+          this.leadDocumentsForActiveLead = [];
           this.forms.leads = {
             title: item.title || "",
             description: item.description || "",
@@ -5659,7 +5814,10 @@
               happenedAt: this.toDateTimeLocal(new Date().toISOString()),
               companyId: this.toIntOrNull(this.forms.deals.companyId),
               dealId: this.toIntOrNull(this.editingDealId),
-              ownerId: this.toIntOrNull(this.forms.deals.ownerId),
+              ownerId: this.resolveTouchOwnerIdFromContext({
+                dealId: this.editingDealId,
+                companyId: this.forms.deals.companyId,
+              }),
               documentUploadTarget: this.toIntOrNull(this.editingDealId) ? "deal" : (this.toIntOrNull(this.forms.deals.companyId) ? "company" : ""),
             };
             this.loadTouchDocuments();
@@ -5676,7 +5834,10 @@
             happenedAt: this.toDateTimeLocal(new Date().toISOString()),
             companyId: this.toIntOrNull(this.forms.deals.companyId),
             dealId: this.toIntOrNull(this.editingDealId),
-            ownerId: this.toIntOrNull(this.forms.deals.ownerId),
+            ownerId: this.resolveTouchOwnerIdFromContext({
+              dealId: this.editingDealId,
+              companyId: this.forms.deals.companyId,
+            }),
             documentUploadTarget: this.toIntOrNull(this.editingDealId) ? "deal" : (this.toIntOrNull(this.forms.deals.companyId) ? "company" : ""),
           };
           this.loadTouchDocuments();
@@ -5965,7 +6126,10 @@
             happenedAt: this.toDateTimeLocal(new Date().toISOString()),
             companyId: this.toIntOrNull(this.editingLeadItem?.clientId),
             leadId: this.toIntOrNull(this.editingLeadId),
-            ownerId: this.toIntOrNull(this.forms.leads.assignedToId),
+            ownerId: this.resolveTouchOwnerIdFromContext({
+              leadId: this.editingLeadId,
+              companyId: this.editingLeadItem?.clientId,
+            }),
             documentUploadTarget: this.toIntOrNull(this.editingLeadItem?.clientId) ? "company" : "",
           };
           this.loadTouchDocuments();
@@ -5983,6 +6147,76 @@
           this.resetTaskFollowUpForm();
           this.showModal = true;
           this.loadTaskTouchOptions();
+        },
+        async toggleLeadDocumentsPanel() {
+          this.showLeadDocumentsPanel = !this.showLeadDocumentsPanel;
+          if (this.showLeadDocumentsPanel) {
+            await this.loadLeadDocuments();
+          }
+        },
+        openLeadDocumentPicker() {
+          if (!this.editingLeadId || this.isLeadDocumentUploading) {
+            return;
+          }
+          const input = this.$refs.leadDocumentInput;
+          if (input) {
+            input.click();
+          }
+        },
+        mapLeadDocument(item) {
+          return {
+            id: item.id,
+            scope: "lead",
+            leadId: this.toIntOrNull(item.lead),
+            originalName: item.original_name || item.originalName || "",
+            fileUrl: item.download_url || item.downloadUrl || item.file_url || item.fileUrl || "",
+            fileSize: Number.parseInt(item.file_size || item.fileSize || 0, 10) || 0,
+            uploadedByName: item.uploaded_by_name || item.uploadedByName || "",
+            createdAt: item.created_at || item.createdAt || "",
+          };
+        },
+        async loadLeadDocuments() {
+          const leadId = this.toIntOrNull(this.editingLeadId);
+          if (!leadId) {
+            this.leadDocumentsForActiveLead = [];
+            return;
+          }
+          this.isLeadDocumentsLoading = true;
+          try {
+            const payload = await this.apiRequest(`/api/v1/lead-documents/?lead=${leadId}&page_size=100`);
+            const records = Array.isArray(payload?.results) ? payload.results : (Array.isArray(payload) ? payload : []);
+            this.leadDocumentsForActiveLead = records.map((item) => this.mapLeadDocument(item));
+          } finally {
+            this.isLeadDocumentsLoading = false;
+          }
+        },
+        async handleLeadDocumentInput(event) {
+          const input = event?.target;
+          const file = input?.files && input.files[0] ? input.files[0] : null;
+          const leadId = this.toIntOrNull(this.editingLeadId);
+          if (!file || !leadId) {
+            if (input) input.value = "";
+            return;
+          }
+          const formData = new FormData();
+          formData.append("lead", String(leadId));
+          formData.append("file", file);
+          formData.append("original_name", file.name || "");
+          this.isLeadDocumentUploading = true;
+          try {
+            const created = await this.apiRequest("/api/v1/lead-documents/", {
+              method: "POST",
+              body: formData,
+            });
+            this.leadDocumentsForActiveLead = [
+              this.mapLeadDocument(created),
+              ...this.leadDocumentsForActiveLead,
+            ];
+            this.showLeadDocumentsPanel = true;
+          } finally {
+            this.isLeadDocumentUploading = false;
+            if (input) input.value = "";
+          }
         },
         resolveCompanyRegionLabel(address) {
           const chunks = String(address || "")
@@ -6099,6 +6333,9 @@
               ...this.getDefaultForm("touches"),
               happenedAt: this.toDateTimeLocal(new Date().toISOString()),
               companyId: this.toIntOrNull(this.editingCompanyId),
+              ownerId: this.resolveTouchOwnerIdFromContext({
+                companyId: this.editingCompanyId,
+              }),
             };
             this.showModal = true;
             return;
@@ -7229,12 +7466,14 @@
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
           this.showDealDocumentsPanel = false;
+          this.showLeadDocumentsPanel = false;
           this.resetDealCommunicationsState();
           this.showDealContactForm = false;
           this.resetDealCompanyForm();
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.dealDocumentsForActiveDeal = [];
+          this.leadDocumentsForActiveLead = [];
           this.touchDealDocuments = [];
           this.touchCompanyDocuments = [];
           this.showCompanyContactForm = false;
@@ -7294,12 +7533,14 @@
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
           this.showDealDocumentsPanel = false;
+          this.showLeadDocumentsPanel = false;
           this.resetDealCommunicationsState();
           this.showDealContactForm = false;
           this.resetDealCompanyForm();
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.dealDocumentsForActiveDeal = [];
+          this.leadDocumentsForActiveLead = [];
           this.touchDealDocuments = [];
           this.touchCompanyDocuments = [];
           this.showCompanyContactForm = false;

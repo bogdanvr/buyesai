@@ -1,9 +1,11 @@
 from decimal import Decimal
+from pathlib import Path
 
+from django.core.files import File
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from crm.models import Client, Contact, Deal, Lead
+from crm.models import Client, ClientDocument, Contact, Deal, Lead, LeadDocument
 from crm.models.lead import normalize_lead_phone
 from main.tracking import (
     build_tracking_sources,
@@ -496,6 +498,28 @@ def convert_lead_to_deal(
     lead.client = target_client
     lead.converted_at = timezone.now()
     lead.save(update_fields=["client", "converted_at", "updated_at"])
+    if target_client is not None:
+        for lead_document in lead.documents.all().order_by("id"):
+            if ClientDocument.objects.filter(
+                client=target_client,
+                original_name=lead_document.original_name,
+                uploaded_by=lead_document.uploaded_by,
+            ).exists():
+                continue
+            client_document = ClientDocument(
+                client=target_client,
+                original_name=lead_document.original_name,
+                uploaded_by=lead_document.uploaded_by,
+            )
+            file_field = getattr(lead_document, "file", None)
+            if file_field:
+                try:
+                    with file_field.open("rb") as source_file:
+                        target_name = Path(lead_document.original_name or file_field.name or "document").name
+                        client_document.file.save(target_name, File(source_file), save=False)
+                except FileNotFoundError:
+                    continue
+            client_document.save()
     lead_event_log = build_lead_combined_event_log(lead)
     if lead_event_log:
         Deal.objects.filter(pk=deal.pk).update(events=_merge_text_blocks(deal.events, lead_event_log))
