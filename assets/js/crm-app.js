@@ -65,6 +65,9 @@
           showTouchCompanyFilter: false,
           showTouchDealFilter: false,
           showManagerNotifications: false,
+          showManagerNotificationSidebar: false,
+          activeManagerNotificationId: "",
+          managerNotificationSidebarMode: "overview",
           managerNotificationDraftPreviewId: "",
           managerNotificationReplyDraftId: "",
           isManagerNotificationReplySending: false,
@@ -704,6 +707,11 @@
         },
         managerNotificationsCount() {
           return this.managerNotifications.length;
+        },
+        activeManagerNotification() {
+          const notificationId = String(this.activeManagerNotificationId || "").trim();
+          if (!notificationId) return null;
+          return (this.managerNotifications || []).find((item) => String(item.id) === notificationId) || null;
         },
         activeUnboundConversation() {
           const conversationId = this.toIntOrNull(this.activeUnboundConversationId);
@@ -3609,6 +3617,20 @@
             };
           }
         },
+        closeManagerNotificationSidebar() {
+          this.showManagerNotificationSidebar = false;
+          this.activeManagerNotificationId = "";
+          this.managerNotificationSidebarMode = "overview";
+          this.activeAutomationMessageDraftPreview = null;
+          this.managerNotificationReplyDraftId = "";
+          this.managerNotificationDraftPreviewId = "";
+          this.managerNotificationReplyComposer = {
+            subject: "",
+            bodyText: "",
+            recipient: "",
+          };
+          this.resetUnboundCommunicationsState();
+        },
         isManagerNotificationDraftPreviewOpen(notificationId) {
           return String(this.managerNotificationDraftPreviewId || "") === String(notificationId || "");
         },
@@ -3699,6 +3721,57 @@
           const hasClient = !!this.toIntOrNull(notification.clientId || notification.companyId);
           const hasDeal = !!this.toIntOrNull(notification.dealId);
           return !hasClient && !hasDeal && !!this.toIntOrNull(notification.messageDraftId);
+        },
+        async openManagerNotificationSidebar(notification, mode = "overview") {
+          if (!notification) return;
+          this.showManagerNotifications = false;
+          this.showManagerNotificationSidebar = true;
+          this.activeManagerNotificationId = String(notification.id || "").trim();
+          this.managerNotificationSidebarMode = String(mode || "overview").trim() || "overview";
+          this.managerNotificationDraftPreviewId = "";
+          this.managerNotificationReplyDraftId = "";
+          this.activeAutomationMessageDraftPreview = null;
+          const draft = this.getAutomationMessageDraftById(notification.messageDraftId);
+          const conversationId = this.toIntOrNull(draft?.conversationId);
+          if (draft) {
+            const previewPayload = {
+              id: draft.id,
+              title: draft.title || draft.messageSubject || "Сообщение",
+              messageText: String(draft.messageText || "").trim(),
+            };
+            this.activeAutomationMessageDraftPreview = previewPayload;
+            this.initializeManagerNotificationReplyComposer(draft);
+          } else {
+            this.managerNotificationReplyComposer = {
+              subject: "",
+              bodyText: "",
+              recipient: "",
+            };
+          }
+          if (conversationId) {
+            await this.loadUnboundCommunications({ preserveSelection: false, forceReloadMessages: false, silent: true });
+            await this.ensureUnboundConversationAvailable(conversationId);
+            await this.selectUnboundConversation(conversationId, { silent: true });
+          } else {
+            this.resetUnboundCommunicationsState();
+          }
+          if (mode === "reply" && draft) {
+            this.managerNotificationReplyDraftId = this.toIntOrNull(draft.id);
+            this.$nextTick(() => {
+              const panel = document.querySelector("[data-manager-sidebar-reply]");
+              if (panel && typeof panel.scrollIntoView === "function") {
+                panel.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            });
+          }
+          if (mode === "binding") {
+            this.$nextTick(() => {
+              const panel = document.querySelector("[data-manager-sidebar-binding]");
+              if (panel && typeof panel.scrollIntoView === "function") {
+                panel.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            });
+          }
         },
         async loadUnboundCommunications(options = {}) {
           const previousConversationId = this.toIntOrNull(this.activeUnboundConversationId);
@@ -3800,20 +3873,18 @@
         async openNotificationBinding(notification) {
           if (!this.notificationNeedsBinding(notification)) return;
           const draft = this.getAutomationMessageDraftById(notification.messageDraftId);
-          const conversationId = this.toIntOrNull(draft?.conversationId);
-          this.showManagerNotifications = true;
-          if (!conversationId) {
+          if (!this.toIntOrNull(draft?.conversationId)) {
             this.setUiError("Не удалось определить переписку для привязки.", { modal: true });
             return;
           }
-          await this.loadUnboundCommunications({ preserveSelection: false, forceReloadMessages: false, silent: true });
-          await this.ensureUnboundConversationAvailable(conversationId);
-          await this.selectUnboundConversation(conversationId, { silent: true });
-          this.managerNotificationReplyDraftId = "";
-          this.scrollToUnboundBinding();
+          await this.openManagerNotificationSidebar(notification, "binding");
         },
         async openManagerNotification(item) {
           if (!item) return;
+          if (this.toIntOrNull(item.messageDraftId) || this.notificationNeedsBinding(item)) {
+            await this.openManagerNotificationSidebar(item, "overview");
+            return;
+          }
           this.showManagerNotifications = false;
           if (item.sourceType === "message_draft" && item.sourceId) {
             await this.previewAutomationMessageDraft(item.sourceId);
@@ -3989,23 +4060,17 @@
         async openAutomationMessageReply(messageDraftId) {
           const draft = this.getAutomationMessageDraftById(messageDraftId);
           if (!draft) return;
+          const notification = (this.managerNotifications || []).find(
+            (item) => String(item.messageDraftId || "") === String(draft.id || "")
+          ) || null;
+          if (notification) {
+            await this.openManagerNotificationSidebar(notification, "reply");
+            return;
+          }
           const normalizedDraftId = this.toIntOrNull(messageDraftId);
           if (!normalizedDraftId) return;
-          this.managerNotificationReplyDraftId = this.isManagerNotificationReplyOpen(normalizedDraftId) ? "" : normalizedDraftId;
-          if (!this.managerNotificationReplyDraftId) return;
+          this.managerNotificationReplyDraftId = normalizedDraftId;
           this.initializeManagerNotificationReplyComposer(draft);
-          this.$nextTick(() => {
-            const panel = document.querySelector("[data-manager-notification-reply-panel]");
-            if (panel && typeof panel.scrollIntoView === "function") {
-              panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
-            }
-            window.setTimeout(() => {
-              const body = document.querySelector("[data-manager-notification-reply-body]");
-              if (body && typeof body.focus === "function") {
-                body.focus();
-              }
-            }, 180);
-          });
         },
         async previewAutomationMessageDraft(messageDraftId) {
           const draft = this.getAutomationMessageDraftById(messageDraftId);
@@ -7058,7 +7123,10 @@
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.showManagerNotifications = false;
+          this.showManagerNotificationSidebar = false;
           this.managerNotificationDraftPreviewId = "";
+          this.activeManagerNotificationId = "";
+          this.managerNotificationSidebarMode = "overview";
           this.managerNotificationReplyDraftId = "";
           this.managerNotificationReplyComposer = {
             subject: "",
@@ -7125,7 +7193,10 @@
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.showManagerNotifications = false;
+          this.showManagerNotificationSidebar = false;
           this.managerNotificationDraftPreviewId = "";
+          this.activeManagerNotificationId = "";
+          this.managerNotificationSidebarMode = "overview";
           this.managerNotificationReplyDraftId = "";
           this.managerNotificationReplyComposer = {
             subject: "",
