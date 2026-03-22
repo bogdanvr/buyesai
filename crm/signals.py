@@ -16,7 +16,7 @@ from crm.models.automation import (
     AutomationQueueItemStatus,
     AutomationRule,
 )
-from crm.models.touch import TouchDirection, normalize_touch_channel_code, resolve_touch_event_type
+from crm.models.touch import DIRECT_TOUCH_EVENT_TYPES_BY_RESULT_CODE, TouchDirection, normalize_touch_channel_code, resolve_touch_event_type
 from crm.services.automation import (
     resolve_touch_automation_rule,
     should_auto_create_touch_follow_up_task,
@@ -198,6 +198,18 @@ def _touch_title(instance: Touch) -> str:
     return f"{direction_label} касание"
 
 
+def _touch_automation_title(instance: Touch, rule: AutomationRule | None = None, *, prefer_next_step: bool = False) -> str:
+    next_step_text = str(getattr(getattr(rule, "next_step_template", None), "name", "") or instance.next_step or "").strip()
+    touch_result = _resolve_touch_result_from_outcome(rule, instance)
+    result_label = str(getattr(touch_result, "name", "") or "").strip()
+    result_code = str(getattr(touch_result, "code", "") or "").strip().lower()
+    if prefer_next_step and next_step_text:
+        return next_step_text
+    if result_code in DIRECT_TOUCH_EVENT_TYPES_BY_RESULT_CODE and result_label:
+        return result_label
+    return _touch_title(instance)
+
+
 def _resolve_touch_event_type(instance: Touch) -> str:
     return resolve_touch_event_type(
         channel_code=getattr(getattr(instance, "channel", None), "name", ""),
@@ -238,10 +250,10 @@ def _draft_defaults_from_touch(instance: Touch, rule: AutomationRule, draft_kind
     touch_result = _resolve_touch_result_from_outcome(rule, instance)
     event_type = _resolve_touch_event_type(instance)
     if draft_kind == AutomationDraftKind.NEXT_STEP:
-        title = next_step_text or _touch_title(instance)
+        title = next_step_text or _touch_automation_title(instance, rule, prefer_next_step=True)
         summary = str(instance.summary or "").strip()
     else:
-        title = _touch_title(instance)
+        title = _touch_automation_title(instance, rule)
         summary = str(instance.summary or getattr(touch_result, "name", "") or "").strip()
     return {
         "source_event_type": event_type,
@@ -298,11 +310,11 @@ def _queue_defaults_from_touch(instance: Touch, rule: AutomationRule, item_kind:
     touch_result = _resolve_touch_result_from_outcome(rule, instance)
     event_type = _resolve_touch_event_type(instance)
     if item_kind == AutomationQueueItemKind.NEXT_STEP:
-        title = next_step_text or _touch_title(instance)
+        title = next_step_text or _touch_automation_title(instance, rule, prefer_next_step=True)
         summary = str(instance.summary or "").strip()
         recommended_action = next_step_text
     else:
-        title = _touch_title(instance)
+        title = _touch_automation_title(instance, rule)
         summary = str(instance.summary or getattr(touch_result, "name", "") or "").strip()
         recommended_action = next_step_text or str(getattr(getattr(rule, "next_step_template", None), "name", "") or "").strip()
     return {
@@ -359,7 +371,7 @@ def _message_draft_defaults_from_touch(instance: Touch, rule: AutomationRule) ->
     resolved_client = _resolve_touch_client(instance)
     channel = getattr(instance, "channel", None)
     event_type = _resolve_touch_event_type(instance)
-    event_title = _touch_title(instance)
+    event_title = _touch_automation_title(instance, rule)
     result_label = _touch_result_label(instance)
     subject = str(getattr(getattr(rule, "next_step_template", None), "name", "") or result_label or event_title).strip()
     message_parts = [str(instance.summary or "").strip()]

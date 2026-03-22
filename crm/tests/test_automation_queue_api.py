@@ -199,3 +199,11 @@ class AutomationQueueApiTests(APITestCase):
         )
         self.assertEqual(current_items.count(), 2)
         self.assertEqual(set(current_items.values_list("item_kind", flat=True)), {"attention", "next_step"})
+        self.assertEqual(
+            current_items.get(item_kind="attention").title,
+            "Оплата подтверждена",
+        )
+        self.assertEqual(
+            current_items.get(item_kind="next_step").title,
+            "Фоллоу-ап через 2 дня",
+        )

@@ -626,6 +626,25 @@
           return (this.datasets.automationQueue || []).filter((item) => String(item.status || "") === "pending");
         },
         managerNotifications() {
+          const messageDraftNotifications = this.pendingAutomationMessageDrafts.map((draft) => ({
+            id: `message-draft-${draft.id}`,
+            sourceType: "message_draft",
+            sourceId: draft.id,
+            touchId: this.toIntOrNull(draft.sourceTouchId),
+            dealId: this.toIntOrNull(draft.dealId),
+            dealTitle: draft.dealTitle || "",
+            companyId: this.toIntOrNull(draft.clientId),
+            companyName: draft.clientName || "",
+            title: draft.title || draft.messageSubject || "Черновик сообщения",
+            eventType: draft.sourceEventType || "",
+            happenedAt: draft.sourceTouchHappenedAt || draft.createdAt || "",
+            deadline: "",
+            recommendedAction: draft.messageText || "",
+            uiPriority: String(draft.automationRuleUiPriority || "medium"),
+            needsConfirmation: true,
+            isDraft: true,
+            isMessageDraft: true,
+          }));
           const queueNotifications = this.pendingAutomationQueueItems.map((item) => ({
             id: `queue-${item.id}`,
             sourceType: "queue",
@@ -661,28 +680,19 @@
             const dedupeKey = `${this.toIntOrNull(item.touchId) || 0}::${String(item.eventType || "").trim()}`;
             return !queueNextStepKeys.has(dedupeKey);
           });
-          const notifications = [
-            ...this.pendingAutomationMessageDrafts.map((draft) => ({
-              id: `message-draft-${draft.id}`,
-              sourceType: "message_draft",
-              sourceId: draft.id,
-              touchId: this.toIntOrNull(draft.sourceTouchId),
-              dealId: this.toIntOrNull(draft.dealId),
-              dealTitle: draft.dealTitle || "",
-              companyId: this.toIntOrNull(draft.clientId),
-              companyName: draft.clientName || "",
-              title: draft.title || draft.messageSubject || "Черновик сообщения",
-              eventType: draft.sourceEventType || "",
-              happenedAt: draft.sourceTouchHappenedAt || draft.createdAt || "",
-              deadline: "",
-              recommendedAction: draft.messageText || "",
-              uiPriority: String(draft.automationRuleUiPriority || "medium"),
-              needsConfirmation: true,
-              isDraft: true,
-              isMessageDraft: true,
-            })),
-            ...filteredQueueNotifications,
-            ...this.pendingAutomationDrafts.map((draft) => ({
+          const occupiedTouchEventKeys = new Set([
+            ...messageDraftNotifications.map((item) => `${this.toIntOrNull(item.touchId) || 0}::${String(item.eventType || "").trim()}`),
+            ...filteredQueueNotifications.map((item) => `${this.toIntOrNull(item.touchId) || 0}::${String(item.eventType || "").trim()}`),
+          ]);
+          const filteredAutomationDraftNotifications = this.pendingAutomationDrafts
+            .filter((draft) => {
+              if (String(draft.draftKind || "").trim() !== "touch") {
+                return true;
+              }
+              const dedupeKey = `${this.toIntOrNull(draft.sourceTouchId) || 0}::${String(draft.sourceEventType || "").trim()}`;
+              return !occupiedTouchEventKeys.has(dedupeKey);
+            })
+            .map((draft) => ({
               id: `draft-${draft.id}`,
               sourceType: "draft",
               sourceId: draft.id,
@@ -699,7 +709,11 @@
               uiPriority: String(draft.automationRuleUiPriority || "medium"),
               needsConfirmation: true,
               isDraft: true,
-            })),
+            }));
+          const notifications = [
+            ...messageDraftNotifications,
+            ...filteredQueueNotifications,
+            ...filteredAutomationDraftNotifications,
           ];
 
           notifications.sort((left, right) => {
@@ -3653,6 +3667,7 @@
         async selectUnboundConversation(conversationId, options = {}) {
           const normalizedConversationId = this.toIntOrNull(conversationId);
           this.activeUnboundConversationId = normalizedConversationId;
+          this.activeAutomationMessageDraftPreview = null;
           const conversation = this.activeUnboundConversation;
           this.syncUnboundConversationBindFormFromConversation(conversation);
           if (normalizedConversationId) {
@@ -3882,13 +3897,18 @@
           const conversationId = this.toIntOrNull(draft.conversationId);
           const channelCode = this.automationEventChannelCode(draft.sourceEventType) || this.normalizeTouchChannelCode(draft.proposedChannelName);
           const recipient = this.deriveCommunicationRecipient(channelCode, draft.contactId);
-          this.showManagerNotifications = false;
+          const previewPayload = {
+            id: draft.id,
+            title: draft.title || draft.messageSubject || "Черновик сообщения",
+            messageText: String(draft.messageText || "").trim(),
+          };
 
           if (conversationId) {
             const conversation = await this.fetchConversationById(conversationId);
             const dealId = this.toIntOrNull(conversation.dealId || draft.dealId);
             const companyId = this.toIntOrNull(conversation.clientId || draft.clientId);
             if (dealId) {
+              this.showManagerNotifications = false;
               const deal = await this.fetchDealById(dealId);
               this.openDealEditor(deal);
               this.showDealCommunicationsPanel = true;
@@ -3899,17 +3919,14 @@
                 bodyText: String(draft.messageText || "").trim(),
                 recipient: recipient,
               };
-              this.activeAutomationMessageDraftPreview = {
-                id: draft.id,
-                title: draft.title || draft.messageSubject || "Черновик сообщения",
-                messageText: String(draft.messageText || "").trim(),
-              };
+              this.activeAutomationMessageDraftPreview = previewPayload;
               this.ensureCommunicationsPolling();
               return;
             }
             if (companyId) {
               const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId));
               if (company) {
+                this.showManagerNotifications = false;
                 this.openCompanyEditor(company);
                 this.showCompanyCommunicationsPanel = true;
                 await this.loadCompanyCommunications({ preserveSelection: false, forceReloadMessages: true });
@@ -3919,18 +3936,21 @@
                   bodyText: String(draft.messageText || "").trim(),
                   recipient: recipient,
                 };
-                this.activeAutomationMessageDraftPreview = {
-                  id: draft.id,
-                  title: draft.title || draft.messageSubject || "Черновик сообщения",
-                  messageText: String(draft.messageText || "").trim(),
-                };
+                this.activeAutomationMessageDraftPreview = previewPayload;
                 this.ensureCommunicationsPolling();
                 return;
               }
             }
+
+            this.showManagerNotifications = true;
+            await this.loadUnboundCommunications({ preserveSelection: false, forceReloadMessages: true, silent: true });
+            await this.selectUnboundConversation(conversationId, { silent: true });
+            this.activeAutomationMessageDraftPreview = previewPayload;
+            return;
           }
 
           if (this.toIntOrNull(draft.dealId)) {
+            this.showManagerNotifications = false;
             const deal = await this.fetchDealById(draft.dealId);
             this.openDealEditor(deal);
             this.showDealCommunicationsPanel = true;
@@ -3942,15 +3962,12 @@
               subject: String(draft.messageSubject || "").trim(),
               bodyText: String(draft.messageText || "").trim(),
             };
-            this.activeAutomationMessageDraftPreview = {
-              id: draft.id,
-              title: draft.title || draft.messageSubject || "Черновик сообщения",
-              messageText: String(draft.messageText || "").trim(),
-            };
+            this.activeAutomationMessageDraftPreview = previewPayload;
             return;
           }
 
           if (draft.sourceTouchId) {
+            this.showManagerNotifications = false;
             await this.openTouchFromEvent(draft.sourceTouchId);
           }
         },
