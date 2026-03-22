@@ -46,6 +46,11 @@ def sync_message_context_from_conversation(*, message: Message) -> Message:
     return message
 
 
+def sync_conversation_message_contexts_from_conversation(*, conversation: Conversation) -> None:
+    for message in conversation.messages.select_related("touch", "deal").all():
+        sync_message_context_from_conversation(message=message)
+
+
 class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ConversationSerializer
 
@@ -106,6 +111,7 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
             resolution_source="api_manual_bind",
         )
         conversation.refresh_from_db()
+        sync_conversation_message_contexts_from_conversation(conversation=conversation)
         return Response(ConversationSerializer(conversation, context={"request": request}).data)
 
     @action(detail=True, methods=["post"])
@@ -346,7 +352,7 @@ class DeliveryFailureQueueViewSet(mixins.ListModelMixin, mixins.RetrieveModelMix
             resolution_source="api_failure_bind",
         )
         conversation.refresh_from_db()
-        sync_message_context_from_conversation(message=message)
+        sync_conversation_message_contexts_from_conversation(conversation=conversation)
 
         if request.user.is_authenticated:
             failure_item.assigned_to = request.user

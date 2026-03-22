@@ -3823,20 +3823,36 @@
             const clientId = this.toIntOrNull(this.unboundConversationBindForm.clientId);
             const contactId = this.toIntOrNull(this.unboundConversationBindForm.contactId);
             const dealId = this.toIntOrNull(this.unboundConversationBindForm.dealId);
-            await this.apiRequest(`/api/v1/communications/conversations/${conversationId}/bind/`, {
+            const boundConversation = this.mapConversation(await this.apiRequest(`/api/v1/communications/conversations/${conversationId}/bind/`, {
               method: "POST",
               body: {
                 client: clientId,
                 contact: contactId,
                 deal: dealId,
               }
-            });
+            }));
             await this.loadUnboundCommunications({ preserveSelection: false, forceReloadMessages: true, silent: true });
             await Promise.all([
               this.loadAutomationQueue(),
               this.loadAutomationMessageDrafts(),
               this.loadAutomationDrafts(),
             ]);
+            if (this.toIntOrNull(boundConversation.dealId)) {
+              this.closeManagerNotificationSidebar();
+              const deal = await this.fetchDealById(boundConversation.dealId);
+              this.openDealEditor(deal);
+              this.showDealCommunicationsPanel = true;
+              await this.loadDealCommunications({ preserveSelection: false, forceReloadMessages: true });
+              await this.selectDealConversation(boundConversation.id, { silent: true });
+              return;
+            }
+            if (this.toIntOrNull(boundConversation.clientId)) {
+              this.closeManagerNotificationSidebar();
+              this.openCompanyEditorById(boundConversation.clientId);
+              this.showCompanyCommunicationsPanel = true;
+              await this.loadCompanyCommunications({ preserveSelection: false, forceReloadMessages: true });
+              await this.selectCompanyConversation(boundConversation.id, { silent: true });
+            }
           } catch (error) {
             this.setUiError(`Ошибка привязки переписки: ${error.message}`, { modal: true });
           } finally {
@@ -4023,7 +4039,7 @@
           const channelCode = this.automationEventChannelCode(draft?.sourceEventType) || this.normalizeTouchChannelCode(draft?.proposedChannelName);
           this.managerNotificationReplyComposer = {
             subject: String(draft?.messageSubject || "").trim(),
-            bodyText: String(draft?.messageText || "").trim(),
+            bodyText: "",
             recipient: this.deriveCommunicationRecipient(channelCode, draft?.contactId),
           };
         },
