@@ -30,6 +30,7 @@ from crm_communications.services import (
     CommunicationTouchService,
     ConversationBindingService,
     ConversationResolverService,
+    InboundLeadService,
     build_message_preview,
     normalize_email,
 )
@@ -200,6 +201,15 @@ class EmailInboundService:
             route_type=EMAIL_THREAD_ROUTE_TYPE,
             route_key=parsed.thread_key,
         )
+        if resolution.client is None and resolution.contact is None and resolution.deal is None and resolution.lead is None:
+            resolution.lead = InboundLeadService.create_email_lead(
+                from_email=parsed.from_email,
+                from_name=parsed.from_name,
+                subject=parsed.subject,
+                body_text=parsed.body_text,
+            )
+            resolution.client = resolution.lead.client
+            resolution.resolution_notes.append("created_new_lead")
         conversation = getattr(getattr(resolution, "matched_route", None), "conversation", None)
         if conversation is None:
             conversation = Conversation.objects.create(
@@ -270,6 +280,7 @@ class EmailInboundService:
             message=message,
             happened_at=parsed.received_at,
         )
+        CommunicationTouchService.ensure_lead_for_message_touch(message=message, lead=resolution.lead)
         EmailInboundService._refresh_conversation_snapshot(conversation=conversation, message=message)
         return {
             "ok": True,

@@ -8,7 +8,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from crm.models import Client, CommunicationChannel, Contact, Deal, Touch
+from crm.models import Client, CommunicationChannel, Contact, Deal, Lead, LeadSource, LeadStatus, Touch
 from crm.models.touch import TouchDirection
 from crm_communications.models import (
     AttemptStatus,
@@ -63,11 +63,37 @@ def get_active_deals_for_client(*, client: Client | None) -> list[Deal]:
     return list(queryset.distinct().order_by("-created_at", "-id"))
 
 
+def get_open_leads_for_client(*, client: Client | None) -> list[Lead]:
+    if client is None:
+        return []
+    queryset = (
+        Lead.objects.select_related("status", "client")
+        .filter(client=client)
+        .exclude(status__code__in=("converted", "archived", "lost", "unqualified", "spam"))
+        .filter(Q(status__isnull=True) | Q(status__is_final=False))
+    )
+    return list(queryset.distinct().order_by("-created_at", "-id"))
+
+
+def get_open_leads_for_email(*, email: str) -> list[Lead]:
+    normalized_email = normalize_email(email)
+    if not normalized_email:
+        return []
+    queryset = (
+        Lead.objects.select_related("status", "client")
+        .filter(email__iexact=normalized_email)
+        .exclude(status__code__in=("converted", "archived", "lost", "unqualified", "spam"))
+        .filter(Q(status__isnull=True) | Q(status__is_final=False))
+    )
+    return list(queryset.distinct().order_by("-created_at", "-id"))
+
+
 @dataclass
 class ConversationResolution:
     client: Client | None = None
     contact: Contact | None = None
     deal: Deal | None = None
+    lead: Lead | None = None
     matched_route: ConversationRoute | None = None
     requires_manual_binding: bool = False
     resolution_notes: list[str] = field(default_factory=list)
@@ -158,6 +184,12 @@ class ConversationResolverService:
                     resolution.client = contacts[0].client
                     resolution.resolution_notes.append("matched_by_contact_telegram")
 
+        if resolution.client is None and email:
+            clients = list(Client.objects.filter(email__iexact=email).order_by("id"))
+            if len(clients) == 1:
+                resolution.client = clients[0]
+                resolution.resolution_notes.append("matched_by_client_email")
+
         if resolution.client is None and resolution.contact is not None:
             resolution.client = resolution.contact.client
 
@@ -165,12 +197,100 @@ class ConversationResolverService:
         if resolution.deal is None:
             if len(active_deals) == 1:
                 resolution.deal = active_deals[0]
+                resolution.lead = active_deals[0].lead
                 resolution.resolution_notes.append("matched_by_single_active_deal")
             elif len(active_deals) > 1:
                 resolution.requires_manual_binding = True
                 resolution.resolution_notes.append("requires_manual_binding")
+                return resolution
+
+        lead_candidates: list[Lead] = []
+        if resolution.deal is None and resolution.lead is None:
+            if resolution.client is not None:
+                lead_candidates.extend(get_open_leads_for_client(client=resolution.client))
+            if email:
+                for lead in get_open_leads_for_email(email=email):
+                    if all(existing.pk != lead.pk for existing in lead_candidates):
+                        lead_candidates.append(lead)
+
+            if len(lead_candidates) == 1:
+                resolution.lead = lead_candidates[0]
+                if resolution.client is None:
+                    resolution.client = lead_candidates[0].client
+                resolution.resolution_notes.append("matched_by_single_open_lead")
+            elif len(lead_candidates) > 1:
+                resolution.requires_manual_binding = True
+                resolution.resolution_notes.append("requires_manual_binding")
 
         return resolution
+
+
+class InboundLeadService:
+    @staticmethod
+    def _default_new_status() -> LeadStatus | None:
+        return LeadStatus.objects.filter(code="new").order_by("id").first()
+
+    @staticmethod
+    def _source_by_code(*, code: str) -> LeadSource | None:
+        normalized_code = str(code or "").strip().lower()
+        if not normalized_code:
+            return None
+        return LeadSource.objects.filter(code=normalized_code).order_by("id").first()
+
+    @staticmethod
+    @transaction.atomic
+    def create_email_lead(
+        *,
+        from_email: str,
+        from_name: str = "",
+        subject: str = "",
+        body_text: str = "",
+        client: Client | None = None,
+    ) -> Lead:
+        title = str(subject or "").strip() or f"Email от {normalize_email(from_email) or 'нового клиента'}"
+        lead = Lead.objects.create(
+            title=title[:255],
+            description=str(body_text or "").strip(),
+            name=str(from_name or "").strip(),
+            email=normalize_email(from_email),
+            company=str(getattr(client, "name", "") or "").strip(),
+            client=client,
+            status=InboundLeadService._default_new_status(),
+            source=InboundLeadService._source_by_code(code="email"),
+            payload={
+                "channel": CommunicationChannelCode.EMAIL,
+                "inbound_auto_created": True,
+                "sender_email": normalize_email(from_email),
+            },
+        )
+        return lead
+
+    @staticmethod
+    @transaction.atomic
+    def create_telegram_lead(
+        *,
+        sender_id: str,
+        sender_name: str = "",
+        body_text: str = "",
+        client: Client | None = None,
+    ) -> Lead:
+        clean_sender_id = str(sender_id or "").strip()
+        title = str(sender_name or "").strip() or f"Telegram {clean_sender_id or 'новое обращение'}"
+        lead = Lead.objects.create(
+            title=title[:255],
+            description=str(body_text or "").strip(),
+            name=str(sender_name or "").strip(),
+            company=str(getattr(client, "name", "") or "").strip(),
+            client=client,
+            status=InboundLeadService._default_new_status(),
+            source=InboundLeadService._source_by_code(code="telegram"),
+            payload={
+                "channel": CommunicationChannelCode.TELEGRAM,
+                "inbound_auto_created": True,
+                "telegram_sender_id": clean_sender_id,
+            },
+        )
+        return lead
 
 
 class ConversationBindingService:
@@ -525,6 +645,26 @@ class CommunicationTouchService:
         message.save(update_fields=["touch", "updated_at"])
         return touch
 
+    @staticmethod
+    @transaction.atomic
+    def ensure_lead_for_message_touch(*, message: Message, lead: Lead | None) -> Touch | None:
+        if lead is None:
+            return getattr(message, "touch", None)
+        message = Message.objects.select_related("touch").get(pk=message.pk)
+        if message.touch_id is None:
+            return None
+        touch = message.touch
+        updates: list[str] = []
+        if touch.lead_id != lead.id:
+            touch.lead = lead
+            updates.append("lead")
+        if touch.client_id is None and lead.client_id:
+            touch.client = lead.client
+            updates.append("client")
+        if updates:
+            touch.save(update_fields=[*updates, "updated_at"])
+        return touch
+
 
 class TelegramInboundWebhookService:
     ROUTE_TYPE = "telegram_chat"
@@ -617,6 +757,14 @@ class TelegramInboundWebhookService:
             route_type=TelegramInboundWebhookService.ROUTE_TYPE,
             route_key=route_key,
         )
+        if resolution.client is None and resolution.contact is None and resolution.deal is None and resolution.lead is None:
+            resolution.lead = InboundLeadService.create_telegram_lead(
+                sender_id=sender_id,
+                sender_name=TelegramInboundWebhookService._build_sender_name(sender),
+                body_text=TelegramInboundWebhookService._extract_body_text(message_payload),
+            )
+            resolution.client = resolution.lead.client
+            resolution.resolution_notes.append("created_new_lead")
 
         conversation = getattr(getattr(resolution, "matched_route", None), "conversation", None)
         if conversation is None:
@@ -689,6 +837,7 @@ class TelegramInboundWebhookService:
                 message=message,
                 happened_at=received_at,
             )
+        CommunicationTouchService.ensure_lead_for_message_touch(message=message, lead=resolution.lead)
 
         TelegramInboundWebhookService._refresh_conversation_snapshot(
             conversation=conversation,

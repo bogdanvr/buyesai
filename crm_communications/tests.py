@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 from unittest.mock import patch
 
-from crm.models import Client, Contact, Deal, DealStage, Touch
+from crm.models import Client, Contact, Deal, DealStage, Lead, LeadSource, LeadStatus, Touch
 from crm_communications.email_outbound import EmailOutboundMessageService
 from crm_communications.models import (
     AttemptStatus,
@@ -60,6 +60,14 @@ class ConversationResolverServiceTests(TestCase):
             order=100,
             is_active=True,
             is_final=True,
+        )
+        self.lead_status_new, _ = LeadStatus.objects.get_or_create(
+            code="new",
+            defaults={"name": "Новый", "order": 10, "is_active": True, "is_final": False},
+        )
+        self.lead_status_converted, _ = LeadStatus.objects.get_or_create(
+            code="converted",
+            defaults={"name": "Конвертирован", "order": 100, "is_active": True, "is_final": True},
         )
 
     def test_resolves_contact_and_single_active_deal_by_email(self):
@@ -177,6 +185,32 @@ class ConversationResolverServiceTests(TestCase):
         self.assertEqual(resolution.contact, contact)
         self.assertEqual(resolution.deal, deal)
         self.assertIn("matched_by_participant_binding", resolution.resolution_notes)
+
+    def test_resolves_single_open_lead_by_email_when_no_active_deal(self):
+        lead = Lead.objects.create(
+            title="Email lead",
+            email="lead@example.com",
+            client=self.client_company,
+            status=self.lead_status_new,
+        )
+
+        resolution = ConversationResolverService.resolve_for_email(email="lead@example.com")
+
+        self.assertEqual(resolution.client, self.client_company)
+        self.assertEqual(resolution.lead, lead)
+        self.assertIsNone(resolution.deal)
+        self.assertIn("matched_by_single_open_lead", resolution.resolution_notes)
+
+    def test_resolves_client_by_company_email(self):
+        self.client_company.email = "team@acme.test"
+        self.client_company.save(update_fields=["email"])
+
+        resolution = ConversationResolverService.resolve_for_email(email="team@acme.test")
+
+        self.assertEqual(resolution.client, self.client_company)
+        self.assertIsNone(resolution.deal)
+        self.assertIsNone(resolution.lead)
+        self.assertIn("matched_by_client_email", resolution.resolution_notes)
 
 
 class ConversationBindingServiceTests(TestCase):
@@ -386,6 +420,14 @@ class MessageQueueServiceTests(TestCase):
 class TelegramInboundWebhookTests(TestCase):
     def setUp(self):
         self.client_company = Client.objects.create(name="Telegram Co")
+        self.new_status, _ = LeadStatus.objects.get_or_create(
+            code="new",
+            defaults={"name": "Новый", "order": 10, "is_active": True, "is_final": False},
+        )
+        self.telegram_source, _ = LeadSource.objects.get_or_create(
+            code="telegram",
+            defaults={"name": "Telegram", "is_active": True},
+        )
         self.contact = Contact.objects.create(
             client=self.client_company,
             first_name="Ivan",
@@ -511,6 +553,39 @@ class TelegramInboundWebhookTests(TestCase):
         self.assertIsNone(touch.deal)
         self.assertEqual(conversation.contact, self.contact)
 
+    def test_unknown_telegram_sender_creates_new_lead(self):
+        response = self.client.post(
+            "/api/v1/webhooks/telegram/",
+            data={
+                "update_id": 4004,
+                "message": {
+                    "message_id": 58,
+                    "date": 1710000030,
+                    "chat": {"id": "999001", "type": "private"},
+                    "from": {"id": "999001", "first_name": "Новый", "username": "newperson"},
+                    "text": "Новое обращение из telegram",
+                },
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Lead.objects.count(), 1)
+        lead = Lead.objects.get()
+        message = Message.objects.get()
+        touch = Touch.objects.get()
+        conversation = Conversation.objects.get()
+
+        self.assertEqual(lead.status.code, "new")
+        self.assertEqual(lead.source.code, "telegram")
+        self.assertEqual(lead.name, "Новый")
+        self.assertIn("telegram", lead.payload.get("channel", ""))
+        self.assertTrue(lead.payload.get("inbound_auto_created"))
+        self.assertIsNone(conversation.client)
+        self.assertIsNone(message.client)
+        self.assertEqual(touch.lead, lead)
+        self.assertEqual(touch.client, None)
+
 
 class TelegramOutboundMessageServiceTests(TestCase):
     def setUp(self):
@@ -634,6 +709,14 @@ class TelegramOutboundMessageServiceTests(TestCase):
 class EmailInboundServiceTests(TestCase):
     def setUp(self):
         self.client_company = Client.objects.create(name="Email Co")
+        self.new_status, _ = LeadStatus.objects.get_or_create(
+            code="new",
+            defaults={"name": "Новый", "order": 10, "is_active": True, "is_final": False},
+        )
+        self.email_source, _ = LeadSource.objects.get_or_create(
+            code="email",
+            defaults={"name": "Email", "is_active": True},
+        )
         self.contact = Contact.objects.create(
             client=self.client_company,
             first_name="Maria",
@@ -791,6 +874,31 @@ class EmailInboundServiceTests(TestCase):
                 self.assertEqual(attachment.original_name, "spec.pdf")
                 self.assertEqual(attachment.size_bytes, len(b"pdf-content"))
                 self.assertTrue(attachment.file.name.endswith("spec.pdf"))
+
+    def test_process_raw_email_creates_new_lead_when_nothing_matched(self):
+        result = EmailInboundService.process_raw_email(
+            raw_message=self.build_email(
+                message_id="email-7@example.com",
+                subject="Новый запрос с нового адреса",
+                body="Здравствуйте, хочу обсудить новый проект.",
+            ).replace(b"maria@example.com", b"brandnew@example.com", 1)
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(Lead.objects.count(), 1)
+        lead = Lead.objects.get()
+        conversation = Conversation.objects.get()
+        message = Message.objects.get()
+        touch = Touch.objects.get()
+
+        self.assertEqual(lead.email, "brandnew@example.com")
+        self.assertEqual(lead.status.code, "new")
+        self.assertEqual(lead.source.code, "email")
+        self.assertTrue(lead.payload.get("inbound_auto_created"))
+        self.assertIsNone(conversation.client)
+        self.assertIsNone(message.client)
+        self.assertEqual(touch.lead, lead)
+        self.assertIsNone(touch.client)
 
 
 class EmailOutboundMessageServiceTests(TestCase):
