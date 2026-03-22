@@ -586,6 +586,45 @@ class TelegramInboundWebhookTests(TestCase):
         self.assertEqual(touch.lead, lead)
         self.assertEqual(touch.client, None)
 
+    def test_known_company_without_active_deal_or_open_lead_creates_new_telegram_lead(self):
+        self.deal.delete()
+        self.contact.delete()
+        ConversationBindingService.ensure_participant_binding(
+            channel=CommunicationChannelCode.TELEGRAM,
+            external_participant_key="telegram:555000",
+            client=self.client_company,
+            contact=None,
+            external_display_name="Client TG",
+        )
+
+        response = self.client.post(
+            "/api/v1/webhooks/telegram/",
+            data={
+                "update_id": 4005,
+                "message": {
+                    "message_id": 59,
+                    "date": 1710000040,
+                    "chat": {"id": "555000", "type": "private"},
+                    "from": {"id": "555000", "first_name": "Client"},
+                    "text": "Пишу в компанию, но без сделки",
+                },
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        lead = Lead.objects.get()
+        message = Message.objects.get()
+        touch = Touch.objects.get()
+        conversation = Conversation.objects.get()
+
+        self.assertEqual(lead.client, self.client_company)
+        self.assertEqual(lead.source.code, "telegram")
+        self.assertEqual(conversation.client, self.client_company)
+        self.assertEqual(message.client, self.client_company)
+        self.assertEqual(touch.client, self.client_company)
+        self.assertEqual(touch.lead, lead)
+
 
 class TelegramOutboundMessageServiceTests(TestCase):
     def setUp(self):
@@ -899,6 +938,32 @@ class EmailInboundServiceTests(TestCase):
         self.assertIsNone(message.client)
         self.assertEqual(touch.lead, lead)
         self.assertIsNone(touch.client)
+
+    def test_process_raw_email_creates_new_lead_inside_existing_company(self):
+        self.deal.delete()
+        self.contact.delete()
+        self.client_company.email = "company-inbox@example.com"
+        self.client_company.save(update_fields=["email"])
+
+        EmailInboundService.process_raw_email(
+            raw_message=self.build_email(
+                message_id="email-8@example.com",
+                subject="Новый лид внутри компании",
+                body="Новый запрос от компании без активной сделки и открытого лида.",
+            ).replace(b"maria@example.com", b"company-inbox@example.com", 1)
+        )
+
+        lead = Lead.objects.get()
+        conversation = Conversation.objects.get()
+        message = Message.objects.get()
+        touch = Touch.objects.get()
+
+        self.assertEqual(lead.client, self.client_company)
+        self.assertEqual(lead.company, self.client_company.name)
+        self.assertEqual(conversation.client, self.client_company)
+        self.assertEqual(message.client, self.client_company)
+        self.assertEqual(touch.client, self.client_company)
+        self.assertEqual(touch.lead, lead)
 
 
 class EmailOutboundMessageServiceTests(TestCase):

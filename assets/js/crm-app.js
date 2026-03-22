@@ -4252,7 +4252,10 @@
             priority: "medium",
             companyId: this.toIntOrNull(item?.clientId || item?.companyId),
             dealId: normalizedDealId,
-            relatedTouchId: this.toIntOrNull(item?.touchId),
+            // `related_touch` in the activities API points to legacy Activity entries,
+            // while automation notifications are sourced from Touch records.
+            // Passing Touch ids here breaks task creation with a validation error.
+            relatedTouchId: null,
             dueAt: resolvedDueAt ? this.toDateTimeLocal(resolvedDueAt) : "",
             reminderOffsetMinutes: 30,
             description: "",

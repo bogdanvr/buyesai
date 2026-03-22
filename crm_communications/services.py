@@ -757,11 +757,12 @@ class TelegramInboundWebhookService:
             route_type=TelegramInboundWebhookService.ROUTE_TYPE,
             route_key=route_key,
         )
-        if resolution.client is None and resolution.contact is None and resolution.deal is None and resolution.lead is None:
+        if resolution.deal is None and resolution.lead is None and not resolution.requires_manual_binding:
             resolution.lead = InboundLeadService.create_telegram_lead(
                 sender_id=sender_id,
                 sender_name=TelegramInboundWebhookService._build_sender_name(sender),
                 body_text=TelegramInboundWebhookService._extract_body_text(message_payload),
+                client=resolution.client,
             )
             resolution.client = resolution.lead.client
             resolution.resolution_notes.append("created_new_lead")

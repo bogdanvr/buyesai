@@ -201,12 +201,13 @@ class EmailInboundService:
             route_type=EMAIL_THREAD_ROUTE_TYPE,
             route_key=parsed.thread_key,
         )
-        if resolution.client is None and resolution.contact is None and resolution.deal is None and resolution.lead is None:
+        if resolution.deal is None and resolution.lead is None and not resolution.requires_manual_binding:
             resolution.lead = InboundLeadService.create_email_lead(
                 from_email=parsed.from_email,
                 from_name=parsed.from_name,
                 subject=parsed.subject,
                 body_text=parsed.body_text,
+                client=resolution.client,
             )
             resolution.client = resolution.lead.client
             resolution.resolution_notes.append("created_new_lead")
