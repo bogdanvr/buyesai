@@ -6,7 +6,8 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from crm.models import Activity, AutomationQueueItem, AutomationRule, Client, CommunicationChannel, Deal, DealStage, NextStepTemplate, OutcomeCatalog, Touch, TouchResult
+from crm.models import Activity, AutomationQueueItem, AutomationRule, Client, CommunicationChannel, Deal, DealStage, NextStepTemplate, OutcomeCatalog, TaskType, Touch, TouchResult
+from crm.models.activity import TaskTypeGroup
 
 
 class AutomationQueueApiTests(APITestCase):
@@ -32,6 +33,11 @@ class AutomationQueueApiTests(APITestCase):
             name="Ждём обратную связь",
             group="waiting",
             result_class="neutral",
+        )
+        self.client_task_type = TaskType.objects.create(
+            name="Фоллоу-ап клиенту",
+            group=TaskTypeGroup.CLIENT_TASK,
+            is_active=True,
         )
         self.outcome = OutcomeCatalog.objects.create(code="waiting_feedback", name="Ждём обратную связь")
         self.template = NextStepTemplate.objects.create(code="followup_after_2_days", name="Фоллоу-ап через 2 дня")
@@ -94,6 +100,8 @@ class AutomationQueueApiTests(APITestCase):
         created_task = Activity.objects.get(pk=queue_item.created_task_id)
         self.assertEqual(created_task.subject, "Фоллоу-ап через 2 дня")
         self.assertEqual(created_task.deal_id, self.deal.pk)
+        self.assertEqual(created_task.task_type_id, self.client_task_type.pk)
+        self.assertEqual(created_task.communication_channel_id, self.channel.pk)
 
     def test_can_list_pending_automation_queue_items(self):
         touch = Touch.objects.create(

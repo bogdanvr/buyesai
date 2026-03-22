@@ -5,8 +5,8 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from api.v1.automation_queue.serializers import AutomationQueueItemSerializer
-from crm.models import Activity, AutomationQueueItem
-from crm.models.activity import ActivityType, TaskPriority, TaskStatus
+from crm.models import Activity, AutomationQueueItem, TaskType
+from crm.models.activity import ActivityType, TaskPriority, TaskStatus, TaskTypeGroup
 from crm.models.automation import AutomationQueueItemKind, AutomationQueueItemStatus
 
 
@@ -61,6 +61,13 @@ class AutomationQueueItemViewSet(ReadOnlyModelViewSet):
         subject = str(item.proposed_next_step or item.recommended_action or item.title or "").strip()
         if not subject:
             return None
+        is_client_task = item.proposed_channel_id is not None
+        task_type = None
+        if is_client_task:
+            task_type = TaskType.objects.filter(
+                group=TaskTypeGroup.CLIENT_TASK,
+                is_active=True,
+            ).order_by("sort_order", "id").first()
         task = Activity.objects.create(
             type=ActivityType.TASK,
             subject=subject,
@@ -68,7 +75,8 @@ class AutomationQueueItemViewSet(ReadOnlyModelViewSet):
             due_at=item.proposed_next_step_at,
             status=TaskStatus.TODO,
             priority=TaskPriority.MEDIUM,
-            communication_channel=item.proposed_channel,
+            task_type=task_type,
+            communication_channel=item.proposed_channel if is_client_task else None,
             lead=item.lead,
             deal=item.deal,
             client=item.client,

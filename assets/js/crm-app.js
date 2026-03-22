@@ -3749,11 +3749,17 @@
           }
         },
         visibleManagerNotificationActions(notification) {
+          if (String(notification?.sourceType || "") === "queue" && String(notification?.queueKind || "") === "next_step") {
+            return [{ id: "confirm_next_step", label: "Подтвердить" }];
+          }
           const actions = Array.isArray(notification?.availableActions) ? notification.availableActions : [];
           return actions.filter((action) => String(action?.id || "").trim() !== "call");
         },
         managerNotificationActionLabel(action) {
           const actionId = String(action?.id || "").trim();
+          if (actionId === "confirm_next_step") {
+            return "Подтвердить";
+          }
           if (actionId === "reply") {
             return "Заполнить результат касания";
           }
@@ -4270,6 +4276,12 @@
           const normalizedActionId = String(actionId || "").trim();
           if (!normalizedActionId || !item) return;
           this.showManagerNotifications = false;
+          if (normalizedActionId === "confirm_next_step") {
+            if (String(item.sourceType || "") === "queue" && this.toIntOrNull(item.sourceId)) {
+              this.confirmAutomationQueueItem(item.sourceId);
+            }
+            return;
+          }
           if (normalizedActionId === "reply") {
             if (this.toIntOrNull(item.touchId)) {
               this.openTouchWithResultPrompt(item.touchId, "Сначала заполните результат входящего касания, затем при необходимости ответьте клиенту.");
