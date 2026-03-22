@@ -1141,7 +1141,7 @@ def touch_deal_events_signal(sender, instance: Touch, created, **kwargs):
         priority="high",
         extra_lines=_touch_event_extra_lines(instance, channel_label, result_label),
     )
-    _append_deal_event(instance.deal_id, entry)
+    _replace_touch_event_in_deal(instance.deal_id, instance.pk, entry)
 
 
 @receiver(post_save, sender=DealDocument)
@@ -1250,7 +1250,7 @@ def touch_lead_events_signal(sender, instance: Touch, created, **kwargs):
         priority="high",
         extra_lines=_touch_event_extra_lines(instance, channel_label, result_label),
     )
-    _append_lead_event(instance.lead_id, entry)
+    _replace_touch_event_in_lead(instance.lead_id, instance.pk, entry)
 
 
 @receiver(post_save, sender=Touch)
@@ -1316,7 +1316,7 @@ def touch_client_events_signal(sender, instance: Touch, created, **kwargs):
         priority="high",
         extra_lines=_touch_event_extra_lines(instance, channel_label, result_label),
     )
-    _append_client_event(instance.client_id, entry)
+    _replace_touch_event_in_client(instance.client_id, instance.pk, entry)
 
 
 @receiver(post_save, sender=Touch)

@@ -997,6 +997,29 @@ class EmailInboundServiceTests(TestCase):
         self.assertIn(f"touch_id: {touches[0].id}", str(lead.events or ""))
         self.assertIn(f"touch_id: {touches[1].id}", str(lead.events or ""))
 
+    def test_updating_same_touch_replaces_lead_event_instead_of_appending_duplicate(self):
+        self.deal.delete()
+        self.contact.delete()
+        self.client_company.email = "company-inbox@example.com"
+        self.client_company.save(update_fields=["email"])
+
+        EmailInboundService.process_raw_email(
+            raw_message=self.build_email(
+                message_id="email-lead-update-1@example.com",
+                subject="Первое письмо",
+                body="Первое обращение в лид.",
+            ).replace(b"maria@example.com", b"company-inbox@example.com", 1)
+        )
+
+        lead = Lead.objects.get()
+        touch = Touch.objects.get(lead=lead)
+        touch.summary = "Обновлённый текст касания"
+        touch.save(update_fields=["summary", "updated_at"])
+
+        lead.refresh_from_db()
+        events_text = str(lead.events or "")
+        self.assertEqual(events_text.count(f"touch_id: {touch.id}"), 1)
+
 
 class EmailOutboundMessageServiceTests(TestCase):
     def setUp(self):
