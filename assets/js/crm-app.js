@@ -3670,6 +3670,12 @@
           }
           return action?.label || "";
         },
+        notificationNeedsBinding(notification) {
+          if (!notification || String(notification.sourceType || "") !== "queue") return false;
+          const hasClient = !!this.toIntOrNull(notification.clientId || notification.companyId);
+          const hasDeal = !!this.toIntOrNull(notification.dealId);
+          return !hasClient && !hasDeal && !!this.toIntOrNull(notification.messageDraftId);
+        },
         async loadUnboundCommunications(options = {}) {
           const previousConversationId = this.toIntOrNull(this.activeUnboundConversationId);
           if (!options.silent) {
@@ -3748,6 +3754,19 @@
             await this.loadCompanyCommunications({ preserveSelection: false, forceReloadMessages: true });
             await this.selectCompanyConversation(conversation.id, { silent: true });
           }
+        },
+        scrollToUnboundBinding() {
+          this.$nextTick(() => {
+            const panel = document.querySelector("[data-unbound-binding-block]");
+            if (panel && typeof panel.scrollIntoView === "function") {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        },
+        async openNotificationBinding(notification) {
+          if (!this.notificationNeedsBinding(notification)) return;
+          await this.previewAutomationMessageDraft(notification.messageDraftId);
+          this.scrollToUnboundBinding();
         },
         async openManagerNotification(item) {
           if (!item) return;
@@ -4008,9 +4027,14 @@
           }
           return "";
         },
-        openAutomationTaskAction(item, { title = "", taskTypeGroup = "internal_task", channelCode = "", dueAt = "" } = {}) {
+        openAutomationTaskAction(item, { title = "", taskTypeGroup = "internal_task", channelCode = "", dueAt = "", fallbackToRecommendation = true } = {}) {
           const normalizedDealId = this.toIntOrNull(item?.dealId);
-          const resolvedTitle = String(title || item?.recommendedAction || item?.title || "").trim();
+          const explicitTitle = String(title || "").trim();
+          const resolvedTitle = explicitTitle || (
+            fallbackToRecommendation
+              ? String(item?.recommendedAction || item?.title || "").trim()
+              : ""
+          );
           const resolvedDueAt = dueAt || item?.suggestedNextStepAt || item?.deadline || "";
           const communicationChannelId = taskTypeGroup === "client_task"
             ? this.toIntOrNull(this.findCommunicationChannelByCode(channelCode)?.id)
@@ -4102,8 +4126,9 @@
           }
           if (normalizedActionId === "create_task") {
             this.openAutomationTaskAction(item, {
-              title: item.recommendedAction || "Создать задачу",
+              title: "",
               taskTypeGroup: "internal_task",
+              fallbackToRecommendation: false,
             });
             return;
           }

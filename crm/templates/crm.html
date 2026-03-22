@@ -248,7 +248,6 @@
                     <div class="mt-2 flex flex-wrap gap-2 text-[11px] text-crm-text">
                       <span v-if="notification.deadline">Срок: [[ formatDueLabel(notification.deadline) ]]</span>
                       <span v-if="notification.needsConfirmation">Требует подтверждения</span>
-                      <span v-if="notification.hasMessageDraft">Есть черновик ответа</span>
                     </div>
                     <div
                       v-if="notification.sourceType === 'queue' && visibleManagerNotificationActions(notification).length"
@@ -274,14 +273,6 @@
                         [[ isManagerNotificationDraftPreviewOpen(notification.id) ? 'Скрыть ответ' : 'Посмотреть ответ' ]]
                       </button>
                       <button
-                        v-if="notification.sourceType === 'queue' && notification.messageDraftId"
-                        type="button"
-                        @click.stop="dismissAutomationMessageDraft(notification.messageDraftId)"
-                        class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
-                      >
-                        Отклонить ответ
-                      </button>
-                      <button
                         v-if="notification.sourceType === 'queue'"
                         type="button"
                         @click.stop="confirmAutomationQueueItem(notification.sourceId)"
@@ -296,6 +287,14 @@
                         class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
                       >
                         Скрыть
+                      </button>
+                      <button
+                        v-if="notification.sourceType === 'queue' && notificationNeedsBinding(notification)"
+                        type="button"
+                        @click.stop="openNotificationBinding(notification)"
+                        class="inline-flex h-8 items-center rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 text-xs font-semibold text-white transition hover:border-amber-300"
+                      >
+                        Привязать
                       </button>
                     </div>
                     <div
@@ -315,13 +314,6 @@
                           class="inline-flex h-8 items-center rounded-lg border border-crm-accent/40 bg-crm-accent/15 px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
                         >
                           Ответить
-                        </button>
-                        <button
-                          type="button"
-                          @click.stop="dismissAutomationMessageDraft(notification.messageDraftId)"
-                          class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
-                        >
-                          Отклонить ответ
                         </button>
                       </div>
                     </div>
@@ -483,7 +475,7 @@
                         </div>
                       </div>
 
-                      <div class="mt-4 rounded-xl border border-amber-400/20 bg-[#0f2f4a] p-3">
+                      <div data-unbound-binding-block class="mt-4 rounded-xl border border-amber-400/20 bg-[#0f2f4a] p-3">
                         <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Ручная привязка</div>
                         <div class="mt-3 grid grid-cols-1 gap-3">
                           <label class="block">
