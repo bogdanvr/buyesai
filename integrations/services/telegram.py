@@ -20,6 +20,10 @@ def handle_telegram_event(payload: dict) -> dict:
     callback_query = payload.get("callback_query") if isinstance(payload, dict) else None
     if isinstance(callback_query, dict):
         return handle_telegram_callback_query(callback_query)
+    if isinstance(payload, dict) and any(isinstance(payload.get(key), dict) for key in ("message", "edited_message")):
+        from crm_communications.services import TelegramInboundWebhookService
+
+        return TelegramInboundWebhookService.process_update(payload=payload)
     return {"ok": True, "provider": "telegram"}
 
 

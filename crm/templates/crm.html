@@ -1171,6 +1171,14 @@
                           >
                             Сделка #[[ dealTimelinePrimaryEvent(timelineItem).dealId ]]
                           </button>
+                          <button
+                            v-if="dealTimelinePrimaryEvent(timelineItem).conversationId"
+                            type="button"
+                            @click.stop="openCommunicationConversationFromEvent(dealTimelinePrimaryEvent(timelineItem))"
+                            class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                          >
+                            Переписка
+                          </button>
                         </div>
                       <div v-if="dealTimelinePrimaryEvent(timelineItem).summaryText || dealTimelinePrimaryEvent(timelineItem).touchResult" class="mt-2 text-sm text-white whitespace-pre-line [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).summaryText || dealTimelinePrimaryEvent(timelineItem).touchResult ]]</div>
                       <div v-if="dealTimelinePrimaryEvent(timelineItem).documents && dealTimelinePrimaryEvent(timelineItem).documents.length" class="mt-2 space-y-2">
@@ -1213,6 +1221,14 @@
                           >
                             Сделка #[[ dealTimelinePrimaryEvent(timelineItem).dealId ]]
                           </button>
+                          <button
+                            v-if="dealTimelinePrimaryEvent(timelineItem).conversationId"
+                            type="button"
+                            @click.stop="openCommunicationConversationFromEvent(dealTimelinePrimaryEvent(timelineItem))"
+                            class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                          >
+                            Переписка
+                          </button>
                         </div>
                       <div v-if="dealTimelinePrimaryEvent(timelineItem).taskResult" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
                         Результат: [[ dealTimelinePrimaryEvent(timelineItem).taskResult ]]
@@ -1224,15 +1240,23 @@
                         <span class="font-medium text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).title || 'Документ' ]]</span>
                         <span class="text-crm-muted shrink-0">[[ eventShortTimestamp(dealTimelinePrimaryEvent(timelineItem).timestamp) || 'Без даты' ]]</span>
                         <span v-if="dealTimelinePrimaryEvent(timelineItem).actorName" class="text-crm-muted shrink-0">[[ dealTimelinePrimaryEvent(timelineItem).actorName ]]</span>
-                        <button
-                          v-if="dealTimelinePrimaryEvent(timelineItem).dealId"
-                          type="button"
-                          @click.stop="openDealFromEvent(dealTimelinePrimaryEvent(timelineItem).dealId)"
-                          class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
-                        >
-                          Сделка #[[ dealTimelinePrimaryEvent(timelineItem).dealId ]]
-                        </button>
-                      </div>
+                          <button
+                            v-if="dealTimelinePrimaryEvent(timelineItem).dealId"
+                            type="button"
+                            @click.stop="openDealFromEvent(dealTimelinePrimaryEvent(timelineItem).dealId)"
+                            class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                          >
+                            Сделка #[[ dealTimelinePrimaryEvent(timelineItem).dealId ]]
+                          </button>
+                          <button
+                            v-if="dealTimelinePrimaryEvent(timelineItem).conversationId"
+                            type="button"
+                            @click.stop="openCommunicationConversationFromEvent(dealTimelinePrimaryEvent(timelineItem))"
+                            class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-0.5 text-[11px] font-semibold text-crm-accent hover:border-crm-accent shrink-0"
+                          >
+                            Переписка
+                          </button>
+                        </div>
                       <div class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
                         [[ dealTimelinePrimaryEvent(timelineItem).documentName || dealTimelinePrimaryEvent(timelineItem).result ]]
                       </div>
@@ -1471,6 +1495,175 @@
                 <span class="text-crm-accent">+</span>
                 <span>Документы</span>
               </button>
+              <button type="button" @click="quickOpenDealCommunications" :disabled="!editingDealId" class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed">
+                <span class="text-crm-accent">+</span>
+                <span>Переписка</span>
+              </button>
+            </div>
+            <div v-if="editingDealId && showDealCommunicationsPanel" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold text-white">Переписка сделки</div>
+                  <div class="text-xs text-crm-muted">[[ forms.deals.title || `Сделка #${editingDealId}` ]]</div>
+                </div>
+                <div class="text-xs text-crm-muted">
+                  [[ dealCommunications.length ? `${dealCommunications.length} диалогов` : 'Диалогов пока нет' ]]
+                </div>
+              </div>
+              <div v-if="dealManualBindingConversations.length" class="mt-4 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div class="text-sm font-semibold text-white">Есть диалоги без привязки к сделке</div>
+                    <div class="mt-1 text-sm text-amber-100/90">
+                      [[ dealManualBindingConversations.length ]] [[ dealManualBindingConversations.length === 1 ? 'диалог компании ждёт' : 'диалога компании ждут' ]] ручной привязки.
+                    </div>
+                  </div>
+                  <button
+                    v-if="forms.deals.companyId"
+                    type="button"
+                    @click="openCompanyEditorById(forms.deals.companyId)"
+                    class="inline-flex h-9 items-center rounded-xl border border-amber-300/30 bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-amber-200"
+                  >
+                    Открыть компанию
+                  </button>
+                </div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <button
+                    v-for="conversation in dealManualBindingConversations"
+                    :key="`deal-manual-bind-${conversation.id}`"
+                    type="button"
+                    @click="bindDealConversationToCurrentDeal(conversation.id)"
+                    class="inline-flex max-w-full items-center gap-2 rounded-xl border border-amber-300/30 bg-[#102f4a] px-3 py-2 text-sm text-white transition hover:border-amber-200"
+                  >
+                    <span class="truncate">[[ conversation.subject || conversation.contactName || `${conversation.channelLabel} #${conversation.id}` ]]</span>
+                    <span class="shrink-0 text-amber-100">Привязать</span>
+                  </button>
+                </div>
+              </div>
+              <div v-if="isDealCommunicationsLoading" class="mt-3 text-sm text-crm-muted">Загрузка переписки...</div>
+              <div v-else class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[320px,minmax(0,1fr)]">
+                <div class="rounded-2xl border border-crm-border bg-[#102f4a] p-3">
+                  <div v-if="dealCommunications.length === 0" class="text-sm text-crm-muted">
+                    По этой сделке пока нет привязанных диалогов.
+                  </div>
+                  <div v-else class="space-y-2">
+                    <button
+                      v-for="conversation in dealCommunications"
+                      :key="`deal-conversation-${conversation.id}`"
+                      type="button"
+                      @click="selectDealConversation(conversation.id)"
+                      :class="[
+                        'w-full rounded-xl border px-3 py-3 text-left transition',
+                        String(activeDealConversationId || '') === String(conversation.id)
+                          ? 'border-crm-accent bg-[#123753]'
+                          : 'border-crm-border bg-[#0f2f4a] hover:border-crm-accent/70'
+                      ]"
+                    >
+                      <div class="flex min-w-0 items-start justify-between gap-2">
+                        <div class="min-w-0">
+                          <div class="text-sm font-semibold text-white truncate">
+                            [[ conversation.subject || conversation.contactName || `${conversation.channelLabel} #${conversation.id}` ]]
+                          </div>
+                          <div class="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-crm-muted">
+                            <span class="rounded-full border border-crm-border px-2 py-0.5 text-white/90">[[ conversation.channelLabel ]]</span>
+                            <span v-if="conversation.contactName">[[ conversation.contactName ]]</span>
+                          </div>
+                        </div>
+                        <div class="shrink-0 text-[11px] text-crm-muted">
+                          [[ conversation.lastMessageAt ? formatEventTimestamp(conversation.lastMessageAt) : '—' ]]
+                        </div>
+                      </div>
+                      <div class="mt-2 text-sm text-crm-muted [overflow-wrap:anywhere]">
+                        [[ conversation.lastMessagePreview || 'Без сообщений' ]]
+                      </div>
+                    </button>
+                  </div>
+                </div>
+                <div class="rounded-2xl border border-crm-border bg-[#102f4a] p-4">
+                  <div v-if="!getActiveDealConversation()" class="text-sm text-crm-muted">
+                    Выберите диалог слева, чтобы посмотреть переписку.
+                  </div>
+                  <template v-else>
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="text-sm font-semibold text-white truncate">
+                          [[ getActiveDealConversation().subject || getActiveDealConversation().contactName || `${getActiveDealConversation().channelLabel} #${getActiveDealConversation().id}` ]]
+                        </div>
+                        <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-crm-muted">
+                          <span class="rounded-full border border-crm-border px-2 py-0.5 text-white/90">[[ getActiveDealConversation().channelLabel ]]</span>
+                          <span v-if="getActiveDealConversation().contactName">[[ getActiveDealConversation().contactName ]]</span>
+                          <span v-if="getActiveDealConversation().clientName">• [[ getActiveDealConversation().clientName ]]</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div v-if="isDealConversationMessagesLoading" class="mt-4 text-sm text-crm-muted">Загрузка сообщений...</div>
+                    <div v-else class="mt-4 max-h-[28rem] space-y-3 overflow-y-auto pr-1">
+                      <div v-if="dealConversationMessages.length === 0" class="text-sm text-crm-muted">
+                        В этом диалоге пока нет сообщений.
+                      </div>
+                      <div
+                        v-for="message in dealConversationMessages"
+                        :key="`deal-message-${message.id}`"
+                        :class="[
+                          'rounded-2xl border p-3',
+                          message.direction === 'outgoing'
+                            ? 'ml-auto border-crm-accent/30 bg-crm-accent/10'
+                            : 'mr-auto border-crm-border bg-[#0f2f4a]'
+                        ]"
+                      >
+                        <div class="flex flex-wrap items-center gap-2 text-xs text-crm-muted">
+                          <span class="font-semibold text-white">[[ message.directionLabel ]]</span>
+                          <span>• [[ message.statusLabel ]]</span>
+                          <span>• [[ formatEventTimestamp(message.sentAt || message.receivedAt || message.createdAt) ]]</span>
+                        </div>
+                        <div v-if="message.subject" class="mt-2 text-sm font-semibold text-white [overflow-wrap:anywhere]">[[ message.subject ]]</div>
+                        <div class="mt-2 whitespace-pre-line text-sm text-white [overflow-wrap:anywhere]">[[ message.bodyText || message.bodyPreview || 'Без текста' ]]</div>
+                        <div v-if="message.lastErrorMessage" class="mt-2 text-xs text-red-200 [overflow-wrap:anywhere]">[[ message.lastErrorMessage ]]</div>
+                        <div v-if="message.attachments.length" class="mt-3 flex flex-wrap gap-2">
+                          <a
+                            v-for="attachment in message.attachments"
+                            :key="`deal-message-attachment-${attachment.id}`"
+                            :href="attachment.fileUrl"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="inline-flex max-w-full items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 py-2 text-xs text-white transition hover:border-crm-accent"
+                          >
+                            <span class="truncate">[[ attachment.originalName || 'Вложение' ]]</span>
+                            <span class="shrink-0 text-crm-muted">[[ formatFileSize(attachment.sizeBytes) ]]</span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="mt-4 rounded-2xl border border-crm-border bg-[#0f2f4a] p-3">
+                      <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Новое сообщение</div>
+                      <div v-if="getActiveDealConversation().channel === 'email'" class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <label class="block md:col-span-2">
+                          <span class="text-sm text-crm-muted">Тема</span>
+                          <input v-model.trim="dealCommunicationComposer.subject" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block md:col-span-2">
+                          <span class="text-sm text-crm-muted">Получатель</span>
+                          <input v-model.trim="dealCommunicationComposer.recipient" type="text" placeholder="Можно оставить пустым" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                      </div>
+                      <label class="mt-3 block">
+                        <span class="text-sm text-crm-muted">Текст</span>
+                        <textarea v-model.trim="dealCommunicationComposer.bodyText" rows="5" class="mt-1 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 py-3 outline-none focus:border-crm-accent"></textarea>
+                      </label>
+                      <div class="mt-3 flex justify-end">
+                        <button
+                          type="button"
+                          @click="sendDealCommunicationMessage"
+                          :disabled="isDealCommunicationSending"
+                          class="inline-flex h-10 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          [[ isDealCommunicationSending ? 'Отправляем...' : 'Отправить сообщение' ]]
+                        </button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
             </div>
             <div v-if="editingDealId && hasDealAutomationSummaryBlocks" class="md:col-span-2 grid grid-cols-1 gap-3 xl:grid-cols-2">
               <div v-if="dealAutomationNextAction" class="rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
@@ -2685,6 +2878,14 @@
                 </button>
                 <button
                   type="button"
+                  @click="toggleCompanyCommunicationsPanel"
+                  class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                >
+                  <span>Переписка</span>
+                  <span class="text-crm-accent text-xs">[[ showCompanyCommunicationsPanel ? '−' : '+' ]]</span>
+                </button>
+                <button
+                  type="button"
                   @click="toggleCompanyWorkRules"
                   class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
                 >
@@ -2944,6 +3145,155 @@
                     </div>
                   </div>
                 </template>
+              </div>
+              <div v-if="showCompanyCommunicationsPanel && editingCompanyId" class="mt-4 rounded-2xl border border-crm-border bg-[#102f4a] p-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div class="text-sm font-semibold text-white">Переписка компании</div>
+                    <div class="text-xs text-crm-muted">[[ forms.companies.name || `Компания #${editingCompanyId}` ]]</div>
+                  </div>
+                  <div class="text-xs text-crm-muted">
+                    [[ companyCommunications.length ? `${companyCommunications.length} диалогов` : 'Диалогов пока нет' ]]
+                  </div>
+                </div>
+                <div v-if="isCompanyCommunicationsLoading" class="mt-3 text-sm text-crm-muted">Загрузка переписки...</div>
+                <div v-else class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[320px,minmax(0,1fr)]">
+                  <div class="rounded-2xl border border-crm-border bg-[#0f2f4a] p-3">
+                    <div v-if="companyCommunications.length === 0" class="text-sm text-crm-muted">
+                      По этой компании пока нет диалогов.
+                    </div>
+                    <div v-else class="space-y-2">
+                      <button
+                        v-for="conversation in companyCommunications"
+                        :key="`company-conversation-${conversation.id}`"
+                        type="button"
+                        @click="selectCompanyConversation(conversation.id)"
+                        :class="[
+                          'w-full rounded-xl border px-3 py-3 text-left transition',
+                          String(activeCompanyConversationId || '') === String(conversation.id)
+                            ? 'border-crm-accent bg-[#123753]'
+                            : 'border-crm-border bg-[#102f4a] hover:border-crm-accent/70'
+                        ]"
+                      >
+                        <div class="flex min-w-0 items-start justify-between gap-2">
+                          <div class="min-w-0">
+                            <div class="text-sm font-semibold text-white truncate">
+                              [[ conversation.subject || conversation.contactName || `${conversation.channelLabel} #${conversation.id}` ]]
+                            </div>
+                            <div class="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-crm-muted">
+                              <span class="rounded-full border border-crm-border px-2 py-0.5 text-white/90">[[ conversation.channelLabel ]]</span>
+                              <span v-if="conversation.contactName">[[ conversation.contactName ]]</span>
+                              <span
+                                v-if="conversation.requiresManualBinding"
+                                class="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-amber-100"
+                              >
+                                Нужна привязка
+                              </span>
+                            </div>
+                          </div>
+                          <div class="shrink-0 text-[11px] text-crm-muted">
+                            [[ conversation.lastMessageAt ? formatEventTimestamp(conversation.lastMessageAt) : '—' ]]
+                          </div>
+                        </div>
+                        <div class="mt-2 text-sm text-crm-muted [overflow-wrap:anywhere]">
+                          [[ conversation.lastMessagePreview || 'Без сообщений' ]]
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="rounded-2xl border border-crm-border bg-[#0f2f4a] p-4">
+                    <div v-if="!getActiveCompanyConversation()" class="text-sm text-crm-muted">
+                      Выберите диалог слева, чтобы посмотреть переписку.
+                    </div>
+                    <template v-else>
+                      <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <div class="text-sm font-semibold text-white truncate">
+                            [[ getActiveCompanyConversation().subject || getActiveCompanyConversation().contactName || `${getActiveCompanyConversation().channelLabel} #${getActiveCompanyConversation().id}` ]]
+                          </div>
+                          <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-crm-muted">
+                            <span class="rounded-full border border-crm-border px-2 py-0.5 text-white/90">[[ getActiveCompanyConversation().channelLabel ]]</span>
+                            <span v-if="getActiveCompanyConversation().contactName">[[ getActiveCompanyConversation().contactName ]]</span>
+                            <span v-if="getActiveCompanyConversation().dealTitle">• [[ getActiveCompanyConversation().dealTitle ]]</span>
+                          </div>
+                        </div>
+                        <button
+                          v-if="getActiveCompanyConversation().requiresManualBinding"
+                          type="button"
+                          @click="bindCompanyConversation(getActiveCompanyConversation().id)"
+                          class="inline-flex h-9 items-center rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 text-sm font-semibold text-white transition hover:border-amber-300"
+                        >
+                          Зафиксировать за компанией
+                        </button>
+                      </div>
+                      <div v-if="isCompanyConversationMessagesLoading" class="mt-4 text-sm text-crm-muted">Загрузка сообщений...</div>
+                      <div v-else class="mt-4 max-h-[28rem] space-y-3 overflow-y-auto pr-1">
+                        <div v-if="companyConversationMessages.length === 0" class="text-sm text-crm-muted">
+                          В этом диалоге пока нет сообщений.
+                        </div>
+                        <div
+                          v-for="message in companyConversationMessages"
+                          :key="`company-message-${message.id}`"
+                          :class="[
+                            'rounded-2xl border p-3',
+                            message.direction === 'outgoing'
+                              ? 'ml-auto border-crm-accent/30 bg-crm-accent/10'
+                              : 'mr-auto border-crm-border bg-[#102f4a]'
+                          ]"
+                        >
+                          <div class="flex flex-wrap items-center gap-2 text-xs text-crm-muted">
+                            <span class="font-semibold text-white">[[ message.directionLabel ]]</span>
+                            <span>• [[ message.statusLabel ]]</span>
+                            <span>• [[ formatEventTimestamp(message.sentAt || message.receivedAt || message.createdAt) ]]</span>
+                          </div>
+                          <div v-if="message.subject" class="mt-2 text-sm font-semibold text-white [overflow-wrap:anywhere]">[[ message.subject ]]</div>
+                          <div class="mt-2 whitespace-pre-line text-sm text-white [overflow-wrap:anywhere]">[[ message.bodyText || message.bodyPreview || 'Без текста' ]]</div>
+                          <div v-if="message.lastErrorMessage" class="mt-2 text-xs text-red-200 [overflow-wrap:anywhere]">[[ message.lastErrorMessage ]]</div>
+                          <div v-if="message.attachments.length" class="mt-3 flex flex-wrap gap-2">
+                            <a
+                              v-for="attachment in message.attachments"
+                              :key="`company-message-attachment-${attachment.id}`"
+                              :href="attachment.fileUrl"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="inline-flex max-w-full items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 py-2 text-xs text-white transition hover:border-crm-accent"
+                            >
+                              <span class="truncate">[[ attachment.originalName || 'Вложение' ]]</span>
+                              <span class="shrink-0 text-crm-muted">[[ formatFileSize(attachment.sizeBytes) ]]</span>
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="mt-4 rounded-2xl border border-crm-border bg-[#102f4a] p-3">
+                        <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Новое сообщение</div>
+                        <div v-if="getActiveCompanyConversation().channel === 'email'" class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <label class="block md:col-span-2">
+                            <span class="text-sm text-crm-muted">Тема</span>
+                            <input v-model.trim="companyCommunicationComposer.subject" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" />
+                          </label>
+                          <label class="block md:col-span-2">
+                            <span class="text-sm text-crm-muted">Получатель</span>
+                            <input v-model.trim="companyCommunicationComposer.recipient" type="text" placeholder="Можно оставить пустым" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" />
+                          </label>
+                        </div>
+                        <label class="mt-3 block">
+                          <span class="text-sm text-crm-muted">Текст</span>
+                          <textarea v-model.trim="companyCommunicationComposer.bodyText" rows="5" class="mt-1 w-full rounded-2xl border border-crm-border bg-[#0f2f4a] px-3 py-3 outline-none focus:border-crm-accent"></textarea>
+                        </label>
+                        <div class="mt-3 flex justify-end">
+                          <button
+                            type="button"
+                            @click="sendCompanyCommunicationMessage"
+                            :disabled="isCompanyCommunicationSending"
+                            class="inline-flex h-10 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            [[ isCompanyCommunicationSending ? 'Отправляем...' : 'Отправить сообщение' ]]
+                          </button>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
               </div>
               <div v-if="showCompanyWorkRules" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                 <div class="py-1">

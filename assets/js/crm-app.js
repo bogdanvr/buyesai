@@ -82,20 +82,28 @@
           showDealCompanyForm: false,
           showDealContactsPanel: false,
           showDealDocumentsPanel: false,
+          showDealCommunicationsPanel: false,
           showDealContactForm: false,
           isDealContactsLoading: false,
           isDealDocumentsLoading: false,
+          isDealCommunicationsLoading: false,
+          isDealConversationMessagesLoading: false,
+          isDealCommunicationSending: false,
           isDealDocumentUploading: false,
           isTouchDocumentsLoading: false,
           isTouchDocumentUploading: false,
           isCompanyContactSaving: false,
           isCompanyContactsLoading: false,
           isCompanyDocumentsLoading: false,
+          isCompanyCommunicationsLoading: false,
+          isCompanyConversationMessagesLoading: false,
+          isCompanyCommunicationSending: false,
           isCompanyDocumentUploading: false,
           isTaskTouchesLoading: false,
           showCompanyContactForm: false,
           showCompanyContactsPanel: false,
           showCompanyDocumentsPanel: false,
+          showCompanyCommunicationsPanel: false,
           showCompanyDealsPanel: false,
           showCompanyLeadsPanel: false,
           showCompanyWorkRules: false,
@@ -291,6 +299,15 @@
           },
           dealTasksForActiveDeal: [],
           dealDocumentsForActiveDeal: [],
+          dealCommunications: [],
+          dealManualBindingConversations: [],
+          dealConversationMessages: [],
+          activeDealConversationId: null,
+          dealCommunicationComposer: {
+            subject: "",
+            bodyText: "",
+            recipient: ""
+          },
           touchDealDocuments: [],
           touchCompanyDocuments: [],
           dealCompanyContacts: [],
@@ -310,6 +327,15 @@
           companyContactsForActiveCompany: [],
           companyDocumentsForActiveCompany: [],
           companyDealDocumentGroups: [],
+          companyCommunications: [],
+          companyConversationMessages: [],
+          activeCompanyConversationId: null,
+          companyCommunicationComposer: {
+            subject: "",
+            bodyText: "",
+            recipient: ""
+          },
+          communicationsPollTimer: null,
           metaOptions: {
             leadStatuses: [],
             dealStages: [],
@@ -1830,6 +1856,9 @@
                 taskId: null,
                 touchId: null,
                 dealId: null,
+                conversationId: null,
+                communicationMessageId: null,
+                communicationChannel: "",
                 eventType: "",
                 priority: "",
                 title: "",
@@ -1874,6 +1903,20 @@
                 if (line.indexOf("deal_id:") === 0) {
                   const parsedDealId = Number.parseInt(line.replace(/^deal_id:\s*/u, "").trim(), 10);
                   eventItem.dealId = Number.isNaN(parsedDealId) ? null : parsedDealId;
+                  return;
+                }
+                if (line.indexOf("conversation_id:") === 0) {
+                  const parsedConversationId = Number.parseInt(line.replace(/^conversation_id:\s*/u, "").trim(), 10);
+                  eventItem.conversationId = Number.isNaN(parsedConversationId) ? null : parsedConversationId;
+                  return;
+                }
+                if (line.indexOf("communication_message_id:") === 0) {
+                  const parsedMessageId = Number.parseInt(line.replace(/^communication_message_id:\s*/u, "").trim(), 10);
+                  eventItem.communicationMessageId = Number.isNaN(parsedMessageId) ? null : parsedMessageId;
+                  return;
+                }
+                if (line.indexOf("communication_channel:") === 0) {
+                  eventItem.communicationChannel = line.replace(/^communication_channel:\s*/u, "").trim();
                   return;
                 }
                 if (line.indexOf("event_type:") === 0) {
@@ -2300,6 +2343,51 @@
             this.errorMessage = `Ошибка открытия сделки: ${error.message}`;
           }
         },
+        async fetchConversationById(conversationId) {
+          const normalizedConversationId = this.toIntOrNull(conversationId);
+          if (!normalizedConversationId) {
+            throw new Error("Некорректный ID диалога");
+          }
+          return this.mapConversation(await this.apiRequest(`/api/v1/communications/conversations/${normalizedConversationId}/`));
+        },
+        async openCommunicationConversationFromEvent(eventItem) {
+          const conversationId = this.toIntOrNull(eventItem?.conversationId);
+          if (!conversationId) {
+            throw new Error("Диалог не найден");
+          }
+          const conversation = await this.fetchConversationById(conversationId);
+          const dealId = this.toIntOrNull(conversation.dealId || eventItem?.dealId);
+          const companyId = this.toIntOrNull(
+            conversation.clientId
+            || this.editingCompanyId
+            || this.editingLeadItem?.clientId
+            || this.editingDealItem?.clientId
+          );
+
+          if (dealId) {
+            const deal = await this.fetchDealById(dealId);
+            this.openDealEditor(deal);
+            this.showDealCommunicationsPanel = true;
+            await this.loadDealCommunications({ preserveSelection: false, forceReloadMessages: true });
+            await this.selectDealConversation(conversationId, { silent: true });
+            this.ensureCommunicationsPolling();
+            return;
+          }
+
+          if (companyId) {
+            const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId));
+            if (company) {
+              this.openCompanyEditor(company);
+              this.showCompanyCommunicationsPanel = true;
+              await this.loadCompanyCommunications({ preserveSelection: false, forceReloadMessages: true });
+              await this.selectCompanyConversation(conversationId, { silent: true });
+              this.ensureCommunicationsPolling();
+              return;
+            }
+          }
+
+          throw new Error("Не удалось определить карточку для открытия переписки");
+        },
         sortDealStages(stages) {
           return [...(Array.isArray(stages) ? stages : [])].sort((left, right) => {
             const leftOrder = Number.parseInt(left && left.order, 10);
@@ -2394,9 +2482,13 @@
           this.showCompanyRequisites = normalized === "requisites" ? this.showCompanyRequisites : false;
           this.showCompanyContactsPanel = normalized === "contacts" ? this.showCompanyContactsPanel : false;
           this.showCompanyDocumentsPanel = normalized === "documents" ? this.showCompanyDocumentsPanel : false;
+          this.showCompanyCommunicationsPanel = normalized === "communications" ? this.showCompanyCommunicationsPanel : false;
           this.showCompanyWorkRules = normalized === "workRules" ? this.showCompanyWorkRules : false;
           this.showCompanyDealsPanel = normalized === "deals" ? this.showCompanyDealsPanel : false;
           this.showCompanyLeadsPanel = normalized === "leads" ? this.showCompanyLeadsPanel : false;
+          if (normalized !== "communications") {
+            this.stopCommunicationsPollingIfIdle();
+          }
         },
         toggleExclusiveCompanyPanel(panelKey) {
           const normalized = String(panelKey || "");
@@ -2406,6 +2498,8 @@
               ? this.showCompanyContactsPanel
               : normalized === "documents"
                 ? this.showCompanyDocumentsPanel
+              : normalized === "communications"
+                ? this.showCompanyCommunicationsPanel
               : normalized === "workRules"
                 ? this.showCompanyWorkRules
                 : normalized === "deals"
@@ -2420,6 +2514,7 @@
           if (normalized === "requisites") this.showCompanyRequisites = true;
           if (normalized === "contacts") this.showCompanyContactsPanel = true;
           if (normalized === "documents") this.showCompanyDocumentsPanel = true;
+          if (normalized === "communications") this.showCompanyCommunicationsPanel = true;
           if (normalized === "workRules") this.showCompanyWorkRules = true;
           if (normalized === "deals") this.showCompanyDealsPanel = true;
           if (normalized === "leads") this.showCompanyLeadsPanel = true;
@@ -2437,11 +2532,408 @@
             await this.loadCompanyDocuments();
           }
         },
+        async toggleCompanyCommunicationsPanel() {
+          const wasOpen = this.showCompanyCommunicationsPanel;
+          this.toggleExclusiveCompanyPanel("communications");
+          if (!wasOpen && this.showCompanyCommunicationsPanel) {
+            await this.loadCompanyCommunications({ preserveSelection: false });
+            return;
+          }
+          if (!this.showCompanyCommunicationsPanel) {
+            this.stopCommunicationsPollingIfIdle();
+          }
+        },
         toggleCompanyDealsPanel() {
           this.toggleExclusiveCompanyPanel("deals");
         },
         toggleCompanyLeadsPanel() {
           this.toggleExclusiveCompanyPanel("leads");
+        },
+        communicationChannelLabel(value) {
+          const code = String(value || "").trim().toLowerCase();
+          if (!code) return "Сообщение";
+          if (code === "email") return "Email";
+          if (code === "telegram") return "Telegram";
+          return code;
+        },
+        communicationMessageStatusLabel(value) {
+          const code = String(value || "").trim().toLowerCase();
+          const labels = {
+            draft: "Черновик",
+            queued: "В очереди",
+            sending: "Отправляется",
+            sent: "Отправлено",
+            delivered: "Доставлено",
+            received: "Получено",
+            failed: "Ошибка",
+            requires_manual_retry: "Нужен ручной retry",
+          };
+          return labels[code] || "Без статуса";
+        },
+        communicationMessageDirectionLabel(value) {
+          return String(value || "").trim().toLowerCase() === "incoming" ? "Входящее" : "Исходящее";
+        },
+        mapConversation(item) {
+          return {
+            id: this.toIntOrNull(item.id),
+            channel: String(item.channel || "").trim().toLowerCase(),
+            channelLabel: this.communicationChannelLabel(item.channel),
+            subject: item.subject || "",
+            status: item.status || "",
+            clientId: this.toIntOrNull(item.client),
+            clientName: item.client_name || "",
+            contactId: this.toIntOrNull(item.contact),
+            contactName: item.contact_name || "",
+            dealId: this.toIntOrNull(item.deal),
+            dealTitle: item.deal_title || "",
+            requiresManualBinding: !!item.requires_manual_binding,
+            lastMessageId: this.toIntOrNull(item.last_message_id),
+            lastMessageDirection: item.last_message_direction || "",
+            lastMessagePreview: item.last_message_preview || "",
+            lastMessageAt: item.last_message_at || "",
+            lastIncomingAt: item.last_incoming_at || "",
+            lastOutgoingAt: item.last_outgoing_at || "",
+            createdAt: item.created_at || "",
+            updatedAt: item.updated_at || "",
+          };
+        },
+        mapCommunicationMessage(item) {
+          return {
+            id: this.toIntOrNull(item.id),
+            conversationId: this.toIntOrNull(item.conversation),
+            channel: String(item.channel || "").trim().toLowerCase(),
+            direction: String(item.direction || "").trim().toLowerCase(),
+            directionLabel: this.communicationMessageDirectionLabel(item.direction),
+            status: item.status || "",
+            statusLabel: this.communicationMessageStatusLabel(item.status),
+            subject: item.subject || "",
+            bodyText: item.body_text || "",
+            bodyHtml: item.body_html || "",
+            bodyPreview: item.body_preview || "",
+            sentAt: item.sent_at || "",
+            receivedAt: item.received_at || "",
+            deliveredAt: item.delivered_at || "",
+            createdAt: item.created_at || "",
+            externalSenderKey: item.external_sender_key || "",
+            externalRecipientKey: item.external_recipient_key || "",
+            contactName: item.contact_name || "",
+            dealTitle: item.deal_title || "",
+            clientName: item.client_name || "",
+            lastErrorMessage: item.last_error_message || "",
+            requiresManualRetry: !!item.requires_manual_retry,
+            attachments: Array.isArray(item.attachments) ? item.attachments.map((attachment) => ({
+              id: this.toIntOrNull(attachment.id),
+              originalName: attachment.original_name || "",
+              mimeType: attachment.mime_type || "",
+              sizeBytes: Number.parseInt(attachment.size_bytes || 0, 10) || 0,
+              fileUrl: attachment.file_url || "",
+            })) : [],
+          };
+        },
+        getActiveCompanyConversation() {
+          const conversationId = this.toIntOrNull(this.activeCompanyConversationId);
+          if (!conversationId) return null;
+          return (this.companyCommunications || []).find((item) => String(item.id) === String(conversationId)) || null;
+        },
+        getActiveDealConversation() {
+          const conversationId = this.toIntOrNull(this.activeDealConversationId);
+          if (!conversationId) return null;
+          return (this.dealCommunications || []).find((item) => String(item.id) === String(conversationId)) || null;
+        },
+        getDefaultCommunicationComposer(conversation) {
+          return {
+            subject: conversation?.channel === "email" ? String(conversation?.subject || "").trim() : "",
+            bodyText: "",
+            recipient: "",
+          };
+        },
+        resetCompanyCommunicationsState() {
+          this.showCompanyCommunicationsPanel = false;
+          this.isCompanyCommunicationsLoading = false;
+          this.isCompanyConversationMessagesLoading = false;
+          this.isCompanyCommunicationSending = false;
+          this.companyCommunications = [];
+          this.companyConversationMessages = [];
+          this.activeCompanyConversationId = null;
+          this.companyCommunicationComposer = this.getDefaultCommunicationComposer(null);
+          this.stopCommunicationsPollingIfIdle();
+        },
+        resetDealCommunicationsState() {
+          this.showDealCommunicationsPanel = false;
+          this.isDealCommunicationsLoading = false;
+          this.isDealConversationMessagesLoading = false;
+          this.isDealCommunicationSending = false;
+          this.dealCommunications = [];
+          this.dealManualBindingConversations = [];
+          this.dealConversationMessages = [];
+          this.activeDealConversationId = null;
+          this.dealCommunicationComposer = this.getDefaultCommunicationComposer(null);
+          this.stopCommunicationsPollingIfIdle();
+        },
+        ensureCommunicationsPolling() {
+          if (this.communicationsPollTimer || typeof window === "undefined") return;
+          this.communicationsPollTimer = window.setInterval(() => {
+            this.pollOpenCommunicationsPanels().catch(() => {});
+          }, 30000);
+        },
+        stopCommunicationsPollingIfIdle() {
+          if (
+            this.showModal
+            && (this.showCompanyCommunicationsPanel || this.showDealCommunicationsPanel)
+          ) {
+            return;
+          }
+          if (this.communicationsPollTimer && typeof window !== "undefined") {
+            window.clearInterval(this.communicationsPollTimer);
+          }
+          this.communicationsPollTimer = null;
+        },
+        async pollOpenCommunicationsPanels() {
+          if (!this.showModal) {
+            this.stopCommunicationsPollingIfIdle();
+            return;
+          }
+          const tasks = [];
+          if (this.showCompanyCommunicationsPanel && this.editingCompanyId) {
+            tasks.push(this.loadCompanyCommunications({
+              silent: true,
+              preserveSelection: true,
+              forceReloadMessages: true,
+            }));
+          }
+          if (this.showDealCommunicationsPanel && this.editingDealId) {
+            tasks.push(this.loadDealCommunications({
+              silent: true,
+              preserveSelection: true,
+              forceReloadMessages: true,
+            }));
+          }
+          if (!tasks.length) {
+            this.stopCommunicationsPollingIfIdle();
+            return;
+          }
+          await Promise.all(tasks);
+        },
+        async loadCompanyConversationMessages(conversationId, options = {}) {
+          const normalizedConversationId = this.toIntOrNull(conversationId);
+          if (!normalizedConversationId) {
+            this.companyConversationMessages = [];
+            return;
+          }
+          if (!options.silent) {
+            this.isCompanyConversationMessagesLoading = true;
+          }
+          try {
+            const payload = await this.apiRequest(`/api/v1/communications/conversations/${normalizedConversationId}/messages/`);
+            const records = Array.isArray(payload) ? payload : this.normalizePaginatedResponse(payload);
+            this.companyConversationMessages = records.map((item) => this.mapCommunicationMessage(item));
+          } finally {
+            this.isCompanyConversationMessagesLoading = false;
+          }
+        },
+        async loadDealConversationMessages(conversationId, options = {}) {
+          const normalizedConversationId = this.toIntOrNull(conversationId);
+          if (!normalizedConversationId) {
+            this.dealConversationMessages = [];
+            return;
+          }
+          if (!options.silent) {
+            this.isDealConversationMessagesLoading = true;
+          }
+          try {
+            const payload = await this.apiRequest(`/api/v1/communications/conversations/${normalizedConversationId}/messages/`);
+            const records = Array.isArray(payload) ? payload : this.normalizePaginatedResponse(payload);
+            this.dealConversationMessages = records.map((item) => this.mapCommunicationMessage(item));
+          } finally {
+            this.isDealConversationMessagesLoading = false;
+          }
+        },
+        async selectCompanyConversation(conversationId, options = {}) {
+          const normalizedConversationId = this.toIntOrNull(conversationId);
+          this.activeCompanyConversationId = normalizedConversationId;
+          const conversation = this.getActiveCompanyConversation();
+          this.companyCommunicationComposer = this.getDefaultCommunicationComposer(conversation);
+          if (normalizedConversationId) {
+            await this.loadCompanyConversationMessages(normalizedConversationId, options);
+          } else {
+            this.companyConversationMessages = [];
+          }
+        },
+        async selectDealConversation(conversationId, options = {}) {
+          const normalizedConversationId = this.toIntOrNull(conversationId);
+          this.activeDealConversationId = normalizedConversationId;
+          const conversation = this.getActiveDealConversation();
+          this.dealCommunicationComposer = this.getDefaultCommunicationComposer(conversation);
+          if (normalizedConversationId) {
+            await this.loadDealConversationMessages(normalizedConversationId, options);
+          } else {
+            this.dealConversationMessages = [];
+          }
+        },
+        async loadCompanyCommunications(options = {}) {
+          const companyId = this.toIntOrNull(this.editingCompanyId);
+          if (!companyId) {
+            this.companyCommunications = [];
+            this.companyConversationMessages = [];
+            this.activeCompanyConversationId = null;
+            return;
+          }
+          const previousConversationId = this.toIntOrNull(this.activeCompanyConversationId);
+          if (!options.silent) {
+            this.isCompanyCommunicationsLoading = true;
+          }
+          try {
+            const payload = await this.apiRequest(`/api/v1/communications/conversations/?client=${companyId}&page_size=100`);
+            const records = this.normalizePaginatedResponse(payload).map((item) => this.mapConversation(item));
+            this.companyCommunications = records;
+            let nextConversationId = options.preserveSelection ? previousConversationId : null;
+            if (!nextConversationId || !records.some((item) => String(item.id) === String(nextConversationId))) {
+              nextConversationId = records[0]?.id || null;
+            }
+            const shouldReloadMessages = !!nextConversationId && (
+              options.forceReloadMessages
+              || String(nextConversationId) !== String(previousConversationId || "")
+              || !this.companyConversationMessages.length
+            );
+            this.activeCompanyConversationId = nextConversationId;
+            this.companyCommunicationComposer = this.getDefaultCommunicationComposer(this.getActiveCompanyConversation());
+            if (shouldReloadMessages) {
+              await this.loadCompanyConversationMessages(nextConversationId, { silent: options.silent });
+            } else if (!nextConversationId) {
+              this.companyConversationMessages = [];
+            }
+            if (this.showCompanyCommunicationsPanel) {
+              this.ensureCommunicationsPolling();
+            }
+          } finally {
+            this.isCompanyCommunicationsLoading = false;
+          }
+        },
+        async loadDealCommunications(options = {}) {
+          const dealId = this.toIntOrNull(this.editingDealId);
+          if (!dealId) {
+            this.dealCommunications = [];
+            this.dealManualBindingConversations = [];
+            this.dealConversationMessages = [];
+            this.activeDealConversationId = null;
+            return;
+          }
+          const companyId = this.toIntOrNull(this.forms.deals.companyId);
+          const previousConversationId = this.toIntOrNull(this.activeDealConversationId);
+          if (!options.silent) {
+            this.isDealCommunicationsLoading = true;
+          }
+          try {
+            const requests = [
+              this.apiRequest(`/api/v1/communications/conversations/?deal=${dealId}&page_size=100`)
+            ];
+            if (companyId) {
+              requests.push(this.apiRequest(`/api/v1/communications/conversations/?client=${companyId}&requires_manual_binding=true&page_size=100`));
+            } else {
+              requests.push(Promise.resolve([]));
+            }
+            const [dealPayload, manualPayload] = await Promise.all(requests);
+            const dealRecords = this.normalizePaginatedResponse(dealPayload).map((item) => this.mapConversation(item));
+            const manualRecords = this.normalizePaginatedResponse(manualPayload)
+              .map((item) => this.mapConversation(item))
+              .filter((item) => item.requiresManualBinding && !this.toIntOrNull(item.dealId));
+            this.dealCommunications = dealRecords;
+            this.dealManualBindingConversations = manualRecords;
+            let nextConversationId = options.preserveSelection ? previousConversationId : null;
+            if (!nextConversationId || !dealRecords.some((item) => String(item.id) === String(nextConversationId))) {
+              nextConversationId = dealRecords[0]?.id || null;
+            }
+            const shouldReloadMessages = !!nextConversationId && (
+              options.forceReloadMessages
+              || String(nextConversationId) !== String(previousConversationId || "")
+              || !this.dealConversationMessages.length
+            );
+            this.activeDealConversationId = nextConversationId;
+            this.dealCommunicationComposer = this.getDefaultCommunicationComposer(this.getActiveDealConversation());
+            if (shouldReloadMessages) {
+              await this.loadDealConversationMessages(nextConversationId, { silent: options.silent });
+            } else if (!nextConversationId) {
+              this.dealConversationMessages = [];
+            }
+            if (this.showDealCommunicationsPanel) {
+              this.ensureCommunicationsPolling();
+            }
+          } finally {
+            this.isDealCommunicationsLoading = false;
+          }
+        },
+        async bindCompanyConversation(conversationId) {
+          const companyId = this.toIntOrNull(this.editingCompanyId);
+          const normalizedConversationId = this.toIntOrNull(conversationId);
+          if (!companyId || !normalizedConversationId) return;
+          await this.apiRequest(`/api/v1/communications/conversations/${normalizedConversationId}/bind/`, {
+            method: "POST",
+            body: {
+              client: companyId,
+            }
+          });
+          await this.loadCompanyCommunications({ preserveSelection: true, forceReloadMessages: true });
+        },
+        async bindDealConversationToCurrentDeal(conversationId) {
+          const dealId = this.toIntOrNull(this.editingDealId);
+          const companyId = this.toIntOrNull(this.forms.deals.companyId);
+          const normalizedConversationId = this.toIntOrNull(conversationId);
+          if (!dealId || !normalizedConversationId) return;
+          await this.apiRequest(`/api/v1/communications/conversations/${normalizedConversationId}/bind/`, {
+            method: "POST",
+            body: {
+              client: companyId,
+              deal: dealId,
+            }
+          });
+          this.activeDealConversationId = normalizedConversationId;
+          await this.loadDealCommunications({ preserveSelection: true, forceReloadMessages: true });
+          if (companyId && this.showCompanyCommunicationsPanel && this.toIntOrNull(this.editingCompanyId) === companyId) {
+            await this.loadCompanyCommunications({ silent: true, preserveSelection: true, forceReloadMessages: true });
+          }
+        },
+        async sendCompanyCommunicationMessage() {
+          const conversation = this.getActiveCompanyConversation();
+          if (!conversation?.id || this.isCompanyCommunicationSending) return;
+          this.clearUiErrors({ modalOnly: true });
+          this.isCompanyCommunicationSending = true;
+          try {
+            await this.apiRequest(`/api/v1/communications/conversations/${conversation.id}/send/`, {
+              method: "POST",
+              body: {
+                subject: this.companyCommunicationComposer.subject,
+                body_text: this.companyCommunicationComposer.bodyText,
+                recipient: this.companyCommunicationComposer.recipient,
+              }
+            });
+            this.companyCommunicationComposer = this.getDefaultCommunicationComposer(conversation);
+            await this.loadCompanyCommunications({ preserveSelection: true, forceReloadMessages: true });
+          } finally {
+            this.isCompanyCommunicationSending = false;
+          }
+        },
+        async sendDealCommunicationMessage() {
+          const conversation = this.getActiveDealConversation();
+          if (!conversation?.id || this.isDealCommunicationSending) return;
+          this.clearUiErrors({ modalOnly: true });
+          this.isDealCommunicationSending = true;
+          try {
+            await this.apiRequest(`/api/v1/communications/conversations/${conversation.id}/send/`, {
+              method: "POST",
+              body: {
+                subject: this.dealCommunicationComposer.subject,
+                body_text: this.dealCommunicationComposer.bodyText,
+                recipient: this.dealCommunicationComposer.recipient,
+              }
+            });
+            this.dealCommunicationComposer = this.getDefaultCommunicationComposer(conversation);
+            await this.loadDealCommunications({ preserveSelection: true, forceReloadMessages: true });
+          } finally {
+            this.isDealCommunicationSending = false;
+          }
+        },
+        async quickOpenDealCommunications() {
+          await this.toggleDealCommunicationsPanel();
         },
         toggleCompanyNoteDraft() {
           this.showCompanyNoteDraft = !this.showCompanyNoteDraft;
@@ -3871,6 +4363,7 @@
           this.resetDealTaskForm();
           this.resetTaskFollowUpForm();
           this.showDealTaskForm = false;
+          this.resetDealCommunicationsState();
           this.showDealDocumentsPanel = false;
           this.dealDocumentsForActiveDeal = [];
           this.resetDealCompanyForm();
@@ -3891,6 +4384,14 @@
           const deal = (this.datasets.deals || []).find((item) => String(item.id) === String(normalizedId));
           if (deal) {
             this.openDealEditor(deal);
+          }
+        },
+        openCompanyEditorById(companyId) {
+          const normalizedId = this.toIntOrNull(companyId);
+          if (!normalizedId) return;
+          const company = (this.datasets.companies || []).find((item) => String(item.id) === String(normalizedId));
+          if (company) {
+            this.openCompanyEditor(company);
           }
         },
         openContactEditor(item) {
@@ -3933,6 +4434,7 @@
           this.showCompanyWorkRules = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDocumentsPanel = false;
+          this.resetCompanyCommunicationsState();
           this.showCompanyDealsPanel = false;
           this.showCompanyLeadsPanel = false;
           this.showCompanyLeadsPanel = false;
@@ -3970,6 +4472,7 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDocumentsPanel = false;
+          this.resetCompanyCommunicationsState();
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
           this.showCompanyLeadsPanel = false;
@@ -4069,6 +4572,12 @@
         },
         toggleDealTaskForm() {
           this.showDealTaskForm = !this.showDealTaskForm;
+          if (this.showDealTaskForm) {
+            this.showDealDocumentsPanel = false;
+            this.showDealContactsPanel = false;
+            this.showDealCommunicationsPanel = false;
+            this.stopCommunicationsPollingIfIdle();
+          }
         },
         handleDealCompanySelectChange() {
           if (this.forms.deals.companyId !== "__create__") {
@@ -4095,10 +4604,26 @@
           if (!this.dealHasSelectedCompany) return;
           this.showDealContactsPanel = !this.showDealContactsPanel;
           if (this.showDealContactsPanel) {
+            this.showDealDocumentsPanel = false;
+            this.showDealTaskForm = false;
+            this.showDealCommunicationsPanel = false;
+            this.stopCommunicationsPollingIfIdle();
             await this.loadContactsForSelectedDealCompany();
             return;
           }
           this.showDealContactForm = false;
+        },
+        async toggleDealCommunicationsPanel() {
+          if (!this.editingDealId) return;
+          this.showDealCommunicationsPanel = !this.showDealCommunicationsPanel;
+          if (this.showDealCommunicationsPanel) {
+            this.showDealDocumentsPanel = false;
+            this.showDealContactsPanel = false;
+            this.showDealTaskForm = false;
+            await this.loadDealCommunications({ preserveSelection: false });
+            return;
+          }
+          this.stopCommunicationsPollingIfIdle();
         },
         toggleDealContactForm() {
           if (!this.dealHasSelectedCompany) return;
@@ -4612,6 +5137,9 @@
           this.showDealDocumentsPanel = !this.showDealDocumentsPanel;
           if (this.showDealDocumentsPanel) {
             this.showDealContactsPanel = false;
+            this.showDealTaskForm = false;
+            this.showDealCommunicationsPanel = false;
+            this.stopCommunicationsPollingIfIdle();
             await this.loadDealDocuments();
           }
         },
@@ -5911,6 +6439,7 @@
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
           this.showDealDocumentsPanel = false;
+          this.resetDealCommunicationsState();
           this.showDealContactForm = false;
           this.resetDealCompanyForm();
           this.dealCompanyContacts = [];
@@ -5921,6 +6450,7 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDocumentsPanel = false;
+          this.resetCompanyCommunicationsState();
           this.showCompanyRequisites = false;
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
@@ -5963,6 +6493,7 @@
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
           this.showDealDocumentsPanel = false;
+          this.resetDealCommunicationsState();
           this.showDealContactForm = false;
           this.resetDealCompanyForm();
           this.dealCompanyContacts = [];
@@ -5973,6 +6504,7 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDocumentsPanel = false;
+          this.resetCompanyCommunicationsState();
           this.showCompanyRequisites = false;
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
@@ -6013,6 +6545,7 @@
           this.cancelSourceCreate();
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
+          this.resetDealCommunicationsState();
           this.showDealContactForm = false;
           this.resetDealCompanyForm();
           this.dealCompanyContacts = [];
@@ -6021,6 +6554,7 @@
           this.touchCompanyDocuments = [];
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
+          this.resetCompanyCommunicationsState();
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
           this.showCompanyLeadsPanel = false;

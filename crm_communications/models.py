@@ -327,6 +327,14 @@ class Message(TimestampedModel):
         on_delete=models.SET_NULL,
         verbose_name="Сделка",
     )
+    touch = models.OneToOneField(
+        "crm.Touch",
+        related_name="communication_message",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Связанное касание",
+    )
     author_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name="communication_messages",
@@ -348,6 +356,7 @@ class Message(TimestampedModel):
     in_reply_to = models.CharField(max_length=255, blank=True, default="", verbose_name="In-Reply-To")
     references = models.TextField(blank=True, default="", verbose_name="References")
     queued_at = models.DateTimeField(blank=True, null=True, verbose_name="Поставлено в очередь")
+    next_attempt_at = models.DateTimeField(blank=True, null=True, verbose_name="Следующая попытка не раньше")
     sending_started_at = models.DateTimeField(blank=True, null=True, verbose_name="Начало отправки")
     sent_at = models.DateTimeField(blank=True, null=True, verbose_name="Отправлено")
     received_at = models.DateTimeField(blank=True, null=True, verbose_name="Получено")
@@ -377,6 +386,7 @@ class Message(TimestampedModel):
             models.Index(fields=["client"]),
             models.Index(fields=["deal"]),
             models.Index(fields=["provider_message_id"]),
+            models.Index(fields=["next_attempt_at"]),
         ]
 
     def __str__(self):

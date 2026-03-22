@@ -424,6 +424,20 @@ def _touch_document_event_lines(instance: Touch) -> list[str]:
     return lines
 
 
+def _touch_communication_event_lines(instance: Touch) -> list[str]:
+    message = getattr(instance, "communication_message", None)
+    if message is None:
+        return []
+    lines: list[str] = []
+    if getattr(message, "conversation_id", None):
+        lines.append(f"conversation_id: {message.conversation_id}")
+    if getattr(message, "id", None):
+        lines.append(f"communication_message_id: {message.id}")
+    if getattr(message, "channel", None):
+        lines.append(f"communication_channel: {message.channel}")
+    return lines
+
+
 def _touch_event_extra_lines(instance: Touch, channel_label: str, result_label: str) -> list[str]:
     return [
         f"title: {_touch_title(instance)}",
@@ -434,6 +448,7 @@ def _touch_event_extra_lines(instance: Touch, channel_label: str, result_label: 
         instance.summary and f"summary: {instance.summary}",
         instance.next_step and f"next_step: {instance.next_step}",
         instance.next_step_at and f"next_step_at: {timezone.localtime(instance.next_step_at).isoformat()}",
+        *_touch_communication_event_lines(instance),
         *_touch_document_event_lines(instance),
     ]
 
