@@ -3731,6 +3731,16 @@
             this.isUnboundCommunicationsLoading = false;
           }
         },
+        async ensureUnboundConversationAvailable(conversationId) {
+          const normalizedConversationId = this.toIntOrNull(conversationId);
+          if (!normalizedConversationId) return null;
+          let conversation = (this.unboundConversations || []).find((item) => String(item.id) === String(normalizedConversationId)) || null;
+          if (conversation) return conversation;
+          conversation = await this.fetchConversationById(normalizedConversationId);
+          if (!conversation) return null;
+          this.unboundConversations = [conversation, ...(this.unboundConversations || []).filter((item) => String(item.id) !== String(normalizedConversationId))];
+          return conversation;
+        },
         async bindSelectedUnboundConversation() {
           const conversationId = this.toIntOrNull(this.activeUnboundConversationId);
           if (!conversationId || this.isUnboundConversationBinding) return;
@@ -3789,7 +3799,17 @@
         },
         async openNotificationBinding(notification) {
           if (!this.notificationNeedsBinding(notification)) return;
-          await this.previewAutomationMessageDraft(notification.messageDraftId);
+          const draft = this.getAutomationMessageDraftById(notification.messageDraftId);
+          const conversationId = this.toIntOrNull(draft?.conversationId);
+          this.showManagerNotifications = true;
+          if (!conversationId) {
+            this.setUiError("Не удалось определить переписку для привязки.", { modal: true });
+            return;
+          }
+          await this.loadUnboundCommunications({ preserveSelection: false, forceReloadMessages: false, silent: true });
+          await this.ensureUnboundConversationAvailable(conversationId);
+          await this.selectUnboundConversation(conversationId, { silent: true });
+          this.managerNotificationReplyDraftId = "";
           this.scrollToUnboundBinding();
         },
         async openManagerNotification(item) {
