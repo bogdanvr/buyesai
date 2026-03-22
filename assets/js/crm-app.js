@@ -3150,13 +3150,37 @@
             await this.loadCompanyCommunications({ silent: true, preserveSelection: true, forceReloadMessages: true });
           }
         },
+        extractOutgoingMessageResponse(response) {
+          if (response && typeof response === "object" && response.message && typeof response.message === "object") {
+            return response.message;
+          }
+          return response;
+        },
+        ensureOutgoingMessageDelivered(response, contextLabel = "Сообщение") {
+          const message = this.extractOutgoingMessageResponse(response);
+          const status = String(message?.status || "").trim();
+          const errorText = String(message?.last_error_message || "").trim();
+          if (status === "sent") {
+            return message;
+          }
+          if (status === "requires_manual_retry") {
+            throw new Error(errorText || `${contextLabel} не отправлено автоматически и требует ручной отправки.`);
+          }
+          if (status === "failed") {
+            throw new Error(errorText || `${contextLabel} не отправлено.`);
+          }
+          if (status === "queued" || status === "sending") {
+            throw new Error(`${contextLabel} поставлено в очередь, но отправка ещё не подтверждена.`);
+          }
+          throw new Error(`${contextLabel} не отправлено. Текущий статус: ${status || "неизвестен"}.`);
+        },
         async sendCompanyCommunicationMessage() {
           const conversation = this.getActiveCompanyConversation();
           if (!conversation?.id || this.isCompanyCommunicationSending) return;
           this.clearUiErrors({ modalOnly: true });
           this.isCompanyCommunicationSending = true;
           try {
-            await this.apiRequest(`/api/v1/communications/conversations/${conversation.id}/send/`, {
+            const response = await this.apiRequest(`/api/v1/communications/conversations/${conversation.id}/send/`, {
               method: "POST",
               body: {
                 subject: this.companyCommunicationComposer.subject,
@@ -3164,8 +3188,11 @@
                 recipient: this.companyCommunicationComposer.recipient,
               }
             });
+            this.ensureOutgoingMessageDelivered(response, "Письмо");
             this.companyCommunicationComposer = this.getDefaultCommunicationComposer(conversation);
             await this.loadCompanyCommunications({ preserveSelection: true, forceReloadMessages: true });
+          } catch (error) {
+            this.setUiError(`Ошибка отправки сообщения: ${error.message}`, { modal: true });
           } finally {
             this.isCompanyCommunicationSending = false;
           }
@@ -3176,7 +3203,7 @@
           this.clearUiErrors({ modalOnly: true });
           this.isDealCommunicationSending = true;
           try {
-            await this.apiRequest(`/api/v1/communications/conversations/${conversation.id}/send/`, {
+            const response = await this.apiRequest(`/api/v1/communications/conversations/${conversation.id}/send/`, {
               method: "POST",
               body: {
                 subject: this.dealCommunicationComposer.subject,
@@ -3184,8 +3211,11 @@
                 recipient: this.dealCommunicationComposer.recipient,
               }
             });
+            this.ensureOutgoingMessageDelivered(response, "Письмо");
             this.dealCommunicationComposer = this.getDefaultCommunicationComposer(conversation);
             await this.loadDealCommunications({ preserveSelection: true, forceReloadMessages: true });
+          } catch (error) {
+            this.setUiError(`Ошибка отправки сообщения: ${error.message}`, { modal: true });
           } finally {
             this.isDealCommunicationSending = false;
           }
@@ -3207,6 +3237,7 @@
                 body_text: this.dealCommunicationStartForm.bodyText,
               }
             });
+            this.ensureOutgoingMessageDelivered(response, "Письмо");
             const createdConversationId = this.toIntOrNull(response?.conversation?.id);
             this.showDealCommunicationStartForm = false;
             this.dealCommunicationStartForm = this.getDefaultDealCommunicationStartForm();
@@ -3214,6 +3245,8 @@
             if (createdConversationId) {
               await this.selectDealConversation(createdConversationId, { silent: true });
             }
+          } catch (error) {
+            this.setUiError(`Ошибка старта переписки: ${error.message}`, { modal: true });
           } finally {
             this.isDealCommunicationStarting = false;
           }
@@ -4700,7 +4733,7 @@
           this.clearUiErrors({ modalOnly: true });
           this.isUnboundCommunicationSending = true;
           try {
-            await this.apiRequest(`/api/v1/communications/conversations/${conversation.id}/send/`, {
+            const response = await this.apiRequest(`/api/v1/communications/conversations/${conversation.id}/send/`, {
               method: "POST",
               body: {
                 subject: this.unboundCommunicationComposer.subject,
@@ -4708,12 +4741,15 @@
                 recipient: this.unboundCommunicationComposer.recipient,
               }
             });
+            this.ensureOutgoingMessageDelivered(response, "Письмо");
             this.unboundCommunicationComposer = this.getDefaultCommunicationComposer(conversation);
             await Promise.all([
               this.loadUnboundCommunications({ preserveSelection: true, forceReloadMessages: true, silent: true }),
               this.loadAutomationMessageDrafts(),
               this.loadAutomationQueue(),
             ]);
+          } catch (error) {
+            this.setUiError(`Ошибка отправки сообщения: ${error.message}`, { modal: true });
           } finally {
             this.isUnboundCommunicationSending = false;
           }
