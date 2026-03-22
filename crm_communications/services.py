@@ -622,6 +622,37 @@ class CommunicationTouchService:
         return channel
 
     @staticmethod
+    def _resolve_touch_lead(*, message: Message) -> Lead | None:
+        direct_lead = getattr(getattr(message, "deal", None), "lead", None)
+        if direct_lead is not None:
+            return direct_lead
+
+        related_message = (
+            Message.objects.select_related("touch__lead")
+            .filter(conversation=message.conversation)
+            .exclude(pk=message.pk)
+            .exclude(touch__isnull=True)
+            .exclude(touch__lead__isnull=True)
+            .order_by("-received_at", "-sent_at", "-created_at", "-id")
+            .first()
+        )
+        inherited_lead = getattr(getattr(related_message, "touch", None), "lead", None)
+        if inherited_lead is not None:
+            return inherited_lead
+
+        if message.client_id:
+            client_leads = get_open_leads_for_client(client=message.client)
+            if len(client_leads) == 1:
+                return client_leads[0]
+
+        contact_email = normalize_email(getattr(getattr(message, "contact", None), "email", ""))
+        if contact_email:
+            email_leads = get_open_leads_for_email(email=contact_email)
+            if len(email_leads) == 1:
+                return email_leads[0]
+        return None
+
+    @staticmethod
     @transaction.atomic
     def ensure_touch_for_message(*, message: Message, happened_at=None) -> Touch:
         message = Message.objects.select_related("deal", "client", "contact", "author_user").get(pk=message.pk)
@@ -636,7 +667,7 @@ class CommunicationTouchService:
             direction=TouchDirection.INCOMING if message.direction == MessageDirection.INCOMING else TouchDirection.OUTGOING,
             summary=CommunicationTouchService._resolve_touch_summary(message=message),
             owner=message.author_user or getattr(getattr(message, "deal", None), "owner", None),
-            lead=getattr(getattr(message, "deal", None), "lead", None),
+            lead=CommunicationTouchService._resolve_touch_lead(message=message),
             deal=message.deal,
             client=message.client,
             contact=message.contact,

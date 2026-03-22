@@ -1096,6 +1096,73 @@ class EmailOutboundMessageServiceTests(TestCase):
         )
 
     @patch("crm_communications.email_outbound.EmailMultiAlternatives")
+    def test_send_message_inherits_lead_from_thread_and_writes_lead_event(self, email_cls_mock):
+        email_instance = email_cls_mock.return_value
+        email_instance.send.return_value = 1
+        lead_status, _ = LeadStatus.objects.get_or_create(
+            code="new",
+            defaults={"name": "Новый", "order": 10, "is_active": True, "is_final": False},
+        )
+        lead = Lead.objects.create(
+            title="Lead from email thread",
+            email="elena@example.com",
+            client=self.client_company,
+            status=lead_status,
+        )
+        lead_conversation = Conversation.objects.create(
+            channel=CommunicationChannelCode.EMAIL,
+            client=self.client_company,
+            contact=self.contact,
+            subject="Lead conversation",
+        )
+        incoming_message = Message.objects.create(
+            conversation=lead_conversation,
+            channel=CommunicationChannelCode.EMAIL,
+            direction=MessageDirection.INCOMING,
+            status=MessageStatus.RECEIVED,
+            client=self.client_company,
+            contact=self.contact,
+            subject="Входящее письмо по лиду",
+            body_text="Первое письмо",
+            body_preview="Первое письмо",
+            external_message_id="lead-incoming@example.com",
+            external_sender_key="email:elena@example.com",
+            received_at=timezone.now() - timedelta(minutes=3),
+        )
+        incoming_touch = Touch.objects.create(
+            happened_at=timezone.now() - timedelta(minutes=3),
+            direction="incoming",
+            summary="Email: Первое письмо",
+            client=self.client_company,
+            contact=self.contact,
+            lead=lead,
+        )
+        incoming_message.touch = incoming_touch
+        incoming_message.save(update_fields=["touch", "updated_at"])
+
+        outgoing_message = Message.objects.create(
+            conversation=lead_conversation,
+            channel=CommunicationChannelCode.EMAIL,
+            direction=MessageDirection.OUTGOING,
+            status=MessageStatus.DRAFT,
+            client=self.client_company,
+            contact=self.contact,
+            author_user=self.user,
+            subject="Ответ по лиду",
+            body_text="Отвечаем клиенту",
+            body_preview="Отвечаем клиенту",
+        )
+        MessageQueueService.enqueue_message(message=outgoing_message)
+
+        processed = EmailOutboundMessageService.send_message(message=outgoing_message)
+        processed.refresh_from_db()
+        lead.refresh_from_db()
+
+        self.assertEqual(processed.status, MessageStatus.SENT)
+        self.assertEqual(processed.touch.lead, lead)
+        self.assertIn(f"touch_id: {processed.touch_id}", str(lead.events or ""))
+
+    @patch("crm_communications.email_outbound.EmailMultiAlternatives")
     def test_send_message_marks_email_as_sent_and_sets_thread_headers(self, email_cls_mock):
         email_instance = email_cls_mock.return_value
         email_instance.send.return_value = 1
