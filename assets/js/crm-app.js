@@ -2831,11 +2831,43 @@
           if (!conversationId) return null;
           return (this.dealCommunications || []).find((item) => String(item.id) === String(conversationId)) || null;
         },
-        getDefaultCommunicationComposer(conversation) {
+        normalizeCommunicationRecipientKey(channelCode, rawValue) {
+          const normalizedChannel = String(channelCode || "").trim().toLowerCase();
+          const raw = String(rawValue || "").trim();
+          if (!raw) return "";
+          if (normalizedChannel === "email") {
+            const emailValue = raw.startsWith("email:") ? raw.slice(6) : raw;
+            const normalizedEmail = String(emailValue || "").trim().toLowerCase();
+            return normalizedEmail.includes("@") ? normalizedEmail : "";
+          }
+          if (normalizedChannel === "telegram") {
+            const telegramValue = raw.startsWith("telegram:") ? raw.slice(9) : raw;
+            const normalizedTelegram = String(telegramValue || "").trim();
+            return normalizedTelegram ? `telegram:${normalizedTelegram}` : "";
+          }
+          return raw;
+        },
+        deriveConversationRecipientFromMessages(conversation, messages = []) {
+          const channelCode = String(conversation?.channel || "").trim().toLowerCase();
+          const sortedMessages = [...(Array.isArray(messages) ? messages : [])].sort((left, right) => {
+            const leftAt = this.parseTaskDueTimestamp(left?.receivedAt || left?.sentAt || left?.createdAt) || 0;
+            const rightAt = this.parseTaskDueTimestamp(right?.receivedAt || right?.sentAt || right?.createdAt) || 0;
+            return rightAt - leftAt;
+          });
+          if (channelCode === "email" || channelCode === "telegram") {
+            const latestIncoming = sortedMessages.find((item) => String(item?.direction || "").trim().toLowerCase() === "incoming");
+            const incomingRecipient = this.normalizeCommunicationRecipientKey(channelCode, latestIncoming?.externalSenderKey);
+            if (incomingRecipient) {
+              return incomingRecipient;
+            }
+          }
+          return this.deriveCommunicationRecipient(channelCode, conversation?.contactId);
+        },
+        getDefaultCommunicationComposer(conversation, messages = []) {
           return {
             subject: conversation?.channel === "email" ? String(conversation?.subject || "").trim() : "",
             bodyText: "",
-            recipient: "",
+            recipient: this.deriveConversationRecipientFromMessages(conversation, messages),
           };
         },
         getAutomationMessageDraftById(messageDraftId) {
@@ -2983,6 +3015,10 @@
             const payload = await this.apiRequest(`/api/v1/communications/conversations/${normalizedConversationId}/messages/`);
             const records = Array.isArray(payload) ? payload : this.normalizePaginatedResponse(payload);
             this.companyConversationMessages = records.map((item) => this.mapCommunicationMessage(item));
+            const conversation = this.getActiveCompanyConversation();
+            if (conversation && String(conversation.id) === String(normalizedConversationId) && !String(this.companyCommunicationComposer.bodyText || "").trim()) {
+              this.companyCommunicationComposer = this.getDefaultCommunicationComposer(conversation, this.companyConversationMessages);
+            }
           } finally {
             this.isCompanyConversationMessagesLoading = false;
           }
@@ -3000,6 +3036,10 @@
             const payload = await this.apiRequest(`/api/v1/communications/conversations/${normalizedConversationId}/messages/`);
             const records = Array.isArray(payload) ? payload : this.normalizePaginatedResponse(payload);
             this.dealConversationMessages = records.map((item) => this.mapCommunicationMessage(item));
+            const conversation = this.getActiveDealConversation();
+            if (conversation && String(conversation.id) === String(normalizedConversationId) && !String(this.dealCommunicationComposer.bodyText || "").trim()) {
+              this.dealCommunicationComposer = this.getDefaultCommunicationComposer(conversation, this.dealConversationMessages);
+            }
           } finally {
             this.isDealConversationMessagesLoading = false;
           }
@@ -3825,6 +3865,10 @@
           this.unboundCommunicationComposer = this.getDefaultCommunicationComposer(conversation);
           if (normalizedConversationId) {
             await this.loadUnboundConversationMessages(normalizedConversationId, options);
+            const activeConversation = this.activeUnboundConversation;
+            if (activeConversation && !String(this.unboundCommunicationComposer.bodyText || "").trim()) {
+              this.unboundCommunicationComposer = this.getDefaultCommunicationComposer(activeConversation, this.unboundConversationMessages);
+            }
           } else {
             this.unboundConversationMessages = [];
           }
@@ -3917,6 +3961,12 @@
             await this.loadUnboundCommunications({ preserveSelection: false, forceReloadMessages: false, silent: true });
             await this.ensureUnboundConversationAvailable(conversationId);
             await this.selectUnboundConversation(conversationId, { silent: true });
+            if (draft && !String(this.managerNotificationReplyComposer.recipient || "").trim()) {
+              this.managerNotificationReplyComposer = {
+                ...this.managerNotificationReplyComposer,
+                recipient: this.deriveConversationRecipientFromMessages(this.activeUnboundConversation, this.unboundConversationMessages),
+              };
+            }
           } else {
             this.resetUnboundCommunicationsState();
           }
