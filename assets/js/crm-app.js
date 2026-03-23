@@ -1562,20 +1562,21 @@
           if (this.activeSection !== "tasks") {
             return [];
           }
-          const uniqueCategories = new Map();
-          (this.datasets.tasks || []).forEach((task) => {
-            const categoryId = String(this.toIntOrNull(task.taskTypeCategoryId));
-            if (!categoryId || uniqueCategories.has(categoryId)) {
-              return;
-            }
-            uniqueCategories.set(categoryId, {
-              value: categoryId,
-              label: String(task.taskTypeCategoryName || `Категория #${categoryId}`).trim(),
-            });
-          });
-          return Array.from(uniqueCategories.values()).sort((left, right) => (
-            String(left.label).localeCompare(String(right.label), "ru")
-          ));
+          return (Array.isArray(this.metaOptions.taskCategories) ? this.metaOptions.taskCategories : [])
+            .filter((category) => this.toIntOrNull(category?.id))
+            .map((category) => ({
+              value: String(this.toIntOrNull(category.id)),
+              label: String(category.name || "").trim(),
+              sortOrder: Number(category.sort_order || 0),
+            }))
+            .filter((category) => category.label)
+            .sort((left, right) => {
+              if (left.sortOrder !== right.sortOrder) {
+                return left.sortOrder - right.sortOrder;
+              }
+              return String(left.label).localeCompare(String(right.label), "ru");
+            })
+            .map(({ value, label }) => ({ value, label }));
         },
         touchCompanyFilterOptions() {
           if (this.activeSection !== "touches") {
@@ -6032,18 +6033,17 @@
             return;
           }
           const dealId = String(this.toIntOrNull(this.forms.tasks.dealId) || "");
-          const hasNonOverdueActiveTask = Array.isArray(this.datasets.tasks)
+          const hasOtherActiveTask = Array.isArray(this.datasets.tasks)
             && this.datasets.tasks.some((task) => (
               String(task.id) !== String(this.editingTaskId)
               && String(task.dealId || "") === dealId
               && this.isTaskActiveStatus(task.taskStatus)
-              && !this.isTaskOverdue(task.dueAtRaw, task.taskStatus)
             ));
           if (this.currentTaskTypeHasAutomaticFollowUp) {
             return;
           }
           if (this.taskFormRequiresFollowUp(this.forms.tasks)) {
-            if (this.hasPreparedTaskFollowUp() || hasNonOverdueActiveTask) {
+            if (this.hasPreparedTaskFollowUp() || hasOtherActiveTask) {
               return;
             }
             throw new Error("Для внутренней задачи заполните следующую задачу перед завершением текущей");
@@ -6051,10 +6051,10 @@
           if (!this.taskActiveDealRequiresFollowUp) {
             return;
           }
-          if (hasNonOverdueActiveTask || this.hasPreparedTaskFollowUp()) {
+          if (hasOtherActiveTask || this.hasPreparedTaskFollowUp()) {
             return;
           }
-          throw new Error("Для активной сделки заполните следующую задачу или держите актуальную активную задачу без просрочки");
+          throw new Error("Для активной сделки заполните следующую задачу или держите другую активную задачу");
         },
         validateTaskCompletionEvidence(form) {
           if (!this.isTaskDoneStatus(form.status)) {
