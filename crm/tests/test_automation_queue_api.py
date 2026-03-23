@@ -8,6 +8,7 @@ from rest_framework.test import APITestCase
 
 from crm.models import Activity, AutomationQueueItem, AutomationRule, Client, CommunicationChannel, Deal, DealStage, NextStepTemplate, OutcomeCatalog, TaskCategory, TaskType, Touch, TouchResult
 from crm.models.activity import TaskTypeGroup
+from crm_communications.models import Conversation, Message
 
 
 class AutomationQueueApiTests(APITestCase):
@@ -185,6 +186,66 @@ class AutomationQueueApiTests(APITestCase):
         self.assertIn("schedule_meeting", action_ids)
         self.assertIn("create_task", action_ids)
         self.assertEqual(incoming_rule.event_type, "email_received")
+
+    def test_queue_item_serializer_marks_primary_incoming_message(self):
+        AutomationRule.objects.create(
+            event_type="email_received",
+            ui_mode="needs_attention",
+            ui_priority="high",
+            show_in_attention_queue=True,
+            is_active=True,
+            sort_order=20,
+        )
+        conversation = Conversation.objects.create(channel="email", deal=self.deal, client=self.company)
+        first_touch = Touch.objects.create(
+            happened_at=timezone.now() - timedelta(minutes=5),
+            channel=self.channel,
+            direction="incoming",
+            summary="Первое письмо клиента",
+            owner=self.user,
+            deal=self.deal,
+            client=self.company,
+        )
+        Message.objects.create(
+            conversation=conversation,
+            channel="email",
+            direction="incoming",
+            status="received",
+            deal=self.deal,
+            client=self.company,
+            touch=first_touch,
+            received_at=first_touch.happened_at,
+            body_text="Первое письмо клиента",
+        )
+        second_touch = Touch.objects.create(
+            happened_at=timezone.now(),
+            channel=self.channel,
+            direction="incoming",
+            summary="Повторное письмо клиента",
+            owner=self.user,
+            deal=self.deal,
+            client=self.company,
+        )
+        Message.objects.create(
+            conversation=conversation,
+            channel="email",
+            direction="incoming",
+            status="received",
+            deal=self.deal,
+            client=self.company,
+            touch=second_touch,
+            received_at=second_touch.happened_at,
+            body_text="Повторное письмо клиента",
+        )
+
+        response = self.client.get(reverse("automation-queue-list"), {"status": "pending", "deal": self.deal.pk})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data["results"] if isinstance(response.data, dict) and "results" in response.data else response.data
+        first_item = next(item for item in payload if item["source_touch"] == first_touch.pk and item["item_kind"] == "attention")
+        second_item = next(item for item in payload if item["source_touch"] == second_touch.pk and item["item_kind"] == "attention")
+        self.assertTrue(first_item["is_primary_message"])
+        self.assertFalse(second_item["is_primary_message"])
 
     def test_touch_result_change_dismisses_stale_pending_queue_items(self):
         incoming_rule = AutomationRule.objects.create(

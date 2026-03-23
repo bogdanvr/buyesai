@@ -1,3 +1,5 @@
+from django.db.models import Q
+from django.db.models.functions import Coalesce
 from rest_framework import serializers
 
 from crm.models import AutomationQueueItem
@@ -23,6 +25,7 @@ class AutomationQueueItemSerializer(serializers.ModelSerializer):
     task_subject = serializers.CharField(source="task.subject", read_only=True)
     created_task_subject = serializers.CharField(source="created_task.subject", read_only=True)
     available_actions = serializers.SerializerMethodField()
+    is_primary_message = serializers.SerializerMethodField()
 
     def _user_name(self, user):
         if user is None:
@@ -45,6 +48,22 @@ class AutomationQueueItemSerializer(serializers.ModelSerializer):
 
     def get_available_actions(self, obj):
         return get_available_actions_for_event(obj.source_event_type)
+
+    def get_is_primary_message(self, obj):
+        message = getattr(getattr(obj, "source_touch", None), "communication_message", None)
+        if message is None or not getattr(message, "conversation_id", None):
+            return False
+
+        message_timestamp = message.received_at or message.sent_at or message.created_at
+        earlier_messages = (
+            message.conversation.messages
+            .annotate(sort_at=Coalesce("received_at", "sent_at", "created_at"))
+            .filter(
+                Q(sort_at__lt=message_timestamp)
+                | (Q(sort_at=message_timestamp) & Q(pk__lt=message.pk))
+            )
+        )
+        return not earlier_messages.exists()
 
     class Meta:
         model = AutomationQueueItem
@@ -89,6 +108,7 @@ class AutomationQueueItemSerializer(serializers.ModelSerializer):
             "created_task",
             "created_task_subject",
             "available_actions",
+            "is_primary_message",
             "acted_by",
             "acted_by_name",
             "acted_at",

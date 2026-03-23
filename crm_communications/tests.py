@@ -1214,6 +1214,40 @@ class EmailOutboundMessageServiceTests(TestCase):
         self.assertEqual(kwargs["to"], ["alt-recipient@example.com"])
 
     @patch("crm_communications.email_outbound.EmailMultiAlternatives")
+    def test_send_message_drops_invalid_thread_headers(self, email_cls_mock):
+        email_instance = email_cls_mock.return_value
+        email_instance.send.return_value = 1
+        route = self.conversation.routes.filter(route_type="email_thread").first()
+        route.route_key = "bad route key"
+        route.save(update_fields=["route_key", "updated_at"])
+        inbound = (
+            Message.objects.filter(
+                conversation=self.conversation,
+                channel=CommunicationChannelCode.EMAIL,
+                direction=MessageDirection.INCOMING,
+            )
+            .order_by("-id")
+            .first()
+        )
+        inbound.external_message_id = "bad message id"
+        inbound.save(update_fields=["external_message_id", "updated_at"])
+        message = self.create_outgoing_message()
+        message.in_reply_to = "also bad id"
+        message.save(update_fields=["in_reply_to", "updated_at"])
+        MessageQueueService.enqueue_message(message=message)
+
+        processed = EmailOutboundMessageService.send_message(message=message)
+        processed.refresh_from_db()
+
+        self.assertEqual(processed.status, MessageStatus.SENT)
+        self.assertEqual(processed.in_reply_to, "")
+        self.assertEqual(processed.references, "")
+        _, kwargs = email_cls_mock.call_args
+        self.assertEqual(kwargs["headers"]["Message-ID"], f"<{processed.external_message_id}>")
+        self.assertNotIn("In-Reply-To", kwargs["headers"])
+        self.assertNotIn("References", kwargs["headers"])
+
+    @patch("crm_communications.email_outbound.EmailMultiAlternatives")
     def test_send_message_without_recipient_moves_to_manual_retry(self, email_cls_mock):
         self.contact.email = ""
         self.contact.save(update_fields=["email"])

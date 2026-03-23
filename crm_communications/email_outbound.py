@@ -32,6 +32,20 @@ def _clean_message_id(value: str) -> str:
     return normalized.strip().lower()
 
 
+def _is_safe_message_id(value: str) -> bool:
+    normalized = _clean_message_id(value)
+    if not normalized:
+        return False
+    if len(normalized) > 255:
+        return False
+    return re.fullmatch(r"[^\s<>]+", normalized) is not None
+
+
+def _sanitize_message_id(value: str) -> str:
+    normalized = _clean_message_id(value)
+    return normalized if _is_safe_message_id(normalized) else ""
+
+
 class EmailOutboundMessageService:
     @staticmethod
     def _normalize_recipient_key(value: str) -> str:
@@ -90,7 +104,7 @@ class EmailOutboundMessageService:
             .order_by("-is_primary", "-id")
             .first()
         )
-        return str(getattr(route, "route_key", "") or "").strip().lower()
+        return _sanitize_message_id(getattr(route, "route_key", ""))
 
     @staticmethod
     def _resolve_latest_message_id(*, message: Message) -> str:
@@ -104,11 +118,11 @@ class EmailOutboundMessageService:
             .order_by("-received_at", "-sent_at", "-created_at", "-id")
             .first()
         )
-        return str(getattr(latest_thread_message, "external_message_id", "") or "").strip().lower()
+        return _sanitize_message_id(getattr(latest_thread_message, "external_message_id", ""))
 
     @staticmethod
     def _ensure_outbound_message_id(*, message: Message) -> str:
-        existing = _clean_message_id(message.external_message_id)
+        existing = _sanitize_message_id(message.external_message_id)
         if existing:
             return existing
         domain = ""
@@ -123,7 +137,7 @@ class EmailOutboundMessageService:
     @staticmethod
     def _build_thread_headers(*, message: Message, current_message_id: str) -> tuple[str, str]:
         thread_key = EmailOutboundMessageService._resolve_thread_key(message=message)
-        latest_message_id = _clean_message_id(message.in_reply_to) or EmailOutboundMessageService._resolve_latest_message_id(message=message)
+        latest_message_id = _sanitize_message_id(message.in_reply_to) or EmailOutboundMessageService._resolve_latest_message_id(message=message)
         in_reply_to = latest_message_id
 
         references_parts: list[str] = []
@@ -232,8 +246,8 @@ class EmailOutboundMessageService:
             happened_at=sent_message.sent_at or timezone.now(),
         )
         sent_message.external_recipient_key = f"email:{recipient}"
-        sent_message.in_reply_to = in_reply_to
-        sent_message.references = references
+        sent_message.in_reply_to = _sanitize_message_id(in_reply_to)
+        sent_message.references = " ".join(_sanitize_message_id(item) for item in references.split() if _sanitize_message_id(item))
         sent_message.save(update_fields=["external_recipient_key", "in_reply_to", "references", "updated_at"])
 
         thread_key = EmailOutboundMessageService._resolve_thread_key(message=sent_message) or current_message_id

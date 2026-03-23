@@ -674,6 +674,7 @@
             uiPriority: String(item.automationRuleUiPriority || "medium"),
             needsConfirmation: true,
             isDraft: false,
+            isPrimaryMessage: !!item.isPrimaryMessage,
             availableActions: Array.isArray(item.availableActions) ? item.availableActions : [],
             messageDraft: messageDraftsByTouchEventKey.get(
               `${this.toIntOrNull(item.sourceTouchId) || 0}::${String(item.sourceEventType || "").trim()}`
@@ -4031,7 +4032,16 @@
             return [{ id: "confirm_next_step", label: "Подтвердить" }];
           }
           const actions = Array.isArray(notification?.availableActions) ? notification.availableActions : [];
-          return actions.filter((action) => String(action?.id || "").trim() !== "call");
+          return actions.filter((action) => {
+            const actionId = String(action?.id || "").trim();
+            if (actionId === "call") {
+              return false;
+            }
+            if (actionId === "reply" && notification?.isPrimaryMessage) {
+              return false;
+            }
+            return true;
+          });
         },
         managerNotificationActionLabel(action) {
           const actionId = String(action?.id || "").trim();
@@ -4282,8 +4292,8 @@
             return;
           }
           if (item.sourceType === "queue" && item.touchId) {
-            const shouldPromptResult = Array.isArray(item.availableActions)
-              && item.availableActions.some((action) => String(action?.id || "").trim() === "reply");
+            const shouldPromptResult = this.visibleManagerNotificationActions(item)
+              .some((action) => String(action?.id || "").trim() === "reply");
             if (shouldPromptResult) {
               await this.openTouchWithResultPrompt(
                 item.touchId,
@@ -7632,6 +7642,7 @@
             actedAt: item.acted_at || null,
             createdAt: item.created_at || null,
             updatedAt: item.updated_at || null,
+            isPrimaryMessage: !!item.is_primary_message,
           };
         },
         mapAutomationQueueItem(item) {

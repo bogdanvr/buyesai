@@ -20,6 +20,8 @@ class AutomationQueueItemViewSet(ReadOnlyModelViewSet):
             "source_touch",
             "source_touch__channel",
             "source_touch__result_option",
+            "source_touch__communication_message",
+            "source_touch__communication_message__conversation",
             "outcome",
             "touch_result",
             "next_step_template",
