@@ -546,14 +546,14 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(response.data["priority"], "high")
         self.assertEqual(response.data["task_type"], task_type.pk)
         self.assertEqual(response.data["task_type_name"], "Квалификация")
-        self.assertEqual(response.data["task_type_group"], TaskTypeGroup.INTERNAL_TASK)
-        self.assertEqual(response.data["task_type_group_label"], "Внутренняя задача")
+        self.assertIsNone(response.data["task_type_category"])
+        self.assertNotIn("task_type_category_name", response.data)
         self.assertIsNone(response.data["communication_channel"])
         self.assertNotIn("communication_channel_name", response.data)
         self.assertEqual(response.data["related_touch"], touch.pk)
         self.assertEqual(response.data["related_touch_subject"], "Первичный звонок")
 
-    def test_task_type_meta_returns_group(self):
+    def test_task_type_meta_returns_category_driven_fields_without_group(self):
         later_task_type = TaskType.objects.create(
             name="Коммерческое предложение",
             group=TaskTypeGroup.CLIENT_TASK,
@@ -571,8 +571,8 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(response.data[0]["id"], earlier_task_type.pk)
         self.assertEqual(response.data[0]["sort_order"], 10)
         self.assertEqual(response.data[1]["id"], later_task_type.pk)
-        self.assertEqual(response.data[1]["group"], TaskTypeGroup.CLIENT_TASK)
-        self.assertEqual(response.data[1]["group_label"], "Клиентская задача")
+        self.assertNotIn("group", response.data[1])
+        self.assertNotIn("group_label", response.data[1])
 
     def test_task_category_and_task_type_meta_are_filtered_by_user_roles(self):
         developer_role = UserRole.objects.create(code="developer", name="Разработчик", sort_order=10)

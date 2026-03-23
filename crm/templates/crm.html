@@ -2086,7 +2086,7 @@
                   <button
                     v-if="dealLatestSignificantItem.hasSuggestedNextStep"
                     type="button"
-                    @click="prepareDealTaskFromAutomation({ title: dealLatestSignificantItem.suggestedNextStep, at: dealLatestSignificantItem.suggestedNextStepAt, taskTypeGroup: dealLatestSignificantItem.defaultTaskTypeGroup, communicationChannelId: dealLatestSignificantItem.defaultCommunicationChannelId })"
+                    @click="prepareDealTaskFromAutomation({ title: dealLatestSignificantItem.suggestedNextStep, at: dealLatestSignificantItem.suggestedNextStepAt, taskCategoryId: dealLatestSignificantItem.defaultTaskCategoryId, communicationChannelId: dealLatestSignificantItem.defaultCommunicationChannelId })"
                     class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
                   >
                     Следующая задача
@@ -2149,7 +2149,7 @@
                       <button
                         v-if="chain.primary.hasSuggestedNextStep"
                         type="button"
-                        @click="prepareDealTaskFromAutomation({ title: chain.primary.suggestedNextStep, at: chain.primary.suggestedNextStepAt, taskTypeGroup: chain.primary.defaultTaskTypeGroup, communicationChannelId: chain.primary.defaultCommunicationChannelId })"
+                        @click="prepareDealTaskFromAutomation({ title: chain.primary.suggestedNextStep, at: chain.primary.suggestedNextStepAt, taskCategoryId: chain.primary.defaultTaskCategoryId, communicationChannelId: chain.primary.defaultCommunicationChannelId })"
                         class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
                       >
                         Создать задачу
@@ -2703,14 +2703,7 @@
                   <input v-model="dealTaskForm.subject" type="text" placeholder="Например: Подготовить КП" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                 </label>
                 <label class="block">
-                  <span class="text-sm text-crm-muted">Группа задачи</span>
-                  <select v-model="dealTaskForm.taskTypeGroup" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
-                    <option value="">Не выбрана</option>
-                    <option v-for="option in taskTypeGroupOptions" :key="`deal-task-group-${option.value}`" :value="option.value">[[ option.label ]]</option>
-                  </select>
-                </label>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">Категория</span>
+                  <span class="text-sm text-crm-muted">Категория задачи</span>
                   <select v-model="dealTaskForm.taskCategoryId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
                     <option :value="null">Не выбрана</option>
                     <option v-for="category in filteredDealTaskCategoryOptions" :key="`deal-task-category-${category.id}`" :value="category.id">[[ category.name ]]</option>
@@ -2956,14 +2949,7 @@
                   <input v-model="touchFollowUpForm.subject" type="text" placeholder="Например: Отправить КП" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                 </label>
                 <label class="block">
-                  <span class="text-sm text-crm-muted">Группа задачи</span>
-                  <select v-model="touchFollowUpForm.taskTypeGroup" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
-                    <option value="">Не выбрана</option>
-                    <option v-for="option in taskTypeGroupOptions" :key="`touch-follow-up-group-${option.value}`" :value="option.value">[[ option.label ]]</option>
-                  </select>
-                </label>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">Категория</span>
+                  <span class="text-sm text-crm-muted">Категория задачи</span>
                   <select v-model="touchFollowUpForm.taskCategoryId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
                     <option :value="null">Не выбрана</option>
                     <option v-for="category in filteredTouchFollowUpCategoryOptions" :key="`touch-follow-up-category-${category.id}`" :value="category.id">[[ category.name ]]</option>
@@ -4398,23 +4384,7 @@
                   </select>
                 </div>
                 <div class="py-1">
-                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Группа задачи</div>
-                  <button v-if="editingTaskId && !isTaskSummaryEditing('taskTypeGroup')" type="button" @click="openTaskSummaryField('taskTypeGroup')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
-                    [[ taskSummaryTaskTypeGroupLabel ]]
-                  </button>
-                  <select
-                    v-else
-                    v-model="forms.tasks.taskTypeGroup"
-                    @change="stopTaskSummaryEdit('taskTypeGroup')"
-                    @blur="stopTaskSummaryEdit('taskTypeGroup')"
-                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
-                  >
-                    <option value="">Не выбрана</option>
-                    <option v-for="option in taskTypeGroupOptions" :key="`task-summary-group-${option.value}`" :value="option.value">[[ option.label ]]</option>
-                  </select>
-                </div>
-                <div class="py-1">
-                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Категория</div>
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Категория задачи</div>
                   <button v-if="editingTaskId && !isTaskSummaryEditing('taskCategoryId')" type="button" @click="openTaskSummaryField('taskCategoryId')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
                     [[ taskSummaryTaskCategoryLabel ]]
                   </button>
@@ -4444,7 +4414,7 @@
                     <option :value="null">Не выбран</option>
                     <option v-for="taskType in filteredTaskTypeOptions" :key="`task-summary-type-${taskType.id}`" :value="taskType.id">[[ taskType.name ]]</option>
                   </select>
-                  <div v-if="forms.tasks.taskTypeGroup && !filteredTaskTypeOptions.length" class="mt-2 text-xs text-crm-muted">Для выбранных группы и категории пока нет типов задач.</div>
+                  <div v-if="forms.tasks.taskCategoryId && !filteredTaskTypeOptions.length" class="mt-2 text-xs text-crm-muted">Для выбранной категории пока нет типов задач.</div>
                 </div>
                 <div class="py-1">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Лид</div>
@@ -4572,14 +4542,7 @@
                   <input v-model="taskFollowUpForm.subject" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                 </label>
                 <label class="block">
-                  <span class="text-sm text-crm-muted">Группа задачи</span>
-                  <select v-model="taskFollowUpForm.taskTypeGroup" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
-                    <option value="">Не выбрана</option>
-                    <option v-for="option in taskTypeGroupOptions" :key="`task-followup-group-${option.value}`" :value="option.value">[[ option.label ]]</option>
-                  </select>
-                </label>
-                <label class="block">
-                  <span class="text-sm text-crm-muted">Категория</span>
+                  <span class="text-sm text-crm-muted">Категория задачи</span>
                   <select v-model="taskFollowUpForm.taskCategoryId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
                     <option :value="null">Не выбрана</option>
                     <option v-for="category in filteredTaskFollowUpCategoryOptions" :key="`task-followup-category-${category.id}`" :value="category.id">[[ category.name ]]</option>

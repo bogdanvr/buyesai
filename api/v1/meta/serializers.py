@@ -94,17 +94,26 @@ class UserOptionSerializer(serializers.ModelSerializer):
 
 
 class TaskCategorySerializer(serializers.ModelSerializer):
-    group_label = serializers.CharField(source="get_group_display", read_only=True)
-
     class Meta:
         model = TaskCategory
-        fields = ["id", "name", "code", "sort_order", "group", "group_label", "is_active"]
+        fields = [
+            "id",
+            "name",
+            "code",
+            "sort_order",
+            "uses_communication_channel",
+            "requires_follow_up_task_on_done",
+            "satisfies_deal_next_step_requirement",
+            "is_active",
+        ]
 
 
 class TaskTypeSerializer(serializers.ModelSerializer):
-    group_label = serializers.CharField(source="get_group_display", read_only=True)
     auto_task_type_name = serializers.CharField(source="auto_task_type.name", read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
+    category_uses_communication_channel = serializers.BooleanField(source="category.uses_communication_channel", read_only=True)
+    category_requires_follow_up_task_on_done = serializers.BooleanField(source="category.requires_follow_up_task_on_done", read_only=True)
+    category_satisfies_deal_next_step_requirement = serializers.BooleanField(source="category.satisfies_deal_next_step_requirement", read_only=True)
 
     class Meta:
         model = TaskType
@@ -112,10 +121,11 @@ class TaskTypeSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "sort_order",
-            "group",
-            "group_label",
             "category",
             "category_name",
+            "category_uses_communication_channel",
+            "category_requires_follow_up_task_on_done",
+            "category_satisfies_deal_next_step_requirement",
             "auto_touch_on_done",
             "touch_result",
             "auto_task_on_done",

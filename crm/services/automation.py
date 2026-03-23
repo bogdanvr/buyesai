@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.utils import timezone
 
 from crm.models import Activity, AutomationRule, Touch
-from crm.models.activity import ActivityType, TaskPriority, TaskStatus, TaskTypeGroup
+from crm.models.activity import ActivityType, TaskPriority, TaskStatus, task_type_uses_communication_channel
 from crm.models.touch import resolve_touch_event_type
 
 
@@ -84,7 +84,6 @@ def upsert_touch_follow_up_task(instance: Touch, rule: AutomationRule | None) ->
     )
     client = instance.client or getattr(instance.deal, "client", None) or getattr(instance.lead, "client", None)
     communication_channel = getattr(instance, "channel", None)
-    task_type_group = TaskTypeGroup.CLIENT_TASK if communication_channel is not None else ""
 
     existing = (
         Activity.objects.filter(
@@ -108,7 +107,7 @@ def upsert_touch_follow_up_task(instance: Touch, rule: AutomationRule | None) ->
             existing.due_at = due_at
             update_fields.append("due_at")
         if existing.communication_channel_id != getattr(communication_channel, "id", None):
-            existing.communication_channel = communication_channel if task_type_group == TaskTypeGroup.CLIENT_TASK else None
+            existing.communication_channel = communication_channel if task_type_uses_communication_channel(getattr(existing, "task_type", None)) else None
             update_fields.append("communication_channel")
         if existing.client_id != getattr(client, "id", None):
             existing.client = client
@@ -133,7 +132,7 @@ def upsert_touch_follow_up_task(instance: Touch, rule: AutomationRule | None) ->
         due_at=due_at,
         status=TaskStatus.TODO,
         priority=TaskPriority.MEDIUM,
-        communication_channel=communication_channel if task_type_group == TaskTypeGroup.CLIENT_TASK else None,
+        communication_channel=communication_channel,
         lead=instance.lead,
         deal=instance.deal,
         client=client,

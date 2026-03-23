@@ -21,11 +21,26 @@ class UserRoleAssignmentAdmin(admin.ModelAdmin):
 
 @admin.register(TaskCategory)
 class TaskCategoryAdmin(admin.ModelAdmin):
-    list_display = ("name", "code", "group", "sort_order", "is_active", "created_at")
-    list_filter = ("group", "is_active")
+    list_display = (
+        "name",
+        "code",
+        "uses_communication_channel",
+        "requires_follow_up_task_on_done",
+        "satisfies_deal_next_step_requirement",
+        "sort_order",
+        "is_active",
+        "created_at",
+    )
+    list_filter = (
+        "uses_communication_channel",
+        "requires_follow_up_task_on_done",
+        "satisfies_deal_next_step_requirement",
+        "is_active",
+    )
     search_fields = ("name", "code")
     ordering = ("sort_order", "name")
     filter_horizontal = ("allowed_roles",)
+    exclude = ("group",)
 
 
 @admin.register(TaskType)
@@ -34,7 +49,6 @@ class TaskTypeAdmin(admin.ModelAdmin):
         "name",
         "category",
         "sort_order",
-        "group",
         "auto_touch_on_done",
         "touch_result",
         "auto_task_on_done",
@@ -42,10 +56,11 @@ class TaskTypeAdmin(admin.ModelAdmin):
         "is_active",
         "created_at",
     )
-    list_filter = ("category", "group", "auto_touch_on_done", "auto_task_on_done", "is_active")
+    list_filter = ("category", "auto_touch_on_done", "auto_task_on_done", "is_active")
     search_fields = ("name",)
     ordering = ("sort_order", "name")
     autocomplete_fields = ("category", "auto_task_type")
+    exclude = ("group",)
 
 
 @admin.register(Activity)

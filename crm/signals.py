@@ -7,7 +7,11 @@ from django.utils import timezone
 
 from audit.services import log_model_event
 from crm.models import Activity, AutomationDraft, AutomationMessageDraft, AutomationQueueItem, Client, ClientDocument, Deal, DealDocument, DealStage, Lead, Touch, TouchResult
-from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup
+from crm.models.activity import (
+    ActivityType,
+    TaskStatus,
+    task_type_uses_communication_channel,
+)
 from crm.models.automation import (
     AutomationDraftKind,
     AutomationMessageDraftStatus,
@@ -546,15 +550,10 @@ def _task_related_client_ids(instance: Activity) -> list[int]:
     return client_ids
 
 
-def _task_type_group(instance: Activity) -> str:
-    task_type = getattr(instance, "task_type", None)
-    return str(getattr(task_type, "group", "") or "").strip()
-
-
 def _resolve_task_completion_event_type(instance: Activity) -> str:
     if instance.type != ActivityType.TASK or instance.status != TaskStatus.DONE:
         return ""
-    if _task_type_group(instance) != TaskTypeGroup.CLIENT_TASK:
+    if not task_type_uses_communication_channel(getattr(instance, "task_type", None)):
         return "internal_task_completed"
     channel_code = normalize_touch_channel_code(getattr(getattr(instance, "communication_channel", None), "name", ""))
     if channel_code == "call":
@@ -864,7 +863,7 @@ def activity_task_auto_follow_up_signal(sender, instance: Activity, created, **k
     if task_type is None or not getattr(task_type, "auto_task_on_done", False) or auto_task_type is None:
         return
 
-    communication_channel = instance.communication_channel if getattr(auto_task_type, "group", "") == TaskTypeGroup.CLIENT_TASK else None
+    communication_channel = instance.communication_channel if task_type_uses_communication_channel(auto_task_type) else None
     Activity.objects.create(
         type=ActivityType.TASK,
         subject=str(getattr(auto_task_type, "name", "") or "").strip() or instance.subject,

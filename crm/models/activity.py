@@ -100,6 +100,18 @@ class TaskCategory(TimestampedModel):
         default="",
         verbose_name="Группа задач",
     )
+    uses_communication_channel = models.BooleanField(
+        default=False,
+        verbose_name="Использует канал связи",
+    )
+    requires_follow_up_task_on_done = models.BooleanField(
+        default=False,
+        verbose_name="Требует следующую задачу при завершении",
+    )
+    satisfies_deal_next_step_requirement = models.BooleanField(
+        default=False,
+        verbose_name="Закрывает требование следующего шага по сделке",
+    )
     allowed_roles = models.ManyToManyField(
         "crm.UserRole",
         related_name="task_categories",
@@ -119,6 +131,7 @@ class TaskCategory(TimestampedModel):
     def save(self, *args, **kwargs):
         if not str(self.code or "").strip():
             self.code = slugify(self.name or "", allow_unicode=False).replace("-", "_") or f"task_category_{self.pk or 'new'}"
+        self.group = TaskTypeGroup.CLIENT_TASK if self.uses_communication_channel else TaskTypeGroup.INTERNAL_TASK
         super().save(*args, **kwargs)
 
 
@@ -129,7 +142,7 @@ class TaskType(TimestampedModel):
         max_length=32,
         choices=TaskTypeGroup.choices,
         default=TaskTypeGroup.INTERNAL_TASK,
-        verbose_name="Группа типа задачи",
+        verbose_name="Группа задач",
     )
     category = models.ForeignKey(
         "crm.TaskCategory",
@@ -160,6 +173,12 @@ class TaskType(TimestampedModel):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        category = getattr(self, "category", None)
+        if category is not None:
+            self.group = TaskTypeGroup.CLIENT_TASK if getattr(category, "uses_communication_channel", False) else TaskTypeGroup.INTERNAL_TASK
+        super().save(*args, **kwargs)
+
 
 def get_available_task_categories_for_user(user):
     queryset = TaskCategory.objects.filter(is_active=True)
@@ -184,6 +203,31 @@ def get_available_task_types_for_user(user):
         | models.Q(category__allowed_roles__isnull=True)
         | models.Q(category__allowed_roles__is_active=True, category__allowed_roles__assignments__user=user)
     ).distinct()
+
+
+def get_task_type_category(task_type):
+    return getattr(task_type, "category", None) if task_type is not None else None
+
+
+def task_type_uses_communication_channel(task_type) -> bool:
+    category = get_task_type_category(task_type)
+    if category is not None:
+        return bool(getattr(category, "uses_communication_channel", False))
+    return str(getattr(task_type, "group", "") or "").strip() == TaskTypeGroup.CLIENT_TASK
+
+
+def task_type_requires_follow_up_task(task_type) -> bool:
+    category = get_task_type_category(task_type)
+    if category is not None:
+        return bool(getattr(category, "requires_follow_up_task_on_done", False))
+    return str(getattr(task_type, "group", "") or "").strip() == TaskTypeGroup.INTERNAL_TASK
+
+
+def task_type_satisfies_deal_next_step_requirement(task_type) -> bool:
+    category = get_task_type_category(task_type)
+    if category is not None:
+        return bool(getattr(category, "satisfies_deal_next_step_requirement", False))
+    return str(getattr(task_type, "group", "") or "").strip() == TaskTypeGroup.CLIENT_TASK
 
 
 class Activity(TimestampedModel):

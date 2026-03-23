@@ -2,7 +2,14 @@ from rest_framework import serializers
 from django.utils import timezone
 
 from crm.models import Activity
-from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup, get_available_task_types_for_user
+from crm.models.activity import (
+    ActivityType,
+    TaskStatus,
+    get_available_task_types_for_user,
+    task_type_requires_follow_up_task,
+    task_type_satisfies_deal_next_step_requirement,
+    task_type_uses_communication_channel,
+)
 
 
 class ActivitySerializer(serializers.ModelSerializer):
@@ -12,10 +19,11 @@ class ActivitySerializer(serializers.ModelSerializer):
     deal_title = serializers.CharField(source="deal.title", read_only=True)
     contact_name = serializers.SerializerMethodField()
     task_type_name = serializers.CharField(source="task_type.name", read_only=True)
-    task_type_group = serializers.CharField(source="task_type.group", read_only=True)
-    task_type_group_label = serializers.CharField(source="task_type.get_group_display", read_only=True)
     task_type_category = serializers.IntegerField(source="task_type.category_id", read_only=True)
     task_type_category_name = serializers.CharField(source="task_type.category.name", read_only=True)
+    task_type_category_uses_communication_channel = serializers.BooleanField(source="task_type.category.uses_communication_channel", read_only=True)
+    task_type_category_requires_follow_up_task_on_done = serializers.BooleanField(source="task_type.category.requires_follow_up_task_on_done", read_only=True)
+    task_type_category_satisfies_deal_next_step_requirement = serializers.BooleanField(source="task_type.category.satisfies_deal_next_step_requirement", read_only=True)
     communication_channel_name = serializers.CharField(source="communication_channel.name", read_only=True)
     related_touch_subject = serializers.CharField(source="related_touch.subject", read_only=True)
     status_label = serializers.SerializerMethodField()
@@ -35,12 +43,11 @@ class ActivitySerializer(serializers.ModelSerializer):
         queryset = deal.activities.filter(
             type=ActivityType.TASK,
             status__in=self.ACTIVE_TASK_STATUSES,
-            task_type__group=TaskTypeGroup.CLIENT_TASK,
             due_at__gte=now,
-        )
+        ).select_related("task_type__category")
         if current_task_id is not None:
             queryset = queryset.exclude(pk=current_task_id)
-        return queryset.exists()
+        return any(task_type_satisfies_deal_next_step_requirement(getattr(item, "task_type", None)) for item in queryset)
 
     def get_status_label(self, obj):
         if obj.type != ActivityType.TASK:
@@ -97,9 +104,10 @@ class ActivitySerializer(serializers.ModelSerializer):
         status = self._resolve_task_status(attrs)
         is_done = status == TaskStatus.DONE
         task_type = attrs.get("task_type", getattr(self.instance, "task_type", None))
-        task_type_group = str(getattr(task_type, "group", "") or "").strip()
         request = self.context.get("request")
         user = getattr(request, "user", None)
+        uses_communication_channel = task_type_uses_communication_channel(task_type)
+        requires_follow_up_task = task_type_requires_follow_up_task(task_type)
         has_automatic_follow_up_task = self._has_automatic_follow_up_task(task_type)
         communication_channel = attrs.get(
             "communication_channel",
@@ -122,7 +130,7 @@ class ActivitySerializer(serializers.ModelSerializer):
         if activity_type == ActivityType.TASK:
             attrs["status"] = status
             attrs["is_done"] = is_done
-            if task_type_group != TaskTypeGroup.CLIENT_TASK and communication_channel is not None:
+            if not uses_communication_channel and communication_channel is not None:
                 attrs["communication_channel"] = None
         if activity_type == ActivityType.TASK and not due_at:
             raise serializers.ValidationError({"due_at": "Укажите срок задачи."})
@@ -137,7 +145,7 @@ class ActivitySerializer(serializers.ModelSerializer):
                 deal,
                 current_task_id=getattr(self.instance, "pk", None),
             )
-            if task_type_group == TaskTypeGroup.CLIENT_TASK:
+            if uses_communication_channel:
                 if communication_channel is None:
                     raise serializers.ValidationError(
                         {"communication_channel": "Укажите тип канала перед завершением клиентской задачи."}
@@ -149,7 +157,7 @@ class ActivitySerializer(serializers.ModelSerializer):
         if (
             activity_type == ActivityType.TASK
             and is_done
-            and task_type_group == TaskTypeGroup.INTERNAL_TASK
+            and requires_follow_up_task
             and not has_follow_up_task
             and not has_automatic_follow_up_task
             and not has_non_overdue_client_task
@@ -197,10 +205,11 @@ class ActivitySerializer(serializers.ModelSerializer):
             "priority",
             "task_type",
             "task_type_name",
-            "task_type_group",
-            "task_type_group_label",
             "task_type_category",
             "task_type_category_name",
+            "task_type_category_uses_communication_channel",
+            "task_type_category_requires_follow_up_task_on_done",
+            "task_type_category_satisfies_deal_next_step_requirement",
             "communication_channel",
             "communication_channel_name",
             "related_touch",

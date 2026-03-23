@@ -6,7 +6,7 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from api.v1.automation_queue.serializers import AutomationQueueItemSerializer
 from crm.models import Activity, AutomationQueueItem, TaskType
-from crm.models.activity import ActivityType, TaskPriority, TaskStatus, TaskTypeGroup
+from crm.models.activity import ActivityType, TaskPriority, TaskStatus
 from crm.models.automation import AutomationQueueItemKind, AutomationQueueItemStatus
 from crm.services.automation import infer_next_step_due_at
 
@@ -71,7 +71,7 @@ class AutomationQueueItemViewSet(ReadOnlyModelViewSet):
         task_type = None
         if is_client_task:
             task_type = TaskType.objects.filter(
-                group=TaskTypeGroup.CLIENT_TASK,
+                category__uses_communication_channel=True,
                 is_active=True,
             ).order_by("sort_order", "id").first()
         task = Activity.objects.create(

@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from crm.models import Activity, AutomationQueueItem, AutomationRule, Client, CommunicationChannel, Deal, DealStage, NextStepTemplate, OutcomeCatalog, TaskType, Touch, TouchResult
+from crm.models import Activity, AutomationQueueItem, AutomationRule, Client, CommunicationChannel, Deal, DealStage, NextStepTemplate, OutcomeCatalog, TaskCategory, TaskType, Touch, TouchResult
 from crm.models.activity import TaskTypeGroup
 
 
@@ -34,8 +34,17 @@ class AutomationQueueApiTests(APITestCase):
             group="waiting",
             result_class="neutral",
         )
+        self.client_task_category = TaskCategory.objects.create(
+            code="client_task",
+            name="Клиентская задача",
+            uses_communication_channel=True,
+            requires_follow_up_task_on_done=False,
+            satisfies_deal_next_step_requirement=True,
+            is_active=True,
+        )
         self.client_task_type = TaskType.objects.create(
             name="Фоллоу-ап клиенту",
+            category=self.client_task_category,
             group=TaskTypeGroup.CLIENT_TASK,
             is_active=True,
         )

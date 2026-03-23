@@ -43,11 +43,6 @@
       { value: "high", label: "Высокий" }
     ];
 
-    const TASK_TYPE_GROUP_OPTIONS = [
-      { value: "internal_task", label: "Внутренняя задача" },
-      { value: "client_task", label: "Клиентская задача" }
-    ];
-
     const app = createApp({
       compilerOptions: {
         delimiters: ["[[", "]]"]
@@ -235,7 +230,6 @@
             },
             tasks: {
               subject: "",
-              taskTypeGroup: "",
               taskCategoryId: null,
               taskTypeId: null,
               communicationChannelId: null,
@@ -272,7 +266,6 @@
           },
           dealTaskForm: {
             subject: "",
-            taskTypeGroup: "",
             taskCategoryId: null,
             taskTypeId: null,
             communicationChannelId: null,
@@ -282,7 +275,6 @@
           },
           touchFollowUpForm: {
             subject: "",
-            taskTypeGroup: "",
             taskCategoryId: null,
             taskTypeId: null,
             communicationChannelId: null,
@@ -292,7 +284,6 @@
           },
           taskFollowUpForm: {
             subject: "",
-            taskTypeGroup: "",
             taskCategoryId: null,
             taskTypeId: null,
             communicationChannelId: null,
@@ -403,7 +394,6 @@
           },
           taskStatusOptions: TASK_STATUS_OPTIONS,
           taskPriorityOptions: TASK_PRIORITY_OPTIONS,
-          taskTypeGroupOptions: TASK_TYPE_GROUP_OPTIONS,
           taskReminderOptions: [
             { value: 5, label: "5 минут" },
             { value: 10, label: "10 минут" },
@@ -835,13 +825,12 @@
           return (this.datasets.tasks || [])
             .filter((task) => (
               String(task.dealId || "") === String(dealId)
-              && ["client_task", "internal_task"].includes(String(task.taskTypeGroup || ""))
               && this.isTaskActiveStatus(task.taskStatus || task.status)
               && task.dueAtRaw
             ))
             .slice()
             .sort((left, right) => (
-              (String(left.taskTypeGroup || "") === "client_task" ? 0 : 1) - (String(right.taskTypeGroup || "") === "client_task" ? 0 : 1)
+              (this.taskItemSatisfiesDealNextStepRequirement(left) ? 0 : 1) - (this.taskItemSatisfiesDealNextStepRequirement(right) ? 0 : 1)
               || (this.parseTaskDueTimestamp(left.dueAtRaw) || 0) - (this.parseTaskDueTimestamp(right.dueAtRaw) || 0)
             ));
         },
@@ -1051,7 +1040,11 @@
               recommendedAction: automationPrompt.recommendedAction || "",
               canCreateTask: true,
               touchId: automationPrompt.touchId,
-              taskTypeGroup: automationPrompt.touch?.channelId ? "client_task" : "",
+              defaultTaskCategoryId: this.findPreferredTaskCategoryId({
+                usesCommunicationChannel: !!automationPrompt.touch?.channelId,
+                requiresFollowUp: !automationPrompt.touch?.channelId,
+                satisfiesDealNextStepRequirement: !!automationPrompt.touch?.channelId,
+              }),
               communicationChannelId: automationPrompt.touch?.channelId || null,
             };
           }
@@ -1068,7 +1061,11 @@
               recommendedAction: "",
               canCreateTask: !!String(nextTouch.nextStep || "").trim(),
               touchId: this.toIntOrNull(nextTouch.id),
-              taskTypeGroup: nextTouch.channelId ? "client_task" : "",
+              defaultTaskCategoryId: this.findPreferredTaskCategoryId({
+                usesCommunicationChannel: !!nextTouch.channelId,
+                requiresFollowUp: !nextTouch.channelId,
+                satisfiesDealNextStepRequirement: !!nextTouch.channelId,
+              }),
               communicationChannelId: nextTouch.channelId || null,
             };
           }
@@ -1303,12 +1300,12 @@
           };
         },
         showTaskTypeSelector() {
-          return this.isOptionalFieldExpanded("tasks", "taskTypeGroup")
-            || !!String(this.forms.tasks.taskTypeGroup || "").trim()
+          return this.isOptionalFieldExpanded("tasks", "taskCategoryId")
+            || !!this.toIntOrNull(this.forms.tasks.taskCategoryId)
             || !!this.toIntOrNull(this.forms.tasks.taskTypeId);
         },
         showTaskCommunicationChannelField() {
-          return this.currentTaskTypeGroup === "client_task";
+          return this.taskFormUsesCommunicationChannel(this.forms.tasks);
         },
         filteredTaskDealOptions() {
           const companyId = this.toIntOrNull(this.forms.tasks.companyId);
@@ -1349,10 +1346,6 @@
           const value = String(this.forms.tasks.priority || "").trim();
           return (this.taskPriorityOptions || []).find((option) => option.value === value)?.label || "Не выбран";
         },
-        taskSummaryTaskTypeGroupLabel() {
-          const value = this.normalizeTaskTypeGroup(this.forms.tasks.taskTypeGroup);
-          return (this.taskTypeGroupOptions || []).find((option) => option.value === value)?.label || "Не выбрана";
-        },
         taskSummaryTaskCategoryLabel() {
           const category = this.resolveTaskCategoryById(this.forms.tasks.taskCategoryId);
           return category?.name || "Не выбрана";
@@ -1379,11 +1372,6 @@
         taskSummaryDueLabel() {
           return this.forms.tasks.dueAt ? this.formatDueLabel(this.forms.tasks.dueAt) : "Не указан";
         },
-        currentTaskTypeGroup() {
-          return this.normalizeTaskTypeGroup(
-            this.forms.tasks.taskTypeGroup || this.resolveTaskTypeGroupById(this.forms.tasks.taskTypeId)
-          );
-        },
         currentTaskTypeHasAutomaticFollowUp() {
           const taskType = this.resolveTaskTypeById(this.forms.tasks.taskTypeId);
           return !!(taskType && taskType.auto_task_on_done && this.toIntOrNull(taskType.auto_task_type));
@@ -1404,7 +1392,7 @@
             && this.isTaskDoneStatus(this.forms.tasks.status)
             && !this.currentTaskTypeHasAutomaticFollowUp
             && (
-              this.currentTaskTypeGroup === "internal_task"
+              this.taskFormRequiresFollowUp(this.forms.tasks)
               || this.taskActiveDealRequiresFollowUp
             );
         },
@@ -1421,68 +1409,44 @@
           }
           return "Без сделки";
         },
-        currentTaskFollowUpTypeGroup() {
-          return this.normalizeTaskTypeGroup(
-            this.taskFollowUpForm.taskTypeGroup || this.resolveTaskTypeGroupById(this.taskFollowUpForm.taskTypeId)
-          );
-        },
         filteredTaskFollowUpTypeOptions() {
-          return this.filterTaskTypesByGroupAndCategory(
-            this.currentTaskFollowUpTypeGroup,
-            this.taskFollowUpForm.taskCategoryId
-          );
+          return this.filterTaskTypesByCategory(this.taskFollowUpForm.taskCategoryId);
         },
         filteredTaskFollowUpCategoryOptions() {
-          return this.filterTaskCategoriesByGroup(this.currentTaskFollowUpTypeGroup);
+          return this.filterTaskCategories();
         },
         showTaskFollowUpTypeSelector() {
-          return !!String(this.taskFollowUpForm.taskTypeGroup || "").trim()
+          return !!this.toIntOrNull(this.taskFollowUpForm.taskCategoryId)
             || !!this.toIntOrNull(this.taskFollowUpForm.taskTypeId);
         },
         showTaskFollowUpCommunicationChannelField() {
-          return this.currentTaskFollowUpTypeGroup === "client_task";
-        },
-        currentDealTaskTypeGroup() {
-          return this.normalizeTaskTypeGroup(
-            this.dealTaskForm.taskTypeGroup || this.resolveTaskTypeGroupById(this.dealTaskForm.taskTypeId)
-          );
+          return this.taskFormUsesCommunicationChannel(this.taskFollowUpForm);
         },
         filteredDealTaskTypeOptions() {
-          return this.filterTaskTypesByGroupAndCategory(
-            this.currentDealTaskTypeGroup,
-            this.dealTaskForm.taskCategoryId
-          );
+          return this.filterTaskTypesByCategory(this.dealTaskForm.taskCategoryId);
         },
         filteredDealTaskCategoryOptions() {
-          return this.filterTaskCategoriesByGroup(this.currentDealTaskTypeGroup);
+          return this.filterTaskCategories();
         },
         showDealTaskTypeSelector() {
-          return !!String(this.dealTaskForm.taskTypeGroup || "").trim()
+          return !!this.toIntOrNull(this.dealTaskForm.taskCategoryId)
             || !!this.toIntOrNull(this.dealTaskForm.taskTypeId);
         },
         showDealTaskCommunicationChannelField() {
-          return this.currentDealTaskTypeGroup === "client_task";
-        },
-        currentTouchFollowUpTypeGroup() {
-          return this.normalizeTaskTypeGroup(
-            this.touchFollowUpForm.taskTypeGroup || this.resolveTaskTypeGroupById(this.touchFollowUpForm.taskTypeId)
-          );
+          return this.taskFormUsesCommunicationChannel(this.dealTaskForm);
         },
         filteredTouchFollowUpTypeOptions() {
-          return this.filterTaskTypesByGroupAndCategory(
-            this.currentTouchFollowUpTypeGroup,
-            this.touchFollowUpForm.taskCategoryId
-          );
+          return this.filterTaskTypesByCategory(this.touchFollowUpForm.taskCategoryId);
         },
         filteredTouchFollowUpCategoryOptions() {
-          return this.filterTaskCategoriesByGroup(this.currentTouchFollowUpTypeGroup);
+          return this.filterTaskCategories();
         },
         showTouchFollowUpTypeSelector() {
-          return !!String(this.touchFollowUpForm.taskTypeGroup || "").trim()
+          return !!this.toIntOrNull(this.touchFollowUpForm.taskCategoryId)
             || !!this.toIntOrNull(this.touchFollowUpForm.taskTypeId);
         },
         showTouchFollowUpCommunicationChannelField() {
-          return this.currentTouchFollowUpTypeGroup === "client_task";
+          return this.taskFormUsesCommunicationChannel(this.touchFollowUpForm);
         },
         emptyLabel() {
           const labels = {
@@ -1672,38 +1636,13 @@
           return Array.isArray(this.taskTouchOptions) ? this.taskTouchOptions : [];
         },
         filteredTaskTypeOptions() {
-          return this.filterTaskTypesByGroupAndCategory(
-            this.normalizeTaskTypeGroup(this.forms.tasks.taskTypeGroup),
-            this.forms.tasks.taskCategoryId
-          );
+          return this.filterTaskTypesByCategory(this.forms.tasks.taskCategoryId);
         },
         filteredTaskCategoryOptions() {
-          return this.filterTaskCategoriesByGroup(this.normalizeTaskTypeGroup(this.forms.tasks.taskTypeGroup));
+          return this.filterTaskCategories();
         }
       },
       watch: {
-        "forms.tasks.taskTypeGroup": {
-          handler(nextValue) {
-            if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
-              this.forms.tasks.communicationChannelId = null;
-            }
-            const selectedCategory = this.resolveTaskCategoryById(this.forms.tasks.taskCategoryId);
-            if (selectedCategory) {
-              const categoryGroup = this.normalizeTaskTypeGroup(selectedCategory.group);
-              if (categoryGroup && categoryGroup !== this.normalizeTaskTypeGroup(nextValue)) {
-                this.forms.tasks.taskCategoryId = null;
-              }
-            }
-            const selectedTaskTypeId = this.toIntOrNull(this.forms.tasks.taskTypeId);
-            if (!selectedTaskTypeId) {
-              return;
-            }
-            const taskTypeGroup = this.resolveTaskTypeGroupById(selectedTaskTypeId);
-            if (taskTypeGroup && taskTypeGroup !== this.normalizeTaskTypeGroup(nextValue)) {
-              this.forms.tasks.taskTypeId = null;
-            }
-          }
-        },
         "forms.tasks.taskCategoryId": {
           handler() {
             this.syncTaskCategorySelection(this.forms.tasks);
@@ -1903,28 +1842,6 @@
             }
           }
         },
-        "taskFollowUpForm.taskTypeGroup": {
-          handler(nextValue) {
-            if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
-              this.taskFollowUpForm.communicationChannelId = null;
-            }
-            const selectedCategory = this.resolveTaskCategoryById(this.taskFollowUpForm.taskCategoryId);
-            if (selectedCategory) {
-              const categoryGroup = this.normalizeTaskTypeGroup(selectedCategory.group);
-              if (categoryGroup && categoryGroup !== this.normalizeTaskTypeGroup(nextValue)) {
-                this.taskFollowUpForm.taskCategoryId = null;
-              }
-            }
-            const selectedTaskTypeId = this.toIntOrNull(this.taskFollowUpForm.taskTypeId);
-            if (!selectedTaskTypeId) {
-              return;
-            }
-            const taskTypeGroup = this.resolveTaskTypeGroupById(selectedTaskTypeId);
-            if (taskTypeGroup && taskTypeGroup !== this.normalizeTaskTypeGroup(nextValue)) {
-              this.taskFollowUpForm.taskTypeId = null;
-            }
-          }
-        },
         "taskFollowUpForm.taskCategoryId": {
           handler() {
             this.syncTaskCategorySelection(this.taskFollowUpForm);
@@ -1935,28 +1852,6 @@
             this.syncTaskTypeSelection(this.taskFollowUpForm);
           }
         },
-        "dealTaskForm.taskTypeGroup": {
-          handler(nextValue) {
-            if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
-              this.dealTaskForm.communicationChannelId = null;
-            }
-            const selectedCategory = this.resolveTaskCategoryById(this.dealTaskForm.taskCategoryId);
-            if (selectedCategory) {
-              const categoryGroup = this.normalizeTaskTypeGroup(selectedCategory.group);
-              if (categoryGroup && categoryGroup !== this.normalizeTaskTypeGroup(nextValue)) {
-                this.dealTaskForm.taskCategoryId = null;
-              }
-            }
-            const selectedTaskTypeId = this.toIntOrNull(this.dealTaskForm.taskTypeId);
-            if (!selectedTaskTypeId) {
-              return;
-            }
-            const taskTypeGroup = this.resolveTaskTypeGroupById(selectedTaskTypeId);
-            if (taskTypeGroup && taskTypeGroup !== this.normalizeTaskTypeGroup(nextValue)) {
-              this.dealTaskForm.taskTypeId = null;
-            }
-          }
-        },
         "dealTaskForm.taskCategoryId": {
           handler() {
             this.syncTaskCategorySelection(this.dealTaskForm);
@@ -1965,28 +1860,6 @@
         "dealTaskForm.taskTypeId": {
           handler() {
             this.syncTaskTypeSelection(this.dealTaskForm);
-          }
-        },
-        "touchFollowUpForm.taskTypeGroup": {
-          handler(nextValue) {
-            if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
-              this.touchFollowUpForm.communicationChannelId = null;
-            }
-            const selectedCategory = this.resolveTaskCategoryById(this.touchFollowUpForm.taskCategoryId);
-            if (selectedCategory) {
-              const categoryGroup = this.normalizeTaskTypeGroup(selectedCategory.group);
-              if (categoryGroup && categoryGroup !== this.normalizeTaskTypeGroup(nextValue)) {
-                this.touchFollowUpForm.taskCategoryId = null;
-              }
-            }
-            const selectedTaskTypeId = this.toIntOrNull(this.touchFollowUpForm.taskTypeId);
-            if (!selectedTaskTypeId) {
-              return;
-            }
-            const taskTypeGroup = this.resolveTaskTypeGroupById(selectedTaskTypeId);
-            if (taskTypeGroup && taskTypeGroup !== this.normalizeTaskTypeGroup(nextValue)) {
-              this.touchFollowUpForm.taskTypeId = null;
-            }
           }
         },
         "touchFollowUpForm.taskCategoryId": {
@@ -2375,8 +2248,14 @@
           const normalized = String(value || "").trim();
           return labels[normalized] || normalized || "активность";
         },
-        normalizeTaskTypeGroup(value) {
-          return String(value || "").trim();
+        taskCategoryUsesCommunicationChannel(categoryLike) {
+          return !!(categoryLike && categoryLike.uses_communication_channel);
+        },
+        taskCategoryRequiresFollowUp(categoryLike) {
+          return !!(categoryLike && categoryLike.requires_follow_up_task_on_done);
+        },
+        taskCategorySatisfiesDealNextStepRequirement(categoryLike) {
+          return !!(categoryLike && categoryLike.satisfies_deal_next_step_requirement);
         },
         resolveTaskCategoryById(taskCategoryId) {
           const normalizedTaskCategoryId = this.toIntOrNull(taskCategoryId);
@@ -2391,43 +2270,68 @@
           const taskType = this.resolveTaskTypeById(taskTypeId);
           return this.toIntOrNull(taskType?.category);
         },
-        filterTaskCategoriesByGroup(selectedGroup) {
-          const normalizedGroup = this.normalizeTaskTypeGroup(selectedGroup);
-          const taskCategories = Array.isArray(this.metaOptions.taskCategories) ? this.metaOptions.taskCategories : [];
-          if (!normalizedGroup) {
-            return taskCategories;
-          }
-          return taskCategories.filter((category) => {
-            const categoryGroup = this.normalizeTaskTypeGroup(category.group);
-            return !categoryGroup || categoryGroup === normalizedGroup;
-          });
+        resolveTaskCategoryFromType(taskTypeId) {
+          return this.resolveTaskCategoryById(this.resolveTaskTypeCategoryIdById(taskTypeId));
         },
-        filterTaskTypesByGroupAndCategory(selectedGroup, taskCategoryId) {
-          const normalizedGroup = this.normalizeTaskTypeGroup(selectedGroup);
+        taskFormCategory(form) {
+          if (!form || typeof form !== "object") return null;
+          return this.resolveTaskCategoryById(form.taskCategoryId) || this.resolveTaskCategoryFromType(form.taskTypeId);
+        },
+        taskFormUsesCommunicationChannel(form) {
+          return this.taskCategoryUsesCommunicationChannel(this.taskFormCategory(form));
+        },
+        taskFormRequiresFollowUp(form) {
+          return this.taskCategoryRequiresFollowUp(this.taskFormCategory(form));
+        },
+        taskFormSatisfiesDealNextStepRequirement(form) {
+          return this.taskCategorySatisfiesDealNextStepRequirement(this.taskFormCategory(form));
+        },
+        taskItemUsesCommunicationChannel(task) {
+          if (!task || typeof task !== "object") return false;
+          if (typeof task.taskTypeCategoryUsesCommunicationChannel === "boolean") {
+            return task.taskTypeCategoryUsesCommunicationChannel;
+          }
+          return this.taskCategoryUsesCommunicationChannel(this.resolveTaskCategoryById(task.taskTypeCategoryId));
+        },
+        taskItemSatisfiesDealNextStepRequirement(task) {
+          if (!task || typeof task !== "object") return false;
+          if (typeof task.taskTypeCategorySatisfiesDealNextStepRequirement === "boolean") {
+            return task.taskTypeCategorySatisfiesDealNextStepRequirement;
+          }
+          return this.taskCategorySatisfiesDealNextStepRequirement(this.resolveTaskCategoryById(task.taskTypeCategoryId));
+        },
+        findPreferredTaskCategoryId({ usesCommunicationChannel = false, requiresFollowUp = false, satisfiesDealNextStepRequirement = false } = {}) {
+          const categories = Array.isArray(this.metaOptions.taskCategories) ? this.metaOptions.taskCategories : [];
+          const matched = categories.find((category) => (
+            !!category.is_active
+            && !!category.uses_communication_channel === !!usesCommunicationChannel
+            && !!category.requires_follow_up_task_on_done === !!requiresFollowUp
+            && !!category.satisfies_deal_next_step_requirement === !!satisfiesDealNextStepRequirement
+          ));
+          if (matched) {
+            return this.toIntOrNull(matched.id);
+          }
+          const fallback = categories.find((category) => (
+            !!category.is_active
+            && !!category.uses_communication_channel === !!usesCommunicationChannel
+          ));
+          return this.toIntOrNull(fallback?.id);
+        },
+        filterTaskCategories() {
+          return Array.isArray(this.metaOptions.taskCategories) ? this.metaOptions.taskCategories : [];
+        },
+        filterTaskTypesByCategory(taskCategoryId) {
           const normalizedTaskCategoryId = this.toIntOrNull(taskCategoryId);
           const taskTypes = Array.isArray(this.metaOptions.taskTypes) ? this.metaOptions.taskTypes : [];
-          if (!normalizedGroup) {
-            return normalizedTaskCategoryId
-              ? taskTypes.filter((taskType) => String(taskType.category || "") === String(normalizedTaskCategoryId))
-              : [];
+          if (!normalizedTaskCategoryId) {
+            return [];
           }
           return taskTypes.filter((taskType) => {
-            if (this.normalizeTaskTypeGroup(taskType.group) !== normalizedGroup) {
-              return false;
-            }
-            if (normalizedTaskCategoryId && String(taskType.category || "") !== String(normalizedTaskCategoryId)) {
+            if (String(taskType.category || "") !== String(normalizedTaskCategoryId)) {
               return false;
             }
             return true;
           });
-        },
-        resolveTaskTypeGroupById(taskTypeId) {
-          const normalizedTaskTypeId = this.toIntOrNull(taskTypeId);
-          if (!normalizedTaskTypeId) {
-            return "";
-          }
-          const taskType = this.resolveTaskTypeById(normalizedTaskTypeId);
-          return this.normalizeTaskTypeGroup(taskType ? taskType.group : "");
         },
         resolveTaskTypeById(taskTypeId) {
           const normalizedTaskTypeId = this.toIntOrNull(taskTypeId);
@@ -2448,10 +2352,6 @@
           if (!taskType) {
             return;
           }
-          const taskTypeGroup = this.normalizeTaskTypeGroup(taskType.group);
-          if (taskTypeGroup && this.normalizeTaskTypeGroup(form.taskTypeGroup) !== taskTypeGroup) {
-            form.taskTypeGroup = taskTypeGroup;
-          }
           const taskCategoryId = this.toIntOrNull(taskType.category);
           if (taskCategoryId && this.toIntOrNull(form.taskCategoryId) !== taskCategoryId) {
             form.taskCategoryId = taskCategoryId;
@@ -2461,11 +2361,11 @@
           if (!form || typeof form !== "object") return;
           const category = this.resolveTaskCategoryById(form.taskCategoryId);
           if (!category) {
+            form.communicationChannelId = null;
             return;
           }
-          const categoryGroup = this.normalizeTaskTypeGroup(category.group);
-          if (categoryGroup && this.normalizeTaskTypeGroup(form.taskTypeGroup) !== categoryGroup) {
-            form.taskTypeGroup = categoryGroup;
+          if (!this.taskCategoryUsesCommunicationChannel(category)) {
+            form.communicationChannelId = null;
           }
           const selectedTaskType = this.resolveTaskTypeById(form.taskTypeId);
           if (
@@ -3669,7 +3569,11 @@
             recommendedAction: String(rule.next_step_template_name || "").trim(),
             suggestedNextStep,
             suggestedNextStepAt: touch.nextStepAtRaw || null,
-            defaultTaskTypeGroup: touch.channelId ? "client_task" : "",
+            defaultTaskCategoryId: this.findPreferredTaskCategoryId({
+              usesCommunicationChannel: !!touch.channelId,
+              requiresFollowUp: !touch.channelId,
+              satisfiesDealNextStepRequirement: !!touch.channelId,
+            }),
             defaultCommunicationChannelId: touch.channelId || null,
             needsAttention: (
               uiMode === "needs_attention"
@@ -3717,7 +3621,11 @@
             rule,
             suggestedNextStep: String(draft.proposedNextStep || "").trim(),
             suggestedNextStepAt: draft.proposedNextStepAt || null,
-            defaultTaskTypeGroup: draft.proposedChannelId ? "client_task" : "",
+            defaultTaskCategoryId: this.findPreferredTaskCategoryId({
+              usesCommunicationChannel: !!draft.proposedChannelId,
+              requiresFollowUp: !draft.proposedChannelId,
+              satisfiesDealNextStepRequirement: !!draft.proposedChannelId,
+            }),
             defaultCommunicationChannelId: this.toIntOrNull(draft.proposedChannelId),
             recommendedAction: String(draft.proposedNextStep || "").trim(),
             hasSuggestedNextStep: !!String(draft.proposedNextStep || "").trim(),
@@ -3758,7 +3666,11 @@
             recommendedAction: String(item.recommendedAction || "").trim(),
             suggestedNextStep: String(item.proposedNextStep || item.recommendedAction || "").trim(),
             suggestedNextStepAt: item.proposedNextStepAt || null,
-            defaultTaskTypeGroup: item.proposedChannelId ? "client_task" : "",
+            defaultTaskCategoryId: this.findPreferredTaskCategoryId({
+              usesCommunicationChannel: !!item.proposedChannelId,
+              requiresFollowUp: !item.proposedChannelId,
+              satisfiesDealNextStepRequirement: !!item.proposedChannelId,
+            }),
             defaultCommunicationChannelId: this.toIntOrNull(item.proposedChannelId),
             hasSuggestedNextStep: !!String(item.proposedNextStep || item.recommendedAction || "").trim(),
             needsAttention: String(item.itemKind || "") === "attention",
@@ -3794,7 +3706,7 @@
             rule,
             suggestedNextStep: "",
             suggestedNextStepAt: null,
-            defaultTaskTypeGroup: "",
+            defaultTaskCategoryId: null,
             defaultCommunicationChannelId: this.toIntOrNull(draft.proposedChannelId),
             recommendedAction: String(draft.messageText || "").trim(),
             hasSuggestedNextStep: false,
@@ -4305,7 +4217,7 @@
           if (item.sourceType === "queue" && String(item.queueKind || "") === "next_step") {
             this.openAutomationTaskAction(item, {
               title: item.recommendedAction || item.title || "",
-              taskTypeGroup: "internal_task",
+              taskCategoryId: this.toIntOrNull(item.defaultTaskCategoryId),
             });
             return;
           }
@@ -4652,7 +4564,7 @@
           }
           return "";
         },
-        openAutomationTaskAction(item, { title = "", taskTypeGroup = "internal_task", channelCode = "", dueAt = "", fallbackToRecommendation = true } = {}) {
+        openAutomationTaskAction(item, { title = "", taskCategoryId = null, channelCode = "", dueAt = "", fallbackToRecommendation = true } = {}) {
           const normalizedDealId = this.toIntOrNull(item?.dealId);
           const explicitTitle = String(title || "").trim();
           const resolvedTitle = explicitTitle || (
@@ -4661,7 +4573,15 @@
               : ""
           );
           const resolvedDueAt = dueAt || item?.suggestedNextStepAt || item?.deadline || "";
-          const communicationChannelId = taskTypeGroup === "client_task"
+          const resolvedTaskCategoryId = this.toIntOrNull(taskCategoryId)
+            || this.toIntOrNull(item?.defaultTaskCategoryId)
+            || this.findPreferredTaskCategoryId({
+              usesCommunicationChannel: !!channelCode,
+              requiresFollowUp: !channelCode,
+              satisfiesDealNextStepRequirement: !!channelCode,
+            });
+          const selectedCategory = this.resolveTaskCategoryById(resolvedTaskCategoryId);
+          const communicationChannelId = this.taskCategoryUsesCommunicationChannel(selectedCategory)
             ? this.toIntOrNull(this.findCommunicationChannelByCode(channelCode)?.id)
             : null;
           if (normalizedDealId) {
@@ -4670,7 +4590,7 @@
               title: resolvedTitle,
               recommendedAction: resolvedTitle,
               at: resolvedDueAt,
-              taskTypeGroup,
+              taskCategoryId: resolvedTaskCategoryId,
               communicationChannelId,
             });
             return;
@@ -4680,7 +4600,7 @@
           this.forms.tasks = {
             ...this.getDefaultForm("tasks"),
             subject: resolvedTitle,
-            taskTypeGroup,
+            taskCategoryId: resolvedTaskCategoryId,
             taskTypeId: null,
             communicationChannelId,
             priority: "medium",
@@ -4745,7 +4665,11 @@
           if (normalizedActionId === "schedule_meeting") {
             this.openAutomationTaskAction(item, {
               title: "Назначить встречу",
-              taskTypeGroup: "client_task",
+              taskCategoryId: this.findPreferredTaskCategoryId({
+                usesCommunicationChannel: true,
+                requiresFollowUp: false,
+                satisfiesDealNextStepRequirement: true,
+              }),
               channelCode: "meeting",
             });
             return;
@@ -4753,7 +4677,11 @@
           if (normalizedActionId === "reschedule_meeting") {
             this.openAutomationTaskAction(item, {
               title: "Перенести встречу",
-              taskTypeGroup: "client_task",
+              taskCategoryId: this.findPreferredTaskCategoryId({
+                usesCommunicationChannel: true,
+                requiresFollowUp: false,
+                satisfiesDealNextStepRequirement: true,
+              }),
               channelCode: "meeting",
             });
             return;
@@ -4761,7 +4689,11 @@
           if (normalizedActionId === "create_task") {
             this.openAutomationTaskAction(item, {
               title: "",
-              taskTypeGroup: "internal_task",
+              taskCategoryId: this.findPreferredTaskCategoryId({
+                usesCommunicationChannel: false,
+                requiresFollowUp: false,
+                satisfiesDealNextStepRequirement: false,
+              }),
               fallbackToRecommendation: false,
             });
             return;
@@ -4769,56 +4701,88 @@
           if (normalizedActionId === "change_channel") {
             this.openAutomationTaskAction(item, {
               title: "Сменить канал связи",
-              taskTypeGroup: "internal_task",
+              taskCategoryId: this.findPreferredTaskCategoryId({
+                usesCommunicationChannel: false,
+                requiresFollowUp: false,
+                satisfiesDealNextStepRequirement: false,
+              }),
             });
             return;
           }
           if (normalizedActionId === "send_proposal") {
             this.openAutomationTaskAction(item, {
               title: "Подготовить КП",
-              taskTypeGroup: "internal_task",
+              taskCategoryId: this.findPreferredTaskCategoryId({
+                usesCommunicationChannel: false,
+                requiresFollowUp: false,
+                satisfiesDealNextStepRequirement: false,
+              }),
             });
             return;
           }
           if (normalizedActionId === "send_materials") {
             this.openAutomationTaskAction(item, {
               title: "Отправить материалы",
-              taskTypeGroup: "internal_task",
+              taskCategoryId: this.findPreferredTaskCategoryId({
+                usesCommunicationChannel: false,
+                requiresFollowUp: false,
+                satisfiesDealNextStepRequirement: false,
+              }),
             });
             return;
           }
           if (normalizedActionId === "revise_proposal") {
             this.openAutomationTaskAction(item, {
               title: "Скорректировать КП",
-              taskTypeGroup: "internal_task",
+              taskCategoryId: this.findPreferredTaskCategoryId({
+                usesCommunicationChannel: false,
+                requiresFollowUp: false,
+                satisfiesDealNextStepRequirement: false,
+              }),
             });
             return;
           }
           if (normalizedActionId === "prepare_documents") {
             this.openAutomationTaskAction(item, {
               title: "Подготовить документы",
-              taskTypeGroup: "internal_task",
+              taskCategoryId: this.findPreferredTaskCategoryId({
+                usesCommunicationChannel: false,
+                requiresFollowUp: false,
+                satisfiesDealNextStepRequirement: false,
+              }),
             });
             return;
           }
           if (normalizedActionId === "prepare_contract") {
             this.openAutomationTaskAction(item, {
               title: "Подготовить договор",
-              taskTypeGroup: "internal_task",
+              taskCategoryId: this.findPreferredTaskCategoryId({
+                usesCommunicationChannel: false,
+                requiresFollowUp: false,
+                satisfiesDealNextStepRequirement: false,
+              }),
             });
             return;
           }
           if (normalizedActionId === "issue_invoice") {
             this.openAutomationTaskAction(item, {
               title: "Выставить счёт",
-              taskTypeGroup: "internal_task",
+              taskCategoryId: this.findPreferredTaskCategoryId({
+                usesCommunicationChannel: false,
+                requiresFollowUp: false,
+                satisfiesDealNextStepRequirement: false,
+              }),
             });
             return;
           }
           if (normalizedActionId === "launch_project") {
             this.openAutomationTaskAction(item, {
               title: "Запустить оказание услуги / проект",
-              taskTypeGroup: "internal_task",
+              taskCategoryId: this.findPreferredTaskCategoryId({
+                usesCommunicationChannel: false,
+                requiresFollowUp: false,
+                satisfiesDealNextStepRequirement: false,
+              }),
             });
           }
         },
@@ -5740,7 +5704,6 @@
           this.editingTaskId = item.id;
           this.forms.tasks = {
             subject: item.subject || item.name || "",
-            taskTypeGroup: item.taskTypeGroup || this.resolveTaskTypeGroupById(item.taskTypeId),
             taskCategoryId: this.toIntOrNull(item.taskTypeCategoryId || this.resolveTaskTypeCategoryIdById(item.taskTypeId)),
             taskTypeId: this.toIntOrNull(item.taskTypeId),
             communicationChannelId: this.toIntOrNull(item.communicationChannelId),
@@ -5884,7 +5847,6 @@
         resetDealTaskForm() {
           this.dealTaskForm = {
             subject: "",
-            taskTypeGroup: "",
             taskCategoryId: null,
             taskTypeId: null,
             communicationChannelId: null,
@@ -5896,7 +5858,6 @@
         resetTouchFollowUpForm() {
           this.touchFollowUpForm = {
             subject: "",
-            taskTypeGroup: "",
             taskCategoryId: null,
             taskTypeId: null,
             communicationChannelId: null,
@@ -5908,7 +5869,6 @@
         resetTaskFollowUpForm() {
           this.taskFollowUpForm = {
             subject: "",
-            taskTypeGroup: "",
             taskCategoryId: null,
             taskTypeId: null,
             communicationChannelId: null,
@@ -5920,7 +5880,7 @@
         hasPreparedTouchFollowUp() {
           return !!(
             this.touchFollowUpForm.subject.trim()
-            || this.touchFollowUpForm.taskTypeGroup
+            || this.touchFollowUpForm.taskCategoryId
             || this.touchFollowUpForm.taskTypeId
             || this.touchFollowUpForm.communicationChannelId
             || this.touchFollowUpForm.dueAt
@@ -5933,7 +5893,7 @@
         hasPendingDealTaskDraft() {
           return !!(
             this.dealTaskForm.subject.trim()
-            || this.dealTaskForm.taskTypeGroup
+            || this.dealTaskForm.taskCategoryId
             || this.dealTaskForm.taskTypeId
             || this.dealTaskForm.communicationChannelId
             || this.dealTaskForm.dueAt
@@ -6023,13 +5983,13 @@
               String(task.id) !== String(this.editingTaskId)
               && String(task.dealId || "") === dealId
               && this.isTaskActiveStatus(task.taskStatus)
-              && task.taskTypeGroup === "client_task"
+              && this.taskItemSatisfiesDealNextStepRequirement(task)
               && !this.isTaskOverdue(task.dueAtRaw, task.taskStatus)
             ));
           if (this.currentTaskTypeHasAutomaticFollowUp) {
             return;
           }
-          if (this.currentTaskTypeGroup === "internal_task") {
+          if (this.taskFormRequiresFollowUp(this.forms.tasks)) {
             if (this.hasPreparedTaskFollowUp() || hasNonOverdueClientTask) {
               return;
             }
@@ -6047,9 +6007,8 @@
           if (!this.isTaskDoneStatus(form.status)) {
             return;
           }
-          const taskTypeGroup = this.normalizeTaskTypeGroup(form.taskTypeGroup || this.resolveTaskTypeGroupById(form.taskTypeId));
           const hasResult = !!this.resolveTaskResultValue(form);
-          if (taskTypeGroup === "client_task") {
+          if (this.taskFormUsesCommunicationChannel(form)) {
             if (!this.toIntOrNull(form.communicationChannelId)) {
               throw new Error("Укажите тип канала перед завершением клиентской задачи");
             }
@@ -6177,7 +6136,7 @@
           this.showDealTaskForm = true;
           this.resetDealTaskForm();
           this.dealTaskForm.subject = String(item.title || item.recommendedAction || "").trim();
-          this.dealTaskForm.taskTypeGroup = String(item.taskTypeGroup || "").trim();
+          this.dealTaskForm.taskCategoryId = this.toIntOrNull(item.taskCategoryId || item.defaultTaskCategoryId);
           this.dealTaskForm.communicationChannelId = this.toIntOrNull(item.communicationChannelId);
           const dueAt = item.at || item.suggestedNextStepAt || item.nextStepAtRaw || "";
           this.dealTaskForm.dueAt = dueAt ? this.toDateTimeLocal(dueAt) : "";
@@ -6672,13 +6631,12 @@
           return (this.datasets.tasks || [])
             .filter((task) => (
               String(task.dealId || "") === String(normalizedDealId)
-              && ["client_task", "internal_task"].includes(String(task.taskTypeGroup || ""))
               && this.isTaskActiveStatus(task.taskStatus || task.status)
               && task.dueAtRaw
             ))
             .slice()
             .sort((left, right) => (
-              (String(left.taskTypeGroup || "") === "client_task" ? 0 : 1) - (String(right.taskTypeGroup || "") === "client_task" ? 0 : 1)
+              (this.taskItemSatisfiesDealNextStepRequirement(left) ? 0 : 1) - (this.taskItemSatisfiesDealNextStepRequirement(right) ? 0 : 1)
               || (this.parseTaskDueTimestamp(left.dueAtRaw) || 0) - (this.parseTaskDueTimestamp(right.dueAtRaw) || 0)
             ));
         },
@@ -6783,7 +6741,7 @@
             })
             .slice()
             .sort((left, right) => (
-              (String(left.taskTypeGroup || "") === "client_task" ? 0 : 1) - (String(right.taskTypeGroup || "") === "client_task" ? 0 : 1)
+              (this.taskItemUsesCommunicationChannel(left) ? 0 : 1) - (this.taskItemUsesCommunicationChannel(right) ? 0 : 1)
               || (this.parseTaskDueTimestamp(left.dueAtRaw) || 0) - (this.parseTaskDueTimestamp(right.dueAtRaw) || 0)
             ));
         },
@@ -7446,8 +7404,6 @@
             taskTypeCategoryName: item.task_type_category_name || "",
             taskTypeId: item.task_type || null,
             taskTypeName: item.task_type_name || "",
-            taskTypeGroup: item.task_type_group || "",
-            taskTypeGroupLabel: item.task_type_group_label || "",
             communicationChannelId: item.communication_channel || null,
             communicationChannelName: item.communication_channel_name || "",
             priority: item.priority || "medium",
@@ -8010,7 +7966,6 @@
           if (section === "tasks") {
             return {
               subject: "",
-              taskTypeGroup: "",
               taskCategoryId: null,
               taskTypeId: null,
               communicationChannelId: null,
@@ -8257,7 +8212,7 @@
                 type: "task",
                 subject,
                 task_type: this.toIntOrNull(this.dealTaskForm.taskTypeId),
-                communication_channel: this.currentDealTaskTypeGroup === "client_task"
+                communication_channel: this.taskFormUsesCommunicationChannel(this.dealTaskForm)
                   ? this.toIntOrNull(this.dealTaskForm.communicationChannelId)
                   : null,
                 description: this.dealTaskForm.description.trim(),
@@ -8533,7 +8488,7 @@
           this.validateTaskCompletionEvidence(form);
           this.validateTaskFollowUpRequirement();
           const clientId = this.toIntOrNull(form.companyId);
-          const communicationChannelId = this.currentTaskTypeGroup === "client_task"
+          const communicationChannelId = this.taskFormUsesCommunicationChannel(form)
             ? this.toIntOrNull(form.communicationChannelId)
             : null;
           await this.apiRequest("/api/v1/activities/", {
@@ -8577,7 +8532,7 @@
           this.validateTaskCompletionEvidence(form);
           this.validateTaskFollowUpRequirement();
           const clientId = this.toIntOrNull(form.companyId);
-          const communicationChannelId = this.currentTaskTypeGroup === "client_task"
+          const communicationChannelId = this.taskFormUsesCommunicationChannel(form)
             ? this.toIntOrNull(form.communicationChannelId)
             : null;
           await this.apiRequest(`/api/v1/activities/${this.editingTaskId}/`, {
@@ -8742,13 +8697,13 @@
           const clientId = this.toIntOrNull(this.forms.tasks.companyId);
           await this.apiRequest("/api/v1/activities/", {
             method: "POST",
-            body: {
-              type: "task",
-              subject,
-              task_type: this.toIntOrNull(followUp.taskTypeId),
-              communication_channel: this.currentTaskFollowUpTypeGroup === "client_task"
-                ? this.toIntOrNull(followUp.communicationChannelId)
-                : null,
+              body: {
+                type: "task",
+                subject,
+                task_type: this.toIntOrNull(followUp.taskTypeId),
+                communication_channel: this.taskFormUsesCommunicationChannel(followUp)
+                  ? this.toIntOrNull(followUp.communicationChannelId)
+                  : null,
               description: followUp.description.trim(),
               due_at: this.toIsoDateTime(followUp.dueAt),
               deadline_reminder_offset_minutes: Number(followUp.reminderOffsetMinutes || 30),
@@ -8766,13 +8721,13 @@
           }
           await this.apiRequest("/api/v1/activities/", {
             method: "POST",
-            body: {
-              type: "task",
-              subject,
-              task_type: this.toIntOrNull(followUp.taskTypeId),
-              communication_channel: this.currentTouchFollowUpTypeGroup === "client_task"
-                ? this.toIntOrNull(followUp.communicationChannelId)
-                : null,
+              body: {
+                type: "task",
+                subject,
+                task_type: this.toIntOrNull(followUp.taskTypeId),
+                communication_channel: this.taskFormUsesCommunicationChannel(followUp)
+                  ? this.toIntOrNull(followUp.communicationChannelId)
+                  : null,
               description: followUp.description.trim(),
               due_at: this.toIsoDateTime(followUp.dueAt),
               deadline_reminder_offset_minutes: Number(followUp.reminderOffsetMinutes || 30),
