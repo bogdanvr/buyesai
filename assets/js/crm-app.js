@@ -6032,19 +6032,18 @@
             return;
           }
           const dealId = String(this.toIntOrNull(this.forms.tasks.dealId) || "");
-          const hasNonOverdueClientTask = Array.isArray(this.datasets.tasks)
+          const hasNonOverdueActiveTask = Array.isArray(this.datasets.tasks)
             && this.datasets.tasks.some((task) => (
               String(task.id) !== String(this.editingTaskId)
               && String(task.dealId || "") === dealId
               && this.isTaskActiveStatus(task.taskStatus)
-              && this.taskItemSatisfiesDealNextStepRequirement(task)
               && !this.isTaskOverdue(task.dueAtRaw, task.taskStatus)
             ));
           if (this.currentTaskTypeHasAutomaticFollowUp) {
             return;
           }
           if (this.taskFormRequiresFollowUp(this.forms.tasks)) {
-            if (this.hasPreparedTaskFollowUp() || hasNonOverdueClientTask) {
+            if (this.hasPreparedTaskFollowUp() || hasNonOverdueActiveTask) {
               return;
             }
             throw new Error("Для внутренней задачи заполните следующую задачу перед завершением текущей");
@@ -6052,10 +6051,10 @@
           if (!this.taskActiveDealRequiresFollowUp) {
             return;
           }
-          if (hasNonOverdueClientTask || this.hasPreparedTaskFollowUp()) {
+          if (hasNonOverdueActiveTask || this.hasPreparedTaskFollowUp()) {
             return;
           }
-          throw new Error("Для активной сделки заполните следующую задачу или держите актуальную клиентскую задачу без просрочки");
+          throw new Error("Для активной сделки заполните следующую задачу или держите актуальную активную задачу без просрочки");
         },
         validateTaskCompletionEvidence(form) {
           if (!this.isTaskDoneStatus(form.status)) {
