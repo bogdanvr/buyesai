@@ -9,6 +9,8 @@ class GroupedCRMAdminSite(AdminSite):
     site_header = "Buyes CRM Admin"
     site_title = "Buyes CRM Admin"
     index_title = "Управление CRM"
+    index_template = "admin/index.html"
+    app_index_template = "admin/app_index.html"
 
     admin_group_order = {
         "Пользователи и права": 5,
@@ -26,8 +28,13 @@ class GroupedCRMAdminSite(AdminSite):
     }
 
     def _resolve_admin_group(self, model_dict):
+        model = model_dict.get("model")
+        if model is not None:
+            model_admin = self._registry.get(model)
+            if model_admin is not None:
+                return str(getattr(model_admin, "admin_group", "") or "").strip() or "Прочее"
         object_name = str(model_dict.get("object_name") or "").strip()
-        app_label = str(model_dict.get("app_label") or "").strip()
+        app_label = str(getattr(getattr(model, "_meta", None), "app_label", "") or "").strip()
         for model, model_admin in self._registry.items():
             if model._meta.app_label == app_label and model.__name__ == object_name:
                 return str(getattr(model_admin, "admin_group", "") or "").strip() or "Прочее"
