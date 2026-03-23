@@ -71,8 +71,35 @@ class TaskTypeAdmin(admin.ModelAdmin):
 @admin.register(Activity, site=crm_admin_site)
 class ActivityAdmin(admin.ModelAdmin):
     admin_group = "Задачи и роли"
-    list_display = ("type", "subject", "task_type", "communication_channel", "status", "priority", "client", "due_at", "created_at")
+    list_display = (
+        "type",
+        "subject",
+        "task_type",
+        "task_category_display",
+        "communication_channel",
+        "status",
+        "priority",
+        "client",
+        "due_at",
+        "created_at",
+    )
     list_filter = ("type", "status", "priority", "task_type", "communication_channel")
     search_fields = ("subject", "description")
     autocomplete_fields = ("lead", "deal", "client", "contact", "created_by", "task_type", "communication_channel", "related_touch")
-    readonly_fields = ("created_at", "updated_at", "completed_at")
+    readonly_fields = ("task_category_display", "created_at", "updated_at", "completed_at")
+
+    @admin.display(description="Категория задачи", ordering="task_type__category__name")
+    def task_category_display(self, obj):
+        task_type = getattr(obj, "task_type", None)
+        category = getattr(task_type, "category", None) if task_type is not None else None
+        return getattr(category, "name", "—")
+
+    def get_fields(self, request, obj=None):
+        fields = list(super().get_fields(request, obj))
+        if "task_category_display" not in fields:
+            try:
+                insert_at = fields.index("task_type") + 1
+            except ValueError:
+                insert_at = len(fields)
+            fields.insert(insert_at, "task_category_display")
+        return fields
