@@ -6,7 +6,19 @@ from rest_framework.test import APITestCase
 import re
 from datetime import timedelta
 
-from crm.models import Activity, Client, CommunicationChannel, Deal, DealStage, LeadSource, TaskType, Touch
+from crm.models import (
+    Activity,
+    Client,
+    CommunicationChannel,
+    Deal,
+    DealStage,
+    LeadSource,
+    TaskCategory,
+    TaskType,
+    Touch,
+    UserRole,
+    UserRoleAssignment,
+)
 from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup
 
 
@@ -561,6 +573,89 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(response.data[1]["id"], later_task_type.pk)
         self.assertEqual(response.data[1]["group"], TaskTypeGroup.CLIENT_TASK)
         self.assertEqual(response.data[1]["group_label"], "Клиентская задача")
+
+    def test_task_category_and_task_type_meta_are_filtered_by_user_roles(self):
+        developer_role = UserRole.objects.create(code="developer", name="Разработчик", sort_order=10)
+        technical_category = TaskCategory.objects.create(
+            code="technical_task",
+            name="Техническая задача",
+            group=TaskTypeGroup.INTERNAL_TASK,
+            sort_order=10,
+        )
+        technical_category.allowed_roles.add(developer_role)
+        sales_category = TaskCategory.objects.create(
+            code="sales_task",
+            name="Задача продаж",
+            group=TaskTypeGroup.CLIENT_TASK,
+            sort_order=20,
+        )
+        TaskType.objects.create(
+            name="Исправить баг",
+            category=technical_category,
+            group=TaskTypeGroup.INTERNAL_TASK,
+            sort_order=10,
+        )
+        TaskType.objects.create(
+            name="Созвон с клиентом",
+            category=sales_category,
+            group=TaskTypeGroup.CLIENT_TASK,
+            sort_order=20,
+        )
+
+        categories_response = self.client.get(reverse("meta-task-categories"))
+        task_types_response = self.client.get(reverse("meta-task-types"))
+
+        self.assertEqual(categories_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(task_types_response.status_code, status.HTTP_200_OK)
+        category_names = {item["name"] for item in categories_response.data}
+        task_type_names = {item["name"] for item in task_types_response.data}
+        self.assertNotIn("Техническая задача", category_names)
+        self.assertNotIn("Исправить баг", task_type_names)
+        self.assertIn("Задача продаж", category_names)
+        self.assertIn("Созвон с клиентом", task_type_names)
+
+        UserRoleAssignment.objects.create(user=self.user, role=developer_role)
+
+        categories_response = self.client.get(reverse("meta-task-categories"))
+        task_types_response = self.client.get(reverse("meta-task-types"))
+
+        category_names = {item["name"] for item in categories_response.data}
+        task_type_names = {item["name"] for item in task_types_response.data}
+        self.assertIn("Техническая задача", category_names)
+        self.assertIn("Исправить баг", task_type_names)
+        self.assertIn("Созвон с клиентом", task_type_names)
+
+    def test_task_create_rejects_task_type_from_unavailable_role_category(self):
+        developer_role = UserRole.objects.create(code="developer", name="Разработчик", sort_order=10)
+        technical_category = TaskCategory.objects.create(
+            code="technical_task",
+            name="Техническая задача",
+            group=TaskTypeGroup.INTERNAL_TASK,
+            sort_order=10,
+        )
+        technical_category.allowed_roles.add(developer_role)
+        technical_task_type = TaskType.objects.create(
+            name="Исправить баг",
+            category=technical_category,
+            group=TaskTypeGroup.INTERNAL_TASK,
+            sort_order=10,
+        )
+
+        response = self.client.post(
+            reverse("activities-list"),
+            {
+                "type": "task",
+                "subject": "Исправить баг",
+                "task_type": technical_task_type.pk,
+                "client": self.company.pk,
+                "due_at": "2026-03-20T10:00:00+06:00",
+                "status": TaskStatus.TODO,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["task_type"][0], "Этот тип задачи недоступен для ваших ролей.")
 
     def test_task_type_meta_returns_auto_touch_fields(self):
         task_type = TaskType.objects.create(

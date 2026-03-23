@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from django.utils.text import slugify
 import uuid
 
 from crm.models.common import TimestampedModel
@@ -42,6 +43,85 @@ class TaskTypeGroup(models.TextChoices):
     CLIENT_TASK = "client_task", "Клиентская задача"
 
 
+class UserRole(TimestampedModel):
+    code = models.CharField(max_length=64, unique=True, verbose_name="Код")
+    name = models.CharField(max_length=128, unique=True, verbose_name="Название роли")
+    sort_order = models.PositiveIntegerField(default=100, verbose_name="Порядок сортировки")
+    is_active = models.BooleanField(default=True, verbose_name="Активна")
+
+    class Meta:
+        verbose_name = "Роль пользователя"
+        verbose_name_plural = "Роли пользователей"
+        ordering = ("sort_order", "name")
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not str(self.code or "").strip():
+            self.code = slugify(self.name or "", allow_unicode=False).replace("-", "_") or f"role_{self.pk or 'new'}"
+        super().save(*args, **kwargs)
+
+
+class UserRoleAssignment(TimestampedModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="crm_user_role_assignments",
+        on_delete=models.CASCADE,
+        verbose_name="Пользователь",
+    )
+    role = models.ForeignKey(
+        "crm.UserRole",
+        related_name="assignments",
+        on_delete=models.CASCADE,
+        verbose_name="Роль",
+    )
+
+    class Meta:
+        verbose_name = "Роль пользователя"
+        verbose_name_plural = "Роли пользователей"
+        ordering = ("user__username", "role__sort_order", "role__name")
+        constraints = [
+            models.UniqueConstraint(fields=["user", "role"], name="unique_crm_user_role_assignment"),
+        ]
+
+    def __str__(self):
+        return f"{self.user} → {self.role}"
+
+
+class TaskCategory(TimestampedModel):
+    code = models.CharField(max_length=64, unique=True, verbose_name="Код")
+    name = models.CharField(max_length=128, unique=True, verbose_name="Название категории")
+    sort_order = models.PositiveIntegerField(default=100, verbose_name="Порядок сортировки")
+    group = models.CharField(
+        max_length=32,
+        choices=TaskTypeGroup.choices,
+        blank=True,
+        default="",
+        verbose_name="Группа задач",
+    )
+    allowed_roles = models.ManyToManyField(
+        "crm.UserRole",
+        related_name="task_categories",
+        blank=True,
+        verbose_name="Доступные роли",
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Активна")
+
+    class Meta:
+        verbose_name = "Категория задачи"
+        verbose_name_plural = "Категории задач"
+        ordering = ("sort_order", "name")
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not str(self.code or "").strip():
+            self.code = slugify(self.name or "", allow_unicode=False).replace("-", "_") or f"task_category_{self.pk or 'new'}"
+        super().save(*args, **kwargs)
+
+
 class TaskType(TimestampedModel):
     name = models.CharField(max_length=128, unique=True, verbose_name="Тип задачи")
     sort_order = models.PositiveIntegerField(default=100, verbose_name="Порядок сортировки")
@@ -50,6 +130,14 @@ class TaskType(TimestampedModel):
         choices=TaskTypeGroup.choices,
         default=TaskTypeGroup.INTERNAL_TASK,
         verbose_name="Группа типа задачи",
+    )
+    category = models.ForeignKey(
+        "crm.TaskCategory",
+        related_name="task_types",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Категория задачи",
     )
     auto_touch_on_done = models.BooleanField(default=False, verbose_name="Автокасание")
     touch_result = models.CharField(max_length=128, blank=True, default="", verbose_name="Результат")
@@ -71,6 +159,31 @@ class TaskType(TimestampedModel):
 
     def __str__(self):
         return self.name
+
+
+def get_available_task_categories_for_user(user):
+    queryset = TaskCategory.objects.filter(is_active=True)
+    if getattr(user, "is_superuser", False):
+        return queryset
+    if user is None or not getattr(user, "is_authenticated", False):
+        return queryset.filter(allowed_roles__isnull=True).distinct()
+    return queryset.filter(
+        models.Q(allowed_roles__isnull=True)
+        | models.Q(allowed_roles__is_active=True, allowed_roles__assignments__user=user)
+    ).distinct()
+
+
+def get_available_task_types_for_user(user):
+    queryset = TaskType.objects.filter(is_active=True).select_related("category")
+    if getattr(user, "is_superuser", False):
+        return queryset
+    if user is None or not getattr(user, "is_authenticated", False):
+        return queryset.filter(models.Q(category__isnull=True) | models.Q(category__allowed_roles__isnull=True)).distinct()
+    return queryset.filter(
+        models.Q(category__isnull=True)
+        | models.Q(category__allowed_roles__isnull=True)
+        | models.Q(category__allowed_roles__is_active=True, category__allowed_roles__assignments__user=user)
+    ).distinct()
 
 
 class Activity(TimestampedModel):

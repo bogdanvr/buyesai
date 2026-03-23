@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.utils import timezone
 
 from crm.models import Activity
-from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup
+from crm.models.activity import ActivityType, TaskStatus, TaskTypeGroup, get_available_task_types_for_user
 
 
 class ActivitySerializer(serializers.ModelSerializer):
@@ -14,6 +14,8 @@ class ActivitySerializer(serializers.ModelSerializer):
     task_type_name = serializers.CharField(source="task_type.name", read_only=True)
     task_type_group = serializers.CharField(source="task_type.group", read_only=True)
     task_type_group_label = serializers.CharField(source="task_type.get_group_display", read_only=True)
+    task_type_category = serializers.IntegerField(source="task_type.category_id", read_only=True)
+    task_type_category_name = serializers.CharField(source="task_type.category.name", read_only=True)
     communication_channel_name = serializers.CharField(source="communication_channel.name", read_only=True)
     related_touch_subject = serializers.CharField(source="related_touch.subject", read_only=True)
     status_label = serializers.SerializerMethodField()
@@ -96,6 +98,8 @@ class ActivitySerializer(serializers.ModelSerializer):
         is_done = status == TaskStatus.DONE
         task_type = attrs.get("task_type", getattr(self.instance, "task_type", None))
         task_type_group = str(getattr(task_type, "group", "") or "").strip()
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
         has_automatic_follow_up_task = self._has_automatic_follow_up_task(task_type)
         communication_channel = attrs.get(
             "communication_channel",
@@ -111,6 +115,10 @@ class ActivitySerializer(serializers.ModelSerializer):
         company_note = attrs.get("company_note", getattr(self.instance, "company_note", ""))
         self._resolve_task_subject(attrs, activity_type, task_type)
         result = self._resolve_task_result(attrs, activity_type, task_type)
+        if activity_type == ActivityType.TASK and task_type is not None:
+            allowed_task_type_ids = set(get_available_task_types_for_user(user).values_list("id", flat=True))
+            if task_type.pk not in allowed_task_type_ids:
+                raise serializers.ValidationError({"task_type": "Этот тип задачи недоступен для ваших ролей."})
         if activity_type == ActivityType.TASK:
             attrs["status"] = status
             attrs["is_done"] = is_done
@@ -191,6 +199,8 @@ class ActivitySerializer(serializers.ModelSerializer):
             "task_type_name",
             "task_type_group",
             "task_type_group_label",
+            "task_type_category",
+            "task_type_category_name",
             "communication_channel",
             "communication_channel_name",
             "related_touch",

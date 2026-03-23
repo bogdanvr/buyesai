@@ -12,6 +12,7 @@ from crm.models import (
     LeadStatus,
     NextStepTemplate,
     OutcomeCatalog,
+    TaskCategory,
     TaskType,
     TouchResult,
 )
@@ -92,9 +93,18 @@ class UserOptionSerializer(serializers.ModelSerializer):
         fields = ["id", "username", "email", "full_name"]
 
 
+class TaskCategorySerializer(serializers.ModelSerializer):
+    group_label = serializers.CharField(source="get_group_display", read_only=True)
+
+    class Meta:
+        model = TaskCategory
+        fields = ["id", "name", "code", "sort_order", "group", "group_label", "is_active"]
+
+
 class TaskTypeSerializer(serializers.ModelSerializer):
     group_label = serializers.CharField(source="get_group_display", read_only=True)
     auto_task_type_name = serializers.CharField(source="auto_task_type.name", read_only=True)
+    category_name = serializers.CharField(source="category.name", read_only=True)
 
     class Meta:
         model = TaskType
@@ -104,6 +114,8 @@ class TaskTypeSerializer(serializers.ModelSerializer):
             "sort_order",
             "group",
             "group_label",
+            "category",
+            "category_name",
             "auto_touch_on_done",
             "touch_result",
             "auto_task_on_done",

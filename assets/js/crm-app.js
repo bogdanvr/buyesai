@@ -236,6 +236,7 @@
             tasks: {
               subject: "",
               taskTypeGroup: "",
+              taskCategoryId: null,
               taskTypeId: null,
               communicationChannelId: null,
               priority: "medium",
@@ -272,6 +273,7 @@
           dealTaskForm: {
             subject: "",
             taskTypeGroup: "",
+            taskCategoryId: null,
             taskTypeId: null,
             communicationChannelId: null,
             dueAt: "",
@@ -281,6 +283,7 @@
           touchFollowUpForm: {
             subject: "",
             taskTypeGroup: "",
+            taskCategoryId: null,
             taskTypeId: null,
             communicationChannelId: null,
             dueAt: "",
@@ -290,6 +293,7 @@
           taskFollowUpForm: {
             subject: "",
             taskTypeGroup: "",
+            taskCategoryId: null,
             taskTypeId: null,
             communicationChannelId: null,
             dueAt: "",
@@ -386,6 +390,7 @@
             dealStages: [],
             leadSources: [],
             users: [],
+            taskCategories: [],
             taskTypes: [],
             touchResults: [],
             outcomes: [],
@@ -1348,6 +1353,10 @@
           const value = this.normalizeTaskTypeGroup(this.forms.tasks.taskTypeGroup);
           return (this.taskTypeGroupOptions || []).find((option) => option.value === value)?.label || "Не выбрана";
         },
+        taskSummaryTaskCategoryLabel() {
+          const category = this.resolveTaskCategoryById(this.forms.tasks.taskCategoryId);
+          return category?.name || "Не выбрана";
+        },
         taskSummaryTaskTypeLabel() {
           const taskType = this.resolveTaskTypeById(this.forms.tasks.taskTypeId);
           return taskType?.name || "Не выбран";
@@ -1418,12 +1427,13 @@
           );
         },
         filteredTaskFollowUpTypeOptions() {
-          const selectedGroup = this.currentTaskFollowUpTypeGroup;
-          const taskTypes = Array.isArray(this.metaOptions.taskTypes) ? this.metaOptions.taskTypes : [];
-          if (!selectedGroup) {
-            return [];
-          }
-          return taskTypes.filter((taskType) => this.normalizeTaskTypeGroup(taskType.group) === selectedGroup);
+          return this.filterTaskTypesByGroupAndCategory(
+            this.currentTaskFollowUpTypeGroup,
+            this.taskFollowUpForm.taskCategoryId
+          );
+        },
+        filteredTaskFollowUpCategoryOptions() {
+          return this.filterTaskCategoriesByGroup(this.currentTaskFollowUpTypeGroup);
         },
         showTaskFollowUpTypeSelector() {
           return !!String(this.taskFollowUpForm.taskTypeGroup || "").trim()
@@ -1438,12 +1448,13 @@
           );
         },
         filteredDealTaskTypeOptions() {
-          const selectedGroup = this.currentDealTaskTypeGroup;
-          const taskTypes = Array.isArray(this.metaOptions.taskTypes) ? this.metaOptions.taskTypes : [];
-          if (!selectedGroup) {
-            return [];
-          }
-          return taskTypes.filter((taskType) => this.normalizeTaskTypeGroup(taskType.group) === selectedGroup);
+          return this.filterTaskTypesByGroupAndCategory(
+            this.currentDealTaskTypeGroup,
+            this.dealTaskForm.taskCategoryId
+          );
+        },
+        filteredDealTaskCategoryOptions() {
+          return this.filterTaskCategoriesByGroup(this.currentDealTaskTypeGroup);
         },
         showDealTaskTypeSelector() {
           return !!String(this.dealTaskForm.taskTypeGroup || "").trim()
@@ -1458,12 +1469,13 @@
           );
         },
         filteredTouchFollowUpTypeOptions() {
-          const selectedGroup = this.currentTouchFollowUpTypeGroup;
-          const taskTypes = Array.isArray(this.metaOptions.taskTypes) ? this.metaOptions.taskTypes : [];
-          if (!selectedGroup) {
-            return [];
-          }
-          return taskTypes.filter((taskType) => this.normalizeTaskTypeGroup(taskType.group) === selectedGroup);
+          return this.filterTaskTypesByGroupAndCategory(
+            this.currentTouchFollowUpTypeGroup,
+            this.touchFollowUpForm.taskCategoryId
+          );
+        },
+        filteredTouchFollowUpCategoryOptions() {
+          return this.filterTaskCategoriesByGroup(this.currentTouchFollowUpTypeGroup);
         },
         showTouchFollowUpTypeSelector() {
           return !!String(this.touchFollowUpForm.taskTypeGroup || "").trim()
@@ -1660,12 +1672,13 @@
           return Array.isArray(this.taskTouchOptions) ? this.taskTouchOptions : [];
         },
         filteredTaskTypeOptions() {
-          const selectedGroup = this.normalizeTaskTypeGroup(this.forms.tasks.taskTypeGroup);
-          const taskTypes = Array.isArray(this.metaOptions.taskTypes) ? this.metaOptions.taskTypes : [];
-          if (!selectedGroup) {
-            return [];
-          }
-          return taskTypes.filter((taskType) => this.normalizeTaskTypeGroup(taskType.group) === selectedGroup);
+          return this.filterTaskTypesByGroupAndCategory(
+            this.normalizeTaskTypeGroup(this.forms.tasks.taskTypeGroup),
+            this.forms.tasks.taskCategoryId
+          );
+        },
+        filteredTaskCategoryOptions() {
+          return this.filterTaskCategoriesByGroup(this.normalizeTaskTypeGroup(this.forms.tasks.taskTypeGroup));
         }
       },
       watch: {
@@ -1673,6 +1686,13 @@
           handler(nextValue) {
             if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
               this.forms.tasks.communicationChannelId = null;
+            }
+            const selectedCategory = this.resolveTaskCategoryById(this.forms.tasks.taskCategoryId);
+            if (selectedCategory) {
+              const categoryGroup = this.normalizeTaskTypeGroup(selectedCategory.group);
+              if (categoryGroup && categoryGroup !== this.normalizeTaskTypeGroup(nextValue)) {
+                this.forms.tasks.taskCategoryId = null;
+              }
             }
             const selectedTaskTypeId = this.toIntOrNull(this.forms.tasks.taskTypeId);
             if (!selectedTaskTypeId) {
@@ -1684,8 +1704,14 @@
             }
           }
         },
+        "forms.tasks.taskCategoryId": {
+          handler() {
+            this.syncTaskCategorySelection(this.forms.tasks);
+          }
+        },
         "forms.tasks.taskTypeId": {
           handler(nextValue, previousValue) {
+            this.syncTaskTypeSelection(this.forms.tasks);
             const nextDefaultResult = this.resolveTaskTypeDefaultResultById(nextValue);
             const previousDefaultResult = this.resolveTaskTypeDefaultResultById(previousValue);
             const currentResult = String(this.forms.tasks.result || "").trim();
@@ -1882,6 +1908,13 @@
             if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
               this.taskFollowUpForm.communicationChannelId = null;
             }
+            const selectedCategory = this.resolveTaskCategoryById(this.taskFollowUpForm.taskCategoryId);
+            if (selectedCategory) {
+              const categoryGroup = this.normalizeTaskTypeGroup(selectedCategory.group);
+              if (categoryGroup && categoryGroup !== this.normalizeTaskTypeGroup(nextValue)) {
+                this.taskFollowUpForm.taskCategoryId = null;
+              }
+            }
             const selectedTaskTypeId = this.toIntOrNull(this.taskFollowUpForm.taskTypeId);
             if (!selectedTaskTypeId) {
               return;
@@ -1892,10 +1925,27 @@
             }
           }
         },
+        "taskFollowUpForm.taskCategoryId": {
+          handler() {
+            this.syncTaskCategorySelection(this.taskFollowUpForm);
+          }
+        },
+        "taskFollowUpForm.taskTypeId": {
+          handler() {
+            this.syncTaskTypeSelection(this.taskFollowUpForm);
+          }
+        },
         "dealTaskForm.taskTypeGroup": {
           handler(nextValue) {
             if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
               this.dealTaskForm.communicationChannelId = null;
+            }
+            const selectedCategory = this.resolveTaskCategoryById(this.dealTaskForm.taskCategoryId);
+            if (selectedCategory) {
+              const categoryGroup = this.normalizeTaskTypeGroup(selectedCategory.group);
+              if (categoryGroup && categoryGroup !== this.normalizeTaskTypeGroup(nextValue)) {
+                this.dealTaskForm.taskCategoryId = null;
+              }
             }
             const selectedTaskTypeId = this.toIntOrNull(this.dealTaskForm.taskTypeId);
             if (!selectedTaskTypeId) {
@@ -1907,10 +1957,27 @@
             }
           }
         },
+        "dealTaskForm.taskCategoryId": {
+          handler() {
+            this.syncTaskCategorySelection(this.dealTaskForm);
+          }
+        },
+        "dealTaskForm.taskTypeId": {
+          handler() {
+            this.syncTaskTypeSelection(this.dealTaskForm);
+          }
+        },
         "touchFollowUpForm.taskTypeGroup": {
           handler(nextValue) {
             if (this.normalizeTaskTypeGroup(nextValue) !== "client_task") {
               this.touchFollowUpForm.communicationChannelId = null;
+            }
+            const selectedCategory = this.resolveTaskCategoryById(this.touchFollowUpForm.taskCategoryId);
+            if (selectedCategory) {
+              const categoryGroup = this.normalizeTaskTypeGroup(selectedCategory.group);
+              if (categoryGroup && categoryGroup !== this.normalizeTaskTypeGroup(nextValue)) {
+                this.touchFollowUpForm.taskCategoryId = null;
+              }
             }
             const selectedTaskTypeId = this.toIntOrNull(this.touchFollowUpForm.taskTypeId);
             if (!selectedTaskTypeId) {
@@ -1920,6 +1987,16 @@
             if (taskTypeGroup && taskTypeGroup !== this.normalizeTaskTypeGroup(nextValue)) {
               this.touchFollowUpForm.taskTypeId = null;
             }
+          }
+        },
+        "touchFollowUpForm.taskCategoryId": {
+          handler() {
+            this.syncTaskCategorySelection(this.touchFollowUpForm);
+          }
+        },
+        "touchFollowUpForm.taskTypeId": {
+          handler() {
+            this.syncTaskTypeSelection(this.touchFollowUpForm);
           }
         },
         "forms.deals.description": {
@@ -2301,6 +2378,49 @@
         normalizeTaskTypeGroup(value) {
           return String(value || "").trim();
         },
+        resolveTaskCategoryById(taskCategoryId) {
+          const normalizedTaskCategoryId = this.toIntOrNull(taskCategoryId);
+          if (!normalizedTaskCategoryId) {
+            return null;
+          }
+          return (this.metaOptions.taskCategories || []).find(
+            (entry) => String(entry.id) === String(normalizedTaskCategoryId)
+          ) || null;
+        },
+        resolveTaskTypeCategoryIdById(taskTypeId) {
+          const taskType = this.resolveTaskTypeById(taskTypeId);
+          return this.toIntOrNull(taskType?.category);
+        },
+        filterTaskCategoriesByGroup(selectedGroup) {
+          const normalizedGroup = this.normalizeTaskTypeGroup(selectedGroup);
+          const taskCategories = Array.isArray(this.metaOptions.taskCategories) ? this.metaOptions.taskCategories : [];
+          if (!normalizedGroup) {
+            return taskCategories;
+          }
+          return taskCategories.filter((category) => {
+            const categoryGroup = this.normalizeTaskTypeGroup(category.group);
+            return !categoryGroup || categoryGroup === normalizedGroup;
+          });
+        },
+        filterTaskTypesByGroupAndCategory(selectedGroup, taskCategoryId) {
+          const normalizedGroup = this.normalizeTaskTypeGroup(selectedGroup);
+          const normalizedTaskCategoryId = this.toIntOrNull(taskCategoryId);
+          const taskTypes = Array.isArray(this.metaOptions.taskTypes) ? this.metaOptions.taskTypes : [];
+          if (!normalizedGroup) {
+            return normalizedTaskCategoryId
+              ? taskTypes.filter((taskType) => String(taskType.category || "") === String(normalizedTaskCategoryId))
+              : [];
+          }
+          return taskTypes.filter((taskType) => {
+            if (this.normalizeTaskTypeGroup(taskType.group) !== normalizedGroup) {
+              return false;
+            }
+            if (normalizedTaskCategoryId && String(taskType.category || "") !== String(normalizedTaskCategoryId)) {
+              return false;
+            }
+            return true;
+          });
+        },
         resolveTaskTypeGroupById(taskTypeId) {
           const normalizedTaskTypeId = this.toIntOrNull(taskTypeId);
           if (!normalizedTaskTypeId) {
@@ -2321,6 +2441,39 @@
         resolveTaskTypeDefaultResultById(taskTypeId) {
           const taskType = this.resolveTaskTypeById(taskTypeId);
           return String(taskType?.touch_result || "").trim();
+        },
+        syncTaskTypeSelection(form) {
+          if (!form || typeof form !== "object") return;
+          const taskType = this.resolveTaskTypeById(form.taskTypeId);
+          if (!taskType) {
+            return;
+          }
+          const taskTypeGroup = this.normalizeTaskTypeGroup(taskType.group);
+          if (taskTypeGroup && this.normalizeTaskTypeGroup(form.taskTypeGroup) !== taskTypeGroup) {
+            form.taskTypeGroup = taskTypeGroup;
+          }
+          const taskCategoryId = this.toIntOrNull(taskType.category);
+          if (taskCategoryId && this.toIntOrNull(form.taskCategoryId) !== taskCategoryId) {
+            form.taskCategoryId = taskCategoryId;
+          }
+        },
+        syncTaskCategorySelection(form) {
+          if (!form || typeof form !== "object") return;
+          const category = this.resolveTaskCategoryById(form.taskCategoryId);
+          if (!category) {
+            return;
+          }
+          const categoryGroup = this.normalizeTaskTypeGroup(category.group);
+          if (categoryGroup && this.normalizeTaskTypeGroup(form.taskTypeGroup) !== categoryGroup) {
+            form.taskTypeGroup = categoryGroup;
+          }
+          const selectedTaskType = this.resolveTaskTypeById(form.taskTypeId);
+          if (
+            selectedTaskType
+            && this.toIntOrNull(selectedTaskType.category) !== this.toIntOrNull(category.id)
+          ) {
+            form.taskTypeId = null;
+          }
         },
         resolveTaskResultValue(formLike) {
           const form = formLike && typeof formLike === "object" ? formLike : {};
@@ -5588,6 +5741,7 @@
           this.forms.tasks = {
             subject: item.subject || item.name || "",
             taskTypeGroup: item.taskTypeGroup || this.resolveTaskTypeGroupById(item.taskTypeId),
+            taskCategoryId: this.toIntOrNull(item.taskTypeCategoryId || this.resolveTaskTypeCategoryIdById(item.taskTypeId)),
             taskTypeId: this.toIntOrNull(item.taskTypeId),
             communicationChannelId: this.toIntOrNull(item.communicationChannelId),
             priority: item.priority || "medium",
@@ -5731,6 +5885,7 @@
           this.dealTaskForm = {
             subject: "",
             taskTypeGroup: "",
+            taskCategoryId: null,
             taskTypeId: null,
             communicationChannelId: null,
             dueAt: "",
@@ -5742,6 +5897,7 @@
           this.touchFollowUpForm = {
             subject: "",
             taskTypeGroup: "",
+            taskCategoryId: null,
             taskTypeId: null,
             communicationChannelId: null,
             dueAt: "",
@@ -5753,6 +5909,7 @@
           this.taskFollowUpForm = {
             subject: "",
             taskTypeGroup: "",
+            taskCategoryId: null,
             taskTypeId: null,
             communicationChannelId: null,
             dueAt: "",
@@ -7285,6 +7442,8 @@
             result: item.result || "",
             saveCompanyNote: !!item.save_company_note,
             companyNote: item.company_note || "",
+            taskTypeCategoryId: item.task_type_category || null,
+            taskTypeCategoryName: item.task_type_category_name || "",
             taskTypeId: item.task_type || null,
             taskTypeName: item.task_type_name || "",
             taskTypeGroup: item.task_type_group || "",
@@ -7852,6 +8011,7 @@
             return {
               subject: "",
               taskTypeGroup: "",
+              taskCategoryId: null,
               taskTypeId: null,
               communicationChannelId: null,
               priority: "medium",
@@ -7918,11 +8078,12 @@
           return `${year}-${month}-${day}T${hours}:${minutes}`;
         },
         async loadMetaOptions() {
-          const [leadStatuses, dealStages, leadSources, users, taskTypes, touchResults, outcomes, nextStepTemplates, automationRules, communicationChannels, contactRoles, contactStatuses] = await Promise.all([
+          const [leadStatuses, dealStages, leadSources, users, taskCategories, taskTypes, touchResults, outcomes, nextStepTemplates, automationRules, communicationChannels, contactRoles, contactStatuses] = await Promise.all([
             this.apiRequest("/api/v1/meta/lead-statuses/"),
             this.apiRequest("/api/v1/meta/deal-stages/"),
             this.apiRequest("/api/v1/meta/lead-sources/"),
             this.apiRequest("/api/v1/meta/users/"),
+            this.apiRequest("/api/v1/meta/task-categories/"),
             this.apiRequest("/api/v1/meta/task-types/"),
             this.apiRequest("/api/v1/meta/touch-results/"),
             this.apiRequest("/api/v1/meta/outcomes/"),
@@ -7936,6 +8097,7 @@
           this.metaOptions.dealStages = this.sortDealStages(this.normalizePaginatedResponse(dealStages));
           this.metaOptions.leadSources = this.normalizePaginatedResponse(leadSources);
           this.metaOptions.users = this.normalizePaginatedResponse(users);
+          this.metaOptions.taskCategories = this.normalizePaginatedResponse(taskCategories);
           this.metaOptions.taskTypes = this.normalizePaginatedResponse(taskTypes);
           this.metaOptions.touchResults = this.normalizePaginatedResponse(touchResults);
           this.metaOptions.outcomes = this.normalizePaginatedResponse(outcomes);

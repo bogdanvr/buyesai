@@ -19,6 +19,7 @@ from api.v1.meta.serializers import (
     LeadStatusSerializer,
     NextStepTemplateSerializer,
     OutcomeCatalogSerializer,
+    TaskCategorySerializer,
     TaskTypeSerializer,
     TouchResultSerializer,
     UserOptionSerializer,
@@ -33,9 +34,11 @@ from crm.models import (
     LeadStatus,
     NextStepTemplate,
     OutcomeCatalog,
+    TaskCategory,
     TaskType,
     TouchResult,
 )
+from crm.models.activity import get_available_task_categories_for_user, get_available_task_types_for_user
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -152,7 +155,15 @@ class TaskTypeListAPIView(ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        return TaskType.objects.filter(is_active=True).order_by("sort_order", "name")
+        return get_available_task_types_for_user(self.request.user).order_by("sort_order", "name")
+
+
+class TaskCategoryListAPIView(ListAPIView):
+    serializer_class = TaskCategorySerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return get_available_task_categories_for_user(self.request.user).order_by("sort_order", "name")
 
 
 class TouchResultListAPIView(ListAPIView):

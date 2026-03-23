@@ -1,4 +1,10 @@
-from crm.models.activity import Activity, TaskType
+from crm.models.activity import (
+    Activity,
+    TaskCategory,
+    TaskType,
+    UserRole,
+    UserRoleAssignment,
+)
 from crm.models.automation import (
     AutomationDraft,
     AutomationMessageDraft,
@@ -18,7 +24,10 @@ from crm.models.touch import Touch, TouchResult
 
 __all__ = [
     "Activity",
+    "TaskCategory",
     "TaskType",
+    "UserRole",
+    "UserRoleAssignment",
     "AutomationRule",
     "AutomationDraft",
     "AutomationMessageDraft",
