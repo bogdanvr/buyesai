@@ -718,7 +718,46 @@
                 </button>
               </div>
             </div>
-            <div v-if="activeSection !== 'touches'" class="px-4 py-4">[[ activeSection === 'tasks' ? 'Сделка' : (activeSection === 'deals' ? 'Сумма' : 'Телефон') ]]</div>
+            <div v-if="activeSection === 'tasks'" class="px-4 py-4 relative" data-task-deal-filter>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 hover:text-white transition"
+                @click.stop="toggleTaskDealFilter"
+              >
+                <span>Сделка</span>
+                <span class="text-[10px]">[[ showTaskDealFilter ? '▲' : '▼' ]]</span>
+              </button>
+              <div
+                v-if="showTaskDealFilter"
+                class="absolute left-2 top-[calc(100%+6px)] z-20 w-64 rounded-xl border border-crm-border bg-[#0d2c47] shadow-panel p-3"
+                @click.stop
+              >
+                <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Фильтр сделок</div>
+                <div class="mt-2 max-h-56 overflow-auto space-y-2">
+                  <button
+                    v-for="option in taskDealFilterOptions"
+                    :key="option.value"
+                    type="button"
+                    class="block w-full rounded-lg px-2 py-1.5 text-left text-sm transition"
+                    :class="String(taskDealFilterId || '') === String(option.value) ? 'bg-white/10 text-white' : 'text-crm-text hover:bg-white/5'"
+                    @click="setTaskDealFilter(option.value, option.label)"
+                  >
+                    [[ option.label ]]
+                  </button>
+                  <div v-if="!taskDealFilterOptions.length" class="text-sm text-crm-muted">
+                    Нет сделок в задачах.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="mt-3 text-xs text-crm-muted hover:text-white underline underline-offset-4"
+                  @click="clearTaskDealFilter"
+                >
+                  Сбросить фильтр
+                </button>
+              </div>
+            </div>
+            <div v-else-if="activeSection !== 'touches'" class="px-4 py-4">[[ activeSection === 'deals' ? 'Сумма' : 'Телефон' ]]</div>
             <div v-else class="px-4 py-4 relative" data-touch-deal-filter>
               <button
                 type="button"

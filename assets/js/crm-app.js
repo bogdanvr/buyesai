@@ -58,6 +58,7 @@
           showStatusFilter: false,
           showTaskCompanyFilter: false,
           showTaskCategoryFilter: false,
+          showTaskDealFilter: false,
           showTouchCompanyFilter: false,
           showTouchDealFilter: false,
           showManagerNotifications: false,
@@ -1577,6 +1578,29 @@
               return String(left.label).localeCompare(String(right.label), "ru");
             })
             .map(({ value, label }) => ({ value, label }));
+        },
+        taskDealFilterOptions() {
+          if (this.activeSection !== "tasks") {
+            return [];
+          }
+          const filteredTasks = (this.datasets.tasks || []).filter((task) => (
+            (!this.selectedTaskCompanyFilters.length || this.selectedTaskCompanyFilters.includes(String(task.clientId || "")))
+            && (!this.selectedTaskCategoryFilters.length || this.selectedTaskCategoryFilters.includes(String(task.taskTypeCategoryId || "")))
+          ));
+          const uniqueDeals = new Map();
+          filteredTasks.forEach((task) => {
+            const dealId = String(this.toIntOrNull(task.dealId));
+            if (!dealId || uniqueDeals.has(dealId)) {
+              return;
+            }
+            uniqueDeals.set(dealId, {
+              value: dealId,
+              label: String(task.deal || `Сделка #${dealId}`).trim(),
+            });
+          });
+          return Array.from(uniqueDeals.values()).sort((left, right) => (
+            String(left.label).localeCompare(String(right.label), "ru")
+          ));
         },
         touchCompanyFilterOptions() {
           if (this.activeSection !== "touches") {
@@ -3888,6 +3912,7 @@
             this.showStatusFilter = false;
             this.showTaskCompanyFilter = false;
             this.showTaskCategoryFilter = false;
+            this.showTaskDealFilter = false;
             this.showTouchCompanyFilter = false;
             this.showTouchDealFilter = false;
             this.loadUnboundCommunications({ preserveSelection: true, silent: true }).catch(() => {});
@@ -5189,6 +5214,7 @@
           if (this.showStatusFilter) {
             this.showTaskCompanyFilter = false;
             this.showTaskCategoryFilter = false;
+            this.showTaskDealFilter = false;
           }
         },
         toggleStatusFilterValue(value) {
@@ -5206,6 +5232,7 @@
           if (this.showTaskCompanyFilter) {
             this.showStatusFilter = false;
             this.showTaskCategoryFilter = false;
+            this.showTaskDealFilter = false;
             this.showTouchCompanyFilter = false;
             this.showTouchDealFilter = false;
           }
@@ -5226,6 +5253,7 @@
           if (this.showTaskCategoryFilter) {
             this.showStatusFilter = false;
             this.showTaskCompanyFilter = false;
+            this.showTaskDealFilter = false;
             this.showTouchCompanyFilter = false;
             this.showTouchDealFilter = false;
           }
@@ -5241,11 +5269,27 @@
         clearTaskCategoryFilter() {
           this.selectedTaskCategoryFilters = [];
         },
+        toggleTaskDealFilter() {
+          this.showTaskDealFilter = !this.showTaskDealFilter;
+          if (this.showTaskDealFilter) {
+            this.showStatusFilter = false;
+            this.showTaskCompanyFilter = false;
+            this.showTaskCategoryFilter = false;
+            this.showTouchCompanyFilter = false;
+            this.showTouchDealFilter = false;
+          }
+        },
+        setTaskDealFilter(value, label = "") {
+          this.taskDealFilterId = value ? String(value) : null;
+          this.taskDealFilterLabel = String(label || "").trim();
+          this.showTaskDealFilter = false;
+        },
         toggleTouchCompanyFilter() {
           this.showTouchCompanyFilter = !this.showTouchCompanyFilter;
           if (this.showTouchCompanyFilter) {
             this.showStatusFilter = false;
             this.showTaskCompanyFilter = false;
+            this.showTaskDealFilter = false;
             this.showTouchDealFilter = false;
           }
         },
@@ -5265,6 +5309,7 @@
           if (this.showTouchDealFilter) {
             this.showStatusFilter = false;
             this.showTaskCompanyFilter = false;
+            this.showTaskDealFilter = false;
             this.showTouchCompanyFilter = false;
           }
         },
@@ -5437,6 +5482,10 @@
           if (this.showTaskCategoryFilter) {
             if (target && target.closest && target.closest("[data-task-category-filter]")) return;
             this.showTaskCategoryFilter = false;
+          }
+          if (this.showTaskDealFilter) {
+            if (target && target.closest && target.closest("[data-task-deal-filter]")) return;
+            this.showTaskDealFilter = false;
           }
           if (this.showTouchCompanyFilter) {
             if (target && target.closest && target.closest("[data-touch-company-filter]")) return;
@@ -5826,6 +5875,7 @@
           this.showStatusFilter = false;
           this.showTaskCompanyFilter = false;
           this.showTaskCategoryFilter = false;
+          this.showTaskDealFilter = false;
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.selectedStatusFilters = [];
@@ -6883,6 +6933,7 @@
           this.showStatusFilter = false;
           this.showTaskCompanyFilter = false;
           this.showTaskCategoryFilter = false;
+          this.showTaskDealFilter = false;
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.selectedStatusFilters = [];
@@ -7770,6 +7821,7 @@
           this.showStatusFilter = false;
           this.showTaskCompanyFilter = false;
           this.showTaskCategoryFilter = false;
+          this.showTaskDealFilter = false;
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.showManagerNotifications = false;
