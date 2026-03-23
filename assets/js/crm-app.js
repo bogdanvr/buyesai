@@ -1516,6 +1516,14 @@
               return leftRank - rightRank;
             }
 
+            if (this.activeSection === "deals") {
+              const leftOpenTasks = this.countDealOpenTasks(left.item?.id);
+              const rightOpenTasks = this.countDealOpenTasks(right.item?.id);
+              if (leftOpenTasks !== rightOpenTasks) {
+                return rightOpenTasks - leftOpenTasks;
+              }
+            }
+
             if (this.activeSection === "tasks" && leftRank === 0 && rightRank === 0) {
               const taskOrder = this.compareActiveTasksByDueAt(left.item, right.item);
               if (taskOrder !== 0) {
