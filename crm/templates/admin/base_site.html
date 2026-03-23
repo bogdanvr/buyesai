@@ -1,0 +1,123 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block branding %}
+  <h1 id="site-name">
+    <a href="{% url 'admin:index' %}">{{ site_header|default:_('Django administration') }}</a>
+  </h1>
+{% endblock %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <style>
+    #header {
+      background: #08131c;
+      color: #f8fafc;
+    }
+    #site-name a,
+    #header a:link,
+    #header a:visited {
+      color: #f8fafc;
+    }
+    #nav-sidebar {
+      background: #050505;
+      border-right: 1px solid #1d1d1d;
+    }
+    #nav-filter {
+      margin: 12px;
+      width: calc(100% - 24px);
+      border-radius: 10px;
+      border: 1px solid #2a2a2a;
+      background: #101010;
+      color: #f8fafc;
+    }
+    #nav-filter::placeholder {
+      color: #7d8a95;
+    }
+    .toggle-nav-sidebar {
+      background: #050505;
+      border-right: 1px solid #1d1d1d;
+    }
+    .crm-admin-sidebar-app {
+      padding: 10px 10px 18px;
+      border-bottom: 1px solid #151515;
+    }
+    .crm-admin-sidebar-app-title {
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #17384a, #0d2634);
+    }
+    .crm-admin-sidebar-app-title a {
+      color: #f8fafc;
+      font-weight: 700;
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      font-size: 12px;
+    }
+    .crm-admin-sidebar-group {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #1f1f1f;
+    }
+    .crm-admin-sidebar-group:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: 0;
+    }
+    .crm-admin-sidebar-group-title {
+      margin: 0 0 8px;
+      padding: 0 4px;
+      color: #7f95a3;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .crm-admin-sidebar-group table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 8px;
+    }
+    .crm-admin-sidebar-group tbody tr {
+      background: #111;
+    }
+    .crm-admin-sidebar-group tbody th,
+    .crm-admin-sidebar-group tbody td {
+      border-top: 1px solid #232323;
+      border-bottom: 1px solid #232323;
+      background: #111;
+    }
+    .crm-admin-sidebar-group tbody th {
+      border-left: 1px solid #232323;
+      border-radius: 10px 0 0 10px;
+      padding-left: 12px;
+    }
+    .crm-admin-sidebar-group tbody td:last-child {
+      border-right: 1px solid #232323;
+      border-radius: 0 10px 10px 0;
+      padding-right: 12px;
+    }
+    .crm-admin-sidebar-group .current-model th,
+    .crm-admin-sidebar-group .current-model td {
+      background: #14293b;
+      border-color: #2f5f86;
+    }
+    .crm-admin-sidebar-group th a,
+    .crm-admin-sidebar-group td a {
+      color: #8ed3ff;
+    }
+    .crm-admin-sidebar-group th a:hover,
+    .crm-admin-sidebar-group td a:hover {
+      color: #d7f0ff;
+    }
+    .crm-admin-sidebar-group .addlink,
+    .crm-admin-sidebar-group .changelink,
+    .crm-admin-sidebar-group .viewlink {
+      white-space: nowrap;
+    }
+  </style>
+{% endblock %}

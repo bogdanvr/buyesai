@@ -1,0 +1,87 @@
+{% load i18n %}
+<button class="sticky toggle-nav-sidebar" id="toggle-nav-sidebar" aria-label="{% translate 'Toggle navigation' %}"></button>
+<nav class="sticky" id="nav-sidebar" aria-label="{% translate 'Sidebar' %}">
+  <input
+    type="search"
+    id="nav-filter"
+    placeholder="{% translate 'Start typing to filter…' %}"
+    aria-label="{% translate 'Filter navigation items' %}"
+  >
+  {% if available_apps %}
+    {% for app in available_apps %}
+      <section class="crm-admin-sidebar-app app-{{ app.app_label }} module{% if app.app_url in request.path|urlencode %} current-app{% endif %}">
+        <div class="crm-admin-sidebar-app-title">
+          <a href="{{ app.app_url }}" class="section">{{ app.name }}</a>
+        </div>
+        {% if app.admin_groups %}
+          {% for group in app.admin_groups %}
+            <div class="crm-admin-sidebar-group">
+              <h2 class="crm-admin-sidebar-group-title">{{ group.name }}</h2>
+              <table>
+                <thead class="visually-hidden">
+                  <tr>
+                    <th scope="col">{% translate 'Model name' %}</th>
+                    <th scope="col">{% translate 'Add link' %}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for model in group.models %}
+                    {% with model_name=model.object_name|lower %}
+                      <tr class="model-{{ model_name }}{% if model.admin_url in request.path|urlencode %} current-model{% endif %}">
+                        <th scope="row" id="{{ app.app_label }}-{{ model_name }}">
+                          {% if model.admin_url %}
+                            <a href="{{ model.admin_url }}"{% if model.admin_url in request.path|urlencode %} aria-current="page"{% endif %}>{{ model.name }}</a>
+                          {% else %}
+                            {{ model.name }}
+                          {% endif %}
+                        </th>
+                        <td>
+                          {% if model.add_url %}
+                            <a href="{{ model.add_url }}" class="addlink" aria-describedby="{{ app.app_label }}-{{ model_name }}">{% translate 'Add' %}</a>
+                          {% endif %}
+                        </td>
+                      </tr>
+                    {% endwith %}
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="crm-admin-sidebar-group">
+            <table>
+              <thead class="visually-hidden">
+                <tr>
+                  <th scope="col">{% translate 'Model name' %}</th>
+                  <th scope="col">{% translate 'Add link' %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for model in app.models %}
+                  {% with model_name=model.object_name|lower %}
+                    <tr class="model-{{ model_name }}{% if model.admin_url in request.path|urlencode %} current-model{% endif %}">
+                      <th scope="row" id="{{ app.app_label }}-{{ model_name }}">
+                        {% if model.admin_url %}
+                          <a href="{{ model.admin_url }}"{% if model.admin_url in request.path|urlencode %} aria-current="page"{% endif %}>{{ model.name }}</a>
+                        {% else %}
+                          {{ model.name }}
+                        {% endif %}
+                      </th>
+                      <td>
+                        {% if model.add_url %}
+                          <a href="{{ model.add_url }}" class="addlink" aria-describedby="{{ app.app_label }}-{{ model_name }}">{% translate 'Add' %}</a>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endwith %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </section>
+    {% endfor %}
+  {% else %}
+    <p class="crm-admin-sidebar-group-title">{% translate 'You don’t have permission to view or edit anything.' %}</p>
+  {% endif %}
+</nav>
