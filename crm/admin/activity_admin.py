@@ -83,23 +83,38 @@ class ActivityAdmin(admin.ModelAdmin):
         "due_at",
         "created_at",
     )
-    list_filter = ("type", "status", "priority", "task_type", "communication_channel")
+    list_filter = ("type", "status", "priority", "task_type__category", "task_type", "communication_channel")
     search_fields = ("subject", "description")
     autocomplete_fields = ("lead", "deal", "client", "contact", "created_by", "task_type", "communication_channel", "related_touch")
     readonly_fields = ("task_category_display", "created_at", "updated_at", "completed_at")
+    fields = (
+        "type",
+        "subject",
+        "description",
+        "result",
+        "task_type",
+        "task_category_display",
+        "communication_channel",
+        "related_touch",
+        "deadline_reminder_offset_minutes",
+        "status",
+        "priority",
+        "due_at",
+        "completed_at",
+        "is_done",
+        "save_company_note",
+        "company_note",
+        "lead",
+        "deal",
+        "client",
+        "contact",
+        "created_by",
+        "created_at",
+        "updated_at",
+    )
 
     @admin.display(description="Категория задачи", ordering="task_type__category__name")
     def task_category_display(self, obj):
         task_type = getattr(obj, "task_type", None)
         category = getattr(task_type, "category", None) if task_type is not None else None
         return getattr(category, "name", "—")
-
-    def get_fields(self, request, obj=None):
-        fields = list(super().get_fields(request, obj))
-        if "task_category_display" not in fields:
-            try:
-                insert_at = fields.index("task_type") + 1
-            except ValueError:
-                insert_at = len(fields)
-            fields.insert(insert_at, "task_category_display")
-        return fields
