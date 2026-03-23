@@ -7,7 +7,6 @@ from crm.models.activity import (
     TaskStatus,
     get_available_task_types_for_user,
     task_type_requires_follow_up_task,
-    task_type_satisfies_deal_next_step_requirement,
     task_type_uses_communication_channel,
 )
 
@@ -36,7 +35,7 @@ class ActivitySerializer(serializers.ModelSerializer):
             return False
         return bool(getattr(task_type, "auto_task_on_done", False) and getattr(task_type, "auto_task_type_id", None))
 
-    def _has_non_overdue_client_task_for_deal(self, deal, current_task_id=None):
+    def _has_non_overdue_active_task_for_deal(self, deal, current_task_id=None):
         if deal is None:
             return False
         now = timezone.now()
@@ -44,10 +43,10 @@ class ActivitySerializer(serializers.ModelSerializer):
             type=ActivityType.TASK,
             status__in=self.ACTIVE_TASK_STATUSES,
             due_at__gte=now,
-        ).select_related("task_type__category")
+        )
         if current_task_id is not None:
             queryset = queryset.exclude(pk=current_task_id)
-        return any(task_type_satisfies_deal_next_step_requirement(getattr(item, "task_type", None)) for item in queryset)
+        return queryset.exists()
 
     def get_status_label(self, obj):
         if obj.type != ActivityType.TASK:
@@ -141,7 +140,7 @@ class ActivitySerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"related_touch": "Связанное касание должно быть активностью, а не задачей."})
         if activity_type == ActivityType.TASK and is_done:
             has_result = bool(str(result or "").strip())
-            has_non_overdue_client_task = self._has_non_overdue_client_task_for_deal(
+            has_non_overdue_active_task = self._has_non_overdue_active_task_for_deal(
                 deal,
                 current_task_id=getattr(self.instance, "pk", None),
             )
@@ -160,7 +159,7 @@ class ActivitySerializer(serializers.ModelSerializer):
             and requires_follow_up_task
             and not has_follow_up_task
             and not has_automatic_follow_up_task
-            and not has_non_overdue_client_task
+            and not has_non_overdue_active_task
         ):
             raise serializers.ValidationError(
                 {"has_follow_up_task": "Для внутренней задачи заполните следующую задачу перед завершением текущей."}
@@ -170,9 +169,9 @@ class ActivitySerializer(serializers.ModelSerializer):
         if activity_type == ActivityType.TASK and is_done and deal is not None:
             stage_code = str(getattr(getattr(deal, "stage", None), "code", "") or "").strip().lower()
             if stage_code not in {"won", "failed"}:
-                if not has_non_overdue_client_task and not has_follow_up_task and not has_automatic_follow_up_task:
+                if not has_non_overdue_active_task and not has_follow_up_task and not has_automatic_follow_up_task:
                     raise serializers.ValidationError(
-                        {"has_follow_up_task": "Для активной сделки укажите следующую задачу или держите актуальную клиентскую задачу без просрочки."}
+                        {"has_follow_up_task": "Для активной сделки укажите следующую задачу или держите актуальную активную задачу без просрочки."}
                     )
         return attrs
 

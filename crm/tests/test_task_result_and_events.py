@@ -410,6 +410,41 @@ class TaskResultAndEventsTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_task_completion_allows_any_non_overdue_active_task_on_deal(self):
+        first_task_type = TaskType.objects.create(name="Подготовить договор v2", group=TaskTypeGroup.INTERNAL_TASK)
+        second_task_type = TaskType.objects.create(name="Согласовать макет", group=TaskTypeGroup.INTERNAL_TASK)
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Подготовить договор",
+            task_type=first_task_type,
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() - timedelta(days=1),
+            status=TaskStatus.IN_PROGRESS,
+            created_by=self.user,
+        )
+        Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Согласовать макет",
+            task_type=second_task_type,
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=2),
+            status=TaskStatus.TODO,
+            created_by=self.user,
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "result": "Задача завершена",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     def test_task_completion_can_append_company_note(self):
         task = Activity.objects.create(
             type=ActivityType.TASK,
