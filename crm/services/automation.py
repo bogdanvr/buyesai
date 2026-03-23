@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.utils import timezone
 
 from crm.models import Activity, AutomationRule, Touch
@@ -40,13 +42,46 @@ def should_auto_create_touch_follow_up_task(instance: Touch, rule: AutomationRul
     return True
 
 
+def infer_next_step_due_at(*, current_due_at=None, next_step_template=None, base_datetime=None):
+    if current_due_at is not None:
+        return current_due_at
+
+    template_code = str(getattr(next_step_template, "code", "") or "").strip().lower()
+    base_value = base_datetime or timezone.now()
+
+    if template_code in {
+        "followup_after_1_day",
+        "retry_call_after_1_day",
+        "payment_control_next_day",
+    }:
+        return base_value + timedelta(days=1)
+    if template_code in {
+        "followup_after_2_days",
+        "followup_contract_after_2_days",
+    }:
+        return base_value + timedelta(days=2)
+    if template_code == "followup_contract_after_3_days":
+        return base_value + timedelta(days=3)
+    if template_code in {
+        "followup_after_call",
+        "followup_after_meeting",
+    }:
+        return base_value + timedelta(days=1)
+
+    return base_value
+
+
 def upsert_touch_follow_up_task(instance: Touch, rule: AutomationRule | None) -> Activity | None:
     if not should_auto_create_touch_follow_up_task(instance, rule):
         return None
     subject = str(getattr(getattr(rule, "next_step_template", None), "name", "") or instance.next_step or "").strip()
     if not subject:
         return None
-    due_at = getattr(instance, "next_step_at", None) or timezone.now()
+    due_at = infer_next_step_due_at(
+        current_due_at=getattr(instance, "next_step_at", None),
+        next_step_template=getattr(rule, "next_step_template", None),
+        base_datetime=getattr(instance, "happened_at", None) or timezone.now(),
+    )
     client = instance.client or getattr(instance.deal, "client", None) or getattr(instance.lead, "client", None)
     communication_channel = getattr(instance, "channel", None)
     task_type_group = TaskTypeGroup.CLIENT_TASK if communication_channel is not None else ""

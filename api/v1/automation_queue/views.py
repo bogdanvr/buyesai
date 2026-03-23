@@ -8,6 +8,7 @@ from api.v1.automation_queue.serializers import AutomationQueueItemSerializer
 from crm.models import Activity, AutomationQueueItem, TaskType
 from crm.models.activity import ActivityType, TaskPriority, TaskStatus, TaskTypeGroup
 from crm.models.automation import AutomationQueueItemKind, AutomationQueueItemStatus
+from crm.services.automation import infer_next_step_due_at
 
 
 class AutomationQueueItemViewSet(ReadOnlyModelViewSet):
@@ -61,6 +62,11 @@ class AutomationQueueItemViewSet(ReadOnlyModelViewSet):
         subject = str(item.proposed_next_step or item.recommended_action or item.title or "").strip()
         if not subject:
             return None
+        due_at = infer_next_step_due_at(
+            current_due_at=item.proposed_next_step_at,
+            next_step_template=item.next_step_template,
+            base_datetime=getattr(getattr(item, "source_touch", None), "happened_at", None) or item.created_at or timezone.now(),
+        )
         is_client_task = item.proposed_channel_id is not None
         task_type = None
         if is_client_task:
@@ -72,7 +78,7 @@ class AutomationQueueItemViewSet(ReadOnlyModelViewSet):
             type=ActivityType.TASK,
             subject=subject,
             description=str(item.summary or "").strip(),
-            due_at=item.proposed_next_step_at,
+            due_at=due_at,
             status=TaskStatus.TODO,
             priority=TaskPriority.MEDIUM,
             task_type=task_type,

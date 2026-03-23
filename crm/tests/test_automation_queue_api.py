@@ -102,6 +102,33 @@ class AutomationQueueApiTests(APITestCase):
         self.assertEqual(created_task.deal_id, self.deal.pk)
         self.assertEqual(created_task.task_type_id, self.client_task_type.pk)
         self.assertEqual(created_task.communication_channel_id, self.channel.pk)
+        self.assertEqual(created_task.due_at, queue_item.proposed_next_step_at)
+
+    def test_confirm_next_step_queue_item_without_explicit_next_step_at_infers_due_at(self):
+        happened_at = timezone.now()
+        touch = Touch.objects.create(
+            happened_at=happened_at,
+            channel=self.channel,
+            direction="outgoing",
+            summary="Отправили письмо без явного next step срока",
+            owner=self.user,
+            deal=self.deal,
+        )
+        queue_item = AutomationQueueItem.objects.get(source_touch=touch, item_kind="next_step", status="pending")
+
+        self.assertIsNotNone(queue_item.proposed_next_step_at)
+        self.assertEqual(queue_item.proposed_next_step_at, happened_at + timedelta(days=2))
+
+        response = self.client.post(
+            reverse("automation-queue-confirm", kwargs={"pk": queue_item.pk}),
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        queue_item.refresh_from_db()
+        created_task = Activity.objects.get(pk=queue_item.created_task_id)
+        self.assertEqual(created_task.due_at, happened_at + timedelta(days=2))
 
     def test_can_list_pending_automation_queue_items(self):
         touch = Touch.objects.create(

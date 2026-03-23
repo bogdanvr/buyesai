@@ -18,6 +18,7 @@ from crm.models.automation import (
 )
 from crm.models.touch import DIRECT_TOUCH_EVENT_TYPES_BY_RESULT_CODE, TouchDirection, normalize_touch_channel_code, resolve_touch_event_type
 from crm.services.automation import (
+    infer_next_step_due_at,
     resolve_touch_automation_rule,
     should_auto_create_touch_follow_up_task,
     should_write_touch_timeline,
@@ -249,6 +250,11 @@ def _draft_defaults_from_touch(instance: Touch, rule: AutomationRule, draft_kind
     next_step_text = str(getattr(getattr(rule, "next_step_template", None), "name", "") or instance.next_step or "").strip()
     touch_result = _resolve_touch_result_from_outcome(rule, instance)
     event_type = _resolve_touch_event_type(instance)
+    proposed_next_step_at = infer_next_step_due_at(
+        current_due_at=getattr(instance, "next_step_at", None),
+        next_step_template=getattr(rule, "next_step_template", None),
+        base_datetime=getattr(instance, "happened_at", None) or timezone.now(),
+    )
     if draft_kind == AutomationDraftKind.NEXT_STEP:
         title = next_step_text or _touch_automation_title(instance, rule, prefer_next_step=True)
         summary = str(instance.summary or "").strip()
@@ -265,7 +271,7 @@ def _draft_defaults_from_touch(instance: Touch, rule: AutomationRule, draft_kind
         "proposed_channel": getattr(instance, "channel", None),
         "proposed_direction": str(instance.direction or "").strip(),
         "proposed_next_step": next_step_text,
-        "proposed_next_step_at": getattr(instance, "next_step_at", None),
+        "proposed_next_step_at": proposed_next_step_at,
         "owner": getattr(instance, "owner", None),
         "lead": getattr(instance, "lead", None),
         "deal": getattr(instance, "deal", None),
@@ -309,6 +315,11 @@ def _queue_defaults_from_touch(instance: Touch, rule: AutomationRule, item_kind:
     next_step_text = str(getattr(getattr(rule, "next_step_template", None), "name", "") or instance.next_step or "").strip()
     touch_result = _resolve_touch_result_from_outcome(rule, instance)
     event_type = _resolve_touch_event_type(instance)
+    proposed_next_step_at = infer_next_step_due_at(
+        current_due_at=getattr(instance, "next_step_at", None),
+        next_step_template=getattr(rule, "next_step_template", None),
+        base_datetime=getattr(instance, "happened_at", None) or timezone.now(),
+    )
     if item_kind == AutomationQueueItemKind.NEXT_STEP:
         title = next_step_text or _touch_automation_title(instance, rule, prefer_next_step=True)
         summary = str(instance.summary or "").strip()
@@ -328,7 +339,7 @@ def _queue_defaults_from_touch(instance: Touch, rule: AutomationRule, item_kind:
         "proposed_channel": getattr(instance, "channel", None),
         "proposed_direction": str(instance.direction or "").strip(),
         "proposed_next_step": next_step_text,
-        "proposed_next_step_at": getattr(instance, "next_step_at", None),
+        "proposed_next_step_at": proposed_next_step_at,
         "owner": getattr(instance, "owner", None),
         "lead": getattr(instance, "lead", None),
         "deal": getattr(instance, "deal", None),
