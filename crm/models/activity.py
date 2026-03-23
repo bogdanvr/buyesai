@@ -78,8 +78,8 @@ class UserRoleAssignment(TimestampedModel):
     )
 
     class Meta:
-        verbose_name = "Роль пользователя"
-        verbose_name_plural = "Роли пользователей"
+        verbose_name = "Назначение роли пользователю"
+        verbose_name_plural = "Назначения ролей пользователям"
         ordering = ("user__username", "role__sort_order", "role__name")
         constraints = [
             models.UniqueConstraint(fields=["user", "role"], name="unique_crm_user_role_assignment"),
@@ -309,8 +309,8 @@ class Activity(TimestampedModel):
     )
 
     class Meta:
-        verbose_name = "Активность"
-        verbose_name_plural = "Активности"
+        verbose_name = "Задача"
+        verbose_name_plural = "Задачи"
         ordering = ("-created_at",)
         indexes = [
             models.Index(fields=["type"]),
