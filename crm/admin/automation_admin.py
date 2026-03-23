@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from crm.admin.site import crm_admin_site
 from crm.models import (
     AutomationDraft,
     AutomationMessageDraft,
@@ -11,20 +12,23 @@ from crm.models import (
 )
 
 
-@admin.register(NextStepTemplate)
+@admin.register(NextStepTemplate, site=crm_admin_site)
 class NextStepTemplateAdmin(admin.ModelAdmin):
+    admin_group = "Автоматизация"
     list_display = ("id", "code", "name")
     search_fields = ("code", "name")
 
 
-@admin.register(OutcomeCatalog)
+@admin.register(OutcomeCatalog, site=crm_admin_site)
 class OutcomeCatalogAdmin(admin.ModelAdmin):
+    admin_group = "Автоматизация"
     list_display = ("id", "code", "name")
     search_fields = ("code", "name")
 
 
-@admin.register(AutomationRule)
+@admin.register(AutomationRule, site=crm_admin_site)
 class AutomationRuleAdmin(admin.ModelAdmin):
+    admin_group = "Автоматизация"
     list_display = (
         "id",
         "event_type",
@@ -59,8 +63,9 @@ class AutomationRuleAdmin(admin.ModelAdmin):
     search_fields = ("event_type", "default_outcome__name", "next_step_template__name", "next_step_template__code")
 
 
-@admin.register(AutomationDraft)
+@admin.register(AutomationDraft, site=crm_admin_site)
 class AutomationDraftAdmin(admin.ModelAdmin):
+    admin_group = "Автоматизация"
     list_display = (
         "id",
         "draft_kind",
@@ -102,8 +107,9 @@ class AutomationDraftAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(AutomationQueueItem)
+@admin.register(AutomationQueueItem, site=crm_admin_site)
 class AutomationQueueItemAdmin(admin.ModelAdmin):
+    admin_group = "Автоматизация"
     list_display = (
         "id",
         "item_kind",
@@ -148,8 +154,9 @@ class AutomationQueueItemAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(AutomationMessageDraft)
+@admin.register(AutomationMessageDraft, site=crm_admin_site)
 class AutomationMessageDraftAdmin(admin.ModelAdmin):
+    admin_group = "Автоматизация"
     list_display = (
         "id",
         "status",
@@ -188,8 +195,9 @@ class AutomationMessageDraftAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(AutomationOutboundMessage)
+@admin.register(AutomationOutboundMessage, site=crm_admin_site)
 class AutomationOutboundMessageAdmin(admin.ModelAdmin):
+    admin_group = "Автоматизация"
     list_display = (
         "id",
         "status",

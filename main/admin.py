@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from crm.admin.site import crm_admin_site
 from main.models import (
     Case,
     Department,
@@ -10,22 +11,30 @@ from main.models import (
 )
 
 @admin.register(Implementation)
+@admin.register(Implementation, site=crm_admin_site)
 class ImplementationAdmin(admin.ModelAdmin):
+    admin_group = "Контент"
     list_display = ('step', 'title', 'period')
 
 
 @admin.register(Case)
+@admin.register(Case, site=crm_admin_site)
 class CaseAdmin(admin.ModelAdmin):
+    admin_group = "Контент"
     list_display = ('title', 'solution')
 
 
 @admin.register(Department)
+@admin.register(Department, site=crm_admin_site)
 class DepartmentAdmin(admin.ModelAdmin):
+    admin_group = "Контент"
     list_display = ('title',)
 
 
 @admin.register(FormSubmission)
+@admin.register(FormSubmission, site=crm_admin_site)
 class FormSubmissionAdmin(admin.ModelAdmin):
+    admin_group = "Сайт и формы"
     list_display = (
         "created_at",
         "form_type",
@@ -49,7 +58,9 @@ class FormSubmissionAdmin(admin.ModelAdmin):
 
 
 @admin.register(WebsiteSession)
+@admin.register(WebsiteSession, site=crm_admin_site)
 class WebsiteSessionAdmin(admin.ModelAdmin):
+    admin_group = "Сайт и формы"
     list_display = (
         "session_id",
         "utm_source",
@@ -64,7 +75,9 @@ class WebsiteSessionAdmin(admin.ModelAdmin):
 
 
 @admin.register(WebsiteSessionEvent)
+@admin.register(WebsiteSessionEvent, site=crm_admin_site)
 class WebsiteSessionEventAdmin(admin.ModelAdmin):
+    admin_group = "Сайт и формы"
     list_display = ("created_at", "session", "event_type", "page_url")
     list_filter = ("event_type", "created_at")
     search_fields = ("session__session_id", "event_type", "page_url")

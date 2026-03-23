@@ -599,10 +599,48 @@
         <div class="h-full min-h-0 rounded-[28px] border border-crm-border bg-[#0b2740] overflow-hidden shadow-panel md:min-h-[540px] flex flex-col">
           <div
             class="hidden lg:grid border-b border-crm-border bg-[#10314d] text-crm-muted text-xs uppercase tracking-[0.16em]"
-            :class="activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : (activeSection === 'deals' ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_150px_110px_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]')"
+            :class="activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : (activeSection === 'deals' ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_150px_110px_160px]' : (activeSection === 'tasks' ? 'grid-cols-[72px_1.15fr_0.9fr_1fr_1fr_1fr_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]'))"
           >
             <div class="px-4 py-4"></div>
             <div class="px-4 py-4">Наименование</div>
+            <div v-if="activeSection === 'tasks'" class="px-4 py-4 relative" data-task-category-filter>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 hover:text-white transition"
+                @click.stop="toggleTaskCategoryFilter"
+              >
+                <span>Тип</span>
+                <span class="text-[10px]">[[ showTaskCategoryFilter ? '▲' : '▼' ]]</span>
+              </button>
+              <div
+                v-if="showTaskCategoryFilter"
+                class="absolute left-2 top-[calc(100%+6px)] z-20 w-64 rounded-xl border border-crm-border bg-[#0d2c47] shadow-panel p-3"
+                @click.stop
+              >
+                <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Фильтр категорий задач</div>
+                <div class="mt-2 max-h-56 overflow-auto space-y-2">
+                  <label v-for="option in taskCategoryFilterOptions" :key="option.value" class="flex items-center gap-2 text-sm text-crm-text">
+                    <input
+                      type="checkbox"
+                      class="w-4 h-4 rounded border-crm-border bg-transparent"
+                      :checked="selectedTaskCategoryFilters.includes(option.value)"
+                      @change="toggleTaskCategoryFilterValue(option.value)"
+                    />
+                    <span>[[ option.label ]]</span>
+                  </label>
+                  <div v-if="!taskCategoryFilterOptions.length" class="text-sm text-crm-muted">
+                    Нет категорий задач.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="mt-3 text-xs text-crm-muted hover:text-white underline underline-offset-4"
+                  @click="clearTaskCategoryFilter"
+                >
+                  Сбросить фильтр
+                </button>
+              </div>
+            </div>
             <div v-if="activeSection !== 'tasks' && activeSection !== 'touches'" class="px-4 py-4">Компания</div>
             <div v-else-if="activeSection === 'tasks'" class="px-4 py-4 relative" data-task-company-filter>
               <button
@@ -781,7 +819,9 @@
                       ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]'
                       : (activeSection === 'deals'
                         ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_150px_110px_160px]'
-                        : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]'),
+                        : (activeSection === 'tasks'
+                          ? 'grid-cols-[72px_1.15fr_0.9fr_1fr_1fr_1fr_160px]'
+                          : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]')),
                     (activeSection === 'leads' || activeSection === 'deals' || activeSection === 'contacts' || activeSection === 'companies' || activeSection === 'tasks' || activeSection === 'touches') ? 'cursor-pointer' : ''
                   ]"
                   @click="onRowClick(item)"
@@ -789,10 +829,8 @@
                   <div class="px-4 py-4 text-xs text-crm-muted font-medium tabular-nums">#[[ item.id ]]</div>
                   <div class="px-4 py-4 min-w-0">
                     <div class="font-medium text-white truncate">[[ item.name ]]</div>
-                    <div v-if="activeSection === 'tasks' && item.taskTypeName" class="mt-1 truncate text-xs text-crm-muted">
-                      Тип: [[ item.taskTypeName ]]
-                    </div>
                   </div>
+                  <div v-if="activeSection === 'tasks'" class="px-4 py-4 text-sm text-crm-text truncate">[[ item.taskTypeName || '—' ]]</div>
                   <div class="px-4 py-4 text-sm text-crm-text truncate">[[ item.company || '—' ]]</div>
                   <div class="px-4 py-4 text-sm text-crm-text truncate">
                     [[ activeSection === 'tasks' ? (item.deal || '—') : (activeSection === 'deals' ? formatDealAmount(item.amount, item.currency) : (item.phone || '—')) ]]

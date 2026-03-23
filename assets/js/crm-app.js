@@ -57,6 +57,7 @@
           isSaving: false,
           showStatusFilter: false,
           showTaskCompanyFilter: false,
+          showTaskCategoryFilter: false,
           showTouchCompanyFilter: false,
           showTouchDealFilter: false,
           showManagerNotifications: false,
@@ -78,6 +79,7 @@
           isUnboundCommunicationSending: false,
           selectedStatusFilters: [],
           selectedTaskCompanyFilters: [],
+          selectedTaskCategoryFilters: [],
           selectedTouchCompanyFilters: [],
           editingLeadId: null,
           editingDealId: null,
@@ -1487,13 +1489,17 @@
                 || !this.selectedTouchCompanyFilters.length
                 || this.selectedTouchCompanyFilters.includes(String(item.clientId || ""))
               );
+            const matchesTaskCategoryFilter =
+              this.activeSection !== "tasks"
+              || !this.selectedTaskCategoryFilters.length
+              || this.selectedTaskCategoryFilters.includes(String(item.taskTypeCategoryId || ""));
             const matchesSearch = !q || [item.name, item.company, item.deal, item.phone, item.email, item.statusLabel]
               .filter(Boolean)
               .some((value) => String(value).toLowerCase().includes(q));
             const matchesStatus =
               !this.selectedStatusFilters.length ||
               this.selectedStatusFilters.includes(item.statusLabel);
-            return matchesDealFilter && matchesCompanyFilter && matchesSearch && matchesStatus;
+            return matchesDealFilter && matchesCompanyFilter && matchesTaskCategoryFilter && matchesSearch && matchesStatus;
           });
           const ordered = filtered.map((item, index) => ({ item, index }));
           ordered.sort((left, right) => {
@@ -1549,6 +1555,25 @@
             });
           });
           return Array.from(uniqueCompanies.values()).sort((left, right) => (
+            String(left.label).localeCompare(String(right.label), "ru")
+          ));
+        },
+        taskCategoryFilterOptions() {
+          if (this.activeSection !== "tasks") {
+            return [];
+          }
+          const uniqueCategories = new Map();
+          (this.datasets.tasks || []).forEach((task) => {
+            const categoryId = String(this.toIntOrNull(task.taskTypeCategoryId));
+            if (!categoryId || uniqueCategories.has(categoryId)) {
+              return;
+            }
+            uniqueCategories.set(categoryId, {
+              value: categoryId,
+              label: String(task.taskTypeCategoryName || `Категория #${categoryId}`).trim(),
+            });
+          });
+          return Array.from(uniqueCategories.values()).sort((left, right) => (
             String(left.label).localeCompare(String(right.label), "ru")
           ));
         },
@@ -3861,6 +3886,7 @@
           if (this.showManagerNotifications) {
             this.showStatusFilter = false;
             this.showTaskCompanyFilter = false;
+            this.showTaskCategoryFilter = false;
             this.showTouchCompanyFilter = false;
             this.showTouchDealFilter = false;
             this.loadUnboundCommunications({ preserveSelection: true, silent: true }).catch(() => {});
@@ -5161,6 +5187,7 @@
           this.showStatusFilter = !this.showStatusFilter;
           if (this.showStatusFilter) {
             this.showTaskCompanyFilter = false;
+            this.showTaskCategoryFilter = false;
           }
         },
         toggleStatusFilterValue(value) {
@@ -5177,6 +5204,7 @@
           this.showTaskCompanyFilter = !this.showTaskCompanyFilter;
           if (this.showTaskCompanyFilter) {
             this.showStatusFilter = false;
+            this.showTaskCategoryFilter = false;
             this.showTouchCompanyFilter = false;
             this.showTouchDealFilter = false;
           }
@@ -5191,6 +5219,26 @@
         },
         clearTaskCompanyFilter() {
           this.selectedTaskCompanyFilters = [];
+        },
+        toggleTaskCategoryFilter() {
+          this.showTaskCategoryFilter = !this.showTaskCategoryFilter;
+          if (this.showTaskCategoryFilter) {
+            this.showStatusFilter = false;
+            this.showTaskCompanyFilter = false;
+            this.showTouchCompanyFilter = false;
+            this.showTouchDealFilter = false;
+          }
+        },
+        toggleTaskCategoryFilterValue(value) {
+          const normalizedValue = String(value || "");
+          if (this.selectedTaskCategoryFilters.includes(normalizedValue)) {
+            this.selectedTaskCategoryFilters = this.selectedTaskCategoryFilters.filter((item) => item !== normalizedValue);
+            return;
+          }
+          this.selectedTaskCategoryFilters = [...this.selectedTaskCategoryFilters, normalizedValue];
+        },
+        clearTaskCategoryFilter() {
+          this.selectedTaskCategoryFilters = [];
         },
         toggleTouchCompanyFilter() {
           this.showTouchCompanyFilter = !this.showTouchCompanyFilter;
@@ -5384,6 +5432,10 @@
           if (this.showTaskCompanyFilter) {
             if (target && target.closest && target.closest("[data-task-company-filter]")) return;
             this.showTaskCompanyFilter = false;
+          }
+          if (this.showTaskCategoryFilter) {
+            if (target && target.closest && target.closest("[data-task-category-filter]")) return;
+            this.showTaskCategoryFilter = false;
           }
           if (this.showTouchCompanyFilter) {
             if (target && target.closest && target.closest("[data-touch-company-filter]")) return;
@@ -5772,10 +5824,12 @@
           this.search = "";
           this.showStatusFilter = false;
           this.showTaskCompanyFilter = false;
+          this.showTaskCategoryFilter = false;
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.selectedStatusFilters = [];
           this.selectedTaskCompanyFilters = [];
+          this.selectedTaskCategoryFilters = [];
           this.selectedTouchCompanyFilters = [];
           this.clearTouchDealFilter();
           if (!this.datasets.tasks.length) {
@@ -6829,10 +6883,12 @@
           this.activeSection = "leads";
           this.showStatusFilter = false;
           this.showTaskCompanyFilter = false;
+          this.showTaskCategoryFilter = false;
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.selectedStatusFilters = [];
           this.selectedTaskCompanyFilters = [];
+          this.selectedTaskCategoryFilters = [];
           this.selectedTouchCompanyFilters = [];
           this.clearTouchDealFilter();
           this.openLeadEditor(lead);
@@ -6841,10 +6897,12 @@
           this.activeSection = "deals";
           this.showStatusFilter = false;
           this.showTaskCompanyFilter = false;
+          this.showTaskCategoryFilter = false;
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.selectedStatusFilters = [];
           this.selectedTaskCompanyFilters = [];
+          this.selectedTaskCategoryFilters = [];
           this.selectedTouchCompanyFilters = [];
           this.clearTouchDealFilter();
           this.openDealEditor(deal);
@@ -7225,10 +7283,12 @@
           this.activeSection = "contacts";
           this.showStatusFilter = false;
           this.showTaskCompanyFilter = false;
+          this.showTaskCategoryFilter = false;
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.selectedStatusFilters = [];
           this.selectedTaskCompanyFilters = [];
+          this.selectedTaskCategoryFilters = [];
           this.selectedTouchCompanyFilters = [];
           this.clearTouchDealFilter();
           this.openContactEditor({
@@ -7710,6 +7770,7 @@
           this.search = "";
           this.showStatusFilter = false;
           this.showTaskCompanyFilter = false;
+          this.showTaskCategoryFilter = false;
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
           this.showManagerNotifications = false;
@@ -7726,6 +7787,7 @@
           this.resetUnboundCommunicationsState();
           this.selectedStatusFilters = [];
           this.selectedTaskCompanyFilters = [];
+          this.selectedTaskCategoryFilters = [];
           this.selectedTouchCompanyFilters = [];
           this.clearTaskDealFilter();
           this.clearTouchDealFilter();

@@ -16,8 +16,8 @@ Including another URLconf
 
 from django.conf import settings
 from django.conf.urls.static import static
-from django.contrib import admin
 from django.urls import include, path
+from crm.admin import crm_admin_site
 from main.views import (
     mainview,
     dadata_party,
@@ -38,7 +38,7 @@ sitemaps = {
 }
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path("admin/", crm_admin_site.urls),
     path(
         "sitemap.xml",
         sitemap,

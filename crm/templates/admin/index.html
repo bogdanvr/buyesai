@@ -1,0 +1,96 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <style>
+    .crm-admin-group-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .crm-admin-group-card {
+      border: 1px solid #d9d9d9;
+      border-radius: 10px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .crm-admin-group-card h2 {
+      margin: 0;
+      padding: 14px 16px;
+      border-bottom: 1px solid #ececec;
+      font-size: 16px;
+    }
+    .crm-admin-group-card ul {
+      list-style: none;
+      margin: 0;
+      padding: 8px 0;
+    }
+    .crm-admin-group-card li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 16px;
+    }
+    .crm-admin-group-card li + li {
+      border-top: 1px solid #f3f3f3;
+    }
+    .crm-admin-group-links {
+      display: inline-flex;
+      gap: 10px;
+      white-space: nowrap;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div id="content-main">
+    {% if app_list %}
+      {% for app in app_list %}
+        <div class="app-{{ app.app_label }} module">
+          <table>
+            <caption>
+              <a href="{{ app.app_url }}" class="section" title="{% blocktranslate with name=app.name %}Models in the {{ name }} application{% endblocktranslate %}">{{ app.name }}</a>
+            </caption>
+          </table>
+          {% if app.admin_groups %}
+            <div class="crm-admin-group-grid">
+              {% for group in app.admin_groups %}
+                <section class="crm-admin-group-card">
+                  <h2>{{ group.name }}</h2>
+                  <ul>
+                    {% for model in group.models %}
+                      <li>
+                        <span>
+                          {% if model.admin_url %}
+                            <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                          {% else %}
+                            {{ model.name }}
+                          {% endif %}
+                        </span>
+                        <span class="crm-admin-group-links">
+                          {% if model.add_url %}
+                            <a href="{{ model.add_url }}">{% translate 'Add' %}</a>
+                          {% endif %}
+                          {% if model.admin_url %}
+                            <a href="{{ model.admin_url }}">{% translate 'Change' %}</a>
+                          {% endif %}
+                        </span>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </section>
+              {% endfor %}
+            </div>
+          {% else %}
+            {{ block.super }}
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>{% translate "You don’t have permission to view or edit anything." %}</p>
+    {% endif %}
+  </div>
+{% endblock %}

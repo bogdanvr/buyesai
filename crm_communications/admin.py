@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from crm.admin.site import crm_admin_site
 from crm_communications.models import (
     Conversation,
     ConversationRoute,
@@ -27,8 +28,9 @@ class MessageAttemptLogInline(admin.TabularInline):
     can_delete = False
 
 
-@admin.register(Conversation)
+@admin.register(Conversation, site=crm_admin_site)
 class ConversationAdmin(admin.ModelAdmin):
+    admin_group = "Коммуникации"
     list_display = (
         "id",
         "channel",
@@ -62,8 +64,9 @@ class ConversationAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(ConversationRoute)
+@admin.register(ConversationRoute, site=crm_admin_site)
 class ConversationRouteAdmin(admin.ModelAdmin):
+    admin_group = "Коммуникации"
     list_display = ("id", "channel", "route_type", "route_key", "conversation", "client", "contact", "deal", "is_primary", "resolution_source")
     list_filter = ("channel", "route_type", "is_primary", "resolution_source")
     search_fields = ("route_key", "client__name", "contact__email", "deal__title", "conversation__subject")
@@ -71,8 +74,9 @@ class ConversationRouteAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at", "resolved_at")
 
 
-@admin.register(ParticipantBinding)
+@admin.register(ParticipantBinding, site=crm_admin_site)
 class ParticipantBindingAdmin(admin.ModelAdmin):
+    admin_group = "Коммуникации"
     list_display = ("id", "channel", "external_participant_key", "external_display_name", "client", "contact", "is_primary", "last_seen_at")
     list_filter = ("channel", "is_primary")
     search_fields = ("external_participant_key", "external_display_name", "client__name", "contact__email")
@@ -80,8 +84,9 @@ class ParticipantBindingAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at", "last_seen_at")
 
 
-@admin.register(Message)
+@admin.register(Message, site=crm_admin_site)
 class MessageAdmin(admin.ModelAdmin):
+    admin_group = "Коммуникации"
     list_display = (
         "id",
         "channel",
@@ -129,16 +134,18 @@ class MessageAdmin(admin.ModelAdmin):
     inlines = [MessageAttachmentInline, MessageAttemptLogInline]
 
 
-@admin.register(MessageWebhookEvent)
+@admin.register(MessageWebhookEvent, site=crm_admin_site)
 class MessageWebhookEventAdmin(admin.ModelAdmin):
+    admin_group = "Коммуникации"
     list_display = ("id", "channel", "event_type", "external_event_id", "external_message_id", "processing_status", "processed_at", "created_at")
     list_filter = ("channel", "event_type", "processing_status")
     search_fields = ("external_event_id", "external_message_id", "error_message")
     readonly_fields = ("created_at", "updated_at", "processed_at", "payload", "error_message")
 
 
-@admin.register(MessageAttemptLog)
+@admin.register(MessageAttemptLog, site=crm_admin_site)
 class MessageAttemptLogAdmin(admin.ModelAdmin):
+    admin_group = "Коммуникации"
     list_display = ("id", "message", "attempt_number", "transport", "status", "error_class", "error_code", "scheduled_retry_at", "is_final", "created_at")
     list_filter = ("transport", "status", "error_class", "is_final")
     search_fields = ("message__subject", "message__external_message_id", "error_code", "error_message")
@@ -168,8 +175,9 @@ def mark_failure_closed(modeladmin, request, queryset):
     queryset.update(resolution_status="closed", assigned_to=request.user)
 
 
-@admin.register(DeliveryFailureQueue)
+@admin.register(DeliveryFailureQueue, site=crm_admin_site)
 class DeliveryFailureQueueAdmin(admin.ModelAdmin):
+    admin_group = "Коммуникации"
     list_display = (
         "id",
         "message",
