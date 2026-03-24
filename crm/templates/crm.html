@@ -1271,6 +1271,10 @@
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Последнее касание</div>
                   <div class="mt-1 text-sm text-white">[[ leadSummaryLastTouch?.summary || leadSummaryLastTouch?.resultOptionName || 'Не указано' ]]</div>
                 </button>
+                <button type="button" @click="openLeadSummaryField('lastTouch')" class="text-left py-1 hover:text-white transition">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дата последнего касания</div>
+                  <div class="mt-1 text-sm text-white">[[ leadSummaryLastTouch?.happenedAtRaw ? formatDueLabel(leadSummaryLastTouch.happenedAtRaw) : 'Не указана' ]]</div>
+                </button>
                 <button type="button" @click="openLeadSummaryField('nextAction')" class="text-left py-1 hover:text-white transition">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Следующий шаг</div>
                   <div class="mt-1 text-sm text-white">[[ leadSummaryNextAction?.title || 'Не указан' ]]</div>
@@ -1823,12 +1827,12 @@
                   <div class="text-sm text-white">[[ dealSummaryLastTouch?.summary || dealSummaryLastTouch?.resultOptionName || 'Не указано' ]]</div>
                 </button>
                 <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
-                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Следующий шаг</div>
-                  <div class="text-sm text-white">[[ dealSummaryNextStepLabel ]]</div>
-                </button>
-                <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дата последнего касания</div>
                   <div class="text-sm text-white">[[ dealSummaryLastTouch?.happenedAtRaw ? formatDueLabel(dealSummaryLastTouch.happenedAtRaw) : 'Не указана' ]]</div>
+                </button>
+                <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Следующий шаг</div>
+                  <div class="text-sm text-white">[[ dealSummaryNextStepLabel ]]</div>
                 </button>
                 <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дата следующего шага</div>
