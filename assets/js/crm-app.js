@@ -10,6 +10,7 @@
       tasks: "/api/v1/activities/?type=task&page_size=100",
       touches: "/api/v1/touches/?page_size=100"
     };
+    const FILTERS_STORAGE_KEY = "crm_section_filters";
 
     const LEAD_STATUS_LABELS = {
       new: "Новый",
@@ -1471,6 +1472,86 @@
         },
         currentItems() {
           return this.datasets[this.activeSection] || [];
+        },
+        activeFilterRows() {
+          const rows = [];
+          if (this.selectedStatusFilters.length) {
+            rows.push({
+              key: "status",
+              fieldLabel: "статусу",
+              valueLabel: this.selectedStatusFilters.join(", "),
+            });
+          }
+          if (this.activeSection === "deals" && this.dealCompanyFilterId) {
+            rows.push({
+              key: "deal_company",
+              fieldLabel: "компании",
+              valueLabel: this.resolveSingleFilterLabel(
+                this.dealCompanyFilterId,
+                this.dealCompanyFilterOptions,
+                this.dealCompanyFilterLabel,
+                "Компания"
+              ),
+            });
+          }
+          if (this.activeSection === "tasks" && this.selectedTaskCompanyFilters.length) {
+            rows.push({
+              key: "task_company",
+              fieldLabel: "компаниям",
+              valueLabel: this.resolveMultiFilterLabels(
+                this.selectedTaskCompanyFilters,
+                this.taskCompanyFilterOptions,
+                "Компания"
+              ),
+            });
+          }
+          if (this.activeSection === "tasks" && this.selectedTaskCategoryFilters.length) {
+            rows.push({
+              key: "task_category",
+              fieldLabel: "типу",
+              valueLabel: this.resolveMultiFilterLabels(
+                this.selectedTaskCategoryFilters,
+                this.taskCategoryFilterOptions,
+                "Категория"
+              ),
+            });
+          }
+          if (this.activeSection === "tasks" && this.taskDealFilterId) {
+            rows.push({
+              key: "task_deal",
+              fieldLabel: "сделке",
+              valueLabel: this.resolveSingleFilterLabel(
+                this.taskDealFilterId,
+                this.taskDealFilterOptions,
+                this.taskDealFilterLabel,
+                "Сделка"
+              ),
+            });
+          }
+          if (this.activeSection === "touches" && this.selectedTouchCompanyFilters.length) {
+            rows.push({
+              key: "touch_company",
+              fieldLabel: "компаниям",
+              valueLabel: this.resolveMultiFilterLabels(
+                this.selectedTouchCompanyFilters,
+                this.touchCompanyFilterOptions,
+                "Компания"
+              ),
+            });
+          }
+          if (this.activeSection === "touches" && this.touchDealFilterId) {
+            rows.push({
+              key: "touch_deal",
+              fieldLabel: "сделке",
+              valueLabel: this.resolveSingleFilterLabel(
+                this.touchDealFilterId,
+                this.touchDealFilterOptions,
+                this.touchDealFilterLabel,
+                "Сделка"
+              ),
+            });
+          }
+          return rows;
         },
         filteredItems() {
           const q = this.search.trim().toLowerCase();
@@ -5288,6 +5369,78 @@
 
           return { border: "rgba(148, 163, 184, .35)", bg: "rgba(148, 163, 184, .10)", text: "#cbd5e1" };
         },
+        resolveSingleFilterLabel(value, options, fallbackLabel = "", entityLabel = "Элемент") {
+          const normalizedValue = String(value || "").trim();
+          if (!normalizedValue) return "";
+          const option = (Array.isArray(options) ? options : []).find(
+            (item) => String(item?.value || "").trim() === normalizedValue
+          );
+          return String(option?.label || fallbackLabel || `${entityLabel} #${normalizedValue}`).trim();
+        },
+        resolveMultiFilterLabels(values, options, entityLabel = "Элемент") {
+          const normalizedValues = Array.isArray(values)
+            ? values.map((item) => String(item || "").trim()).filter(Boolean)
+            : [];
+          if (!normalizedValues.length) {
+            return "";
+          }
+          const optionMap = new Map(
+            (Array.isArray(options) ? options : []).map((item) => [String(item?.value || "").trim(), String(item?.label || "").trim()])
+          );
+          return normalizedValues.map((value) => optionMap.get(value) || `${entityLabel} #${value}`).join(", ");
+        },
+        clearActiveFilter(key) {
+          if (key === "status") return this.clearStatusFilter();
+          if (key === "deal_company") return this.clearDealCompanyFilter();
+          if (key === "task_company") return this.clearTaskCompanyFilter();
+          if (key === "task_category") return this.clearTaskCategoryFilter();
+          if (key === "task_deal") return this.clearTaskDealFilter();
+          if (key === "touch_company") return this.clearTouchCompanyFilter();
+          if (key === "touch_deal") return this.clearTouchDealFilter();
+        },
+        persistFilters() {
+          try {
+            window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({
+              selectedStatusFilters: this.selectedStatusFilters,
+              dealCompanyFilterId: this.dealCompanyFilterId,
+              dealCompanyFilterLabel: this.dealCompanyFilterLabel,
+              selectedTaskCompanyFilters: this.selectedTaskCompanyFilters,
+              selectedTaskCategoryFilters: this.selectedTaskCategoryFilters,
+              taskDealFilterId: this.taskDealFilterId,
+              taskDealFilterLabel: this.taskDealFilterLabel,
+              selectedTouchCompanyFilters: this.selectedTouchCompanyFilters,
+              touchDealFilterId: this.touchDealFilterId,
+              touchDealFilterLabel: this.touchDealFilterLabel,
+            }));
+          } catch (error) {
+          }
+        },
+        restoreFilters() {
+          try {
+            const rawValue = window.localStorage.getItem(FILTERS_STORAGE_KEY);
+            if (!rawValue) return;
+            const payload = JSON.parse(rawValue);
+            this.selectedStatusFilters = Array.isArray(payload?.selectedStatusFilters)
+              ? payload.selectedStatusFilters.map((item) => String(item || "").trim()).filter(Boolean)
+              : [];
+            this.dealCompanyFilterId = payload?.dealCompanyFilterId ? String(payload.dealCompanyFilterId).trim() : null;
+            this.dealCompanyFilterLabel = String(payload?.dealCompanyFilterLabel || "").trim();
+            this.selectedTaskCompanyFilters = Array.isArray(payload?.selectedTaskCompanyFilters)
+              ? payload.selectedTaskCompanyFilters.map((item) => String(item || "").trim()).filter(Boolean)
+              : [];
+            this.selectedTaskCategoryFilters = Array.isArray(payload?.selectedTaskCategoryFilters)
+              ? payload.selectedTaskCategoryFilters.map((item) => String(item || "").trim()).filter(Boolean)
+              : [];
+            this.taskDealFilterId = payload?.taskDealFilterId ? String(payload.taskDealFilterId).trim() : null;
+            this.taskDealFilterLabel = String(payload?.taskDealFilterLabel || "").trim();
+            this.selectedTouchCompanyFilters = Array.isArray(payload?.selectedTouchCompanyFilters)
+              ? payload.selectedTouchCompanyFilters.map((item) => String(item || "").trim()).filter(Boolean)
+              : [];
+            this.touchDealFilterId = payload?.touchDealFilterId ? String(payload.touchDealFilterId).trim() : null;
+            this.touchDealFilterLabel = String(payload?.touchDealFilterLabel || "").trim();
+          } catch (error) {
+          }
+        },
         toggleStatusFilter() {
           this.showStatusFilter = !this.showStatusFilter;
           if (this.showStatusFilter) {
@@ -5302,12 +5455,15 @@
         toggleStatusFilterValue(value) {
           if (this.selectedStatusFilters.includes(value)) {
             this.selectedStatusFilters = this.selectedStatusFilters.filter((item) => item !== value);
+            this.persistFilters();
             return;
           }
           this.selectedStatusFilters = [...this.selectedStatusFilters, value];
+          this.persistFilters();
         },
         clearStatusFilter() {
           this.selectedStatusFilters = [];
+          this.persistFilters();
         },
         toggleDealCompanyFilter() {
           this.showDealCompanyFilter = !this.showDealCompanyFilter;
@@ -5324,10 +5480,12 @@
           this.dealCompanyFilterId = value ? String(value) : null;
           this.dealCompanyFilterLabel = String(label || "").trim();
           this.showDealCompanyFilter = false;
+          this.persistFilters();
         },
         clearDealCompanyFilter() {
           this.dealCompanyFilterId = null;
           this.dealCompanyFilterLabel = "";
+          this.persistFilters();
         },
         toggleTaskCompanyFilter() {
           this.showTaskCompanyFilter = !this.showTaskCompanyFilter;
@@ -5344,12 +5502,15 @@
           const normalizedValue = String(value || "");
           if (this.selectedTaskCompanyFilters.includes(normalizedValue)) {
             this.selectedTaskCompanyFilters = this.selectedTaskCompanyFilters.filter((item) => item !== normalizedValue);
+            this.persistFilters();
             return;
           }
           this.selectedTaskCompanyFilters = [...this.selectedTaskCompanyFilters, normalizedValue];
+          this.persistFilters();
         },
         clearTaskCompanyFilter() {
           this.selectedTaskCompanyFilters = [];
+          this.persistFilters();
         },
         toggleTaskCategoryFilter() {
           this.showTaskCategoryFilter = !this.showTaskCategoryFilter;
@@ -5366,12 +5527,15 @@
           const normalizedValue = String(value || "");
           if (this.selectedTaskCategoryFilters.includes(normalizedValue)) {
             this.selectedTaskCategoryFilters = this.selectedTaskCategoryFilters.filter((item) => item !== normalizedValue);
+            this.persistFilters();
             return;
           }
           this.selectedTaskCategoryFilters = [...this.selectedTaskCategoryFilters, normalizedValue];
+          this.persistFilters();
         },
         clearTaskCategoryFilter() {
           this.selectedTaskCategoryFilters = [];
+          this.persistFilters();
         },
         toggleTaskDealFilter() {
           this.showTaskDealFilter = !this.showTaskDealFilter;
@@ -5388,6 +5552,7 @@
           this.taskDealFilterId = value ? String(value) : null;
           this.taskDealFilterLabel = String(label || "").trim();
           this.showTaskDealFilter = false;
+          this.persistFilters();
         },
         toggleTouchCompanyFilter() {
           this.showTouchCompanyFilter = !this.showTouchCompanyFilter;
@@ -5403,12 +5568,15 @@
           const normalizedValue = String(value || "");
           if (this.selectedTouchCompanyFilters.includes(normalizedValue)) {
             this.selectedTouchCompanyFilters = this.selectedTouchCompanyFilters.filter((item) => item !== normalizedValue);
+            this.persistFilters();
             return;
           }
           this.selectedTouchCompanyFilters = [...this.selectedTouchCompanyFilters, normalizedValue];
+          this.persistFilters();
         },
         clearTouchCompanyFilter() {
           this.selectedTouchCompanyFilters = [];
+          this.persistFilters();
         },
         toggleTouchDealFilter() {
           this.showTouchDealFilter = !this.showTouchDealFilter;
@@ -5424,14 +5592,17 @@
           this.touchDealFilterId = value ? String(value) : null;
           this.touchDealFilterLabel = String(label || "").trim();
           this.showTouchDealFilter = false;
+          this.persistFilters();
         },
         clearTouchDealFilter() {
           this.touchDealFilterId = null;
           this.touchDealFilterLabel = "";
+          this.persistFilters();
         },
         clearTaskDealFilter() {
           this.taskDealFilterId = null;
           this.taskDealFilterLabel = "";
+          this.persistFilters();
         },
         companyHasActiveDeals(companyId) {
           const normalizedCompanyId = this.toIntOrNull(companyId);
@@ -5974,6 +6145,7 @@
         openTaskFromDeal(task) {
           this.taskDealFilterId = task.dealId || this.editingDealId || null;
           this.taskDealFilterLabel = task.deal || this.forms.deals.title || "";
+          this.persistFilters();
           this.openTaskEditor(task);
         },
         async openTaskListForDeal() {
@@ -5994,6 +6166,7 @@
           this.selectedTaskCategoryFilters = [];
           this.selectedTouchCompanyFilters = [];
           this.clearTouchDealFilter();
+          this.persistFilters();
           if (!this.datasets.tasks.length) {
             await this.reloadActiveSection();
           }
@@ -7048,12 +7221,6 @@
           this.showTaskDealFilter = false;
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
-          this.selectedStatusFilters = [];
-          this.selectedTaskCompanyFilters = [];
-          this.selectedTaskCategoryFilters = [];
-          this.selectedTouchCompanyFilters = [];
-          this.clearDealCompanyFilter();
-          this.clearTouchDealFilter();
           this.openLeadEditor(lead);
         },
         openDealFromCompanyPanel(deal) {
@@ -7064,12 +7231,6 @@
           this.showTaskCategoryFilter = false;
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
-          this.selectedStatusFilters = [];
-          this.selectedTaskCompanyFilters = [];
-          this.selectedTaskCategoryFilters = [];
-          this.selectedTouchCompanyFilters = [];
-          this.clearDealCompanyFilter();
-          this.clearTouchDealFilter();
           this.openDealEditor(deal);
         },
         formatRemainingDuration(totalMinutes) {
@@ -7954,13 +8115,6 @@
             recipient: "",
           };
           this.resetUnboundCommunicationsState();
-          this.selectedStatusFilters = [];
-          this.selectedTaskCompanyFilters = [];
-          this.selectedTaskCategoryFilters = [];
-          this.selectedTouchCompanyFilters = [];
-          this.clearDealCompanyFilter();
-          this.clearTaskDealFilter();
-          this.clearTouchDealFilter();
           this.editingLeadId = null;
           this.editingDealId = null;
           this.editingContactId = null;
@@ -9082,6 +9236,7 @@
           this.errorMessage = `Ошибка загрузки справочников: ${error.message}`;
         }
         await this.loadAllSections();
+        this.restoreFilters();
         window.setTimeout(() => this.hideStartupScreen(), 500);
       },
       beforeUnmount() {
