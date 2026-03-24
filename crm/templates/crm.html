@@ -241,7 +241,15 @@
                       <span class="text-[11px] text-crm-muted">[[ eventShortTimestamp(notification.happenedAt) || 'Без даты' ]]</span>
                     </div>
                     <div class="mt-1 text-xs text-crm-muted [overflow-wrap:anywhere]">
-                      [[ notification.dealTitle || notification.companyName || 'Без привязки' ]]
+                      <button
+                        v-if="managerNotificationContextLabel(notification)"
+                        type="button"
+                        @click.stop="openManagerNotificationContext(notification)"
+                        class="text-left text-crm-accent underline underline-offset-4 hover:text-white"
+                      >
+                        [[ managerNotificationContextLabel(notification) ]]
+                      </button>
+                      <span v-else>Без привязки</span>
                     </div>
                     <div v-if="managerNotificationSourceLabel(notification)" class="mt-1 text-xs text-crm-muted [overflow-wrap:anywhere]">
                       <span>Источник: </span>

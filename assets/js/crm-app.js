@@ -399,6 +399,8 @@
             recipient: "",
           },
           communicationsPollTimer: null,
+          automationNotificationsPollTimer: null,
+          isAutomationNotificationsPolling: false,
           metaOptions: {
             leadStatuses: [],
             dealStages: [],
@@ -692,6 +694,7 @@
             companyId: this.toIntOrNull(item.clientId),
             companyName: item.clientName || "",
             leadId: this.toIntOrNull(item.leadId),
+            leadTitle: item.leadTitle || "",
             contactId: this.toIntOrNull(item.contactId),
             ownerId: this.toIntOrNull(item.ownerId),
             title: item.title || item.summary || "Очередь автоматизации",
@@ -1867,20 +1870,13 @@
         },
         "forms.tasks.dealId": {
           handler() {
-            if (this.toIntOrNull(this.forms.tasks.dealId)) {
-              this.forms.tasks.leadId = null;
-            }
             if (this.activeSection === "tasks" && this.showModal) {
               this.loadTaskTouchOptions();
             }
           }
         },
         "forms.tasks.leadId": {
-          handler(nextValue) {
-            if (this.toIntOrNull(nextValue)) {
-              this.forms.tasks.companyId = null;
-              this.forms.tasks.dealId = null;
-            }
+          handler() {
             if (this.activeSection === "tasks" && this.showModal) {
               this.loadTaskTouchOptions();
             }
@@ -1888,9 +1884,6 @@
         },
         "forms.tasks.companyId": {
           handler() {
-            if (this.toIntOrNull(this.forms.tasks.companyId)) {
-              this.forms.tasks.leadId = null;
-            }
             const selectedDealId = this.toIntOrNull(this.forms.tasks.dealId);
             if (selectedDealId) {
               const dealStillAvailable = this.filteredTaskDealOptions.some(
@@ -3220,6 +3213,19 @@
             this.pollOpenCommunicationsPanels().catch(() => {});
           }, 30000);
         },
+        ensureAutomationNotificationsPolling() {
+          if (this.automationNotificationsPollTimer || typeof window === "undefined") return;
+          this.automationNotificationsPollTimer = window.setInterval(() => {
+            this.pollAutomationNotifications().catch(() => {});
+          }, 30000);
+        },
+        stopAutomationNotificationsPolling() {
+          if (this.automationNotificationsPollTimer && typeof window !== "undefined") {
+            window.clearInterval(this.automationNotificationsPollTimer);
+          }
+          this.automationNotificationsPollTimer = null;
+          this.isAutomationNotificationsPolling = false;
+        },
         stopCommunicationsPollingIfIdle() {
           if (
             this.showModal
@@ -3257,6 +3263,20 @@
             return;
           }
           await Promise.all(tasks);
+        },
+        async pollAutomationNotifications() {
+          if (this.isAutomationNotificationsPolling) return;
+          if (typeof document !== "undefined" && document.hidden) return;
+          this.isAutomationNotificationsPolling = true;
+          try {
+            await Promise.all([
+              this.loadAutomationDrafts(),
+              this.loadAutomationQueue(),
+              this.loadAutomationMessageDrafts(),
+            ]);
+          } finally {
+            this.isAutomationNotificationsPolling = false;
+          }
         },
         async loadCompanyConversationMessages(conversationId, options = {}) {
           const normalizedConversationId = this.toIntOrNull(conversationId);
@@ -4208,6 +4228,41 @@
           }
           return summary;
         },
+        managerNotificationContextLabel(notification) {
+          if (!notification || typeof notification !== "object") return "";
+          if (this.toIntOrNull(notification.dealId) && String(notification.dealTitle || "").trim()) {
+            return String(notification.dealTitle || "").trim();
+          }
+          if (this.toIntOrNull(notification.companyId || notification.clientId) && String(notification.companyName || "").trim()) {
+            return String(notification.companyName || "").trim();
+          }
+          if (this.toIntOrNull(notification.leadId) && String(notification.leadTitle || "").trim()) {
+            return String(notification.leadTitle || "").trim();
+          }
+          return "";
+        },
+        openManagerNotificationContext(notification) {
+          if (!notification || typeof notification !== "object") return;
+          if (this.toIntOrNull(notification.dealId)) {
+            this.showManagerNotifications = false;
+            this.openDealEditorById(notification.dealId);
+            return;
+          }
+          const companyId = this.toIntOrNull(notification.companyId || notification.clientId);
+          if (companyId) {
+            this.showManagerNotifications = false;
+            this.openCompanyEditorById(companyId);
+            return;
+          }
+          const leadId = this.toIntOrNull(notification.leadId);
+          if (leadId) {
+            const lead = (this.datasets.leads || []).find((item) => String(item.id) === String(leadId)) || null;
+            if (lead) {
+              this.showManagerNotifications = false;
+              this.openLeadEditor(lead);
+            }
+          }
+        },
         managerNotificationReplyState(notification) {
           const queueId = this.toIntOrNull(notification?.sourceId);
           if (!queueId) return "";
@@ -4788,6 +4843,8 @@
         },
         openAutomationTaskAction(item, { title = "", taskCategoryId = null, channelCode = "", dueAt = "", fallbackToRecommendation = true } = {}) {
           const normalizedDealId = this.toIntOrNull(item?.dealId);
+          const normalizedLeadId = this.toIntOrNull(item?.leadId);
+          const normalizedCompanyId = this.toIntOrNull(item?.clientId || item?.companyId);
           const explicitTitle = String(title || "").trim();
           const resolvedTitle = explicitTitle || (
             fallbackToRecommendation
@@ -4814,6 +4871,8 @@
               at: resolvedDueAt,
               taskCategoryId: resolvedTaskCategoryId,
               communicationChannelId,
+              leadId: normalizedLeadId,
+              companyId: normalizedCompanyId,
             });
             return;
           }
@@ -4826,7 +4885,8 @@
             taskTypeId: null,
             communicationChannelId,
             priority: "medium",
-            companyId: this.toIntOrNull(item?.clientId || item?.companyId),
+            companyId: normalizedCompanyId,
+            leadId: normalizedLeadId,
             dealId: normalizedDealId,
             // `related_touch` in the activities API points to legacy Activity entries,
             // while automation notifications are sourced from Touch records.
@@ -6062,6 +6122,14 @@
           const deal = (this.datasets.deals || []).find((item) => String(item.id) === String(normalizedId));
           if (deal) {
             this.openDealEditor(deal);
+          }
+        },
+        openLeadEditorById(leadId) {
+          const normalizedId = this.toIntOrNull(leadId);
+          if (!normalizedId) return;
+          const lead = (this.datasets.leads || []).find((item) => String(item.id) === String(normalizedId));
+          if (lead) {
+            this.openLeadEditor(lead);
           }
         },
         openCompanyEditorById(companyId) {
@@ -8812,6 +8880,7 @@
           if (!targetDealId) {
             throw new Error("Сначала откройте сделку");
           }
+          const currentDeal = (this.datasets.deals || []).find((item) => String(item.id) === String(targetDealId)) || null;
           const subject = this.resolveTaskSubject(this.dealTaskForm);
           if (!subject) {
             throw new Error("Укажите название задачи или выберите тип задачи");
@@ -8835,7 +8904,8 @@
                 due_at: this.toIsoDateTime(this.dealTaskForm.dueAt),
                 deadline_reminder_offset_minutes: Number(this.dealTaskForm.reminderOffsetMinutes || 30),
                 deal: targetDealId,
-                client: this.toIntOrNull(this.forms.deals.companyId)
+                client: this.toIntOrNull(this.forms.deals.companyId) || this.toIntOrNull(currentDeal?.clientId),
+                lead: this.toIntOrNull(currentDeal?.leadId)
               }
             });
             this.resetDealTaskForm();
@@ -9472,12 +9542,15 @@
           this.errorMessage = `Ошибка загрузки справочников: ${error.message}`;
         }
         await this.loadAllSections();
+        this.ensureAutomationNotificationsPolling();
         this.restoreFilters();
         window.setTimeout(() => this.hideStartupScreen(), 500);
       },
       beforeUnmount() {
         document.removeEventListener("click", this.handleDocumentClick);
         document.removeEventListener("keydown", this.handleGlobalKeydown);
+        this.stopAutomationNotificationsPolling();
+        this.stopCommunicationsPollingIfIdle();
       }
     });
 
