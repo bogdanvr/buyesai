@@ -94,6 +94,37 @@ class AutomationDraftsApiTests(APITestCase):
         self.assertEqual(touch.result_option, self.touch_result)
         self.assertEqual(touch.next_step, "Фоллоу-ап через 2 дня")
 
+    def test_touch_rule_with_create_mode_creates_automation_touch(self):
+        self.rule.create_touchpoint_mode = "create"
+        self.rule.next_step_template = None
+        self.rule.require_manager_confirmation = False
+        self.rule.show_in_attention_queue = False
+        self.rule.save()
+
+        source_touch = Touch.objects.create(
+            happened_at=timezone.now(),
+            channel=self.channel,
+            direction="outgoing",
+            summary="Отправили письмо",
+            owner=self.user,
+            deal=self.deal,
+        )
+
+        touches = list(Touch.objects.filter(deal=self.deal).order_by("id"))
+        self.assertEqual(len(touches), 2)
+        self.assertEqual(touches[0].pk, source_touch.pk)
+
+        created_touch = touches[1]
+        self.assertEqual(created_touch.result_option, self.touch_result)
+        self.assertEqual(created_touch.channel, self.channel)
+        self.assertEqual(created_touch.direction, "outgoing")
+        self.assertEqual(created_touch.summary, "Отправили письмо")
+        self.assertEqual(created_touch.owner, self.user)
+        self.assertEqual(created_touch.deal_id, self.deal.pk)
+        self.assertEqual(created_touch.client_id, self.company.pk)
+        self.assertFalse(AutomationDraft.objects.filter(source_touch=source_touch, draft_kind="touch").exists())
+        self.assertEqual(Touch.objects.filter(deal=self.deal).count(), 2)
+
     def test_can_list_pending_automation_drafts(self):
         touch = Touch.objects.create(
             happened_at=timezone.now(),

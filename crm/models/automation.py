@@ -70,7 +70,7 @@ class AutomationRule(models.Model):
     show_in_attention_queue = models.BooleanField(default=False, verbose_name="Показывать в очереди внимания")
     merge_key = models.CharField(max_length=32, blank=True, default="", verbose_name="Ключ цепочки")
     auto_open_panel = models.BooleanField(default=False, verbose_name="Автооткрывать панель")
-    create_message = models.BooleanField(default=False, verbose_name="Создавать сообщение")
+    create_message = models.BooleanField(default=False, verbose_name="Создавать автоматическое сообщение")
     create_touchpoint_mode = models.CharField(
         max_length=16,
         choices=AutomationTouchpointMode.choices,

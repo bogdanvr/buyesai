@@ -314,6 +314,32 @@ def _upsert_touch_automation_draft(instance: Touch, rule: AutomationRule, draft_
     draft.save()
 
 
+def _create_touch_automation_touch(instance: Touch, rule: AutomationRule) -> Touch | None:
+    defaults = _draft_defaults_from_touch(instance, rule, AutomationDraftKind.TOUCH)
+    happened_at = getattr(instance, "happened_at", None) or timezone.now()
+    summary = str(defaults.get("summary") or defaults.get("title") or "").strip()
+    auto_touch = Touch(
+        happened_at=happened_at,
+        channel=defaults.get("proposed_channel"),
+        direction=str(defaults.get("proposed_direction") or instance.direction or TouchDirection.OUTGOING).strip() or TouchDirection.OUTGOING,
+        result_option=defaults.get("touch_result"),
+        summary=summary,
+        next_step=str(defaults.get("proposed_next_step") or "").strip(),
+        next_step_at=defaults.get("proposed_next_step_at"),
+        owner=defaults.get("owner"),
+        lead=defaults.get("lead"),
+        deal=defaults.get("deal"),
+        client=defaults.get("client"),
+        contact=defaults.get("contact"),
+        task=None,
+    )
+    # The auto-created touch should stay a normal CRM touch, but it must not
+    # recursively trigger the same automation rule again.
+    auto_touch._skip_touch_automation = True
+    auto_touch.save()
+    return auto_touch
+
+
 def _queue_defaults_from_touch(instance: Touch, rule: AutomationRule, item_kind: str) -> dict:
     resolved_client = _resolve_touch_client(instance)
     next_step_text = str(getattr(getattr(rule, "next_step_template", None), "name", "") or instance.next_step or "").strip()
@@ -1331,6 +1357,9 @@ def touch_client_events_signal(sender, instance: Touch, created, **kwargs):
 
 @receiver(post_save, sender=Touch)
 def touch_automation_drafts_signal(sender, instance: Touch, created, **kwargs):
+    if bool(getattr(instance, "_skip_touch_automation", False)):
+        return
+
     event_type, rule = resolve_touch_automation_rule(instance)
 
     allowed_draft_kinds: set[str] = set()
@@ -1391,6 +1420,8 @@ def touch_automation_drafts_signal(sender, instance: Touch, created, **kwargs):
 
     if str(rule.create_touchpoint_mode or "").strip() == "draft":
         _upsert_touch_automation_draft(instance, rule, AutomationDraftKind.TOUCH)
+    elif created and str(rule.create_touchpoint_mode or "").strip() == "create":
+        _create_touch_automation_touch(instance, rule)
 
     should_create_next_step_draft = AutomationDraftKind.NEXT_STEP in allowed_draft_kinds
     if should_create_next_step_draft:
