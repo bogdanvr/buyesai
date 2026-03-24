@@ -497,15 +497,15 @@
         <div v-if="errorMessage" class="mb-4 rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-red-200 text-sm">
           [[ errorMessage ]]
         </div>
-        <div v-if="activeFilterRows.length" class="mb-4 space-y-3">
+        <div v-if="activeFilterRows.length" class="mb-4 flex flex-wrap items-center gap-3">
           <div
             v-for="filterRow in activeFilterRows"
             :key="`active-filter-${filterRow.key}`"
-            class="flex items-center justify-between gap-3 rounded-2xl border border-crm-border bg-crm-panel px-4 py-3 text-sm"
+            class="inline-flex max-w-full items-center gap-3 rounded-2xl border border-crm-border bg-crm-panel px-4 py-3 text-sm"
           >
-            <div class="min-w-0">
+            <div class="min-w-0 max-w-full">
               <span class="text-crm-muted">Фильтр по [[ filterRow.fieldLabel ]]:</span>
-              <span class="ml-2 font-medium text-white truncate">[[ filterRow.valueLabel ]]</span>
+              <span class="ml-2 font-medium text-white break-words">[[ filterRow.valueLabel ]]</span>
             </div>
             <button
               type="button"
