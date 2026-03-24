@@ -2739,7 +2739,7 @@
         async openTaskFromEvent(taskId) {
           try {
             const task = await this.fetchTaskById(taskId);
-            this.openTaskEditor(task);
+            this.openTaskEditor(task, { parentContext: this.modalParentContext || this.captureModalParentContext() });
           } catch (error) {
             this.errorMessage = `Ошибка открытия задачи: ${error.message}`;
           }
@@ -2752,7 +2752,7 @@
             }
             const existingTouch = (this.datasets.touches || []).find((item) => String(item.id) === String(normalizedTouchId));
             const touch = existingTouch || this.mapTouch(await this.apiRequest(`/api/v1/touches/${normalizedTouchId}/`));
-            this.openTouchEditor(touch);
+            this.openTouchEditor(touch, { parentContext: this.modalParentContext || this.captureModalParentContext() });
           } catch (error) {
             this.errorMessage = `Ошибка открытия касания: ${error.message}`;
           }
@@ -6081,7 +6081,10 @@
           this.showModal = true;
           this.enrichCompanyFromDadataByInn();
         },
-        openTaskEditor(item) {
+        openTaskEditor(item, options = {}) {
+          if (Object.prototype.hasOwnProperty.call(options, "parentContext")) {
+            this.modalParentContext = options.parentContext;
+          }
           this.clearUiErrors({ modalOnly: true });
           this.activeSection = "tasks";
           this.taskSummaryEditingField = "";
@@ -6164,6 +6167,8 @@
           this.touchDealDocuments = [];
           this.touchCompanyDocuments = [];
           this.resetTouchFollowUpForm();
+          this.resetTaskFollowUpForm();
+          this.taskTouchOptions = [];
           if (context.section === "deals") {
             this.editingLeadId = null;
             this.editingDealId = this.toIntOrNull(context.editingDealId);
@@ -6242,7 +6247,7 @@
           this.taskDealFilterId = task.dealId || this.editingDealId || null;
           this.taskDealFilterLabel = task.deal || this.forms.deals.title || "";
           this.persistFilters();
-          this.openTaskEditor(task);
+          this.openTaskEditor(task, { parentContext: this.modalParentContext || this.captureModalParentContext() });
         },
         async openTaskListForDeal() {
           if (!this.editingDealId) return;
@@ -8264,7 +8269,7 @@
           this.search = "";
         },
         closeModal() {
-          if (this.activeSection === "touches" && this.modalParentContext) {
+          if ((this.activeSection === "touches" || this.activeSection === "tasks") && this.modalParentContext) {
             this.restoreModalParentContext();
             return;
           }
@@ -9241,7 +9246,7 @@
           this.isSaving = true;
           this.clearUiErrors({ modalOnly: true });
           try {
-            const returnToParentAfterTouch = this.activeSection === "touches" && !!this.modalParentContext;
+            const returnToParentAfterChildModal = (this.activeSection === "touches" || this.activeSection === "tasks") && !!this.modalParentContext;
             let savedDeal = null;
             const currentTouchId = this.editingTouchId;
             if (this.activeSection === "leads" && this.editingLeadId) await this.updateLead();
@@ -9305,7 +9310,7 @@
             } else {
               await this.reloadActiveSection();
             }
-            if (returnToParentAfterTouch) {
+            if (returnToParentAfterChildModal) {
               await this.restoreModalParentContext();
             }
           } catch (error) {
