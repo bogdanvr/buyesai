@@ -2833,8 +2833,8 @@
                 <option v-for="channel in metaOptions.communicationChannels" :key="channel.id" :value="channel.id">[[ channel.name ]]</option>
               </select>
             </label>
-            <label class="block">
-              <span class="text-sm text-crm-muted">Результат</span>
+            <label class="block rounded-xl border border-crm-accent/40 bg-crm-accent/10 px-3 py-2">
+              <span class="text-[11px] uppercase tracking-[0.12em] text-crm-accent">Результат</span>
               <div v-if="touchResultPromptVisible" class="mt-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div class="text-sm text-white [overflow-wrap:anywhere]">
@@ -2849,7 +2849,7 @@
                   </button>
                 </div>
               </div>
-              <select id="touch-result-option" v-model="forms.touches.resultOptionId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+              <select id="touch-result-option" v-model="forms.touches.resultOptionId" class="mt-1 w-full h-11 rounded-lg border border-crm-accent/40 bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
                 <option :value="null">Не выбран</option>
                 <option
                   v-for="option in availableTouchResults(forms.touches.channelId, forms.touches.resultOptionId)"

@@ -54,6 +54,7 @@
           activeSection: "leads",
           search: "",
           showModal: false,
+          modalParentContext: null,
           isLoading: false,
           isSaving: false,
           showStatusFilter: false,
@@ -6112,7 +6113,97 @@
           this.showModal = true;
           this.loadTaskTouchOptions();
         },
-        openTouchEditor(item) {
+        cloneModalContextValue(value) {
+          if (value === undefined) return undefined;
+          return JSON.parse(JSON.stringify(value));
+        },
+        captureModalParentContext() {
+          if (!this.showModal) {
+            return null;
+          }
+          if (this.activeSection === "deals" && this.toIntOrNull(this.editingDealId)) {
+            return {
+              section: "deals",
+              editingDealId: this.toIntOrNull(this.editingDealId),
+              dealSummaryEditingField: String(this.dealSummaryEditingField || ""),
+              showDealTaskForm: !!this.showDealTaskForm,
+              dealTaskForm: this.cloneModalContextValue(this.dealTaskForm),
+              showDealCompanyForm: !!this.showDealCompanyForm,
+              dealCompanyForm: this.cloneModalContextValue(this.dealCompanyForm),
+              showDealContactsPanel: !!this.showDealContactsPanel,
+              showDealDocumentsPanel: !!this.showDealDocumentsPanel,
+              showDealCommunicationsPanel: !!this.showDealCommunicationsPanel,
+              showDealContactForm: !!this.showDealContactForm,
+            };
+          }
+          if (this.activeSection === "leads" && this.toIntOrNull(this.editingLeadId)) {
+            return {
+              section: "leads",
+              editingLeadId: this.toIntOrNull(this.editingLeadId),
+              leadSummaryEditingField: String(this.leadSummaryEditingField || ""),
+              showLeadDocumentsPanel: !!this.showLeadDocumentsPanel,
+            };
+          }
+          return null;
+        },
+        async restoreModalParentContext() {
+          const context = this.modalParentContext;
+          this.modalParentContext = null;
+          if (!context) {
+            return false;
+          }
+          this.clearUiErrors({ modalOnly: true });
+          this.setTouchResultPrompt("");
+          this.showAllTouchResults = false;
+          this.activeSection = context.section;
+          this.showModal = true;
+          this.editingContactId = null;
+          this.editingCompanyId = null;
+          this.editingTaskId = null;
+          this.editingTouchId = null;
+          this.touchDealDocuments = [];
+          this.touchCompanyDocuments = [];
+          this.resetTouchFollowUpForm();
+          if (context.section === "deals") {
+            this.editingLeadId = null;
+            this.editingDealId = this.toIntOrNull(context.editingDealId);
+            this.dealSummaryEditingField = String(context.dealSummaryEditingField || "");
+            this.showDealTaskForm = !!context.showDealTaskForm;
+            this.dealTaskForm = this.cloneModalContextValue(context.dealTaskForm) || this.dealTaskForm;
+            this.showDealCompanyForm = !!context.showDealCompanyForm;
+            this.dealCompanyForm = this.cloneModalContextValue(context.dealCompanyForm) || this.dealCompanyForm;
+            this.showDealContactsPanel = !!context.showDealContactsPanel;
+            this.showDealDocumentsPanel = !!context.showDealDocumentsPanel;
+            this.showDealCommunicationsPanel = !!context.showDealCommunicationsPanel;
+            this.showDealContactForm = !!context.showDealContactForm;
+            await this.loadTasksForDeal();
+            if (this.toIntOrNull(this.forms.deals.companyId)) {
+              await this.loadContactsForSelectedDealCompany();
+            }
+            if (this.showDealDocumentsPanel) {
+              await this.loadDealDocuments();
+            }
+            if (this.showDealCommunicationsPanel) {
+              await this.loadDealCommunications();
+            }
+            return true;
+          }
+          if (context.section === "leads") {
+            this.editingDealId = null;
+            this.editingLeadId = this.toIntOrNull(context.editingLeadId);
+            this.leadSummaryEditingField = String(context.leadSummaryEditingField || "");
+            this.showLeadDocumentsPanel = !!context.showLeadDocumentsPanel;
+            if (this.showLeadDocumentsPanel) {
+              await this.loadLeadDocuments();
+            }
+            return true;
+          }
+          return false;
+        },
+        openTouchEditor(item, options = {}) {
+          if (Object.prototype.hasOwnProperty.call(options, "parentContext")) {
+            this.modalParentContext = options.parentContext;
+          }
           this.clearUiErrors({ modalOnly: true });
           this.setTouchResultPrompt("");
           this.showAllTouchResults = false;
@@ -6472,11 +6563,13 @@
             return;
           }
           if (fieldKey === "touch") {
+            const parentContext = this.captureModalParentContext();
             const touch = this.dealSummaryNextTouch || this.dealSummaryLastTouch;
             if (touch) {
-              this.openTouchEditor(touch);
+              this.openTouchEditor(touch, { parentContext });
               return;
             }
+            this.modalParentContext = parentContext;
             this.activeSection = "touches";
             this.editingTouchId = null;
             this.forms.touches = {
@@ -6497,6 +6590,7 @@
           this.startDealSummaryEdit(fieldKey);
         },
         quickAddDealTouch() {
+          this.modalParentContext = this.captureModalParentContext();
           this.activeSection = "touches";
           this.editingTouchId = null;
           this.showAllTouchResults = false;
@@ -6790,6 +6884,7 @@
           }
         },
         quickAddLeadTouch() {
+          this.modalParentContext = this.captureModalParentContext();
           this.activeSection = "touches";
           this.editingTouchId = null;
           this.showAllTouchResults = false;
@@ -6936,7 +7031,7 @@
         openLeadSummaryField(fieldKey) {
           if (fieldKey === "lastTouch") {
             if (this.leadSummaryLastTouch) {
-              this.openTouchEditor(this.leadSummaryLastTouch);
+              this.openTouchEditor(this.leadSummaryLastTouch, { parentContext: this.captureModalParentContext() });
             }
             return;
           }
@@ -6947,7 +7042,7 @@
                 this.openTaskEditor(nextAction.item);
                 return;
               }
-              this.openTouchEditor(nextAction.item);
+              this.openTouchEditor(nextAction.item, { parentContext: this.captureModalParentContext() });
               return;
             }
           }
@@ -8169,7 +8264,12 @@
           this.search = "";
         },
         closeModal() {
+          if (this.activeSection === "touches" && this.modalParentContext) {
+            this.restoreModalParentContext();
+            return;
+          }
           this.showModal = false;
+          this.modalParentContext = null;
           this.showAllTouchResults = false;
           this.leadSummaryEditingField = "";
           this.taskSummaryEditingField = "";
@@ -9141,6 +9241,7 @@
           this.isSaving = true;
           this.clearUiErrors({ modalOnly: true });
           try {
+            const returnToParentAfterTouch = this.activeSection === "touches" && !!this.modalParentContext;
             let savedDeal = null;
             const currentTouchId = this.editingTouchId;
             if (this.activeSection === "leads" && this.editingLeadId) await this.updateLead();
@@ -9203,6 +9304,9 @@
               await Promise.all([this.loadSection("touches"), this.loadSection("leads"), this.loadSection("deals"), this.loadSection("companies"), this.loadAutomationDrafts(), this.loadAutomationQueue(), this.loadAutomationMessageDrafts()]);
             } else {
               await this.reloadActiveSection();
+            }
+            if (returnToParentAfterTouch) {
+              await this.restoreModalParentContext();
             }
           } catch (error) {
             this.setUiError(`Ошибка сохранения: ${error.message}`, { modal: true });
