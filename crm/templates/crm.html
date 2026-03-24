@@ -498,6 +498,22 @@
           [[ errorMessage ]]
         </div>
         <div
+          v-if="activeSection === 'deals' && dealCompanyFilterId"
+          class="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-crm-border bg-crm-panel px-4 py-3 text-sm"
+        >
+          <div class="min-w-0">
+            <span class="text-crm-muted">Фильтр по компании:</span>
+            <span class="ml-2 font-medium text-white truncate">[[ dealCompanyFilterLabel || `Компания #${dealCompanyFilterId}` ]]</span>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 rounded-lg border border-crm-border bg-[#13314e] px-3 py-1.5 text-xs font-medium hover:border-crm-accent hover:text-white transition"
+            @click="clearDealCompanyFilter"
+          >
+            Сбросить
+          </button>
+        </div>
+        <div
           v-if="activeSection === 'tasks' && taskDealFilterId"
           class="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-crm-border bg-crm-panel px-4 py-3 text-sm"
         >
@@ -598,7 +614,7 @@
       <section class="px-4 md:px-7 py-5 flex-1 min-h-0 overflow-hidden">
         <div class="h-full min-h-0 rounded-[28px] border border-crm-border bg-[#0b2740] overflow-hidden shadow-panel md:min-h-[540px] flex flex-col">
           <div
-            class="hidden lg:grid border-b border-crm-border bg-[#10314d] text-crm-muted text-xs uppercase tracking-[0.16em]"
+            class="hidden lg:grid items-center border-b border-crm-border bg-[#10314d] text-crm-muted text-xs uppercase tracking-[0.16em]"
             :class="activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : (activeSection === 'deals' ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_150px_110px_160px]' : (activeSection === 'tasks' ? 'grid-cols-[72px_1.15fr_0.9fr_1fr_1fr_1fr_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]'))"
           >
             <div class="px-4 py-4"></div>
@@ -641,7 +657,46 @@
                 </button>
               </div>
             </div>
-            <div v-if="activeSection !== 'tasks' && activeSection !== 'touches'" class="px-4 py-4">Компания</div>
+            <div v-if="activeSection === 'deals'" class="px-4 py-4 relative" data-deal-company-filter>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 hover:text-white transition"
+                @click.stop="toggleDealCompanyFilter"
+              >
+                <span>Компания</span>
+                <span class="text-[10px]">[[ showDealCompanyFilter ? '▲' : '▼' ]]</span>
+              </button>
+              <div
+                v-if="showDealCompanyFilter"
+                class="absolute left-2 top-[calc(100%+6px)] z-20 w-64 rounded-xl border border-crm-border bg-[#0d2c47] shadow-panel p-3"
+                @click.stop
+              >
+                <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Фильтр компаний</div>
+                <div class="mt-2 max-h-56 overflow-auto space-y-2">
+                  <button
+                    v-for="option in dealCompanyFilterOptions"
+                    :key="option.value"
+                    type="button"
+                    class="block w-full rounded-lg px-2 py-1.5 text-left text-sm transition"
+                    :class="String(dealCompanyFilterId || '') === String(option.value) ? 'bg-white/10 text-white' : 'text-crm-text hover:bg-white/5'"
+                    @click="setDealCompanyFilter(option.value, option.label)"
+                  >
+                    [[ option.label ]]
+                  </button>
+                  <div v-if="!dealCompanyFilterOptions.length" class="text-sm text-crm-muted">
+                    Нет компаний в сделках.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="mt-3 text-xs text-crm-muted hover:text-white underline underline-offset-4"
+                  @click="clearDealCompanyFilter"
+                >
+                  Сбросить фильтр
+                </button>
+              </div>
+            </div>
+            <div v-else-if="activeSection !== 'tasks' && activeSection !== 'touches'" class="px-4 py-4">Компания</div>
             <div v-else-if="activeSection === 'tasks'" class="px-4 py-4 relative" data-task-company-filter>
               <button
                 type="button"
