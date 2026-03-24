@@ -659,6 +659,7 @@
             sourceId: item.id,
             queueKind: item.itemKind || "",
             touchId: this.toIntOrNull(item.sourceTouchId),
+            conversationId: this.toIntOrNull(item.conversationId),
             dealId: this.toIntOrNull(item.dealId),
             dealTitle: item.dealTitle || "",
             companyId: this.toIntOrNull(item.clientId),
@@ -4068,9 +4069,6 @@
           return this.managerNotificationReplyState(notification) === "answered" ? "Отвечено" : "Ответить";
         },
         managerNotificationReplyButtonDisabled(notification) {
-          if (this.managerNotificationReplyState(notification) === "answered") {
-            return true;
-          }
           return this.isManagerNotificationReplySending && String(this.activeManagerNotificationId || "") === String(notification?.id || "");
         },
         setManagerNotificationReplyState(queueId, state) {
@@ -4104,7 +4102,7 @@
           this.managerNotificationReplyDraftId = "";
           this.activeAutomationMessageDraftPreview = null;
           const draft = this.getAutomationMessageDraftById(notification.messageDraftId);
-          const conversationId = this.toIntOrNull(draft?.conversationId);
+          const conversationId = this.toIntOrNull(draft?.conversationId) || this.toIntOrNull(notification?.conversationId);
           if (draft) {
             const previewPayload = {
               id: draft.id,
@@ -7686,6 +7684,7 @@
             taskSubject: item.task_subject || "",
             createdTaskId: item.created_task || null,
             createdTaskSubject: item.created_task_subject || "",
+            conversationId: item.conversation_id || null,
             availableActions: Array.isArray(item.available_actions) ? item.available_actions : [],
             actedById: item.acted_by || null,
             actedByName: item.acted_by_name || "",

@@ -12,6 +12,7 @@ class AutomationQueueItemSerializer(serializers.ModelSerializer):
     automation_rule_ui_priority = serializers.CharField(source="automation_rule.ui_priority", read_only=True)
     source_touch_summary = serializers.CharField(source="source_touch.summary", read_only=True)
     source_touch_happened_at = serializers.DateTimeField(source="source_touch.happened_at", read_only=True)
+    conversation_id = serializers.IntegerField(source="source_touch.communication_message.conversation_id", read_only=True)
     outcome_name = serializers.CharField(source="outcome.name", read_only=True)
     touch_result_name = serializers.CharField(source="touch_result.name", read_only=True)
     next_step_template_name = serializers.CharField(source="next_step_template.name", read_only=True)
@@ -82,6 +83,7 @@ class AutomationQueueItemSerializer(serializers.ModelSerializer):
             "source_touch",
             "source_touch_summary",
             "source_touch_happened_at",
+            "conversation_id",
             "outcome",
             "outcome_name",
             "touch_result",

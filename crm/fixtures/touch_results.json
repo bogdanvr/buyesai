@@ -3,34 +3,15 @@
     "model": "crm.touchresult",
     "pk": 1,
     "fields": {
-      "code": "no_answer",
-      "name": "Не дозвонились / нет ответа",
-      "group": "no_contact",
+      "code": "new_inbound_request",
+      "name": "Новый входящий запрос",
+      "group": "new",
       "result_class": "neutral",
-      "requires_next_step": true,
+      "requires_next_step": false,
       "requires_loss_reason": false,
       "is_active": true,
-      "sort_order": 10,
+      "sort_order": 5,
       "allowed_touch_types": [
-        "call"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 2,
-    "fields": {
-      "code": "callback_later",
-      "name": "Попросили связаться позже",
-      "group": "postponed",
-      "result_class": "neutral",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 20,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
         "email",
         "telegram",
         "whatsapp"
@@ -39,19 +20,38 @@
   },
   {
     "model": "crm.touchresult",
-    "pk": 3,
+    "pk": 2,
     "fields": {
-      "code": "contact_made",
-      "name": "Контакт состоялся",
-      "group": "contact_no_progress",
-      "result_class": "neutral",
+      "code": "lead_taken_in_work",
+      "name": "Лид взят в работу",
+      "group": "progress",
+      "result_class": "progress",
       "requires_next_step": true,
       "requires_loss_reason": false,
       "is_active": true,
-      "sort_order": 30,
+      "sort_order": 15,
       "allowed_touch_types": [
         "call",
-        "meeting",
+        "email",
+        "telegram",
+        "whatsapp",
+        "meeting"
+      ]
+    }
+  },
+  {
+    "model": "crm.touchresult",
+    "pk": 3,
+    "fields": {
+      "code": "client_replied",
+      "name": "Клиент ответил",
+      "group": "progress",
+      "result_class": "progress",
+      "requires_next_step": true,
+      "requires_loss_reason": false,
+      "is_active": true,
+      "sort_order": 25,
+      "allowed_touch_types": [
         "email",
         "telegram",
         "whatsapp"
@@ -62,17 +62,15 @@
     "model": "crm.touchresult",
     "pk": 4,
     "fields": {
-      "code": "thinking",
-      "name": "Думают",
-      "group": "waiting",
-      "result_class": "neutral",
+      "code": "contact_details_received",
+      "name": "Получены контактные данные",
+      "group": "progress",
+      "result_class": "progress",
       "requires_next_step": true,
       "requires_loss_reason": false,
       "is_active": true,
-      "sort_order": 40,
+      "sort_order": 35,
       "allowed_touch_types": [
-        "call",
-        "meeting",
         "email",
         "telegram",
         "whatsapp"
@@ -83,20 +81,20 @@
     "model": "crm.touchresult",
     "pk": 5,
     "fields": {
-      "code": "postponed_by_client",
-      "name": "Отложили решение",
-      "group": "postponed",
-      "result_class": "risk",
-      "requires_next_step": true,
+      "code": "duplicate_lead",
+      "name": "Дубль",
+      "group": "lost",
+      "result_class": "lost",
+      "requires_next_step": false,
       "requires_loss_reason": false,
       "is_active": true,
-      "sort_order": 50,
+      "sort_order": 295,
       "allowed_touch_types": [
         "call",
-        "meeting",
         "email",
         "telegram",
-        "whatsapp"
+        "whatsapp",
+        "meeting"
       ]
     }
   },
@@ -104,17 +102,15 @@
     "model": "crm.touchresult",
     "pk": 6,
     "fields": {
-      "code": "interest_confirmed",
-      "name": "Интерес подтверждён",
-      "group": "progress",
-      "result_class": "progress",
-      "requires_next_step": true,
+      "code": "spam_irrelevant",
+      "name": "Спам / нерелевантное обращение",
+      "group": "lost",
+      "result_class": "lost",
+      "requires_next_step": false,
       "requires_loss_reason": false,
       "is_active": true,
-      "sort_order": 60,
+      "sort_order": 296,
       "allowed_touch_types": [
-        "call",
-        "meeting",
         "email",
         "telegram",
         "whatsapp"
@@ -125,20 +121,20 @@
     "model": "crm.touchresult",
     "pk": 7,
     "fields": {
-      "code": "meeting_scheduled",
-      "name": "Назначена встреча",
-      "group": "progress",
-      "result_class": "progress",
-      "requires_next_step": true,
+      "code": "not_target_lead",
+      "name": "Нецелевой лид",
+      "group": "lost",
+      "result_class": "lost",
+      "requires_next_step": false,
       "requires_loss_reason": false,
       "is_active": true,
-      "sort_order": 70,
+      "sort_order": 297,
       "allowed_touch_types": [
         "call",
-        "meeting",
         "email",
         "telegram",
-        "whatsapp"
+        "whatsapp",
+        "meeting"
       ]
     }
   },
@@ -146,20 +142,20 @@
     "model": "crm.touchresult",
     "pk": 8,
     "fields": {
-      "code": "followup_call_scheduled",
-      "name": "Назначен повторный звонок",
-      "group": "progress",
-      "result_class": "progress",
+      "code": "waiting_client_materials",
+      "name": "Ожидаем материалы от клиента",
+      "group": "waiting",
+      "result_class": "neutral",
       "requires_next_step": true,
       "requires_loss_reason": false,
       "is_active": true,
-      "sort_order": 80,
+      "sort_order": 115,
       "allowed_touch_types": [
         "call",
-        "meeting",
         "email",
         "telegram",
-        "whatsapp"
+        "whatsapp",
+        "meeting"
       ]
     }
   },
@@ -167,651 +163,18 @@
     "model": "crm.touchresult",
     "pk": 9,
     "fields": {
-      "code": "proposal_requested",
-      "name": "Запросили КП",
+      "code": "client_materials_received",
+      "name": "Получены материалы от клиента",
       "group": "progress",
       "result_class": "progress",
       "requires_next_step": true,
       "requires_loss_reason": false,
       "is_active": true,
-      "sort_order": 90,
+      "sort_order": 116,
       "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 10,
-    "fields": {
-      "code": "calculation_requested",
-      "name": "Запросили расчёт",
-      "group": "progress",
-      "result_class": "progress",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 100,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
         "email",
         "telegram",
         "whatsapp"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 11,
-    "fields": {
-      "code": "details_requested",
-      "name": "Запросили уточнение",
-      "group": "progress",
-      "result_class": "progress",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 110,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 12,
-    "fields": {
-      "code": "decision_maker_requested",
-      "name": "Нужно подключить ЛПР",
-      "group": "progress",
-      "result_class": "progress",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 120,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 13,
-    "fields": {
-      "code": "technical_review_requested",
-      "name": "Нужна техническая проработка",
-      "group": "progress",
-      "result_class": "progress",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 130,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 14,
-    "fields": {
-      "code": "proposal_sent",
-      "name": "КП отправлено",
-      "group": "waiting",
-      "result_class": "neutral",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 140,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 15,
-    "fields": {
-      "code": "proposal_received",
-      "name": "КП получено клиентом",
-      "group": "waiting",
-      "result_class": "neutral",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 150,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 16,
-    "fields": {
-      "code": "proposal_under_review",
-      "name": "КП на рассмотрении",
-      "group": "waiting",
-      "result_class": "neutral",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 160,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 17,
-    "fields": {
-      "code": "proposal_revision_requested",
-      "name": "Запросили корректировку КП",
-      "group": "progress",
-      "result_class": "progress",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 170,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 37,
-    "fields": {
-      "code": "proposal_accepted",
-      "name": "КП принято",
-      "group": "won_signal",
-      "result_class": "won_signal",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 175,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 18,
-    "fields": {
-      "code": "discount_requested",
-      "name": "Запросили скидку",
-      "group": "waiting",
-      "result_class": "risk",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 180,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 19,
-    "fields": {
-      "code": "documents_requested",
-      "name": "Запросили договор / счёт / документы",
-      "group": "progress",
-      "result_class": "progress",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 190,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "documents",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 20,
-    "fields": {
-      "code": "contract_sent",
-      "name": "Договор отправлен",
-      "group": "waiting",
-      "result_class": "neutral",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 200,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "documents",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 21,
-    "fields": {
-      "code": "contract_under_review",
-      "name": "Договор на согласовании",
-      "group": "waiting",
-      "result_class": "neutral",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 210,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "documents",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 22,
-    "fields": {
-      "code": "contract_revision_requested",
-      "name": "Требуются правки договора",
-      "group": "waiting",
-      "result_class": "risk",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 220,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "documents",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 23,
-    "fields": {
-      "code": "contract_agreed",
-      "name": "Договор согласован",
-      "group": "won_signal",
-      "result_class": "won_signal",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 230,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "documents",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 24,
-    "fields": {
-      "code": "invoice_sent",
-      "name": "Счёт отправлен",
-      "group": "waiting",
-      "result_class": "neutral",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 240,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "documents",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 25,
-    "fields": {
-      "code": "invoice_accepted",
-      "name": "Счёт принят",
-      "group": "won_signal",
-      "result_class": "won_signal",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 250,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "documents",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 26,
-    "fields": {
-      "code": "waiting_feedback",
-      "name": "Ждём обратную связь",
-      "group": "waiting",
-      "result_class": "neutral",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 260,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "documents",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 27,
-    "fields": {
-      "code": "internal_approval",
-      "name": "Внутреннее согласование у клиента",
-      "group": "waiting",
-      "result_class": "neutral",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 270,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "documents",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 28,
-    "fields": {
-      "code": "waiting_payment",
-      "name": "Ждём оплату",
-      "group": "won_signal",
-      "result_class": "won_signal",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 280,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "documents",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 29,
-    "fields": {
-      "code": "payment_confirmed",
-      "name": "Оплата подтверждена",
-      "group": "won_signal",
-      "result_class": "won_signal",
-      "requires_next_step": true,
-      "requires_loss_reason": false,
-      "is_active": true,
-      "sort_order": 290,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "documents",
-        "proposal"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 30,
-    "fields": {
-      "code": "rejected_price",
-      "name": "Отказ — дорого",
-      "group": "lost",
-      "result_class": "lost",
-      "requires_next_step": false,
-      "requires_loss_reason": true,
-      "is_active": true,
-      "sort_order": 300,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal",
-        "documents"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 31,
-    "fields": {
-      "code": "rejected_timing",
-      "name": "Отказ — не устроили сроки",
-      "group": "lost",
-      "result_class": "lost",
-      "requires_next_step": false,
-      "requires_loss_reason": true,
-      "is_active": true,
-      "sort_order": 310,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal",
-        "documents"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 32,
-    "fields": {
-      "code": "rejected_no_need",
-      "name": "Отказ — неактуально",
-      "group": "lost",
-      "result_class": "lost",
-      "requires_next_step": false,
-      "requires_loss_reason": true,
-      "is_active": true,
-      "sort_order": 320,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal",
-        "documents"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 33,
-    "fields": {
-      "code": "rejected_competitor",
-      "name": "Отказ — выбрали конкурента",
-      "group": "lost",
-      "result_class": "lost",
-      "requires_next_step": false,
-      "requires_loss_reason": true,
-      "is_active": true,
-      "sort_order": 330,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal",
-        "documents"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 34,
-    "fields": {
-      "code": "rejected_no_budget",
-      "name": "Отказ — нет бюджета",
-      "group": "lost",
-      "result_class": "lost",
-      "requires_next_step": false,
-      "requires_loss_reason": true,
-      "is_active": true,
-      "sort_order": 340,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal",
-        "documents"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 35,
-    "fields": {
-      "code": "rejected_decision_frozen",
-      "name": "Потеря — проект заморожен",
-      "group": "lost",
-      "result_class": "lost",
-      "requires_next_step": false,
-      "requires_loss_reason": true,
-      "is_active": true,
-      "sort_order": 350,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal",
-        "documents"
-      ]
-    }
-  },
-  {
-    "model": "crm.touchresult",
-    "pk": 36,
-    "fields": {
-      "code": "rejected_no_response_after_proposal",
-      "name": "Потеря — нет ответа после КП",
-      "group": "lost",
-      "result_class": "lost",
-      "requires_next_step": false,
-      "requires_loss_reason": true,
-      "is_active": true,
-      "sort_order": 360,
-      "allowed_touch_types": [
-        "call",
-        "meeting",
-        "email",
-        "telegram",
-        "whatsapp",
-        "proposal",
-        "documents"
       ]
     }
   }

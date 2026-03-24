@@ -246,6 +246,8 @@ class AutomationQueueApiTests(APITestCase):
         second_item = next(item for item in payload if item["source_touch"] == second_touch.pk and item["item_kind"] == "attention")
         self.assertTrue(first_item["is_primary_message"])
         self.assertFalse(second_item["is_primary_message"])
+        self.assertEqual(first_item["conversation_id"], conversation.pk)
+        self.assertEqual(second_item["conversation_id"], conversation.pk)
 
     def test_touch_result_change_dismisses_stale_pending_queue_items(self):
         incoming_rule = AutomationRule.objects.create(
