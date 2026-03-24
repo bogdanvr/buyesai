@@ -3002,6 +3002,27 @@
                   [[ option.name ]]
                 </option>
               </select>
+              <div
+                v-if="!showAllTouchResults && availableTouchResults(forms.touches.channelId, forms.touches.resultOptionId).length < (metaOptions.touchResults || []).length"
+                class="mt-2 text-xs"
+              >
+                <button
+                  type="button"
+                  class="text-crm-accent hover:text-white underline underline-offset-4 transition"
+                  @click="showAllTouchResults = true"
+                >
+                  Посмотреть все
+                </button>
+              </div>
+              <div v-else-if="showAllTouchResults" class="mt-2 text-xs">
+                <button
+                  type="button"
+                  class="text-crm-muted hover:text-white underline underline-offset-4 transition"
+                  @click="showAllTouchResults = false"
+                >
+                  Вернуться к отфильтрованным
+                </button>
+              </div>
             </label>
             <div v-if="matchedTouchAutomationRule" class="md:col-span-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3">
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1">

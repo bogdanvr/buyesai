@@ -112,6 +112,7 @@
           isTouchDocumentUploading: false,
           touchResultPromptVisible: false,
           touchResultPromptText: "",
+          showAllTouchResults: false,
           isCompanyContactSaving: false,
           isCompanyContactsLoading: false,
           isCompanyDocumentsLoading: false,
@@ -5164,6 +5165,9 @@
           return "border-crm-border/80 bg-[#0f2f4a]";
         },
         availableTouchResults(channelId, currentResultId = null) {
+          if (this.showAllTouchResults) {
+            return this.metaOptions.touchResults || [];
+          }
           const normalizedChannelId = this.toIntOrNull(channelId);
           const currentId = this.toIntOrNull(currentResultId);
           const selectedLeadId = this.toIntOrNull(this.forms.touches.leadId);
@@ -6111,6 +6115,7 @@
         openTouchEditor(item) {
           this.clearUiErrors({ modalOnly: true });
           this.setTouchResultPrompt("");
+          this.showAllTouchResults = false;
           this.activeSection = "touches";
           this.editingLeadId = null;
           this.editingDealId = null;
@@ -6494,6 +6499,7 @@
         quickAddDealTouch() {
           this.activeSection = "touches";
           this.editingTouchId = null;
+          this.showAllTouchResults = false;
           this.forms.touches = {
             ...this.getDefaultForm("touches"),
             happenedAt: this.toDateTimeLocal(new Date().toISOString()),
@@ -6786,6 +6792,7 @@
         quickAddLeadTouch() {
           this.activeSection = "touches";
           this.editingTouchId = null;
+          this.showAllTouchResults = false;
           this.forms.touches = {
             ...this.getDefaultForm("touches"),
             happenedAt: this.toDateTimeLocal(new Date().toISOString()),
@@ -8163,6 +8170,7 @@
         },
         closeModal() {
           this.showModal = false;
+          this.showAllTouchResults = false;
           this.leadSummaryEditingField = "";
           this.taskSummaryEditingField = "";
           this.companySummaryEditingField = "";
@@ -8229,6 +8237,7 @@
           this.leadSummaryEditingField = "";
           this.taskSummaryEditingField = "";
           this.companySummaryEditingField = "";
+          this.showAllTouchResults = false;
           this.showDealCompanyFilter = false;
           this.showTouchCompanyFilter = false;
           this.showTouchDealFilter = false;
