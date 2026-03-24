@@ -243,6 +243,9 @@
                     <div class="mt-1 text-xs text-crm-muted [overflow-wrap:anywhere]">
                       [[ notification.dealTitle || notification.companyName || 'Без привязки' ]]
                     </div>
+                    <div v-if="managerNotificationSourceLabel(notification)" class="mt-1 text-xs text-crm-muted [overflow-wrap:anywhere]">
+                      Источник: [[ managerNotificationSourceLabel(notification) ]]
+                    </div>
                     <div v-if="notification.recommendedAction" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
                       Рекомендовано: [[ notification.recommendedAction ]]
                     </div>
@@ -276,7 +279,7 @@
                         [[ managerNotificationReplyButtonLabel(notification) ]]
                       </button>
                       <button
-                        v-if="notification.sourceType === 'queue'"
+                        v-if="notification.sourceType === 'queue' && notification.queueKind !== 'next_step'"
                         type="button"
                         @click.stop="confirmAutomationQueueItem(notification.sourceId)"
                         class="inline-flex h-8 items-center rounded-lg border border-crm-accent/40 bg-crm-accent/15 px-3 text-xs font-semibold text-white transition hover:border-crm-accent"

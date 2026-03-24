@@ -684,6 +684,8 @@
             sourceId: item.id,
             queueKind: item.itemKind || "",
             touchId: this.toIntOrNull(item.sourceTouchId),
+            sourceTouchSummary: item.sourceTouchSummary || "",
+            sourceTouchHappenedAt: item.sourceTouchHappenedAt || "",
             conversationId: this.toIntOrNull(item.conversationId),
             dealId: this.toIntOrNull(item.dealId),
             dealTitle: item.dealTitle || "",
@@ -4194,6 +4196,17 @@
             return "Заполнить результат касания";
           }
           return action?.label || "";
+        },
+        managerNotificationSourceLabel(notification) {
+          const touchId = this.toIntOrNull(notification?.touchId || notification?.sourceTouchId);
+          const summary = String(notification?.sourceTouchSummary || "").trim();
+          if (touchId && summary) {
+            return `Касание #${touchId}: ${summary}`;
+          }
+          if (touchId) {
+            return `Касание #${touchId}`;
+          }
+          return summary;
         },
         managerNotificationReplyState(notification) {
           const queueId = this.toIntOrNull(notification?.sourceId);
