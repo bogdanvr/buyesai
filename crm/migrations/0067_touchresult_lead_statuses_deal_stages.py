@@ -9,23 +9,23 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AddField(
-            model_name="dealstage",
-            name="touch_results",
+            model_name="touchresult",
+            name="deal_stages",
             field=models.ManyToManyField(
                 blank=True,
-                related_name="deal_stages",
-                to="crm.touchresult",
-                verbose_name="Результаты касаний",
+                related_name="touch_results",
+                to="crm.dealstage",
+                verbose_name="Этапы сделок",
             ),
         ),
         migrations.AddField(
-            model_name="leadstatus",
-            name="touch_results",
+            model_name="touchresult",
+            name="lead_statuses",
             field=models.ManyToManyField(
                 blank=True,
-                related_name="lead_statuses",
-                to="crm.touchresult",
-                verbose_name="Результаты касаний",
+                related_name="touch_results",
+                to="crm.leadstatus",
+                verbose_name="Статусы лидов",
             ),
         ),
     ]
