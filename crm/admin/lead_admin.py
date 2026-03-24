@@ -19,6 +19,7 @@ class LeadStatusAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "is_final")
     ordering = ("order",)
     search_fields = ("name", "code")
+    filter_horizontal = ("touch_results",)
 
 
 @admin.register(Lead, site=crm_admin_site)

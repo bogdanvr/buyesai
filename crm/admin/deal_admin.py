@@ -11,6 +11,7 @@ class DealStageAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "is_final")
     search_fields = ("name", "code")
     ordering = ("order",)
+    filter_horizontal = ("touch_results",)
 
 
 @admin.register(Deal, site=crm_admin_site)

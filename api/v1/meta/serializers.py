@@ -22,15 +22,19 @@ User = get_user_model()
 
 
 class LeadStatusSerializer(serializers.ModelSerializer):
+    touch_result_ids = serializers.PrimaryKeyRelatedField(source="touch_results", many=True, read_only=True)
+
     class Meta:
         model = LeadStatus
-        fields = ["id", "name", "code", "order", "is_active", "is_final"]
+        fields = ["id", "name", "code", "order", "is_active", "is_final", "touch_result_ids"]
 
 
 class DealStageSerializer(serializers.ModelSerializer):
+    touch_result_ids = serializers.PrimaryKeyRelatedField(source="touch_results", many=True, read_only=True)
+
     class Meta:
         model = DealStage
-        fields = ["id", "name", "code", "order", "is_active", "is_final"]
+        fields = ["id", "name", "code", "order", "is_active", "is_final", "touch_result_ids"]
 
 
 class LeadSourceSerializer(serializers.ModelSerializer):
@@ -139,8 +143,6 @@ class TouchResultSerializer(serializers.ModelSerializer):
     group_label = serializers.SerializerMethodField()
     result_class = serializers.CharField(read_only=True)
     result_class_label = serializers.SerializerMethodField()
-    lead_status_ids = serializers.PrimaryKeyRelatedField(source="lead_statuses", many=True, read_only=True)
-    deal_stage_ids = serializers.PrimaryKeyRelatedField(source="deal_stages", many=True, read_only=True)
 
     def get_group_label(self, obj):
         return str(getattr(obj, "group", "") or "").strip()
@@ -168,8 +170,6 @@ class TouchResultSerializer(serializers.ModelSerializer):
             "is_active",
             "sort_order",
             "allowed_touch_types",
-            "lead_status_ids",
-            "deal_stage_ids",
         ]
 
 

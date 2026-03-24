@@ -9,6 +9,12 @@ class LeadStatus(TimestampedModel):
     order = models.PositiveSmallIntegerField(default=100, verbose_name="Порядок")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
     is_final = models.BooleanField(default=False, verbose_name="Финальный")
+    touch_results = models.ManyToManyField(
+        "crm.TouchResult",
+        related_name="lead_statuses",
+        blank=True,
+        verbose_name="Результаты касаний",
+    )
 
     class Meta:
         verbose_name = "Статус лида"
@@ -25,6 +31,12 @@ class DealStage(TimestampedModel):
     order = models.PositiveSmallIntegerField(default=100, verbose_name="Порядок")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
     is_final = models.BooleanField(default=False, verbose_name="Финальный")
+    touch_results = models.ManyToManyField(
+        "crm.TouchResult",
+        related_name="deal_stages",
+        blank=True,
+        verbose_name="Результаты касаний",
+    )
 
     class Meta:
         verbose_name = "Этап сделки"

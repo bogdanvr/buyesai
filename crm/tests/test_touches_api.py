@@ -44,8 +44,8 @@ class TouchesApiTests(APITestCase):
             is_active=True,
             is_final=False,
         )
-        self.touch_result.lead_statuses.add(self.lead_status)
-        self.touch_result.deal_stages.add(self.stage)
+        self.lead_status.touch_results.add(self.touch_result)
+        self.stage.touch_results.add(self.touch_result)
         self.deal = Deal.objects.create(title="Сделка для касания", stage=self.stage, client=self.company)
         self.task = Activity.objects.create(
             type=ActivityType.TASK,
@@ -139,8 +139,20 @@ class TouchesApiTests(APITestCase):
         self.assertEqual(response.data[0]["class"], "neutral")
         self.assertEqual(response.data[0]["requires_next_step"], True)
         self.assertEqual(response.data[0]["allowed_touch_types"], ["call"])
-        self.assertEqual(response.data[0]["lead_status_ids"], [self.lead_status.pk])
-        self.assertEqual(response.data[0]["deal_stage_ids"], [self.stage.pk])
+        self.assertNotIn("lead_status_ids", response.data[0])
+        self.assertNotIn("deal_stage_ids", response.data[0])
+
+    def test_lead_status_meta_returns_touch_results(self):
+        response = self.client.get(reverse("meta-lead-statuses"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[0]["touch_result_ids"], [self.touch_result.pk])
+
+    def test_deal_stage_meta_returns_touch_results(self):
+        response = self.client.get(reverse("meta-deal-stages"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[0]["touch_result_ids"], [self.touch_result.pk])
 
     def test_cannot_use_touch_result_with_unsupported_channel(self):
         email_channel = CommunicationChannel.objects.create(name="Email")

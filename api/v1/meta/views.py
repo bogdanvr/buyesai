@@ -99,7 +99,12 @@ class LeadStatusListAPIView(ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        return LeadStatus.objects.filter(is_active=True).order_by("order", "name")
+        return (
+            LeadStatus.objects
+            .filter(is_active=True)
+            .prefetch_related("touch_results")
+            .order_by("order", "name")
+        )
 
 
 class DealStageListAPIView(ListAPIView):
@@ -107,7 +112,12 @@ class DealStageListAPIView(ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        return DealStage.objects.filter(is_active=True).order_by("order", "name")
+        return (
+            DealStage.objects
+            .filter(is_active=True)
+            .prefetch_related("touch_results")
+            .order_by("order", "name")
+        )
 
 
 class LeadSourceListAPIView(ListCreateAPIView):
@@ -171,12 +181,7 @@ class TouchResultListAPIView(ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        return (
-            TouchResult.objects
-            .filter(is_active=True)
-            .prefetch_related("lead_statuses", "deal_stages")
-            .order_by("sort_order", "name")
-        )
+        return TouchResult.objects.filter(is_active=True).order_by("sort_order", "name")
 
 
 class OutcomeCatalogListAPIView(ListAPIView):

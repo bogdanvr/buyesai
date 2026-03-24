@@ -10,7 +10,6 @@ class TouchResultAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "code", "group", "result_class", "sort_order", "is_active")
     list_filter = ("group", "result_class", "requires_next_step", "requires_loss_reason", "is_active")
     search_fields = ("name", "code")
-    filter_horizontal = ("lead_statuses", "deal_stages")
 
 
 @admin.register(Touch, site=crm_admin_site)

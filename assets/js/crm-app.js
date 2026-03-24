@@ -5062,16 +5062,21 @@
           const selectedDeal = selectedDealId
             ? (this.datasets.deals || []).find((deal) => String(deal.id) === String(selectedDealId))
             : null;
-          const selectedLeadStatusId = this.toIntOrNull(selectedLead?.statusId);
-          const selectedDealStageId = this.toIntOrNull(selectedDeal?.stageId);
+          const selectedLeadStatus = this.toIntOrNull(selectedLead?.statusId)
+            ? (this.metaOptions.leadStatuses || []).find((status) => String(status.id) === String(selectedLead.statusId))
+            : null;
+          const selectedDealStage = this.toIntOrNull(selectedDeal?.stageId)
+            ? (this.metaOptions.dealStages || []).find((stage) => String(stage.id) === String(selectedDeal.stageId))
+            : null;
+          const leadTouchResultIds = Array.isArray(selectedLeadStatus?.touch_result_ids)
+            ? selectedLeadStatus.touch_result_ids.map((item) => this.toIntOrNull(item)).filter(Boolean)
+            : [];
+          const dealTouchResultIds = Array.isArray(selectedDealStage?.touch_result_ids)
+            ? selectedDealStage.touch_result_ids.map((item) => this.toIntOrNull(item)).filter(Boolean)
+            : [];
           return (this.metaOptions.touchResults || []).filter((option) => {
             const allowedTypes = Array.isArray(option.allowed_touch_types) ? option.allowed_touch_types : [];
-            const leadStatusIds = Array.isArray(option.lead_status_ids)
-              ? option.lead_status_ids.map((item) => this.toIntOrNull(item)).filter(Boolean)
-              : [];
-            const dealStageIds = Array.isArray(option.deal_stage_ids)
-              ? option.deal_stage_ids.map((item) => this.toIntOrNull(item)).filter(Boolean)
-              : [];
+            const optionId = this.toIntOrNull(option.id);
             if (currentId && String(option.id) === String(currentId)) {
               return true;
             }
@@ -5079,10 +5084,10 @@
             } else if (!allowedTypes.includes(selectedChannelCode)) {
               return false;
             }
-            if (selectedLeadId && leadStatusIds.length && !leadStatusIds.includes(selectedLeadStatusId)) {
+            if (selectedLeadId && leadTouchResultIds.length && !leadTouchResultIds.includes(optionId)) {
               return false;
             }
-            if (selectedDealId && dealStageIds.length && !dealStageIds.includes(selectedDealStageId)) {
+            if (selectedDealId && dealTouchResultIds.length && !dealTouchResultIds.includes(optionId)) {
               return false;
             }
             return true;

@@ -101,18 +101,6 @@ class TouchResult(models.Model):
     is_active = models.BooleanField(default=True, verbose_name="Активен")
     sort_order = models.PositiveIntegerField(default=100, verbose_name="Порядок сортировки")
     allowed_touch_types = models.JSONField(default=list, blank=True, verbose_name="Разрешенные типы касания")
-    lead_statuses = models.ManyToManyField(
-        "crm.LeadStatus",
-        related_name="touch_results",
-        blank=True,
-        verbose_name="Статусы лидов",
-    )
-    deal_stages = models.ManyToManyField(
-        "crm.DealStage",
-        related_name="touch_results",
-        blank=True,
-        verbose_name="Этапы сделок",
-    )
 
     class Meta:
         verbose_name = "Результат касания"
