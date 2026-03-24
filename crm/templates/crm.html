@@ -1819,20 +1819,20 @@
                   />
                 </div>
                 <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
-                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Следующий шаг</div>
-                  <div class="text-sm text-white">[[ dealSummaryNextStepLabel ]]</div>
-                </button>
-                <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
-                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дата следующего шага</div>
-                  <div class="text-sm text-white">[[ dealSummaryNextStepAtLabel ]]</div>
-                </button>
-                <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Последнее касание</div>
                   <div class="text-sm text-white">[[ dealSummaryLastTouch?.summary || dealSummaryLastTouch?.resultOptionName || 'Не указано' ]]</div>
                 </button>
                 <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Следующий шаг</div>
+                  <div class="text-sm text-white">[[ dealSummaryNextStepLabel ]]</div>
+                </button>
+                <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дата последнего касания</div>
                   <div class="text-sm text-white">[[ dealSummaryLastTouch?.happenedAtRaw ? formatDueLabel(dealSummaryLastTouch.happenedAtRaw) : 'Не указана' ]]</div>
+                </button>
+                <button type="button" @click="openDealSummaryField('touch')" class="text-left py-1 hover:text-white transition">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дата следующего шага</div>
+                  <div class="text-sm text-white">[[ dealSummaryNextStepAtLabel ]]</div>
                 </button>
                 <button type="button" @click="openTaskListForDeal" class="text-left py-1 hover:text-white transition">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Просроченные задачи</div>
@@ -2116,90 +2116,6 @@
               </div>
             </div>
             <div v-if="editingDealId && hasDealAutomationSummaryBlocks" class="md:col-span-2 grid grid-cols-1 gap-3 xl:grid-cols-2">
-              <div v-if="dealAutomationNextAction" class="rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Следующее действие</div>
-                    <div class="mt-1 text-base font-semibold text-white">[[ dealAutomationNextAction.title || 'Не указано' ]]</div>
-                  </div>
-                  <div v-if="dealAutomationNextAction.at" class="rounded-full border border-crm-border bg-[#102f4a] px-2.5 py-1 text-xs text-white">
-                    [[ formatDueLabel(dealAutomationNextAction.at) ]]
-                  </div>
-                </div>
-                <div class="mt-3 grid grid-cols-1 gap-2 text-sm text-white md:grid-cols-2">
-                  <div><span class="text-crm-muted">Ответственный:</span> [[ dealAutomationNextAction.ownerName || 'Не назначен' ]]</div>
-                  <div><span class="text-crm-muted">Источник:</span> [[ dealAutomationNextAction.sourceLabel || '—' ]]</div>
-                  <div v-if="dealAutomationNextAction.recommendedAction" class="md:col-span-2"><span class="text-crm-muted">Рекомендация:</span> [[ dealAutomationNextAction.recommendedAction ]]</div>
-                </div>
-                <div class="mt-3 flex flex-wrap gap-2">
-                  <button
-                    v-if="dealAutomationNextAction.sourceTouchId"
-                    type="button"
-                    @click="openTouchFromEvent(dealAutomationNextAction.sourceTouchId)"
-                    class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
-                  >
-                    Открыть событие
-                  </button>
-                  <button
-                    v-if="dealAutomationNextAction.canConfirm && dealAutomationNextAction.queueId"
-                    type="button"
-                    @click="confirmAutomationQueueItem(dealAutomationNextAction.queueId)"
-                    class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
-                  >
-                    Подтвердить
-                  </button>
-                  <button
-                    v-if="dealAutomationNextAction.canConfirm && dealAutomationNextAction.queueId"
-                    type="button"
-                    @click="dismissAutomationQueueItem(dealAutomationNextAction.queueId)"
-                    class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
-                  >
-                    Отклонить
-                  </button>
-                  <button
-                    v-if="dealAutomationNextAction.canCreateTask"
-                    type="button"
-                    @click="prepareDealTaskFromAutomation(dealAutomationNextAction)"
-                    class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
-                  >
-                    Создать задачу
-                  </button>
-                </div>
-              </div>
-              <div v-if="dealLatestSignificantItem" :class="['rounded-2xl border p-4', dealAutomationCardClass(dealLatestSignificantItem)]">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Последнее значимое событие</div>
-                    <div class="mt-1 text-base font-semibold text-white">[[ dealLatestSignificantItem.eventLabel ]]</div>
-                  </div>
-                  <div class="rounded-full border border-current/20 px-2.5 py-1 text-xs text-white/90">
-                    [[ formatEventTimestamp(dealLatestSignificantItem.happenedAtRaw) ]]
-                  </div>
-                </div>
-                <div class="mt-3 text-sm text-white [overflow-wrap:anywhere]">
-                  [[ dealLatestSignificantItem.summary || dealLatestSignificantItem.resultName || 'Без описания' ]]
-                </div>
-                <div class="mt-2 text-sm text-crm-muted">
-                  [[ dealLatestSignificantItem.ownerName || 'Менеджер не указан' ]]
-                </div>
-                <div class="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    @click="openTouchFromEvent(dealLatestSignificantItem.touchId)"
-                    class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
-                  >
-                    Открыть касание
-                  </button>
-                  <button
-                    v-if="dealLatestSignificantItem.hasSuggestedNextStep"
-                    type="button"
-                    @click="prepareDealTaskFromAutomation({ title: dealLatestSignificantItem.suggestedNextStep, at: dealLatestSignificantItem.suggestedNextStepAt, taskCategoryId: dealLatestSignificantItem.defaultTaskCategoryId, communicationChannelId: dealLatestSignificantItem.defaultCommunicationChannelId })"
-                    class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
-                  >
-                    Следующая задача
-                  </button>
-                </div>
-              </div>
               <div v-if="dealAttentionChains.length" class="xl:col-span-2 rounded-2xl border border-red-400/30 bg-red-400/10 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -2298,69 +2214,6 @@
                     </div>
                     <div class="shrink-0 text-xs text-crm-muted">[[ formatEventTimestamp(chain.primary.happenedAtRaw) ]]</div>
                   </button>
-                </div>
-              </div>
-              <div v-if="dealDraftTouchChains.length" class="rounded-2xl border border-amber-400/25 bg-amber-400/10 p-4">
-                <div class="text-xs uppercase tracking-[0.12em] text-amber-100/80">Черновики автоматизации</div>
-                <div class="mt-3 space-y-3">
-                  <div
-                    v-for="chain in dealDraftTouchChains"
-                    :key="chain.id"
-                    class="rounded-xl border border-amber-400/20 bg-[#102f4a] p-3"
-                  >
-                    <div class="text-sm font-semibold text-white">[[ chain.title ]]</div>
-                    <div class="mt-1 text-xs text-crm-muted">[[ formatEventTimestamp(chain.primary.happenedAtRaw) ]] • [[ chain.primary.draftKind === 'message' ? (chain.primary.messageSubject || 'Черновик сообщения') : (chain.primary.resultName || 'Результат не указан') ]]</div>
-                    <div v-if="chain.primary.draftKind === 'message'" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
-                      [[ chain.primary.messageText || 'Текст сообщения не указан' ]]
-                    </div>
-                    <div v-else-if="chain.primary.suggestedNextStep" class="mt-2 text-sm text-white [overflow-wrap:anywhere]">
-                      [[ chain.primary.suggestedNextStep ]][[ chain.primary.suggestedNextStepAt ? ` до ${formatDueLabel(chain.primary.suggestedNextStepAt)}` : '' ]]
-                    </div>
-                    <div v-if="chain.count > 1" class="mt-2 text-xs text-crm-muted">
-                      [[ chain.count ]] события в этой цепочке
-                    </div>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                      <button
-                        v-if="chain.primary.draftKind !== 'message'"
-                        type="button"
-                        @click="confirmAutomationDraft(chain.primary.draftId)"
-                        class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
-                      >
-                        Подтвердить
-                      </button>
-                      <button
-                        v-if="chain.primary.draftKind === 'message'"
-                        type="button"
-                        @click="confirmAutomationMessageDraft(chain.primary.messageDraftId)"
-                        class="inline-flex h-9 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
-                      >
-                        Подтвердить
-                      </button>
-                      <button
-                        type="button"
-                        @click="openTouchFromEvent(chain.primary.touchId)"
-                        class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
-                      >
-                        Изменить
-                      </button>
-                      <button
-                        v-if="chain.primary.draftKind !== 'message'"
-                        type="button"
-                        @click="dismissAutomationDraft(chain.primary.draftId)"
-                        class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
-                      >
-                        Отклонить
-                      </button>
-                      <button
-                        v-if="chain.primary.draftKind === 'message'"
-                        type="button"
-                        @click="dismissAutomationMessageDraft(chain.primary.messageDraftId)"
-                        class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
-                      >
-                        Отклонить
-                      </button>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
