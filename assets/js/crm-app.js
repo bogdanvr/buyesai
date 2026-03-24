@@ -603,6 +603,11 @@
           const next = this.leadNextActionSummaryByLeadId(leadId);
           return next?.title || next?.at ? next : null;
         },
+        leadTasksForActiveLead() {
+          const leadId = this.toIntOrNull(this.editingLeadId);
+          if (!leadId) return [];
+          return this.sortTasksByListRules(this.leadTasksByLeadId(leadId).slice());
+        },
         touchLeadOptions() {
           const companyId = this.toIntOrNull(this.forms.touches.companyId);
           return this.datasets.leads
@@ -863,15 +868,9 @@
           return this.dealSummaryUpcomingTasks[0] || null;
         },
         dealSummaryNextStepLabel() {
-          if (this.dealAutomationNextAction?.title) {
-            return this.dealAutomationNextAction.title;
-          }
           return this.dealSummaryNextStepTask?.subject || this.dealSummaryNextTouch?.nextStep || "Не указан";
         },
         dealSummaryNextStepAtLabel() {
-          if (this.dealAutomationNextAction?.at) {
-            return this.formatDueLabel(this.dealAutomationNextAction.at);
-          }
           if (this.dealSummaryNextStepTask?.dueAtRaw) {
             return this.formatDueLabel(this.dealSummaryNextStepTask.dueAtRaw);
           }
@@ -6659,6 +6658,19 @@
             this.showModal = true;
             return;
           }
+          if (fieldKey === "nextStep") {
+            const parentContext = this.captureModalParentContext();
+            if (this.dealSummaryNextStepTask) {
+              this.openTaskEditor(this.dealSummaryNextStepTask, { parentContext });
+              return;
+            }
+            const touch = this.dealSummaryNextTouch || this.dealSummaryLastTouch;
+            if (touch) {
+              this.openTouchEditor(touch, { parentContext });
+              return;
+            }
+            return;
+          }
           this.startDealSummaryEdit(fieldKey);
         },
         quickAddDealTouch() {
@@ -6683,6 +6695,14 @@
         },
         quickToggleDealTaskForm() {
           this.showDealTaskForm = true;
+          this.$nextTick(() => {
+            const panel = document.getElementById("deal-task-panel");
+            if (panel && typeof panel.scrollIntoView === "function") {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        },
+        scrollToDealTasksPanel() {
           this.$nextTick(() => {
             const panel = document.getElementById("deal-task-panel");
             if (panel && typeof panel.scrollIntoView === "function") {
@@ -6986,6 +7006,17 @@
           this.resetTaskFollowUpForm();
           this.showModal = true;
           this.loadTaskTouchOptions();
+        },
+        scrollToLeadTasksPanel() {
+          this.$nextTick(() => {
+            const panel = document.getElementById("lead-task-panel");
+            if (panel && typeof panel.scrollIntoView === "function") {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        },
+        openTaskFromLead(task) {
+          this.openTaskEditor(task, { parentContext: this.modalParentContext || this.captureModalParentContext() });
         },
         async toggleLeadDocumentsPanel() {
           this.showLeadDocumentsPanel = !this.showLeadDocumentsPanel;
