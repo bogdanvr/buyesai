@@ -181,34 +181,42 @@ class TouchesApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("result_option", response.data)
 
-    def test_cannot_use_touch_result_not_allowed_for_channel(self):
-        restricted_channel = CommunicationChannel.objects.create(name="Звонок 2")
-        other_result = TouchResult.objects.create(
-            name="Только другой результат",
+    def test_channel_touch_results_do_not_block_manual_save(self):
+        restricted_channel = CommunicationChannel.objects.create(name="Telegram")
+        allowed_channel_result = TouchResult.objects.create(
+            name="Только для фильтра канала",
             group="follow_up",
             result_class="neutral",
             requires_next_step=False,
-            allowed_touch_types=["call"],
+            allowed_touch_types=[],
             sort_order=20,
         )
-        restricted_channel.touch_results.add(other_result)
+        manual_result = TouchResult.objects.create(
+            name="Ручной результат вне канала",
+            group="follow_up",
+            result_class="neutral",
+            requires_next_step=False,
+            allowed_touch_types=[],
+            sort_order=21,
+        )
+        restricted_channel.touch_results.add(allowed_channel_result)
 
         response = self.client.post(
             reverse("touches-list"),
             {
                 "happened_at": "2026-03-18T10:00:00+06:00",
                 "channel": restricted_channel.pk,
-                "result_option": self.touch_result.pk,
+                "result_option": manual_result.pk,
                 "direction": "outgoing",
-                "summary": "Созвон",
+                "summary": "Сообщение вручную сохранено",
                 "next_step_at": (timezone.now() + timedelta(days=1)).isoformat(),
                 "deal": self.deal.pk,
             },
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("result_option", response.data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["result_option_name"], manual_result.name)
 
     def test_can_attach_company_and_deal_documents_to_touch(self):
         company_document = ClientDocument.objects.create(
