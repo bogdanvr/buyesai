@@ -5216,11 +5216,11 @@
             if (currentId && String(option.id) === String(currentId)) {
               return true;
             }
-            if (!allowedTypes.length || !selectedChannelCode) {
-            } else if (!allowedTypes.includes(selectedChannelCode)) {
-              return false;
-            }
-            if (normalizedChannelId && channelTouchResultIds.length && !channelTouchResultIds.includes(optionId)) {
+            if (normalizedChannelId && channelTouchResultIds.length) {
+              if (!channelTouchResultIds.includes(optionId)) {
+                return false;
+              }
+            } else if (allowedTypes.length && selectedChannelCode && !allowedTypes.includes(selectedChannelCode)) {
               return false;
             }
             if (selectedLeadId && leadTouchResultIds.length && !leadTouchResultIds.includes(optionId)) {

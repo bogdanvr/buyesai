@@ -162,7 +162,7 @@ class TouchesApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data[0]["touch_result_ids"], [self.touch_result.pk])
 
-    def test_cannot_use_touch_result_with_unsupported_channel(self):
+    def test_unsupported_channel_does_not_block_manual_save(self):
         email_channel = CommunicationChannel.objects.create(name="Email")
 
         response = self.client.post(
@@ -173,13 +173,14 @@ class TouchesApiTests(APITestCase):
                 "result_option": self.touch_result.pk,
                 "direction": "outgoing",
                 "summary": "Письмо отправлено",
+                "next_step_at": (timezone.now() + timedelta(days=1)).isoformat(),
                 "deal": self.deal.pk,
             },
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("result_option", response.data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["result_option_name"], self.touch_result.name)
 
     def test_channel_touch_results_do_not_block_manual_save(self):
         restricted_channel = CommunicationChannel.objects.create(name="Telegram")

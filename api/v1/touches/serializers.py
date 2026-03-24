@@ -154,22 +154,7 @@ class TouchSerializer(serializers.ModelSerializer):
         return instance
 
     def _validate_result_option_channel(self, result_option, channel):
-        if result_option is None:
-            return
-        allowed_touch_types = list(getattr(result_option, "allowed_touch_types", []) or [])
-        if not allowed_touch_types or channel is None:
-            return
-        channel_code = normalize_touch_channel_code(getattr(channel, "name", ""))
-        if channel_code and channel_code in allowed_touch_types:
-            return
-        raise serializers.ValidationError(
-            {
-                "result_option": (
-                    f'Результат "{result_option.name}" нельзя использовать с каналом '
-                    f'"{getattr(channel, "name", "")}".'
-                )
-            }
-        )
+        return
 
     def _validate_deal_next_activity(self, attrs, deal, has_follow_up_task=False):
         stage_code = str(getattr(getattr(deal, "stage", None), "code", "") or "").strip().lower()
