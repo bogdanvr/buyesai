@@ -82,6 +82,14 @@
           isUnboundConversationBinding: false,
           isUnboundCommunicationSending: false,
           selectedStatusFilters: [],
+          statusFiltersBySection: {
+            leads: [],
+            deals: [],
+            contacts: [],
+            companies: [],
+            tasks: [],
+            touches: [],
+          },
           selectedTaskCompanyFilters: [],
           selectedTaskCategoryFilters: [],
           selectedTouchCompanyFilters: [],
@@ -1821,6 +1829,10 @@
         }
       },
       watch: {
+        activeSection(nextValue, previousValue) {
+          this.syncStatusFiltersForSection(previousValue);
+          this.applyStatusFiltersForSection(nextValue);
+        },
         "forms.tasks.taskCategoryId": {
           handler() {
             this.syncTaskCategorySelection(this.forms.tasks);
@@ -5403,10 +5415,41 @@
           if (key === "touch_company") return this.clearTouchCompanyFilter();
           if (key === "touch_deal") return this.clearTouchDealFilter();
         },
+        statusFilterSections() {
+          return ["leads", "deals", "contacts", "companies", "tasks", "touches"];
+        },
+        syncStatusFiltersForSection(section) {
+          const normalizedSection = String(section || "").trim();
+          if (!this.statusFilterSections().includes(normalizedSection)) {
+            return;
+          }
+          this.statusFiltersBySection = {
+            ...this.statusFiltersBySection,
+            [normalizedSection]: [...this.selectedStatusFilters],
+          };
+        },
+        applyStatusFiltersForSection(section) {
+          const normalizedSection = String(section || "").trim();
+          const nextFilters = this.statusFilterSections().includes(normalizedSection)
+            ? this.statusFiltersBySection?.[normalizedSection]
+            : [];
+          this.selectedStatusFilters = Array.isArray(nextFilters)
+            ? nextFilters.map((item) => String(item || "").trim()).filter(Boolean)
+            : [];
+        },
+        normalizeStatusFiltersBySection(payload) {
+          const normalized = {};
+          this.statusFilterSections().forEach((section) => {
+            const rawValue = payload && Array.isArray(payload[section]) ? payload[section] : [];
+            normalized[section] = rawValue.map((item) => String(item || "").trim()).filter(Boolean);
+          });
+          return normalized;
+        },
         persistFilters() {
+          this.syncStatusFiltersForSection(this.activeSection);
           try {
             window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({
-              selectedStatusFilters: this.selectedStatusFilters,
+              statusFiltersBySection: this.statusFiltersBySection,
               dealCompanyFilterId: this.dealCompanyFilterId,
               dealCompanyFilterLabel: this.dealCompanyFilterLabel,
               selectedTaskCompanyFilters: this.selectedTaskCompanyFilters,
@@ -5425,9 +5468,14 @@
             const rawValue = window.localStorage.getItem(FILTERS_STORAGE_KEY);
             if (!rawValue) return;
             const payload = JSON.parse(rawValue);
-            this.selectedStatusFilters = Array.isArray(payload?.selectedStatusFilters)
-              ? payload.selectedStatusFilters.map((item) => String(item || "").trim()).filter(Boolean)
-              : [];
+            const normalizedStatusFilters = this.normalizeStatusFiltersBySection(payload?.statusFiltersBySection);
+            if (Array.isArray(payload?.selectedStatusFilters)) {
+              normalizedStatusFilters[this.activeSection] = payload.selectedStatusFilters
+                .map((item) => String(item || "").trim())
+                .filter(Boolean);
+            }
+            this.statusFiltersBySection = normalizedStatusFilters;
+            this.applyStatusFiltersForSection(this.activeSection);
             this.dealCompanyFilterId = payload?.dealCompanyFilterId ? String(payload.dealCompanyFilterId).trim() : null;
             this.dealCompanyFilterLabel = String(payload?.dealCompanyFilterLabel || "").trim();
             this.selectedTaskCompanyFilters = Array.isArray(payload?.selectedTaskCompanyFilters)
