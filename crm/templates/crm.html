@@ -287,8 +287,10 @@
                         type="button"
                         @click.stop="openManagerNotificationSidebar(notification, 'reply')"
                         :disabled="managerNotificationReplyButtonDisabled(notification)"
-                        class="inline-flex h-8 items-center rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 text-xs font-semibold text-white transition hover:border-amber-300"
-                        :class="managerNotificationReplyState(notification) === 'answered' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100 hover:border-emerald-300' : ''"
+                        class="inline-flex h-8 items-center rounded-lg border px-3 text-xs font-semibold text-white transition"
+                        :class="managerNotificationReplyState(notification) === 'answered'
+                          ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100 hover:border-emerald-300'
+                          : 'border-red-400/30 bg-red-400/10 text-red-100 hover:border-red-300'"
                       >
                         [[ managerNotificationReplyButtonLabel(notification) ]]
                       </button>

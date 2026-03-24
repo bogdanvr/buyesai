@@ -4275,7 +4275,9 @@
           return !!this.toIntOrNull(notification?.messageDraftId);
         },
         managerNotificationReplyButtonLabel(notification) {
-          return this.managerNotificationReplyState(notification) === "answered" ? "Отвечено" : "Ответить";
+          return this.managerNotificationReplyState(notification) === "answered"
+            ? "Результат касания заполнен"
+            : "Заполнить результат касания";
         },
         managerNotificationReplyButtonDisabled(notification) {
           return this.isManagerNotificationReplySending && String(this.activeManagerNotificationId || "") === String(notification?.id || "");
