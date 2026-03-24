@@ -5189,6 +5189,9 @@
             (channel) => String(channel.id) === String(normalizedChannelId || "")
           );
           const selectedChannelCode = this.normalizeTouchChannelCode(selectedChannel);
+          const channelTouchResultIds = Array.isArray(selectedChannel?.touch_result_ids)
+            ? selectedChannel.touch_result_ids.map((item) => this.toIntOrNull(item)).filter(Boolean)
+            : [];
           const selectedLead = selectedLeadId
             ? (this.datasets.leads || []).find((lead) => String(lead.id) === String(selectedLeadId))
             : null;
@@ -5215,6 +5218,9 @@
             }
             if (!allowedTypes.length || !selectedChannelCode) {
             } else if (!allowedTypes.includes(selectedChannelCode)) {
+              return false;
+            }
+            if (normalizedChannelId && channelTouchResultIds.length && !channelTouchResultIds.includes(optionId)) {
               return false;
             }
             if (selectedLeadId && leadTouchResultIds.length && !leadTouchResultIds.includes(optionId)) {

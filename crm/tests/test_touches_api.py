@@ -44,6 +44,7 @@ class TouchesApiTests(APITestCase):
             is_active=True,
             is_final=False,
         )
+        self.channel.touch_results.add(self.touch_result)
         self.lead_status.touch_results.add(self.touch_result)
         self.stage.touch_results.add(self.touch_result)
         self.deal = Deal.objects.create(title="Сделка для касания", stage=self.stage, client=self.company)
@@ -142,6 +143,13 @@ class TouchesApiTests(APITestCase):
         self.assertNotIn("lead_status_ids", response.data[0])
         self.assertNotIn("deal_stage_ids", response.data[0])
 
+    def test_communication_channel_meta_returns_touch_results(self):
+        response = self.client.get(reverse("meta-communication-channels"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        channel_payload = next(item for item in response.data if item["id"] == self.channel.pk)
+        self.assertEqual(channel_payload["touch_result_ids"], [self.touch_result.pk])
+
     def test_lead_status_meta_returns_touch_results(self):
         response = self.client.get(reverse("meta-lead-statuses"))
 
@@ -165,6 +173,35 @@ class TouchesApiTests(APITestCase):
                 "result_option": self.touch_result.pk,
                 "direction": "outgoing",
                 "summary": "Письмо отправлено",
+                "deal": self.deal.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("result_option", response.data)
+
+    def test_cannot_use_touch_result_not_allowed_for_channel(self):
+        restricted_channel = CommunicationChannel.objects.create(name="Звонок 2")
+        other_result = TouchResult.objects.create(
+            name="Только другой результат",
+            group="follow_up",
+            result_class="neutral",
+            requires_next_step=False,
+            allowed_touch_types=["call"],
+            sort_order=20,
+        )
+        restricted_channel.touch_results.add(other_result)
+
+        response = self.client.post(
+            reverse("touches-list"),
+            {
+                "happened_at": "2026-03-18T10:00:00+06:00",
+                "channel": restricted_channel.pk,
+                "result_option": self.touch_result.pk,
+                "direction": "outgoing",
+                "summary": "Созвон",
+                "next_step_at": (timezone.now() + timedelta(days=1)).isoformat(),
                 "deal": self.deal.pk,
             },
             format="json",

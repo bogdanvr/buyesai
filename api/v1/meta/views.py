@@ -133,7 +133,7 @@ class CommunicationChannelListAPIView(ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        return CommunicationChannel.objects.filter(is_active=True).order_by("name")
+        return CommunicationChannel.objects.filter(is_active=True).prefetch_related("touch_results").order_by("name")
 
 
 class ContactRoleListAPIView(ListAPIView):

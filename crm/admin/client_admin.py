@@ -61,6 +61,7 @@ class CommunicationChannelAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "is_active", "created_at")
     list_filter = ("is_active",)
     search_fields = ("name",)
+    filter_horizontal = ("touch_results",)
 
 
 @admin.register(ClientDocument, site=crm_admin_site)

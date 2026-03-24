@@ -64,13 +64,17 @@ class LeadSourceSerializer(serializers.ModelSerializer):
 
 class CommunicationChannelSerializer(serializers.ModelSerializer):
     code = serializers.SerializerMethodField()
+    touch_result_ids = serializers.SerializerMethodField()
 
     def get_code(self, obj):
         return slugify(str(getattr(obj, "name", "") or "").strip(), allow_unicode=False).replace("-", "_")
 
+    def get_touch_result_ids(self, obj):
+        return list(obj.touch_results.order_by("id").values_list("id", flat=True))
+
     class Meta:
         model = CommunicationChannel
-        fields = ["id", "name", "code", "is_active"]
+        fields = ["id", "name", "code", "is_active", "touch_result_ids"]
 
 
 class ContactRoleSerializer(serializers.ModelSerializer):

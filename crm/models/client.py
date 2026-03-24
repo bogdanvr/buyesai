@@ -86,6 +86,12 @@ class Client(TimestampedModel):
 class CommunicationChannel(TimestampedModel):
     name = models.CharField(max_length=128, unique=True, verbose_name="Канал связи")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
+    touch_results = models.ManyToManyField(
+        "crm.TouchResult",
+        related_name="communication_channels",
+        blank=True,
+        verbose_name="Допустимые результаты касаний",
+    )
 
     class Meta:
         verbose_name = "Канал связи"

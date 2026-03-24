@@ -156,6 +156,17 @@ class TouchSerializer(serializers.ModelSerializer):
     def _validate_result_option_channel(self, result_option, channel):
         if result_option is None:
             return
+        if channel is not None:
+            channel_touch_result_ids = list(channel.touch_results.values_list("id", flat=True))
+            if channel_touch_result_ids and result_option.pk not in channel_touch_result_ids:
+                raise serializers.ValidationError(
+                    {
+                        "result_option": (
+                            f'Результат "{result_option.name}" не входит в допустимые для канала '
+                            f'"{getattr(channel, "name", "")}".'
+                        )
+                    }
+                )
         allowed_touch_types = list(getattr(result_option, "allowed_touch_types", []) or [])
         if not allowed_touch_types or channel is None:
             return
