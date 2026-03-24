@@ -4204,6 +4204,9 @@
             if (actionId === "reply" && notification?.isPrimaryMessage) {
               return false;
             }
+            if (actionId === "reply" && this.managerNotificationTouchHasResult(notification)) {
+              return false;
+            }
             return true;
           });
         },
