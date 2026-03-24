@@ -4268,14 +4268,26 @@
           if (!queueId) return "";
           return String(this.managerNotificationReplyStates[String(queueId)] || "").trim();
         },
+        managerNotificationTouchHasResult(notification) {
+          const touchId = this.toIntOrNull(notification?.touchId || notification?.sourceTouchId);
+          if (!touchId) return false;
+          const touch = (this.datasets.touches || []).find((item) => String(item.id) === String(touchId)) || null;
+          if (!touch) return false;
+          return !!(
+            this.toIntOrNull(touch.resultOptionId)
+            || String(touch.resultOptionName || "").trim()
+            || String(touch.resultOptionCode || "").trim()
+          );
+        },
         managerNotificationReplyButtonVisible(notification) {
           if (String(notification?.sourceType || "") !== "queue") return false;
           if (String(notification?.queueKind || "") === "next_step") return false;
+          if (this.managerNotificationTouchHasResult(notification)) return true;
           if (this.managerNotificationReplyState(notification) === "answered") return true;
           return !!this.toIntOrNull(notification?.messageDraftId);
         },
         managerNotificationReplyButtonLabel(notification) {
-          return this.managerNotificationReplyState(notification) === "answered"
+          return (this.managerNotificationTouchHasResult(notification) || this.managerNotificationReplyState(notification) === "answered")
             ? "Результат касания заполнен"
             : "Заполнить результат касания";
         },
