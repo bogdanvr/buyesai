@@ -29,6 +29,11 @@ class TaskResultAndEventsTests(APITestCase):
             password="testpass123",
             is_staff=True,
         )
+        self.second_user = get_user_model().objects.create_user(
+            username="staff_events_second",
+            password="testpass123",
+            is_staff=True,
+        )
         self.client.force_authenticate(user=self.user)
         self.company = Client.objects.create(name="Acme")
         self.source = LeadSource.objects.create(name="Сайт", code="site")
@@ -622,6 +627,43 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertNotIn("communication_channel_name", response.data)
         self.assertEqual(response.data["related_touch"], touch.pk)
         self.assertEqual(response.data["related_touch_subject"], "Первичный звонок")
+        self.assertEqual(response.data["owner"], self.user.pk)
+        self.assertEqual(response.data["owner_name"], self.user.username)
+
+    def test_task_defaults_owner_to_current_user(self):
+        response = self.client.post(
+            reverse("activities-list"),
+            {
+                "type": ActivityType.TASK,
+                "subject": "Задача с дефолтным ответственным",
+                "deal": self.deal.pk,
+                "client": self.company.pk,
+                "due_at": "2026-03-20T10:00:00+06:00",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["owner"], self.user.pk)
+        self.assertEqual(response.data["owner_name"], self.user.username)
+
+    def test_task_can_be_created_with_explicit_owner(self):
+        response = self.client.post(
+            reverse("activities-list"),
+            {
+                "type": ActivityType.TASK,
+                "subject": "Задача с выбранным ответственным",
+                "deal": self.deal.pk,
+                "client": self.company.pk,
+                "due_at": "2026-03-20T10:00:00+06:00",
+                "owner": self.second_user.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["owner"], self.second_user.pk)
+        self.assertEqual(response.data["owner_name"], self.second_user.username)
 
     def test_task_type_meta_returns_category_driven_fields_without_group(self):
         later_task_type = TaskType.objects.create(

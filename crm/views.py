@@ -9,7 +9,7 @@ from django.shortcuts import render
 
 @staff_member_required
 def crm_dashboard(request):
-    return render(request, "crm.html")
+    return render(request, "crm.html", {"current_user_id": getattr(request.user, "id", None)})
 
 
 @staff_member_required

@@ -18,16 +18,17 @@ class TouchesApiTests(APITestCase):
             is_staff=True,
         )
         self.client.force_authenticate(user=self.user)
-        self.channel = CommunicationChannel.objects.create(name="Телефон")
+        self.channel = CommunicationChannel.objects.create(name="Телефон Touch API")
         self.lead_status = LeadStatus.objects.create(
-            name="В работе",
-            code="in_progress",
+            name="В работе Touch API",
+            code="touch_api_in_progress",
             order=10,
             is_active=True,
             is_final=False,
         )
         self.touch_result = TouchResult.objects.create(
-            name="Назначен следующий шаг",
+            name="Назначен следующий шаг Touch API",
+            code="touch_api_follow_up_result",
             group="follow_up",
             result_class="neutral",
             requires_next_step=True,
@@ -38,8 +39,8 @@ class TouchesApiTests(APITestCase):
         self.contact = Contact.objects.create(client=self.company, first_name="Иван", last_name="Иванов")
         self.lead = Lead.objects.create(title="Лид для касания", company="Acme", status=self.lead_status)
         self.stage = DealStage.objects.create(
-            name="В работе",
-            code="in_progress",
+            name="В работе Сделка Touch API",
+            code="touch_api_deal_in_progress",
             order=10,
             is_active=True,
             is_final=False,
@@ -87,8 +88,8 @@ class TouchesApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["channel_name"], "Телефон")
-        self.assertEqual(response.data["result_option_name"], "Назначен следующий шаг")
+        self.assertEqual(response.data["channel_name"], self.channel.name)
+        self.assertEqual(response.data["result_option_name"], self.touch_result.name)
         self.assertEqual(response.data["result_option_group"], "follow_up")
         self.assertEqual(response.data["result_option_class"], "neutral")
         self.assertEqual(response.data["direction_label"], "Исходящее")
@@ -135,13 +136,14 @@ class TouchesApiTests(APITestCase):
         response = self.client.get(reverse("meta-touch-results"))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data[0]["code"], self.touch_result.code)
-        self.assertEqual(response.data[0]["group"], "follow_up")
-        self.assertEqual(response.data[0]["class"], "neutral")
-        self.assertEqual(response.data[0]["requires_next_step"], True)
-        self.assertEqual(response.data[0]["allowed_touch_types"], ["call"])
-        self.assertNotIn("lead_status_ids", response.data[0])
-        self.assertNotIn("deal_stage_ids", response.data[0])
+        result_payload = next(item for item in response.data if item["id"] == self.touch_result.pk)
+        self.assertEqual(result_payload["code"], self.touch_result.code)
+        self.assertEqual(result_payload["group"], "follow_up")
+        self.assertEqual(result_payload["class"], "neutral")
+        self.assertEqual(result_payload["requires_next_step"], True)
+        self.assertEqual(result_payload["allowed_touch_types"], ["call"])
+        self.assertNotIn("lead_status_ids", result_payload)
+        self.assertNotIn("deal_stage_ids", result_payload)
 
     def test_communication_channel_meta_returns_touch_results(self):
         response = self.client.get(reverse("meta-communication-channels"))
@@ -154,13 +156,15 @@ class TouchesApiTests(APITestCase):
         response = self.client.get(reverse("meta-lead-statuses"))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data[0]["touch_result_ids"], [self.touch_result.pk])
+        lead_status_payload = next(item for item in response.data if item["id"] == self.lead_status.pk)
+        self.assertEqual(lead_status_payload["touch_result_ids"], [self.touch_result.pk])
 
     def test_deal_stage_meta_returns_touch_results(self):
         response = self.client.get(reverse("meta-deal-stages"))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data[0]["touch_result_ids"], [self.touch_result.pk])
+        stage_payload = next(item for item in response.data if item["id"] == self.stage.pk)
+        self.assertEqual(stage_payload["touch_result_ids"], [self.touch_result.pk])
 
     def test_unsupported_channel_does_not_block_manual_save(self):
         email_channel = CommunicationChannel.objects.create(name="Email")
@@ -186,6 +190,7 @@ class TouchesApiTests(APITestCase):
         restricted_channel = CommunicationChannel.objects.create(name="Telegram")
         allowed_channel_result = TouchResult.objects.create(
             name="Только для фильтра канала",
+            code="touch_api_channel_filter_only",
             group="follow_up",
             result_class="neutral",
             requires_next_step=False,
@@ -194,6 +199,7 @@ class TouchesApiTests(APITestCase):
         )
         manual_result = TouchResult.objects.create(
             name="Ручной результат вне канала",
+            code="touch_api_manual_outside_channel",
             group="follow_up",
             result_class="neutral",
             requires_next_step=False,

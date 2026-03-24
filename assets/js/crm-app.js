@@ -1,6 +1,9 @@
     const { createApp } = Vue;
     const appRootElement = document.getElementById("app");
     const appRootTemplate = appRootElement ? String(appRootElement.innerHTML || "") : "";
+    const currentUserId = appRootElement
+      ? (Number.parseInt(appRootElement.dataset.currentUserId || "", 10) || null)
+      : null;
 
     const SECTION_ENDPOINTS = {
       leads: "/api/v1/leads/?page_size=100",
@@ -54,6 +57,7 @@
           activeSection: "leads",
           search: "",
           showModal: false,
+          currentUserId,
           modalParentContext: null,
           isLoading: false,
           isSaving: false,
@@ -251,7 +255,9 @@
               taskTypeId: null,
               communicationChannelId: null,
               priority: "medium",
+              ownerId: currentUserId,
               companyId: null,
+              leadId: null,
               dealId: null,
               relatedTouchId: null,
               dueAt: "",
@@ -1364,6 +1370,12 @@
         taskSummaryPriorityLabel() {
           const value = String(this.forms.tasks.priority || "").trim();
           return (this.taskPriorityOptions || []).find((option) => option.value === value)?.label || "Не выбран";
+        },
+        taskSummaryOwnerLabel() {
+          const ownerId = this.toIntOrNull(this.forms.tasks.ownerId);
+          if (!ownerId) return "Не назначен";
+          const user = (this.metaOptions.users || []).find((item) => String(item.id) === String(ownerId));
+          return user ? (user.full_name || user.username) : (this.editingTaskItem?.ownerName || "Не назначен");
         },
         taskSummaryTaskCategoryLabel() {
           const category = this.resolveTaskCategoryById(this.forms.tasks.taskCategoryId);
@@ -6154,6 +6166,7 @@
             taskTypeId: this.toIntOrNull(item.taskTypeId),
             communicationChannelId: this.toIntOrNull(item.communicationChannelId),
             priority: item.priority || "medium",
+            ownerId: this.toIntOrNull(item.ownerId) || this.currentUserId,
             companyId: this.toIntOrNull(item.clientId),
             leadId: this.toIntOrNull(item.leadId),
             dealId: this.toIntOrNull(item.dealId),
@@ -7943,6 +7956,8 @@
             id: item.id,
             name: item.subject || `Задача #${item.id}`,
             subject: item.subject || `Задача #${item.id}`,
+            ownerId: item.owner || this.toIntOrNull(item.created_by) || null,
+            ownerName: item.owner_name || "",
             description: item.description || "",
             result: item.result || "",
             saveCompanyNote: !!item.save_company_note,
@@ -8526,6 +8541,7 @@
               taskTypeId: null,
               communicationChannelId: null,
               priority: "medium",
+              ownerId: this.currentUserId,
               companyId: null,
               leadId: null,
               dealId: null,
@@ -9047,11 +9063,13 @@
           const communicationChannelId = this.taskFormUsesCommunicationChannel(form)
             ? this.toIntOrNull(form.communicationChannelId)
             : null;
+          const ownerId = this.toIntOrNull(form.ownerId) || this.currentUserId;
           await this.apiRequest("/api/v1/activities/", {
             method: "POST",
             body: {
               type: "task",
               subject,
+              owner: ownerId,
               task_type: this.toIntOrNull(form.taskTypeId),
               communication_channel: communicationChannelId,
               priority: form.priority || "medium",
@@ -9091,11 +9109,13 @@
           const communicationChannelId = this.taskFormUsesCommunicationChannel(form)
             ? this.toIntOrNull(form.communicationChannelId)
             : null;
+          const ownerId = this.toIntOrNull(form.ownerId) || this.currentUserId;
           await this.apiRequest(`/api/v1/activities/${this.editingTaskId}/`, {
             method: "PATCH",
             body: {
               type: "task",
               subject,
+              owner: ownerId,
               task_type: this.toIntOrNull(form.taskTypeId),
               communication_channel: communicationChannelId,
               priority: form.priority || "medium",

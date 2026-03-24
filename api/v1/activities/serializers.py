@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 
 from crm.models import Activity
 from crm.models.activity import (
@@ -11,8 +12,18 @@ from crm.models.activity import (
 )
 
 
+User = get_user_model()
+
+
 class ActivitySerializer(serializers.ModelSerializer):
     subject = serializers.CharField(required=False, allow_blank=True)
+    owner = serializers.PrimaryKeyRelatedField(
+        source="created_by",
+        queryset=User.objects.filter(is_active=True, is_staff=True),
+        required=False,
+        allow_null=True,
+    )
+    owner_name = serializers.SerializerMethodField()
     client_name = serializers.CharField(source="client.name", read_only=True)
     lead_title = serializers.CharField(source="lead.title", read_only=True)
     deal_title = serializers.CharField(source="deal.title", read_only=True)
@@ -66,6 +77,13 @@ class ActivitySerializer(serializers.ModelSerializer):
             return ""
         full_name = f"{contact.first_name} {contact.last_name}".strip()
         return full_name or contact.phone or f"Контакт #{contact.id}"
+
+    def get_owner_name(self, obj):
+        owner = getattr(obj, "created_by", None)
+        if owner is None:
+            return ""
+        full_name = owner.get_full_name() if hasattr(owner, "get_full_name") else ""
+        return str(full_name or getattr(owner, "username", "") or "").strip()
 
     def _resolve_task_subject(self, attrs, activity_type, task_type):
         if activity_type != ActivityType.TASK:
@@ -200,6 +218,8 @@ class ActivitySerializer(serializers.ModelSerializer):
             "status",
             "status_label",
             "priority",
+            "owner",
+            "owner_name",
             "task_type",
             "task_type_name",
             "task_type_category",
@@ -229,4 +249,4 @@ class ActivitySerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ("completed_at", "created_at", "updated_at")
+        read_only_fields = ("completed_at", "created_at", "updated_at", "created_by")

@@ -50,4 +50,4 @@ class ActivityViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
-        serializer.save(created_by=user)
+        serializer.save(created_by=serializer.validated_data.get("created_by") or user)

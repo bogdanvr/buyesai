@@ -63,7 +63,7 @@
 <body class="crm-startup-screen-active">
   <div id="crm-startup-screen"></div>
   
-  <div id="app" v-cloak class="crm-grid">
+  <div id="app" v-cloak class="crm-grid" data-current-user-id="{{ current_user_id|default:'' }}">
     <aside class="hidden md:flex flex-col items-center bg-[#041425] border-r border-crm-border py-4 gap-3">
       <div class="w-12 h-12 rounded-2xl border border-crm-border bg-crm-panel flex items-center justify-center">
         <svg viewBox="0 0 100 100" class="w-8 h-8" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -4465,6 +4465,22 @@
                     @blur="stopTaskSummaryEdit('dueAt')"
                     class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
                   />
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Ответственный</div>
+                  <button v-if="editingTaskId && !isTaskSummaryEditing('ownerId')" type="button" @click="openTaskSummaryField('ownerId')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ taskSummaryOwnerLabel ]]
+                  </button>
+                  <select
+                    v-else
+                    v-model="forms.tasks.ownerId"
+                    @change="stopTaskSummaryEdit('ownerId')"
+                    @blur="stopTaskSummaryEdit('ownerId')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option :value="null">Не выбран</option>
+                    <option v-for="user in metaOptions.users" :key="`task-summary-owner-${user.id}`" :value="user.id">[[ user.full_name || user.username ]]</option>
+                  </select>
                 </div>
               </div>
             </div>
