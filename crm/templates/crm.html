@@ -1705,9 +1705,13 @@
                     </a>
                   </div>
                 </div>
-                <div class="rounded-xl border border-crm-accent/40 bg-crm-accent/10 px-3 py-2">
+                <div
+                  class="rounded-xl border border-crm-accent/40 bg-crm-accent/10 px-3 py-2"
+                  :class="!isDealSummaryEditing('stageId') ? 'cursor-pointer' : ''"
+                  @click="!isDealSummaryEditing('stageId') && openDealSummaryField('stageId')"
+                >
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-accent">Этап</div>
-                  <button v-if="!isDealSummaryEditing('stageId')" type="button" @click="openDealSummaryField('stageId')" class="mt-1 text-left text-sm font-medium text-white hover:text-crm-accent transition">
+                  <button v-if="!isDealSummaryEditing('stageId')" type="button" @click.stop="openDealSummaryField('stageId')" class="mt-1 text-left text-sm font-medium text-white hover:text-crm-accent transition">
                     [[ metaOptions.dealStages.find(stage => String(stage.id) === String(forms.deals.stageId))?.name || 'Не выбран' ]]
                   </button>
                   <select
