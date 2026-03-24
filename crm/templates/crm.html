@@ -918,16 +918,9 @@
                       [[ dealCloseSecondaryLabel(item.closeDate) ]]
                     </div>
                   </div>
-                  <div v-if="activeSection === 'deals'" class="px-4 py-4 text-sm text-crm-text truncate">
-                    [[ item.ownerName || '—' ]]
-                  </div>
-                  <div v-if="activeSection === 'deals'" class="px-4 py-4 text-sm text-crm-text font-medium tabular-nums">
-                    [[ countDealOpenTasks(item.id) ]]
-                  </div>
-                  <div v-if="activeSection === 'touches'" class="px-4 py-4 text-sm text-crm-text truncate">
+                  <div v-else-if="activeSection === 'touches'" class="px-4 py-4 text-sm text-crm-text truncate">
                     [[ item.channelName || '—' ]]
                   </div>
-                  <div v-if="activeSection === 'touches'" class="px-4 py-4 text-sm text-crm-text truncate">[[ item.email || '—' ]]</div>
                   <div v-else-if="activeSection !== 'tasks'" class="px-4 py-4 text-sm text-crm-text truncate">[[ item.email || '—' ]]</div>
                   <div v-else class="px-4 py-4 text-sm text-crm-text min-w-0">
                     <div
@@ -944,6 +937,13 @@
                       [[ taskDueSecondaryLabel(item.dueAtRaw, item.taskStatus) ]]
                     </div>
                   </div>
+                  <div v-if="activeSection === 'deals'" class="px-4 py-4 text-sm text-crm-text truncate">
+                    [[ item.ownerName || '—' ]]
+                  </div>
+                  <div v-if="activeSection === 'deals'" class="px-4 py-4 text-sm text-crm-text font-medium tabular-nums">
+                    [[ countDealOpenTasks(item.id) ]]
+                  </div>
+                  <div v-if="activeSection === 'touches'" class="px-4 py-4 text-sm text-crm-text truncate">[[ item.email || '—' ]]</div>
                   <div v-if="activeSection === 'companies'" class="px-4 py-4 text-sm text-crm-text font-medium tabular-nums">
                     [[ countCompanyActiveDeals(item.id) ]]
                   </div>
