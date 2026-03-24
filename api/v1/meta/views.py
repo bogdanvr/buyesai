@@ -171,7 +171,12 @@ class TouchResultListAPIView(ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        return TouchResult.objects.filter(is_active=True).order_by("sort_order", "name")
+        return (
+            TouchResult.objects
+            .filter(is_active=True)
+            .prefetch_related("lead_statuses", "deal_stages")
+            .order_by("sort_order", "name")
+        )
 
 
 class OutcomeCatalogListAPIView(ListAPIView):

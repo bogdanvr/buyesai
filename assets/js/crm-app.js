@@ -5050,19 +5050,42 @@
         availableTouchResults(channelId, currentResultId = null) {
           const normalizedChannelId = this.toIntOrNull(channelId);
           const currentId = this.toIntOrNull(currentResultId);
+          const selectedLeadId = this.toIntOrNull(this.forms.touches.leadId);
+          const selectedDealId = this.toIntOrNull(this.forms.touches.dealId);
           const selectedChannel = (this.metaOptions.communicationChannels || []).find(
             (channel) => String(channel.id) === String(normalizedChannelId || "")
           );
           const selectedChannelCode = this.normalizeTouchChannelCode(selectedChannel);
+          const selectedLead = selectedLeadId
+            ? (this.datasets.leads || []).find((lead) => String(lead.id) === String(selectedLeadId))
+            : null;
+          const selectedDeal = selectedDealId
+            ? (this.datasets.deals || []).find((deal) => String(deal.id) === String(selectedDealId))
+            : null;
+          const selectedLeadStatusId = this.toIntOrNull(selectedLead?.statusId);
+          const selectedDealStageId = this.toIntOrNull(selectedDeal?.stageId);
           return (this.metaOptions.touchResults || []).filter((option) => {
             const allowedTypes = Array.isArray(option.allowed_touch_types) ? option.allowed_touch_types : [];
+            const leadStatusIds = Array.isArray(option.lead_status_ids)
+              ? option.lead_status_ids.map((item) => this.toIntOrNull(item)).filter(Boolean)
+              : [];
+            const dealStageIds = Array.isArray(option.deal_stage_ids)
+              ? option.deal_stage_ids.map((item) => this.toIntOrNull(item)).filter(Boolean)
+              : [];
             if (currentId && String(option.id) === String(currentId)) {
               return true;
             }
             if (!allowedTypes.length || !selectedChannelCode) {
-              return true;
+            } else if (!allowedTypes.includes(selectedChannelCode)) {
+              return false;
             }
-            return allowedTypes.includes(selectedChannelCode);
+            if (selectedLeadId && leadStatusIds.length && !leadStatusIds.includes(selectedLeadStatusId)) {
+              return false;
+            }
+            if (selectedDealId && dealStageIds.length && !dealStageIds.includes(selectedDealStageId)) {
+              return false;
+            }
+            return true;
           });
         },
         isTaskActiveStatus(status) {

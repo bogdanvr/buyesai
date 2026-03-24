@@ -139,6 +139,8 @@ class TouchResultSerializer(serializers.ModelSerializer):
     group_label = serializers.SerializerMethodField()
     result_class = serializers.CharField(read_only=True)
     result_class_label = serializers.SerializerMethodField()
+    lead_status_ids = serializers.PrimaryKeyRelatedField(source="lead_statuses", many=True, read_only=True)
+    deal_stage_ids = serializers.PrimaryKeyRelatedField(source="deal_stages", many=True, read_only=True)
 
     def get_group_label(self, obj):
         return str(getattr(obj, "group", "") or "").strip()
@@ -166,6 +168,8 @@ class TouchResultSerializer(serializers.ModelSerializer):
             "is_active",
             "sort_order",
             "allowed_touch_types",
+            "lead_status_ids",
+            "deal_stage_ids",
         ]
 
 

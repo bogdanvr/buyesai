@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from datetime import timedelta
 
-from crm.models import Activity, Client, ClientDocument, CommunicationChannel, Contact, Deal, DealDocument, DealStage, Lead, Touch, TouchResult
+from crm.models import Activity, Client, ClientDocument, CommunicationChannel, Contact, Deal, DealDocument, DealStage, Lead, LeadStatus, Touch, TouchResult
 from crm.models.activity import ActivityType
 
 
@@ -19,6 +19,13 @@ class TouchesApiTests(APITestCase):
         )
         self.client.force_authenticate(user=self.user)
         self.channel = CommunicationChannel.objects.create(name="Телефон")
+        self.lead_status = LeadStatus.objects.create(
+            name="В работе",
+            code="in_progress",
+            order=10,
+            is_active=True,
+            is_final=False,
+        )
         self.touch_result = TouchResult.objects.create(
             name="Назначен следующий шаг",
             group="follow_up",
@@ -29,7 +36,7 @@ class TouchesApiTests(APITestCase):
         )
         self.company = Client.objects.create(name="Acme")
         self.contact = Contact.objects.create(client=self.company, first_name="Иван", last_name="Иванов")
-        self.lead = Lead.objects.create(title="Лид для касания", company="Acme")
+        self.lead = Lead.objects.create(title="Лид для касания", company="Acme", status=self.lead_status)
         self.stage = DealStage.objects.create(
             name="В работе",
             code="in_progress",
@@ -37,6 +44,8 @@ class TouchesApiTests(APITestCase):
             is_active=True,
             is_final=False,
         )
+        self.touch_result.lead_statuses.add(self.lead_status)
+        self.touch_result.deal_stages.add(self.stage)
         self.deal = Deal.objects.create(title="Сделка для касания", stage=self.stage, client=self.company)
         self.task = Activity.objects.create(
             type=ActivityType.TASK,
@@ -130,6 +139,8 @@ class TouchesApiTests(APITestCase):
         self.assertEqual(response.data[0]["class"], "neutral")
         self.assertEqual(response.data[0]["requires_next_step"], True)
         self.assertEqual(response.data[0]["allowed_touch_types"], ["call"])
+        self.assertEqual(response.data[0]["lead_status_ids"], [self.lead_status.pk])
+        self.assertEqual(response.data[0]["deal_stage_ids"], [self.stage.pk])
 
     def test_cannot_use_touch_result_with_unsupported_channel(self):
         email_channel = CommunicationChannel.objects.create(name="Email")
