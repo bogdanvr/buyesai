@@ -4294,10 +4294,30 @@
         managerNotificationReplyButtonDisabled() {
           return false;
         },
+        managerNotificationReplyChannelCode(notification) {
+          const touchId = this.toIntOrNull(notification?.touchId || notification?.sourceTouchId);
+          const touch = touchId
+            ? ((this.datasets.touches || []).find((item) => String(item.id) === String(touchId)) || null)
+            : null;
+          const touchChannel = touch?.channelId
+            ? ((this.metaOptions.communicationChannels || []).find((item) => String(item.id) === String(touch.channelId)) || null)
+            : null;
+          return this.normalizeTouchChannelCode(touchChannel)
+            || this.automationEventChannelCode(notification?.eventType)
+            || "";
+        },
         managerNotificationMessageReplyButtonVisible(notification) {
           if (String(notification?.sourceType || "") !== "queue") return false;
           if (String(notification?.queueKind || "") === "next_step") return false;
-          return !!this.toIntOrNull(notification?.messageDraftId);
+          const channelCode = this.managerNotificationReplyChannelCode(notification);
+          if (!["email", "telegram"].includes(channelCode)) {
+            return false;
+          }
+          return !!(
+            this.toIntOrNull(notification?.messageDraftId)
+            || this.toIntOrNull(notification?.conversationId)
+            || this.toIntOrNull(notification?.dealId)
+          );
         },
         managerNotificationMessageReplyButtonDisabled(notification) {
           return this.isManagerNotificationReplySending && String(this.activeManagerNotificationId || "") === String(notification?.id || "");
@@ -4540,6 +4560,62 @@
           if (item.sourceType === "touch" && item.sourceId) {
             await this.openTouchFromEvent(item.sourceId);
           }
+        },
+        async openManagerNotificationReply(notification) {
+          if (!notification) return;
+          if (this.toIntOrNull(notification.messageDraftId)) {
+            await this.openManagerNotificationSidebar(notification, "reply");
+            return;
+          }
+          const channelCode = this.managerNotificationReplyChannelCode(notification) || "email";
+          const conversationId = this.toIntOrNull(notification.conversationId);
+          if (conversationId) {
+            try {
+              await this.openCommunicationConversationFromEvent(notification);
+              if (this.toIntOrNull(notification.dealId)) {
+                this.scrollToCommunicationComposer("deal");
+              } else if (this.toIntOrNull(notification.companyId || notification.clientId)) {
+                this.scrollToCommunicationComposer("company");
+              }
+              return;
+            } catch (error) {
+              this.setUiError(`Ошибка открытия переписки: ${error.message}`, { modal: true });
+              return;
+            }
+          }
+          const dealId = this.toIntOrNull(notification.dealId);
+          if (dealId) {
+            try {
+              const deal = await this.fetchDealById(dealId);
+              const touchId = this.toIntOrNull(notification.touchId || notification.sourceTouchId);
+              const touch = touchId
+                ? ((this.datasets.touches || []).find((item) => String(item.id) === String(touchId)) || null)
+                : null;
+              const defaultForm = this.getDefaultDealCommunicationStartForm();
+              this.showManagerNotifications = false;
+              this.openDealEditor(deal);
+              this.showDealCommunicationsPanel = true;
+              this.showDealCommunicationStartForm = true;
+              this.dealCommunicationStartForm = {
+                ...defaultForm,
+                channel: channelCode,
+                contactId: this.toIntOrNull(notification.contactId || touch?.contactId || defaultForm.contactId),
+                recipient: this.deriveCommunicationRecipient(channelCode, notification.contactId || touch?.contactId || defaultForm.contactId),
+                subject: channelCode === "email"
+                  ? (String(defaultForm.subject || "").trim() || String(touch?.summary || notification.title || "").trim())
+                  : "",
+                bodyText: "",
+              };
+              if (!String(this.dealCommunicationStartForm.recipient || "").trim()) {
+                this.syncDealCommunicationStartRecipient();
+              }
+              this.scrollToCommunicationComposer("deal");
+            } catch (error) {
+              this.setUiError(`Ошибка подготовки ответа: ${error.message}`, { modal: true });
+            }
+            return;
+          }
+          this.setUiError("Для этого уведомления пока не удалось открыть ответ в переписке.", { modal: true });
         },
         async confirmAutomationQueueItem(queueId) {
           const normalizedQueueId = this.toIntOrNull(queueId);
