@@ -4287,14 +4287,22 @@
           if (String(notification?.queueKind || "") === "next_step") return false;
           if (this.managerNotificationTouchHasResult(notification)) return true;
           if (this.managerNotificationReplyState(notification) === "answered") return true;
-          return !!this.toIntOrNull(notification?.messageDraftId);
+          return !!this.toIntOrNull(notification?.touchId || notification?.sourceTouchId);
         },
         managerNotificationReplyButtonLabel(notification) {
           return (this.managerNotificationTouchHasResult(notification) || this.managerNotificationReplyState(notification) === "answered")
             ? "Результат касания заполнен"
             : "Заполнить результат касания";
         },
-        managerNotificationReplyButtonDisabled(notification) {
+        managerNotificationReplyButtonDisabled() {
+          return false;
+        },
+        managerNotificationMessageReplyButtonVisible(notification) {
+          if (String(notification?.sourceType || "") !== "queue") return false;
+          if (String(notification?.queueKind || "") === "next_step") return false;
+          return !!this.toIntOrNull(notification?.messageDraftId);
+        },
+        managerNotificationMessageReplyButtonDisabled(notification) {
           return this.isManagerNotificationReplySending && String(this.activeManagerNotificationId || "") === String(notification?.id || "");
         },
         setManagerNotificationReplyState(queueId, state) {
