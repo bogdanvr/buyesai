@@ -312,14 +312,6 @@
                         Подтвердить
                       </button>
                       <button
-                        v-if="notification.sourceType === 'queue' && notification.queueKind !== 'next_step'"
-                        type="button"
-                        @click.stop="confirmAutomationQueueItem(notification.sourceId)"
-                        class="inline-flex h-8 items-center rounded-lg border border-crm-accent/40 bg-crm-accent/15 px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
-                      >
-                        Обработано
-                      </button>
-                      <button
                         v-if="notification.sourceType === 'queue'"
                         type="button"
                         @click.stop="dismissAutomationQueueItem(notification.sourceId)"
@@ -1142,7 +1134,17 @@
         <div class="w-full max-w-none md:max-w-5xl rounded-[24px] md:rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel h-[calc(100dvh-1rem)] md:h-auto md:max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col">
           <div class="px-4 md:px-6 py-4 md:py-5 border-b border-crm-border flex items-start justify-between gap-4 shrink-0">
             <div class="min-w-0">
-              <h2 class="text-lg md:text-xl font-semibold break-words">[[ modalTitle ]]</h2>
+              <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-lg md:text-xl font-semibold break-words">[[ modalTitle ]]</h2>
+                <button
+                  v-if="activeSection === 'touches' && touchResultPromptVisible"
+                  type="button"
+                  @click="focusTouchResultField"
+                  class="inline-flex h-7 items-center rounded-full border border-amber-400/30 bg-amber-400/10 px-3 text-[11px] font-semibold text-amber-100 transition hover:border-amber-300"
+                >
+                  Заполнить результат
+                </button>
+              </div>
               <p class="text-sm text-crm-muted mt-1 break-words">[[ createModalSubtitle ]]</p>
             </div>
             <button @click="closeModal" class="w-10 h-10 rounded-xl border border-crm-border bg-crm-panel hover:border-crm-accent shrink-0">✕</button>
@@ -2932,20 +2934,6 @@
             </label>
             <label class="block rounded-xl border border-crm-accent/40 bg-crm-accent/10 px-3 py-2">
               <span class="text-[11px] uppercase tracking-[0.12em] text-crm-accent">Результат</span>
-              <div v-if="touchResultPromptVisible" class="mt-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <div class="text-sm text-white [overflow-wrap:anywhere]">
-                    [[ touchResultPromptText || 'Сначала заполните результат касания.' ]]
-                  </div>
-                  <button
-                    type="button"
-                    @click="focusTouchResultField"
-                    class="inline-flex h-8 items-center rounded-lg border border-amber-300/40 bg-amber-300/10 px-3 text-xs font-semibold text-white transition hover:border-amber-200"
-                  >
-                    Заполнить результат касания
-                  </button>
-                </div>
-              </div>
               <select id="touch-result-option" v-model="forms.touches.resultOptionId" class="mt-1 w-full h-11 rounded-lg border border-crm-accent/40 bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
                 <option :value="null">Не выбран</option>
                 <option
@@ -2999,13 +2987,6 @@
               </select>
             </label>
             <label class="block">
-              <span class="text-sm text-crm-muted">Ответственный</span>
-              <select v-model="forms.touches.ownerId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
-                <option :value="null">Не выбран</option>
-                <option v-for="user in metaOptions.users" :key="user.id" :value="user.id">[[ user.full_name || user.username ]]</option>
-              </select>
-            </label>
-            <label class="block">
               <span class="text-sm text-crm-muted">Компания</span>
               <select v-model="forms.touches.companyId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
                 <option :value="null">Не выбрана</option>
@@ -3017,6 +2998,27 @@
               <select v-model="forms.touches.contactId" :disabled="!toIntOrNull(forms.touches.companyId)" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed">
                 <option :value="null">[[ toIntOrNull(forms.touches.companyId) ? 'Не выбран' : 'Сначала выберите компанию' ]]</option>
                 <option v-for="contact in touchContactOptions" :key="contact.id" :value="contact.id">[[ contact.title ]]</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">Лид</span>
+              <select v-model="forms.touches.leadId" :disabled="!toIntOrNull(forms.touches.companyId)" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed">
+                <option :value="null">[[ toIntOrNull(forms.touches.companyId) ? 'Не выбран' : 'Сначала выберите компанию' ]]</option>
+                <option v-for="lead in touchLeadOptions" :key="lead.id" :value="lead.id">[[ lead.title ]]</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">Сделка</span>
+              <select v-model="forms.touches.dealId" :disabled="!toIntOrNull(forms.touches.companyId)" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed">
+                <option :value="null">[[ toIntOrNull(forms.touches.companyId) ? 'Не выбрана' : 'Сначала выберите компанию' ]]</option>
+                <option v-for="deal in touchDealOptions" :key="deal.id" :value="deal.id">[[ deal.title ]]</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="text-sm text-crm-muted">Ответственный</span>
+              <select v-model="forms.touches.ownerId" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent">
+                <option :value="null">Не выбран</option>
+                <option v-for="user in metaOptions.users" :key="user.id" :value="user.id">[[ user.full_name || user.username ]]</option>
               </select>
             </label>
             <label class="block md:col-span-2">
@@ -3066,20 +3068,6 @@
                   <textarea v-model="touchFollowUpForm.description" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
                 </label>
               </div>
-            </label>
-            <label class="block">
-              <span class="text-sm text-crm-muted">Лид</span>
-              <select v-model="forms.touches.leadId" :disabled="!toIntOrNull(forms.touches.companyId)" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed">
-                <option :value="null">[[ toIntOrNull(forms.touches.companyId) ? 'Не выбран' : 'Сначала выберите компанию' ]]</option>
-                <option v-for="lead in touchLeadOptions" :key="lead.id" :value="lead.id">[[ lead.title ]]</option>
-              </select>
-            </label>
-            <label class="block">
-              <span class="text-sm text-crm-muted">Сделка</span>
-              <select v-model="forms.touches.dealId" :disabled="!toIntOrNull(forms.touches.companyId)" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed">
-                <option :value="null">[[ toIntOrNull(forms.touches.companyId) ? 'Не выбрана' : 'Сначала выберите компанию' ]]</option>
-                <option v-for="deal in touchDealOptions" :key="deal.id" :value="deal.id">[[ deal.title ]]</option>
-              </select>
             </label>
             <label class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Задача</span>

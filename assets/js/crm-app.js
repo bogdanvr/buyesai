@@ -4201,6 +4201,9 @@
             if (actionId === "call") {
               return false;
             }
+            if (actionId === "schedule_meeting") {
+              return false;
+            }
             if (actionId === "reply") {
               return false;
             }
@@ -6465,6 +6468,12 @@
           this.editingTaskId = null;
           this.editingTouchId = null;
           this.editingTouchId = item.id;
+          const resolvedOwnerId = this.toIntOrNull(item.ownerId) || this.resolveTouchOwnerIdFromContext({
+            dealId: this.toIntOrNull(item.dealId),
+            leadId: this.toIntOrNull(item.leadId),
+            taskId: this.toIntOrNull(item.taskId),
+            companyId: this.toIntOrNull(item.clientId),
+          });
           this.forms.touches = {
             happenedAt: this.toDateTimeLocal(item.happenedAtRaw),
             channelId: this.toIntOrNull(item.channelId),
@@ -6473,7 +6482,7 @@
             summary: item.summary || "",
             nextStep: item.nextStep || "",
             nextStepAt: this.toDateTimeLocal(item.nextStepAtRaw),
-            ownerId: this.toIntOrNull(item.ownerId),
+            ownerId: resolvedOwnerId,
             companyId: this.toIntOrNull(item.clientId),
             contactId: this.toIntOrNull(item.contactId),
             taskId: this.toIntOrNull(item.taskId),
