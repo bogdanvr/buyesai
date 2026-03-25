@@ -4201,10 +4201,7 @@
             if (actionId === "call") {
               return false;
             }
-            if (actionId === "reply" && notification?.isPrimaryMessage) {
-              return false;
-            }
-            if (actionId === "reply" && this.managerNotificationTouchHasResult(notification)) {
+            if (actionId === "reply") {
               return false;
             }
             return true;
