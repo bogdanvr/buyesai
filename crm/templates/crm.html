@@ -1287,6 +1287,16 @@
                           <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
                         </svg>
                       </a>
+                      <button
+                        v-if="forms.leads.phone && editingLeadId"
+                        type="button"
+                        @click.stop="startNovofonCall({ phone: forms.leads.phone, entityType: 'lead', entityId: editingLeadId })"
+                        :disabled="isNovofonCallStartingFor('lead', editingLeadId, forms.leads.phone)"
+                        class="inline-flex h-6 items-center justify-center rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2 text-[10px] font-semibold text-emerald-200 transition hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        title="Позвонить через CRM"
+                      >
+                        [[ isNovofonCallStartingFor('lead', editingLeadId, forms.leads.phone) ? '...' : 'CRM' ]]
+                      </button>
                     </div>
                     <div class="flex items-center gap-2 min-w-0">
                       <button v-if="!isLeadSummaryEditing('email')" type="button" @click="openLeadSummaryField('email')" class="min-w-0 text-left text-sm text-white hover:text-crm-accent transition truncate">
@@ -1820,6 +1830,16 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
                       </svg>
                     </a>
+                    <button
+                      v-if="dealSummaryContact && dealSummaryContact.phone && dealSummaryContact.id"
+                      type="button"
+                      @click.stop="startNovofonCall({ phone: dealSummaryContact.phone, entityType: 'contact', entityId: dealSummaryContact.id })"
+                      :disabled="isNovofonCallStartingFor('contact', dealSummaryContact.id, dealSummaryContact.phone)"
+                      class="inline-flex h-6 items-center justify-center rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2 text-[10px] font-semibold text-emerald-200 transition hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+                      title="Позвонить через CRM"
+                    >
+                      [[ isNovofonCallStartingFor('contact', dealSummaryContact.id, dealSummaryContact.phone) ? '...' : 'CRM' ]]
+                    </button>
                     <a
                       v-if="dealSummaryContact && emailHref(dealSummaryContact.email)"
                       :href="emailHref(dealSummaryContact.email)"
@@ -2878,7 +2898,17 @@
             <label class="block">
               <span class="text-sm text-crm-muted">Телефон</span>
               <div class="relative mt-2">
-                <input v-model="forms.contacts.phone" @focus="ensurePhonePrefix(forms.contacts, 'phone')" type="text" class="w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] pl-4 pr-12 outline-none focus:border-crm-accent" />
+                <input v-model="forms.contacts.phone" @focus="ensurePhonePrefix(forms.contacts, 'phone')" type="text" class="w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] pl-4 pr-24 outline-none focus:border-crm-accent" />
+                <button
+                  v-if="forms.contacts.phone && editingContactId"
+                  type="button"
+                  @click.stop="startNovofonCall({ phone: forms.contacts.phone, entityType: 'contact', entityId: editingContactId })"
+                  :disabled="isNovofonCallStartingFor('contact', editingContactId, forms.contacts.phone)"
+                  class="absolute right-12 top-1/2 -translate-y-1/2 inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2 text-[10px] font-semibold text-emerald-200 transition hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Позвонить через CRM"
+                >
+                  [[ isNovofonCallStartingFor('contact', editingContactId, forms.contacts.phone) ? '...' : 'CRM' ]]
+                </button>
                 <a
                   v-if="phoneHref(forms.contacts.phone)"
                   :href="phoneHref(forms.contacts.phone)"
@@ -3220,6 +3250,16 @@
                           <path stroke-linecap="round" stroke-linejoin="round" d="M3 5.25C3 4.01 4.01 3 5.25 3h2.1c.97 0 1.82.62 2.12 1.54l.7 2.11c.23.69.04 1.45-.49 1.95l-1.28 1.2a15.78 15.78 0 006.47 6.47l1.2-1.28c.5-.53 1.26-.72 1.95-.49l2.11.7A2.24 2.24 0 0121 16.65v2.1A2.25 2.25 0 0118.75 21h-.75C9.72 21 3 14.28 3 6V5.25z" />
                         </svg>
                       </a>
+                      <button
+                        v-if="forms.companies.phone && editingCompanyId"
+                        type="button"
+                        @click.stop="startNovofonCall({ phone: forms.companies.phone, entityType: 'company', entityId: editingCompanyId })"
+                        :disabled="isNovofonCallStartingFor('company', editingCompanyId, forms.companies.phone)"
+                        class="inline-flex h-6 items-center justify-center rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2 text-[10px] font-semibold text-emerald-200 transition hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        title="Позвонить через CRM"
+                      >
+                        [[ isNovofonCallStartingFor('company', editingCompanyId, forms.companies.phone) ? '...' : 'CRM' ]]
+                      </button>
                     </div>
                     <div class="flex items-center gap-2 min-w-0">
                       <button v-if="!isCompanySummaryEditing('email')" type="button" @click="openCompanySummaryField('email')" class="min-w-0 text-left text-sm text-white hover:text-crm-accent transition truncate">

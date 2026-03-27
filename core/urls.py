@@ -18,6 +18,16 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
 from crm.admin import crm_admin_site
+from integrations.novofon.views import (
+    NovofonCallAPIView,
+    NovofonCheckConnectionAPIView,
+    NovofonSettingsAPIView,
+    NovofonSyncEmployeesAPIView,
+    NovofonWebhookAPIView,
+    PhoneCallDetailAPIView,
+    PhoneCallListAPIView,
+    TelephonyEventReprocessAPIView,
+)
 from main.views import (
     mainview,
     dadata_party,
@@ -55,6 +65,14 @@ urlpatterns = [
     path("api/dadata/party/by-inn/", dadata_party_by_inn, name="dadata_party_by_inn"),
     path("api/chat/token", chat_token),
     path("api/consultant/chat/", consultant_chat, name="consultant_chat"),
+    path("api/integrations/novofon/webhook/", NovofonWebhookAPIView.as_view(), name="integrations-novofon-webhook"),
+    path("api/telephony/novofon/settings/", NovofonSettingsAPIView.as_view(), name="telephony-novofon-settings"),
+    path("api/telephony/novofon/check-connection/", NovofonCheckConnectionAPIView.as_view(), name="telephony-novofon-check-connection"),
+    path("api/telephony/novofon/sync-employees/", NovofonSyncEmployeesAPIView.as_view(), name="telephony-novofon-sync-employees"),
+    path("api/telephony/novofon/call/", NovofonCallAPIView.as_view(), name="telephony-novofon-call"),
+    path("api/telephony/calls/", PhoneCallListAPIView.as_view(), name="telephony-calls"),
+    path("api/telephony/calls/<int:pk>/", PhoneCallDetailAPIView.as_view(), name="telephony-call-detail"),
+    path("api/admin/telephony/events/<int:pk>/reprocess/", TelephonyEventReprocessAPIView.as_view(), name="telephony-event-reprocess"),
     path("api/v1/", include("api.v1.urls")),
 ]
 

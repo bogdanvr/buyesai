@@ -172,6 +172,8 @@
           },
           errorMessage: "",
           modalErrorMessage: "",
+          isNovofonCallStarting: false,
+          activeNovofonCallTarget: "",
           forms: {
             leads: {
               title: "",
@@ -2126,6 +2128,48 @@
         phoneHref(value) {
           const normalized = String(value || "").trim().replace(/[^\d+]/g, "");
           return normalized ? `tel:${normalized}` : "";
+        },
+        novofonCallTargetKey(entityType, entityId, phone) {
+          const normalizedEntityType = String(entityType || "").trim();
+          const normalizedEntityId = this.toIntOrNull(entityId);
+          const normalizedPhone = String(phone || "").trim();
+          return [normalizedEntityType, normalizedEntityId || "", normalizedPhone].join(":");
+        },
+        isNovofonCallStartingFor(entityType, entityId, phone) {
+          return this.isNovofonCallStarting
+            && this.activeNovofonCallTarget === this.novofonCallTargetKey(entityType, entityId, phone);
+        },
+        async startNovofonCall({ phone = "", entityType = "", entityId = null, comment = "" } = {}) {
+          const normalizedPhone = String(phone || "").trim();
+          const normalizedEntityType = String(entityType || "").trim();
+          const normalizedEntityId = this.toIntOrNull(entityId);
+          if (!normalizedPhone || !normalizedEntityType || !normalizedEntityId) {
+            this.setUiError("Недостаточно данных для запуска звонка.", { modal: true });
+            return;
+          }
+          const targetKey = this.novofonCallTargetKey(normalizedEntityType, normalizedEntityId, normalizedPhone);
+          if (this.isNovofonCallStarting && this.activeNovofonCallTarget === targetKey) {
+            return;
+          }
+          this.clearUiErrors({ modalOnly: true });
+          this.isNovofonCallStarting = true;
+          this.activeNovofonCallTarget = targetKey;
+          try {
+            await this.apiRequest("/api/telephony/novofon/call/", {
+              method: "POST",
+              body: {
+                phone: normalizedPhone,
+                entity_type: normalizedEntityType,
+                entity_id: normalizedEntityId,
+                comment: String(comment || "").trim(),
+              }
+            });
+          } catch (error) {
+            this.setUiError(`Ошибка запуска звонка: ${error.message}`, { modal: true });
+          } finally {
+            this.isNovofonCallStarting = false;
+            this.activeNovofonCallTarget = "";
+          }
         },
         emailHref(value) {
           const normalized = String(value || "").trim();
