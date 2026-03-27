@@ -21,6 +21,7 @@ from crm.admin import crm_admin_site
 from integrations.novofon.views import (
     NovofonCallAPIView,
     NovofonCheckConnectionAPIView,
+    NovofonImportCallsAPIView,
     NovofonSettingsAPIView,
     NovofonSyncEmployeesAPIView,
     NovofonWebhookAPIView,
@@ -69,6 +70,7 @@ urlpatterns = [
     path("api/telephony/novofon/settings/", NovofonSettingsAPIView.as_view(), name="telephony-novofon-settings"),
     path("api/telephony/novofon/check-connection/", NovofonCheckConnectionAPIView.as_view(), name="telephony-novofon-check-connection"),
     path("api/telephony/novofon/sync-employees/", NovofonSyncEmployeesAPIView.as_view(), name="telephony-novofon-sync-employees"),
+    path("api/telephony/novofon/import-calls/", NovofonImportCallsAPIView.as_view(), name="telephony-novofon-import-calls"),
     path("api/telephony/novofon/call/", NovofonCallAPIView.as_view(), name="telephony-novofon-call"),
     path("api/telephony/calls/", PhoneCallListAPIView.as_view(), name="telephony-calls"),
     path("api/telephony/calls/<int:pk>/", PhoneCallDetailAPIView.as_view(), name="telephony-call-detail"),

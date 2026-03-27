@@ -7,6 +7,7 @@ from api.v1.pagination import StandardResultsSetPagination
 from integrations.models import PhoneCall, TelephonyEventLog
 from integrations.novofon.serializers import (
     NovofonCallRequestSerializer,
+    NovofonCallImportRequestSerializer,
     NovofonSettingsSerializer,
     PhoneCallSerializer,
     TelephonyEventLogSerializer,
@@ -14,6 +15,7 @@ from integrations.novofon.serializers import (
 from integrations.novofon.services import (
     check_novofon_connection,
     get_novofon_account,
+    import_novofon_calls_history,
     initiate_novofon_call,
     process_novofon_webhook_event,
     queue_novofon_webhook_event,
@@ -65,6 +67,18 @@ class NovofonCallAPIView(APIView):
         except ValueError as error:
             return Response({"ok": False, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(result, status=status.HTTP_201_CREATED)
+
+
+class NovofonImportCallsAPIView(APIView):
+    def post(self, request):
+        serializer = NovofonCallImportRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            account = get_novofon_account(create=True)
+            result = import_novofon_calls_history(account=account, **serializer.validated_data)
+        except ValueError as error:
+            return Response({"ok": False, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class PhoneCallListAPIView(generics.ListAPIView):

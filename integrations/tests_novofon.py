@@ -294,3 +294,100 @@ class NovofonSyncEmployeesApiTests(APITestCase):
         mapping = TelephonyUserMapping.objects.get(provider_account=self.account, novofon_employee_id="emp-1")
         self.assertEqual(mapping.novofon_extension, "101")
         self.assertEqual(mapping.novofon_full_name, "Alice Example")
+
+
+class NovofonImportCallsApiTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="novofon_history_admin",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=self.user)
+        self.account = TelephonyProviderAccount.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            enabled=True,
+            api_key="token",
+            api_base_url="https://dataapi-jsonrpc.novofon.ru/v2.0",
+        )
+        TelephonyUserMapping.objects.create(
+            provider_account=self.account,
+            crm_user=self.user,
+            novofon_employee_id="101",
+            novofon_extension="101",
+            novofon_full_name="Alice Example",
+            is_active=True,
+        )
+        self.company = Client.objects.create(name="History Co", phone="+7 900 000-00-00")
+        self.contact = Contact.objects.create(
+            client=self.company,
+            first_name="История",
+            phone="+7 900 000-00-00",
+            is_primary=True,
+        )
+        self.lead = Lead.objects.create(
+            title="Исторический лид",
+            phone="+7 900 000-00-00",
+            assigned_to=self.user,
+        )
+        self.stage = DealStage.objects.create(
+            name="History Stage",
+            code="history_stage",
+            order=10,
+            is_active=True,
+            is_final=False,
+        )
+        self.deal = Deal.objects.create(
+            title="History Deal",
+            client=self.company,
+            lead=self.lead,
+            stage=self.stage,
+            owner=self.user,
+        )
+
+    @patch("integrations.novofon.services.NovofonClient.get_calls_report")
+    def test_import_calls_creates_phone_call_and_links_lead(self, get_calls_report_mock):
+        now = timezone.now()
+        get_calls_report_mock.side_effect = [
+            {
+                "metadata": {"total_items": 1},
+                "data": [
+                    {
+                        "id": 555001,
+                        "start_time": now.strftime("%Y-%m-%d %H:%M:%S"),
+                        "finish_time": now.strftime("%Y-%m-%d %H:%M:%S"),
+                        "direction": "in",
+                        "is_lost": False,
+                        "contact_phone_number": "+7 900 000-00-00",
+                        "virtual_phone_number": "+7 495 000-00-00",
+                        "operator_phone_number": "101",
+                        "talk_duration": 45,
+                        "clean_talk_duration": 40,
+                        "total_duration": 50,
+                        "full_record_file_link": "https://media.novofon.ru/1/abc",
+                        "communication_id": 7001,
+                        "last_answered_employee_id": "101",
+                        "employees": [{"employee_id": "101"}],
+                    }
+                ],
+            },
+            {
+                "metadata": {"total_items": 1},
+                "data": [],
+            },
+        ]
+
+        response = self.client.post(
+            reverse("telephony-novofon-import-calls"),
+            {"days": 7, "limit": 100, "max_records": 100},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["created"], 1)
+        call = PhoneCall.objects.get(external_call_id="555001")
+        self.assertEqual(call.lead_id, self.lead.pk)
+        self.assertEqual(call.company_id, self.company.pk)
+        self.assertEqual(call.contact_id, self.contact.pk)
+        self.assertEqual(call.deal_id, self.deal.pk)
+        self.assertEqual(call.crm_user_id, self.user.pk)

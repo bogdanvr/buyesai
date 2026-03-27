@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 
 from audit.services import log_event
@@ -47,6 +49,28 @@ def _provider_client(account: TelephonyProviderAccount) -> NovofonClient:
     return NovofonClient(account)
 
 
+CALLS_REPORT_FIELDS = [
+    "id",
+    "start_time",
+    "finish_time",
+    "direction",
+    "is_lost",
+    "contact_phone_number",
+    "virtual_phone_number",
+    "operator_phone_number",
+    "talk_duration",
+    "clean_talk_duration",
+    "total_duration",
+    "full_record_file_link",
+    "communication_id",
+    "last_answered_employee_id",
+    "first_answered_employee_id",
+    "last_talked_employee_id",
+    "first_talked_employee_id",
+    "employees",
+]
+
+
 def _phone_call_status_from_api(payload: dict) -> str:
     raw_status = str(payload.get("status") or payload.get("call_status") or "").strip().lower()
     if raw_status in {choice for choice, _label in PhoneCallStatus.choices}:
@@ -56,6 +80,135 @@ def _phone_call_status_from_api(payload: dict) -> str:
     if raw_status in {"error", "failed"}:
         return PhoneCallStatus.FAILED
     return PhoneCallStatus.RINGING
+
+
+def _parse_novofon_datetime(value: str):
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    parsed = parse_datetime(raw.replace(" ", "T"))
+    if parsed is None:
+        try:
+            parsed = datetime.strptime(raw, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return None
+    if timezone.is_naive(parsed):
+        return timezone.make_aware(parsed, timezone.get_current_timezone())
+    return parsed
+
+
+def _int_or_none(value):
+    try:
+        if value in (None, ""):
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _phone_call_status_from_report(row: dict) -> str:
+    if bool(row.get("is_lost")):
+        return PhoneCallStatus.MISSED
+    total_duration = _int_or_none(row.get("total_duration")) or 0
+    talk_duration = _int_or_none(row.get("talk_duration")) or 0
+    finish_time = _parse_novofon_datetime(row.get("finish_time"))
+    if talk_duration > 0:
+        return PhoneCallStatus.COMPLETED
+    if finish_time and total_duration == 0:
+        return PhoneCallStatus.CANCELED
+    if finish_time:
+        return PhoneCallStatus.COMPLETED
+    return PhoneCallStatus.RINGING
+
+
+def _direction_from_report(row: dict) -> str:
+    return PhoneCallDirection.INBOUND if str(row.get("direction") or "").strip().lower() == "in" else PhoneCallDirection.OUTBOUND
+
+
+def _resolve_history_employee_id(row: dict) -> str:
+    candidates = [
+        row.get("last_answered_employee_id"),
+        row.get("last_talked_employee_id"),
+        row.get("first_answered_employee_id"),
+        row.get("first_talked_employee_id"),
+    ]
+    for candidate in candidates:
+        normalized = str(candidate or "").strip()
+        if normalized:
+            return normalized
+    employees = row.get("employees") if isinstance(row.get("employees"), list) else []
+    for employee in employees:
+        normalized = str((employee or {}).get("employee_id") or "").strip()
+        if normalized:
+            return normalized
+    return ""
+
+
+def _upsert_phone_call_from_history(*, account: TelephonyProviderAccount, row: dict) -> tuple[PhoneCall | None, bool]:
+    external_call_id = str(row.get("id") or "").strip()
+    if not external_call_id:
+        return None, False
+
+    direction = _direction_from_report(row)
+    employee_id = _resolve_history_employee_id(row)
+    mapping = resolve_novofon_mapping(account=account, employee_id=employee_id)
+    phone_from = str(
+        row.get("contact_phone_number")
+        if direction == PhoneCallDirection.INBOUND
+        else (row.get("operator_phone_number") or row.get("virtual_phone_number") or "")
+    ).strip()
+    phone_to = str(
+        (row.get("virtual_phone_number") or row.get("operator_phone_number") or "")
+        if direction == PhoneCallDirection.INBOUND
+        else row.get("contact_phone_number")
+    ).strip()
+    normalized_client_phone = normalize_phone(row.get("contact_phone_number") or "")
+    call, created = PhoneCall.objects.get_or_create(
+        provider=TelephonyProvider.NOVOFON,
+        external_call_id=external_call_id,
+        defaults={
+            "external_parent_event_id": str(row.get("communication_id") or "").strip(),
+            "direction": direction,
+            "status": _phone_call_status_from_report(row),
+            "phone_from": phone_from,
+            "phone_to": phone_to,
+            "client_phone_normalized": normalized_client_phone,
+            "virtual_number": str(row.get("virtual_phone_number") or "").strip(),
+            "crm_user": getattr(mapping, "crm_user", None),
+            "responsible_user": getattr(mapping, "crm_user", None) or account.default_owner,
+            "started_at": _parse_novofon_datetime(row.get("start_time")),
+            "answered_at": _parse_novofon_datetime(row.get("start_time")) if (_int_or_none(row.get("talk_duration")) or 0) > 0 else None,
+            "ended_at": _parse_novofon_datetime(row.get("finish_time")),
+            "duration_sec": _int_or_none(row.get("total_duration")),
+            "talk_duration_sec": _int_or_none(row.get("clean_talk_duration")) or _int_or_none(row.get("talk_duration")),
+            "recording_url": str(row.get("full_record_file_link") or "").strip(),
+            "raw_payload_last": row,
+        },
+    )
+    call.external_parent_event_id = str(row.get("communication_id") or call.external_parent_event_id or "").strip()
+    call.direction = direction
+    call.status = _phone_call_status_from_report(row)
+    call.phone_from = phone_from or call.phone_from
+    call.phone_to = phone_to or call.phone_to
+    call.client_phone_normalized = normalized_client_phone or call.client_phone_normalized
+    call.virtual_number = str(row.get("virtual_phone_number") or call.virtual_number or "").strip()
+    call.crm_user = getattr(mapping, "crm_user", None) or call.crm_user
+    call.responsible_user = getattr(mapping, "crm_user", None) or call.responsible_user or account.default_owner
+    call.started_at = _parse_novofon_datetime(row.get("start_time")) or call.started_at
+    if (_int_or_none(row.get("talk_duration")) or 0) > 0:
+        call.answered_at = _parse_novofon_datetime(row.get("start_time")) or call.answered_at
+    call.ended_at = _parse_novofon_datetime(row.get("finish_time")) or call.ended_at
+    call.duration_sec = _int_or_none(row.get("total_duration")) if row.get("total_duration") not in (None, "") else call.duration_sec
+    call.talk_duration_sec = (
+        _int_or_none(row.get("clean_talk_duration"))
+        or _int_or_none(row.get("talk_duration"))
+        or call.talk_duration_sec
+    )
+    call.recording_url = str(row.get("full_record_file_link") or call.recording_url or "").strip()
+    call.raw_payload_last = row or call.raw_payload_last
+    _ensure_binding_for_call(account=account, call=call)
+    call.save()
+    return call, created
 
 
 def _resolve_entity(*, entity_type: str, entity_id: int):
@@ -341,6 +494,83 @@ def check_novofon_connection(*, account: TelephonyProviderAccount | None = None)
         account.last_connection_error = str(error)
         account.save(update_fields=["last_connection_checked_at", "last_connection_status", "last_connection_error", "updated_at"])
         return {"ok": False, "error": str(error)}
+
+
+@transaction.atomic
+def import_novofon_calls_history(
+    *,
+    account: TelephonyProviderAccount | None = None,
+    date_from=None,
+    date_till=None,
+    days: int = 30,
+    limit: int = 500,
+    max_records: int = 5000,
+    include_ongoing_calls: bool = False,
+) -> dict:
+    account = account or get_novofon_account(create=True)
+    if account is None or not account.enabled:
+        raise ValueError("Интеграция Novofon отключена.")
+
+    now = timezone.now()
+    resolved_date_till = date_till or now
+    resolved_date_from = date_from or (resolved_date_till - timedelta(days=int(days or 30)))
+    if resolved_date_from > resolved_date_till:
+        raise ValueError("date_from не может быть больше date_till.")
+    if resolved_date_till - resolved_date_from > timedelta(days=90):
+        raise ValueError("Novofon Data API позволяет импортировать период не более 90 дней за один запуск.")
+
+    client = _provider_client(account)
+    imported = 0
+    created_count = 0
+    updated_count = 0
+    missed_followups = 0
+    offset = 0
+    normalized_limit = max(1, min(int(limit or 500), 1000))
+    normalized_max_records = max(1, min(int(max_records or 5000), 20000))
+
+    while imported < normalized_max_records:
+        requested_limit = min(normalized_limit, normalized_max_records - imported)
+        page = client.get_calls_report(
+            date_from=resolved_date_from,
+            date_till=resolved_date_till,
+            limit=requested_limit,
+            offset=offset,
+            include_ongoing_calls=include_ongoing_calls,
+            fields=CALLS_REPORT_FIELDS,
+        )
+        records = page.get("data") if isinstance(page.get("data"), list) else []
+        if not records:
+            break
+        for row in records:
+            call, created = _upsert_phone_call_from_history(account=account, row=row)
+            if call is None:
+                continue
+            imported += 1
+            if created:
+                created_count += 1
+            else:
+                updated_count += 1
+            if account.create_task_for_missed_call and call.status == PhoneCallStatus.MISSED:
+                followup = create_missed_call_followup_task(call)
+                if followup is not None:
+                    missed_followups += 1
+            if imported >= normalized_max_records:
+                break
+        if len(records) < requested_limit:
+            break
+        offset += len(records)
+
+    return {
+        "ok": True,
+        "date_from": resolved_date_from.isoformat(),
+        "date_till": resolved_date_till.isoformat(),
+        "imported": imported,
+        "created": created_count,
+        "updated": updated_count,
+        "missed_followups": missed_followups,
+        "limit": normalized_limit,
+        "max_records": normalized_max_records,
+    }
 
 
 @transaction.atomic

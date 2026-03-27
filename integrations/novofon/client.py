@@ -4,6 +4,7 @@ import logging
 import uuid
 
 import requests
+from django.utils import timezone
 
 from integrations.models import TelephonyProviderAccount
 from integrations.novofon.selectors import normalize_phone
@@ -120,6 +121,31 @@ class NovofonClient:
         )
         records = payload.get("data") if isinstance(payload.get("data"), list) else []
         return records
+
+    def get_calls_report(
+        self,
+        *,
+        date_from,
+        date_till,
+        limit: int = 500,
+        offset: int = 0,
+        include_ongoing_calls: bool = False,
+        fields: list[str] | None = None,
+    ) -> dict:
+        params = {
+            "date_from": timezone.localtime(date_from).strftime("%Y-%m-%d %H:%M:%S"),
+            "date_till": timezone.localtime(date_till).strftime("%Y-%m-%d %H:%M:%S"),
+            "limit": int(limit),
+            "offset": int(offset),
+            "include_ongoing_calls": bool(include_ongoing_calls),
+        }
+        if fields:
+            params["fields"] = fields
+        payload = self._data_api_request("get.calls_report", params=params)
+        return {
+            "metadata": payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {},
+            "data": payload.get("data") if isinstance(payload.get("data"), list) else [],
+        }
 
     def _resolve_virtual_phone_number(self) -> str:
         allowed_numbers = [

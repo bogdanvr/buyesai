@@ -31,6 +31,12 @@
 - `client_phone_normalized`
 - `contact_id / company_id / lead_id / deal_id`
 
+Если звонок есть в кабинете Novofon, но не попал в CRM, можно выполнить ручной импорт:
+
+```http
+POST /api/telephony/novofon/import-calls/
+```
+
 ### 3. Сопоставление пользователей
 
 Смотреть `TelephonyUserMapping`:
@@ -86,6 +92,7 @@ POST /api/admin/telephony/events/{id}/reprocess/
 2. есть ли у контакта/компании/лида совпадающий номер
 3. есть ли открытая сделка у компании
 4. включен ли `create_lead_for_unknown_number`
+5. если это старый звонок, был ли выполнен `import-calls`
 
 ## Кодовые точки диагностики
 

@@ -6,6 +6,7 @@
 - синхронизация сотрудников Novofon в таблицу сопоставлений;
 - webhook endpoint `POST /api/integrations/novofon/webhook/`;
 - запуск исходящего звонка через `POST /api/telephony/novofon/call/`;
+- ручной импорт исторических звонков через `POST /api/telephony/novofon/import-calls/`;
 - журнал событий телефонии;
 - модель истории звонков `PhoneCall`;
 - API истории звонков:
@@ -65,6 +66,42 @@ POST /api/telephony/novofon/sync-employees/
 
 После синхронизации в таблице `TelephonyUserMapping` появятся сотрудники Novofon.
 Дальше им нужно назначить пользователей CRM.
+
+## Импорт исторических звонков
+
+Вызвать:
+
+```http
+POST /api/telephony/novofon/import-calls/
+Content-Type: application/json
+```
+
+Пример payload:
+
+```json
+{
+  "days": 30,
+  "limit": 500,
+  "max_records": 5000,
+  "include_ongoing_calls": false
+}
+```
+
+Или с явным диапазоном:
+
+```json
+{
+  "date_from": "2026-03-01T00:00:00+06:00",
+  "date_till": "2026-03-27T23:59:59+06:00",
+  "limit": 500,
+  "max_records": 5000
+}
+```
+
+Ограничения:
+
+- Novofon `get.calls_report` позволяет импортировать период не более 90 дней за один запуск;
+- импорт идемпотентен: повторный запуск обновляет уже существующие `PhoneCall`, а не создает дубли.
 
 ## Настройки API
 

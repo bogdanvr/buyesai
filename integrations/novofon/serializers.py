@@ -139,6 +139,22 @@ class NovofonCallRequestSerializer(serializers.Serializer):
     comment = serializers.CharField(required=False, allow_blank=True, default="")
 
 
+class NovofonCallImportRequestSerializer(serializers.Serializer):
+    date_from = serializers.DateTimeField(required=False)
+    date_till = serializers.DateTimeField(required=False)
+    days = serializers.IntegerField(required=False, min_value=1, max_value=90, default=30)
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=1000, default=500)
+    max_records = serializers.IntegerField(required=False, min_value=1, max_value=20000, default=5000)
+    include_ongoing_calls = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        date_from = attrs.get("date_from")
+        date_till = attrs.get("date_till")
+        if (date_from and not date_till) or (date_till and not date_from):
+            raise serializers.ValidationError("Нужно передать обе даты: date_from и date_till.")
+        return attrs
+
+
 class PhoneCallSerializer(serializers.ModelSerializer):
     crm_user_name = serializers.SerializerMethodField()
     responsible_user_name = serializers.SerializerMethodField()
