@@ -847,16 +847,16 @@
           return contacts.find((contact) => contact.isPrimary) || contacts[0] || null;
         },
         activeLeadPhoneCallHistoryState() {
-          return this.getPhoneCallHistoryEntityState("lead", this.editingLeadId, false);
+          return this.getPhoneCallHistoryEntityState("lead", this.editingLeadId, false) || this.defaultPhoneCallHistoryState();
         },
         activeDealPhoneCallHistoryState() {
-          return this.getPhoneCallHistoryEntityState("deal", this.editingDealId, false);
+          return this.getPhoneCallHistoryEntityState("deal", this.editingDealId, false) || this.defaultPhoneCallHistoryState();
         },
         activeContactPhoneCallHistoryState() {
-          return this.getPhoneCallHistoryEntityState("contact", this.editingContactId, false);
+          return this.getPhoneCallHistoryEntityState("contact", this.editingContactId, false) || this.defaultPhoneCallHistoryState();
         },
         activeCompanyPhoneCallHistoryState() {
-          return this.getPhoneCallHistoryEntityState("company", this.editingCompanyId, false);
+          return this.getPhoneCallHistoryEntityState("company", this.editingCompanyId, false) || this.defaultPhoneCallHistoryState();
         },
         dealCommunicationContactOptions() {
           const companyId = this.toIntOrNull(this.forms.deals.companyId);
