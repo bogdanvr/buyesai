@@ -2754,6 +2754,20 @@
           const payload = await this.apiRequest(`/api/v1/deals/${normalizedDealId}/`);
           return this.mapDeal(payload);
         },
+        async fetchCompanyById(companyId) {
+          const normalizedCompanyId = this.toIntOrNull(companyId);
+          if (!normalizedCompanyId) {
+            throw new Error("Некорректный ID компании");
+          }
+
+          const existingCompany = (this.datasets.companies || []).find((item) => String(item.id) === String(normalizedCompanyId));
+          if (existingCompany) {
+            return existingCompany;
+          }
+
+          const payload = await this.apiRequest(`/api/v1/clients/${normalizedCompanyId}/`);
+          return this.mapClient(payload);
+        },
         async openTaskFromEvent(taskId) {
           try {
             const task = await this.fetchTaskById(taskId);
@@ -2815,15 +2829,13 @@
           }
 
           if (companyId) {
-            const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId));
-            if (company) {
-              this.openCompanyEditor(company);
-              this.showCompanyCommunicationsPanel = true;
-              await this.loadCompanyCommunications({ preserveSelection: false, forceReloadMessages: true });
-              await this.selectCompanyConversation(conversationId, { silent: true });
-              this.ensureCommunicationsPolling();
-              return;
-            }
+            const company = await this.fetchCompanyById(companyId);
+            this.openCompanyEditor(company);
+            this.showCompanyCommunicationsPanel = true;
+            await this.loadCompanyCommunications({ preserveSelection: false, forceReloadMessages: true });
+            await this.selectCompanyConversation(conversationId, { silent: true });
+            this.ensureCommunicationsPolling();
+            return;
           }
 
           throw new Error("Не удалось определить карточку для открытия переписки");
@@ -4566,26 +4578,12 @@
         },
         async openManagerNotificationReply(notification) {
           if (!notification) return;
-          if (this.toIntOrNull(notification.messageDraftId)) {
+          this.showManagerNotifications = false;
+          if (this.toIntOrNull(notification.messageDraftId) || this.toIntOrNull(notification.conversationId)) {
             await this.openManagerNotificationSidebar(notification, "reply");
             return;
           }
           const channelCode = this.managerNotificationReplyChannelCode(notification) || "email";
-          const conversationId = this.toIntOrNull(notification.conversationId);
-          if (conversationId) {
-            try {
-              await this.openCommunicationConversationFromEvent(notification);
-              if (this.toIntOrNull(notification.dealId)) {
-                this.scrollToCommunicationComposer("deal");
-              } else if (this.toIntOrNull(notification.companyId || notification.clientId)) {
-                this.scrollToCommunicationComposer("company");
-              }
-              return;
-            } catch (error) {
-              this.setUiError(`Ошибка открытия переписки: ${error.message}`, { modal: true });
-              return;
-            }
-          }
           const dealId = this.toIntOrNull(notification.dealId);
           if (dealId) {
             try {
@@ -5216,17 +5214,15 @@
         async sendManagerNotificationReply(messageDraftId) {
           this.clearUiErrors({ modalOnly: true });
           if (this.isManagerNotificationReplySending) return;
-          const normalizedDraftId = this.toIntOrNull(messageDraftId);
-          if (!normalizedDraftId) {
-            this.setUiError("Не найдено сообщение для ответа.", { modal: true });
-            return;
-          }
-          const draft = this.getAutomationMessageDraftById(normalizedDraftId);
-          if (!draft) {
+          const normalizedDraftId = this.toIntOrNull(messageDraftId || this.managerNotificationReplyDraftId);
+          const draft = normalizedDraftId ? this.getAutomationMessageDraftById(normalizedDraftId) : null;
+          if (normalizedDraftId && !draft) {
             this.setUiError("Черновик ответа не найден. Обновите уведомления и попробуйте снова.", { modal: true });
             return;
           }
-          const conversationId = this.toIntOrNull(draft?.conversationId) || this.toIntOrNull(this.activeUnboundConversationId);
+          const conversationId = this.toIntOrNull(draft?.conversationId)
+            || this.toIntOrNull(this.activeUnboundConversationId)
+            || this.toIntOrNull(this.activeManagerNotification?.conversationId);
           if (!conversationId) {
             this.setUiError("Не удалось определить диалог для ответа. Сначала откройте или привяжите переписку.", { modal: true });
             return;
@@ -5248,10 +5244,12 @@
             const messageStatus = String(response?.status || "").trim();
             const queueId = this.toIntOrNull(this.activeManagerNotification?.sourceId);
             if (messageStatus === "sent") {
-              await this.apiRequest(`/api/v1/automation-message-drafts/${draft.id}/dismiss/`, {
-                method: "POST",
-                body: {},
-              });
+              if (draft) {
+                await this.apiRequest(`/api/v1/automation-message-drafts/${draft.id}/dismiss/`, {
+                  method: "POST",
+                  body: {},
+                });
+              }
               if (queueId) {
                 this.setManagerNotificationReplyState(queueId, "answered");
               }
