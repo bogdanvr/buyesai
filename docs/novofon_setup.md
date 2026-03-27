@@ -41,6 +41,17 @@ env/bin/python manage.py migrate
 
 4. Проверить webhook URL.
 
+Рекомендуемые значения для Novofon:
+
+- `api_key`:
+  access token / API key Novofon
+- `api_secret`:
+  можно оставить пустым, если используется доступ по ключу
+- `api_base_url`:
+  `https://dataapi-jsonrpc.novofon.ru/v2.0`
+- `settings_json.call_api_base_url`:
+  `https://callapi-jsonrpc.novofon.ru/v4.0`
+
 Если в `.env` задан `CRM_PUBLIC_BASE_URL`, CRM соберет полный URL автоматически.
 Иначе в API/админке будет показан только path.
 
@@ -75,9 +86,9 @@ Content-Type: application/json
 ```json
 {
   "enabled": true,
-  "api_key": "key",
-  "api_secret": "secret",
-  "api_base_url": "https://api.example.test",
+  "api_key": "novofon-access-token",
+  "api_secret": "",
+  "api_base_url": "https://dataapi-jsonrpc.novofon.ru/v2.0",
   "webhook_path": "/api/integrations/novofon/webhook/",
   "default_owner": 1,
   "create_lead_for_unknown_number": false,
@@ -87,9 +98,7 @@ Content-Type: application/json
   "is_debug_logging_enabled": true,
   "webhook_shared_secret": "shared-secret",
   "settings_json": {
-    "healthcheck_path": "/ping",
-    "employees_path": "/employees",
-    "call_init_path": "/calls"
+    "call_api_base_url": "https://callapi-jsonrpc.novofon.ru/v4.0"
   },
   "mappings": [
     {
@@ -104,19 +113,13 @@ Content-Type: application/json
 }
 ```
 
-## Допущения текущей реализации
+## Что использует CRM сейчас
 
-- реальный формат webhook payload Novofon в проекте пока не зафиксирован;
-- текущий parser поддерживает наиболее типовые поля:
-  `event_type`, `event_id`, `call_id`, `direction`, `status`, `from`, `to`, `employee_id`, `extension`, timestamps;
-- HTTP-клиент Novofon использует настраиваемые пути:
-  `healthcheck_path`, `employees_path`, `call_init_path`;
-- авторизация в текущем клиенте реализована через заголовки `X-API-Key` и `X-API-Secret`.
-
-Если реальный API Novofon отличается, нужно адаптировать:
-
-- `integrations/novofon/client.py`
-- `integrations/novofon/webhook_parser.py`
+- `Data API` используется для проверки подключения, получения сотрудников и виртуальных номеров;
+- `Call API` используется для запуска исходящего звонка;
+- `api_base_url` в CRM означает именно `Data API base URL`;
+- `Call API base URL` хранится в `settings_json.call_api_base_url`, если не задан, используется официальный дефолт `https://callapi-jsonrpc.novofon.ru/v4.0`;
+- webhook parser все еще остается адаптационным слоем, потому что контракт webhook отдельно от `Data API` / `Call API`.
 
 ## Ручная проверка
 

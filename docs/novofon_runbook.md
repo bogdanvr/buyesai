@@ -61,9 +61,14 @@ POST /api/admin/telephony/events/{id}/reprocess/
 Проверить:
 
 1. `TelephonyProviderAccount.enabled = true`
-2. заполнены `api_base_url`, `api_key`, `api_secret`
-3. у пользователя есть `TelephonyUserMapping`
-4. endpoint `/api/telephony/novofon/call/` не вернул `400`
+2. заполнен `api_base_url = https://dataapi-jsonrpc.novofon.ru/v2.0`
+3. в `settings_json.call_api_base_url` указан `https://callapi-jsonrpc.novofon.ru/v4.0` или поле оставлено на дефолт
+4. заполнен `api_key`
+5. в `allowed_virtual_numbers` есть рабочий виртуальный номер Novofon или у аккаунта есть хотя бы один активный виртуальный номер
+6. у пользователя есть `TelephonyUserMapping`
+7. в `TelephonyUserMapping` заполнен `novofon_employee_id`
+8. если используется `employee.phone_number`, заполнен `novofon_extension`
+9. endpoint `/api/telephony/novofon/call/` не вернул `400`
 
 ### Дубликаты webhook
 
@@ -89,11 +94,9 @@ POST /api/admin/telephony/events/{id}/reprocess/
 - `integrations/novofon/client.py`
 - `integrations/models.py`
 
-## Что доработать после согласования реального API
+## Что еще остается
 
 - финальный format/signature verification webhook;
-- точные endpoint paths и auth-схему Novofon API;
-- реальную асинхронную очередь вместо DB-backed process/reprocess модели;
+- реальная асинхронная очередь вместо DB-backed process/reprocess модели;
 - экран настроек Novofon в CRM;
-- полноценный блок истории звонков в карточках;
 - realtime popup по входящему звонку.

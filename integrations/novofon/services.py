@@ -284,17 +284,27 @@ def sync_novofon_employees(*, account: TelephonyProviderAccount | None = None) -
         employee_id = str(employee.get("id") or employee.get("employee_id") or employee.get("uuid") or "").strip()
         if not employee_id:
             continue
+        extension_payload = employee.get("extension") if isinstance(employee.get("extension"), dict) else {}
+        extension_value = str(
+            employee.get("phone_number")
+            or employee.get("extension_phone_number")
+            or employee.get("inner_phone_number")
+            or employee.get("extension")
+            or extension_payload.get("extension_phone_number")
+            or extension_payload.get("inner_phone_number")
+            or ""
+        ).strip()
         mapping, _created = TelephonyUserMapping.objects.get_or_create(
             provider_account=account,
             novofon_employee_id=employee_id,
             defaults={
-                "novofon_extension": str(employee.get("extension") or employee.get("internal_number") or "").strip(),
+                "novofon_extension": extension_value,
                 "novofon_full_name": str(employee.get("full_name") or employee.get("name") or "").strip(),
                 "is_active": bool(employee.get("is_active", True)),
                 "external_payload": employee,
             },
         )
-        mapping.novofon_extension = str(employee.get("extension") or employee.get("internal_number") or mapping.novofon_extension or "").strip()
+        mapping.novofon_extension = extension_value or mapping.novofon_extension or ""
         mapping.novofon_full_name = str(employee.get("full_name") or employee.get("name") or mapping.novofon_full_name or "").strip()
         mapping.is_active = bool(employee.get("is_active", True))
         mapping.external_payload = employee
@@ -310,12 +320,21 @@ def check_novofon_connection(*, account: TelephonyProviderAccount | None = None)
     client = _provider_client(account)
     checked_at = timezone.now()
     try:
-        payload = client.ping()
+        data_api_payload = client.ping()
+        call_api_payload = client.probe_call_api()
+        virtual_numbers = client.list_virtual_numbers()
         account.last_connection_checked_at = checked_at
         account.last_connection_status = "ok"
         account.last_connection_error = ""
         account.save(update_fields=["last_connection_checked_at", "last_connection_status", "last_connection_error", "updated_at"])
-        return {"ok": True, "payload": payload}
+        return {
+            "ok": True,
+            "payload": {
+                "data_api": data_api_payload,
+                "call_api": call_api_payload,
+                "virtual_numbers_count": len(virtual_numbers),
+            },
+        }
     except NovofonClientError as error:
         account.last_connection_checked_at = checked_at
         account.last_connection_status = "error"
@@ -373,7 +392,8 @@ def initiate_novofon_call(*, user, phone: str, entity_type: str, entity_id: int,
         raise ValueError(f"Novofon API вернул ошибку: {error}") from error
 
     call.external_call_id = str(
-        response_payload.get("call_id")
+        response_payload.get("call_session_id")
+        or response_payload.get("call_id")
         or response_payload.get("id")
         or response_payload.get("uuid")
         or call.external_call_id

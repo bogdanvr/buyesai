@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase
@@ -16,6 +16,11 @@ from integrations.models import (
     TelephonyProviderAccount,
     TelephonyUserMapping,
 )
+from integrations.novofon.client import (
+    DEFAULT_CALL_API_BASE_URL,
+    DEFAULT_DATA_API_BASE_URL,
+    NovofonClient,
+)
 from integrations.novofon.selectors import normalize_phone
 
 
@@ -24,6 +29,84 @@ class NovofonPhoneNormalizationTests(SimpleTestCase):
         self.assertEqual(normalize_phone("+7 (900) 000-00-00"), "79000000000")
         self.assertEqual(normalize_phone("8 (900) 000-00-00"), "79000000000")
         self.assertEqual(normalize_phone("9000000000"), "79000000000")
+
+
+class NovofonClientRoutingTests(SimpleTestCase):
+    class _FakeResponse:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._payload
+
+    def test_ping_uses_data_api_base_url(self):
+        account = TelephonyProviderAccount(
+            provider=TelephonyProvider.NOVOFON,
+            enabled=True,
+            api_key="token-1",
+            api_base_url="",
+        )
+        client = NovofonClient(account)
+        request_mock = Mock(return_value=self._FakeResponse({"result": {"data": [{"id": 1}]}}))
+
+        with patch("integrations.novofon.client.requests.post", request_mock):
+            client.ping()
+
+        self.assertEqual(request_mock.call_args.kwargs["url"], DEFAULT_DATA_API_BASE_URL)
+        payload = request_mock.call_args.kwargs["json"]
+        self.assertEqual(payload["method"], "get.account")
+        self.assertEqual(payload["params"]["access_token"], "token-1")
+
+    def test_initiate_call_uses_call_api_and_virtual_number(self):
+        account = TelephonyProviderAccount(
+            provider=TelephonyProvider.NOVOFON,
+            enabled=True,
+            api_key="token-2",
+            api_base_url="",
+            allowed_virtual_numbers=["+7 (495) 000-00-00"],
+            settings_json={},
+        )
+        client = NovofonClient(account)
+
+        def request_side_effect(*args, **kwargs):
+            payload = kwargs["json"]
+            if payload["method"] == "get.virtual_numbers":
+                return self._FakeResponse({
+                    "result": {
+                        "data": [
+                            {
+                                "virtual_phone_number": "74950000000",
+                                "status": "active",
+                            }
+                        ]
+                    }
+                })
+            if payload["method"] == "start.employee_call":
+                return self._FakeResponse({"result": {"data": {"call_session_id": 12345}}})
+            raise AssertionError(f"Unexpected method {payload['method']}")
+
+        request_mock = Mock(side_effect=request_side_effect)
+        with patch("integrations.novofon.client.requests.post", request_mock):
+            response = client.initiate_call(
+                employee_id="emp-1",
+                extension="101",
+                phone="+7 900 000-00-00",
+                comment="Перезвонить",
+                external_context={"phone_call_id": 77},
+            )
+
+        self.assertEqual(response["call_session_id"], 12345)
+        self.assertEqual(request_mock.call_args.kwargs["url"], DEFAULT_CALL_API_BASE_URL)
+        payload = request_mock.call_args.kwargs["json"]
+        self.assertEqual(payload["method"], "start.employee_call")
+        self.assertEqual(payload["params"]["virtual_phone_number"], "74950000000")
+        self.assertEqual(payload["params"]["contact"], "79000000000")
+        self.assertEqual(payload["params"]["employee"]["id"], "emp-1")
+        self.assertEqual(payload["params"]["employee"]["phone_number"], "101")
+        self.assertEqual(payload["params"]["external_id"], "crm_phone_call_77")
 
 
 class NovofonWebhookApiTests(APITestCase):
