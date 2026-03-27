@@ -1488,6 +1488,95 @@
                 [[ forms.leads.description ]]
               </div>
             </div>
+            <div v-if="editingLeadId" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold text-white">История звонков</div>
+                  <div class="text-xs text-crm-muted">[[ forms.leads.title || `Лид #${editingLeadId}` ]]</div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    v-for="filterOption in phoneCallHistoryFilters"
+                    :key="`lead-call-filter-${filterOption.value}`"
+                    type="button"
+                    @click="setPhoneCallHistoryFilter('lead', editingLeadId, filterOption.value)"
+                    :class="phoneCallFilterButtonClass('lead', editingLeadId, filterOption.value)"
+                    class="inline-flex h-8 items-center rounded-lg border px-3 text-xs font-medium transition"
+                  >
+                    [[ filterOption.label ]]
+                  </button>
+                </div>
+              </div>
+              <div v-if="activeLeadPhoneCallHistoryState.error" class="mt-3 text-sm text-red-300">
+                [[ activeLeadPhoneCallHistoryState.error ]]
+              </div>
+              <div v-else-if="activeLeadPhoneCallHistoryState.loading" class="mt-3 text-sm text-crm-muted">
+                Загрузка звонков...
+              </div>
+              <div v-else-if="activeLeadPhoneCallHistoryState.items.length === 0" class="mt-3 text-sm text-crm-muted">
+                По этому лиду звонков пока нет.
+              </div>
+              <div v-else class="mt-3 space-y-2">
+                <div
+                  v-for="call in activeLeadPhoneCallHistoryState.items"
+                  :key="`lead-call-${call.id}`"
+                  class="rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3"
+                >
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-medium" :class="phoneCallStatusClass(call.status)">
+                          [[ phoneCallStatusLabel(call.status) ]]
+                        </span>
+                        <span class="inline-flex items-center rounded-full border border-crm-border bg-[#123753] px-2 py-1 text-[11px] font-medium text-white">
+                          [[ phoneCallDirectionLabel(call.direction) ]]
+                        </span>
+                        <span class="text-xs text-crm-muted">[[ phoneCallStartedLabel(call) || '—' ]]</span>
+                      </div>
+                      <div class="mt-2 text-sm font-medium text-white break-all">[[ phoneCallDisplayPhone(call) || 'Номер не указан' ]]</div>
+                      <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-crm-muted">
+                        <span>Длительность: [[ phoneCallDurationLabel(call) ]]</span>
+                        <span>Ответственный: [[ call.responsible_user_name || call.crm_user_name || 'Не назначен' ]]</span>
+                        <span v-if="call.virtual_number">Линия: [[ call.virtual_number ]]</span>
+                      </div>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                      <a
+                        v-if="call.recording_url"
+                        :href="call.recording_url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex h-8 items-center rounded-lg border border-crm-accent/40 bg-crm-accent/15 px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Запись
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-if="activeLeadPhoneCallHistoryState.items.length" class="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-crm-muted">
+                <div>[[ `Показано ${activeLeadPhoneCallHistoryState.items.length} из ${activeLeadPhoneCallHistoryState.count}` ]]</div>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    @click="goToPhoneCallHistoryPage('lead', editingLeadId, 'previous')"
+                    :disabled="!activeLeadPhoneCallHistoryState.previous || activeLeadPhoneCallHistoryState.loading"
+                    class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-medium text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Назад
+                  </button>
+                  <span>Стр. [[ activeLeadPhoneCallHistoryState.page || 1 ]]</span>
+                  <button
+                    type="button"
+                    @click="goToPhoneCallHistoryPage('lead', editingLeadId, 'next')"
+                    :disabled="!activeLeadPhoneCallHistoryState.next || activeLeadPhoneCallHistoryState.loading"
+                    class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-medium text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Вперед
+                  </button>
+                </div>
+              </div>
+            </div>
             <div v-if="editingLeadId" id="lead-task-panel" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -1833,12 +1922,12 @@
                     <button
                       v-if="dealSummaryContact && dealSummaryContact.phone && dealSummaryContact.id"
                       type="button"
-                      @click.stop="startNovofonCall({ phone: dealSummaryContact.phone, entityType: 'contact', entityId: dealSummaryContact.id })"
-                      :disabled="isNovofonCallStartingFor('contact', dealSummaryContact.id, dealSummaryContact.phone)"
+                      @click.stop="startNovofonCall({ phone: dealSummaryContact.phone, entityType: 'deal', entityId: editingDealId })"
+                      :disabled="isNovofonCallStartingFor('deal', editingDealId, dealSummaryContact.phone)"
                       class="inline-flex h-6 items-center justify-center rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2 text-[10px] font-semibold text-emerald-200 transition hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
                       title="Позвонить через CRM"
                     >
-                      [[ isNovofonCallStartingFor('contact', dealSummaryContact.id, dealSummaryContact.phone) ? '...' : 'CRM' ]]
+                      [[ isNovofonCallStartingFor('deal', editingDealId, dealSummaryContact.phone) ? '...' : 'CRM' ]]
                     </button>
                     <a
                       v-if="dealSummaryContact && emailHref(dealSummaryContact.email)"
@@ -1997,6 +2086,95 @@
                 <span class="text-crm-accent">+</span>
                 <span>Переписка</span>
               </button>
+            </div>
+            <div v-if="editingDealId" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold text-white">История звонков</div>
+                  <div class="text-xs text-crm-muted">[[ forms.deals.title || `Сделка #${editingDealId}` ]]</div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    v-for="filterOption in phoneCallHistoryFilters"
+                    :key="`deal-call-filter-${filterOption.value}`"
+                    type="button"
+                    @click="setPhoneCallHistoryFilter('deal', editingDealId, filterOption.value)"
+                    :class="phoneCallFilterButtonClass('deal', editingDealId, filterOption.value)"
+                    class="inline-flex h-8 items-center rounded-lg border px-3 text-xs font-medium transition"
+                  >
+                    [[ filterOption.label ]]
+                  </button>
+                </div>
+              </div>
+              <div v-if="activeDealPhoneCallHistoryState.error" class="mt-3 text-sm text-red-300">
+                [[ activeDealPhoneCallHistoryState.error ]]
+              </div>
+              <div v-else-if="activeDealPhoneCallHistoryState.loading" class="mt-3 text-sm text-crm-muted">
+                Загрузка звонков...
+              </div>
+              <div v-else-if="activeDealPhoneCallHistoryState.items.length === 0" class="mt-3 text-sm text-crm-muted">
+                По этой сделке звонков пока нет.
+              </div>
+              <div v-else class="mt-3 space-y-2">
+                <div
+                  v-for="call in activeDealPhoneCallHistoryState.items"
+                  :key="`deal-call-${call.id}`"
+                  class="rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3"
+                >
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-medium" :class="phoneCallStatusClass(call.status)">
+                          [[ phoneCallStatusLabel(call.status) ]]
+                        </span>
+                        <span class="inline-flex items-center rounded-full border border-crm-border bg-[#123753] px-2 py-1 text-[11px] font-medium text-white">
+                          [[ phoneCallDirectionLabel(call.direction) ]]
+                        </span>
+                        <span class="text-xs text-crm-muted">[[ phoneCallStartedLabel(call) || '—' ]]</span>
+                      </div>
+                      <div class="mt-2 text-sm font-medium text-white break-all">[[ phoneCallDisplayPhone(call) || 'Номер не указан' ]]</div>
+                      <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-crm-muted">
+                        <span>Длительность: [[ phoneCallDurationLabel(call) ]]</span>
+                        <span>Ответственный: [[ call.responsible_user_name || call.crm_user_name || 'Не назначен' ]]</span>
+                        <span v-if="call.contact_name">Контакт: [[ call.contact_name ]]</span>
+                      </div>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                      <a
+                        v-if="call.recording_url"
+                        :href="call.recording_url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex h-8 items-center rounded-lg border border-crm-accent/40 bg-crm-accent/15 px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Запись
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-if="activeDealPhoneCallHistoryState.items.length" class="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-crm-muted">
+                <div>[[ `Показано ${activeDealPhoneCallHistoryState.items.length} из ${activeDealPhoneCallHistoryState.count}` ]]</div>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    @click="goToPhoneCallHistoryPage('deal', editingDealId, 'previous')"
+                    :disabled="!activeDealPhoneCallHistoryState.previous || activeDealPhoneCallHistoryState.loading"
+                    class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-medium text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Назад
+                  </button>
+                  <span>Стр. [[ activeDealPhoneCallHistoryState.page || 1 ]]</span>
+                  <button
+                    type="button"
+                    @click="goToPhoneCallHistoryPage('deal', editingDealId, 'next')"
+                    :disabled="!activeDealPhoneCallHistoryState.next || activeDealPhoneCallHistoryState.loading"
+                    class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-medium text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Вперед
+                  </button>
+                </div>
+              </div>
             </div>
             <div v-if="editingDealId && showDealCommunicationsPanel" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <div class="flex flex-wrap items-center justify-between gap-3">
@@ -2952,6 +3130,95 @@
               <input v-model="forms.contacts.isPrimary" type="checkbox" class="w-4 h-4 rounded border-crm-border bg-transparent" />
               <span class="text-sm text-crm-muted">Основной контакт</span>
             </label>
+            <div v-if="editingContactId" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold text-white">История звонков</div>
+                  <div class="text-xs text-crm-muted">[[ forms.contacts.fullName || `Контакт #${editingContactId}` ]]</div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    v-for="filterOption in phoneCallHistoryFilters"
+                    :key="`contact-call-filter-${filterOption.value}`"
+                    type="button"
+                    @click="setPhoneCallHistoryFilter('contact', editingContactId, filterOption.value)"
+                    :class="phoneCallFilterButtonClass('contact', editingContactId, filterOption.value)"
+                    class="inline-flex h-8 items-center rounded-lg border px-3 text-xs font-medium transition"
+                  >
+                    [[ filterOption.label ]]
+                  </button>
+                </div>
+              </div>
+              <div v-if="activeContactPhoneCallHistoryState.error" class="mt-3 text-sm text-red-300">
+                [[ activeContactPhoneCallHistoryState.error ]]
+              </div>
+              <div v-else-if="activeContactPhoneCallHistoryState.loading" class="mt-3 text-sm text-crm-muted">
+                Загрузка звонков...
+              </div>
+              <div v-else-if="activeContactPhoneCallHistoryState.items.length === 0" class="mt-3 text-sm text-crm-muted">
+                По этому контакту звонков пока нет.
+              </div>
+              <div v-else class="mt-3 space-y-2">
+                <div
+                  v-for="call in activeContactPhoneCallHistoryState.items"
+                  :key="`contact-call-${call.id}`"
+                  class="rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3"
+                >
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-medium" :class="phoneCallStatusClass(call.status)">
+                          [[ phoneCallStatusLabel(call.status) ]]
+                        </span>
+                        <span class="inline-flex items-center rounded-full border border-crm-border bg-[#123753] px-2 py-1 text-[11px] font-medium text-white">
+                          [[ phoneCallDirectionLabel(call.direction) ]]
+                        </span>
+                        <span class="text-xs text-crm-muted">[[ phoneCallStartedLabel(call) || '—' ]]</span>
+                      </div>
+                      <div class="mt-2 text-sm font-medium text-white break-all">[[ phoneCallDisplayPhone(call) || 'Номер не указан' ]]</div>
+                      <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-crm-muted">
+                        <span>Длительность: [[ phoneCallDurationLabel(call) ]]</span>
+                        <span>Ответственный: [[ call.responsible_user_name || call.crm_user_name || 'Не назначен' ]]</span>
+                        <span v-if="call.company_name">Компания: [[ call.company_name ]]</span>
+                      </div>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                      <a
+                        v-if="call.recording_url"
+                        :href="call.recording_url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex h-8 items-center rounded-lg border border-crm-accent/40 bg-crm-accent/15 px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Запись
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-if="activeContactPhoneCallHistoryState.items.length" class="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-crm-muted">
+                <div>[[ `Показано ${activeContactPhoneCallHistoryState.items.length} из ${activeContactPhoneCallHistoryState.count}` ]]</div>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    @click="goToPhoneCallHistoryPage('contact', editingContactId, 'previous')"
+                    :disabled="!activeContactPhoneCallHistoryState.previous || activeContactPhoneCallHistoryState.loading"
+                    class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-medium text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Назад
+                  </button>
+                  <span>Стр. [[ activeContactPhoneCallHistoryState.page || 1 ]]</span>
+                  <button
+                    type="button"
+                    @click="goToPhoneCallHistoryPage('contact', editingContactId, 'next')"
+                    :disabled="!activeContactPhoneCallHistoryState.next || activeContactPhoneCallHistoryState.loading"
+                    class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-medium text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Вперед
+                  </button>
+                </div>
+              </div>
+            </div>
           </template>
 
           <template v-if="activeSection === 'touches'">
@@ -3366,6 +3633,95 @@
                 <div class="py-1 md:col-span-2">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Сумма успешных сделок за всё время</div>
                   <div class="mt-1 text-sm text-white">[[ formatDealAmountSummary(companySummaryWonAmount, forms.companies.currency || 'RUB') ]]</div>
+                </div>
+              </div>
+            </div>
+            <div v-if="editingCompanyId" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold text-white">История звонков</div>
+                  <div class="text-xs text-crm-muted">[[ forms.companies.name || `Компания #${editingCompanyId}` ]]</div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    v-for="filterOption in phoneCallHistoryFilters"
+                    :key="`company-call-filter-${filterOption.value}`"
+                    type="button"
+                    @click="setPhoneCallHistoryFilter('company', editingCompanyId, filterOption.value)"
+                    :class="phoneCallFilterButtonClass('company', editingCompanyId, filterOption.value)"
+                    class="inline-flex h-8 items-center rounded-lg border px-3 text-xs font-medium transition"
+                  >
+                    [[ filterOption.label ]]
+                  </button>
+                </div>
+              </div>
+              <div v-if="activeCompanyPhoneCallHistoryState.error" class="mt-3 text-sm text-red-300">
+                [[ activeCompanyPhoneCallHistoryState.error ]]
+              </div>
+              <div v-else-if="activeCompanyPhoneCallHistoryState.loading" class="mt-3 text-sm text-crm-muted">
+                Загрузка звонков...
+              </div>
+              <div v-else-if="activeCompanyPhoneCallHistoryState.items.length === 0" class="mt-3 text-sm text-crm-muted">
+                По этой компании звонков пока нет.
+              </div>
+              <div v-else class="mt-3 space-y-2">
+                <div
+                  v-for="call in activeCompanyPhoneCallHistoryState.items"
+                  :key="`company-call-${call.id}`"
+                  class="rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3"
+                >
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-medium" :class="phoneCallStatusClass(call.status)">
+                          [[ phoneCallStatusLabel(call.status) ]]
+                        </span>
+                        <span class="inline-flex items-center rounded-full border border-crm-border bg-[#123753] px-2 py-1 text-[11px] font-medium text-white">
+                          [[ phoneCallDirectionLabel(call.direction) ]]
+                        </span>
+                        <span class="text-xs text-crm-muted">[[ phoneCallStartedLabel(call) || '—' ]]</span>
+                      </div>
+                      <div class="mt-2 text-sm font-medium text-white break-all">[[ phoneCallDisplayPhone(call) || 'Номер не указан' ]]</div>
+                      <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-crm-muted">
+                        <span>Длительность: [[ phoneCallDurationLabel(call) ]]</span>
+                        <span>Ответственный: [[ call.responsible_user_name || call.crm_user_name || 'Не назначен' ]]</span>
+                        <span v-if="call.deal_title">Сделка: [[ call.deal_title ]]</span>
+                      </div>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                      <a
+                        v-if="call.recording_url"
+                        :href="call.recording_url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex h-8 items-center rounded-lg border border-crm-accent/40 bg-crm-accent/15 px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Запись
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-if="activeCompanyPhoneCallHistoryState.items.length" class="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-crm-muted">
+                <div>[[ `Показано ${activeCompanyPhoneCallHistoryState.items.length} из ${activeCompanyPhoneCallHistoryState.count}` ]]</div>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    @click="goToPhoneCallHistoryPage('company', editingCompanyId, 'previous')"
+                    :disabled="!activeCompanyPhoneCallHistoryState.previous || activeCompanyPhoneCallHistoryState.loading"
+                    class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-medium text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Назад
+                  </button>
+                  <span>Стр. [[ activeCompanyPhoneCallHistoryState.page || 1 ]]</span>
+                  <button
+                    type="button"
+                    @click="goToPhoneCallHistoryPage('company', editingCompanyId, 'next')"
+                    :disabled="!activeCompanyPhoneCallHistoryState.next || activeCompanyPhoneCallHistoryState.loading"
+                    class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-medium text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Вперед
+                  </button>
                 </div>
               </div>
             </div>

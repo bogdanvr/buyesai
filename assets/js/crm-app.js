@@ -174,6 +174,13 @@
           modalErrorMessage: "",
           isNovofonCallStarting: false,
           activeNovofonCallTarget: "",
+          phoneCallHistoryFilters: [
+            { value: "all", label: "Все" },
+            { value: "inbound", label: "Входящие" },
+            { value: "outbound", label: "Исходящие" },
+            { value: "missed", label: "Пропущенные" },
+          ],
+          phoneCallHistories: {},
           forms: {
             leads: {
               title: "",
@@ -838,6 +845,18 @@
           const contacts = (this.dealCompanyContacts.length ? this.dealCompanyContacts : this.datasets.contacts)
             .filter((contact) => String(contact.clientId || "") === String(companyId));
           return contacts.find((contact) => contact.isPrimary) || contacts[0] || null;
+        },
+        activeLeadPhoneCallHistoryState() {
+          return this.getPhoneCallHistoryEntityState("lead", this.editingLeadId, false);
+        },
+        activeDealPhoneCallHistoryState() {
+          return this.getPhoneCallHistoryEntityState("deal", this.editingDealId, false);
+        },
+        activeContactPhoneCallHistoryState() {
+          return this.getPhoneCallHistoryEntityState("contact", this.editingContactId, false);
+        },
+        activeCompanyPhoneCallHistoryState() {
+          return this.getPhoneCallHistoryEntityState("company", this.editingCompanyId, false);
         },
         dealCommunicationContactOptions() {
           const companyId = this.toIntOrNull(this.forms.deals.companyId);
@@ -1847,6 +1866,12 @@
         }
       },
       watch: {
+        showModal(nextValue) {
+          if (!nextValue) return;
+          const target = this.resolveActivePhoneCallHistoryTarget();
+          if (!target) return;
+          this.ensurePhoneCallHistoryLoaded(target.entityType, target.entityId).catch(() => {});
+        },
         activeSection(nextValue, previousValue) {
           this.syncStatusFiltersForSection(previousValue);
           this.applyStatusFiltersForSection(nextValue);
@@ -2164,6 +2189,7 @@
                 comment: String(comment || "").trim(),
               }
             });
+            this.refreshPhoneCallHistory(normalizedEntityType, normalizedEntityId).catch(() => {});
           } catch (error) {
             this.setUiError(`Ошибка запуска звонка: ${error.message}`, { modal: true });
           } finally {
@@ -2179,6 +2205,230 @@
           if (Array.isArray(data)) return data;
           if (data && Array.isArray(data.results)) return data.results;
           return [];
+        },
+        resolveActivePhoneCallHistoryTarget() {
+          if (this.activeSection === "leads" && this.toIntOrNull(this.editingLeadId)) {
+            return { entityType: "lead", entityId: this.toIntOrNull(this.editingLeadId) };
+          }
+          if (this.activeSection === "deals" && this.toIntOrNull(this.editingDealId)) {
+            return { entityType: "deal", entityId: this.toIntOrNull(this.editingDealId) };
+          }
+          if (this.activeSection === "contacts" && this.toIntOrNull(this.editingContactId)) {
+            return { entityType: "contact", entityId: this.toIntOrNull(this.editingContactId) };
+          }
+          if (this.activeSection === "companies" && this.toIntOrNull(this.editingCompanyId)) {
+            return { entityType: "company", entityId: this.toIntOrNull(this.editingCompanyId) };
+          }
+          return null;
+        },
+        phoneCallHistoryEntityKey(entityType, entityId) {
+          const normalizedEntityType = String(entityType || "").trim();
+          const normalizedEntityId = this.toIntOrNull(entityId);
+          if (!normalizedEntityType || !normalizedEntityId) return "";
+          return `${normalizedEntityType}:${normalizedEntityId}`;
+        },
+        defaultPhoneCallHistoryState() {
+          return {
+            loading: false,
+            error: "",
+            items: [],
+            count: 0,
+            next: "",
+            previous: "",
+            page: 1,
+            currentFilter: "all",
+            cache: {},
+          };
+        },
+        getPhoneCallHistoryEntityState(entityType, entityId, createIfMissing = true) {
+          const entityKey = this.phoneCallHistoryEntityKey(entityType, entityId);
+          if (!entityKey) {
+            return this.defaultPhoneCallHistoryState();
+          }
+          if (!this.phoneCallHistories[entityKey] && createIfMissing) {
+            this.phoneCallHistories[entityKey] = this.defaultPhoneCallHistoryState();
+          }
+          return this.phoneCallHistories[entityKey] || this.defaultPhoneCallHistoryState();
+        },
+        phoneCallHistoryCacheKey(filterValue, page) {
+          return `${String(filterValue || "all").trim() || "all"}:${Math.max(1, Number(page) || 1)}`;
+        },
+        buildPhoneCallHistoryQuery(entityType, entityId, filterValue, page) {
+          const normalizedEntityType = String(entityType || "").trim();
+          const normalizedEntityId = this.toIntOrNull(entityId);
+          const normalizedFilter = String(filterValue || "all").trim() || "all";
+          const normalizedPage = Math.max(1, Number(page) || 1);
+          const params = new URLSearchParams({
+            entity_type: normalizedEntityType,
+            entity_id: String(normalizedEntityId || ""),
+            page_size: "10",
+            page: String(normalizedPage),
+          });
+          if (normalizedFilter === "inbound" || normalizedFilter === "outbound") {
+            params.set("direction", normalizedFilter);
+          } else if (normalizedFilter === "missed") {
+            params.set("status", "missed");
+          }
+          return params.toString();
+        },
+        applyPhoneCallHistoryState(state, payload, options = {}) {
+          const normalizedFilter = String(options.filterValue || state.currentFilter || "all").trim() || "all";
+          const normalizedPage = Math.max(1, Number(options.page || payload.page || 1) || 1);
+          state.currentFilter = normalizedFilter;
+          state.page = normalizedPage;
+          state.items = Array.isArray(payload.items) ? payload.items : [];
+          state.count = Math.max(0, Number(payload.count) || 0);
+          state.next = payload.next || "";
+          state.previous = payload.previous || "";
+        },
+        async loadPhoneCallHistory(entityType, entityId, options = {}) {
+          const normalizedEntityType = String(entityType || "").trim();
+          const normalizedEntityId = this.toIntOrNull(entityId);
+          if (!normalizedEntityType || !normalizedEntityId) {
+            return;
+          }
+          const state = this.getPhoneCallHistoryEntityState(normalizedEntityType, normalizedEntityId, true);
+          const filterValue = String(options.filterValue || state.currentFilter || "all").trim() || "all";
+          const page = Math.max(1, Number(options.page || state.page || 1) || 1);
+          const cacheKey = this.phoneCallHistoryCacheKey(filterValue, page);
+          if (!options.force && state.cache[cacheKey]) {
+            this.applyPhoneCallHistoryState(state, state.cache[cacheKey], { filterValue, page });
+            return;
+          }
+          state.loading = true;
+          state.error = "";
+          try {
+            const query = this.buildPhoneCallHistoryQuery(normalizedEntityType, normalizedEntityId, filterValue, page);
+            const response = await this.apiRequest(`/api/telephony/calls/?${query}`);
+            const items = this.normalizePaginatedResponse(response);
+            const payload = {
+              items,
+              count: Number(response?.count) || items.length,
+              next: response?.next || "",
+              previous: response?.previous || "",
+              page,
+            };
+            state.cache = {
+              ...state.cache,
+              [cacheKey]: payload,
+            };
+            this.applyPhoneCallHistoryState(state, payload, { filterValue, page });
+          } catch (error) {
+            state.error = error.message || "Не удалось загрузить историю звонков.";
+          } finally {
+            state.loading = false;
+          }
+        },
+        async ensurePhoneCallHistoryLoaded(entityType, entityId) {
+          return this.loadPhoneCallHistory(entityType, entityId, { page: 1 });
+        },
+        async refreshPhoneCallHistory(entityType, entityId) {
+          const state = this.getPhoneCallHistoryEntityState(entityType, entityId, true);
+          const filterValue = String(state.currentFilter || "all").trim() || "all";
+          state.page = 1;
+          return this.loadPhoneCallHistory(entityType, entityId, {
+            force: true,
+            filterValue,
+            page: 1,
+          });
+        },
+        async setPhoneCallHistoryFilter(entityType, entityId, filterValue) {
+          const state = this.getPhoneCallHistoryEntityState(entityType, entityId, true);
+          state.currentFilter = String(filterValue || "all").trim() || "all";
+          state.page = 1;
+          return this.loadPhoneCallHistory(entityType, entityId, {
+            filterValue: state.currentFilter,
+            page: 1,
+          });
+        },
+        async goToPhoneCallHistoryPage(entityType, entityId, direction) {
+          const state = this.getPhoneCallHistoryEntityState(entityType, entityId, false);
+          if (!state) return;
+          const step = String(direction || "").trim() === "previous" ? -1 : 1;
+          const targetPage = Math.max(1, Number(state.page || 1) + step);
+          if (step < 0 && !state.previous) return;
+          if (step > 0 && !state.next) return;
+          return this.loadPhoneCallHistory(entityType, entityId, {
+            filterValue: state.currentFilter || "all",
+            page: targetPage,
+          });
+        },
+        phoneCallFilterButtonClass(entityType, entityId, filterValue) {
+          const state = this.getPhoneCallHistoryEntityState(entityType, entityId, false);
+          const isActive = String(state?.currentFilter || "all") === String(filterValue || "all");
+          return isActive
+            ? "border-crm-accent bg-crm-accent/15 text-white"
+            : "border-crm-border bg-[#123753] text-crm-muted hover:border-crm-accent/70 hover:text-white";
+        },
+        phoneCallDirectionLabel(direction) {
+          const normalized = String(direction || "").trim();
+          if (normalized === "inbound") return "Входящий";
+          if (normalized === "outbound") return "Исходящий";
+          return "Звонок";
+        },
+        phoneCallStatusLabel(status) {
+          const normalized = String(status || "").trim();
+          if (normalized === "ringing") return "Звонит";
+          if (normalized === "answered") return "Ответили";
+          if (normalized === "missed") return "Пропущен";
+          if (normalized === "completed") return "Завершен";
+          if (normalized === "failed") return "Ошибка";
+          if (normalized === "canceled") return "Отменен";
+          return normalized || "Неизвестно";
+        },
+        phoneCallStatusClass(status) {
+          const normalized = String(status || "").trim();
+          if (normalized === "answered" || normalized === "completed") {
+            return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300";
+          }
+          if (normalized === "missed" || normalized === "failed" || normalized === "canceled") {
+            return "border-red-400/30 bg-red-400/10 text-red-300";
+          }
+          if (normalized === "ringing") {
+            return "border-amber-400/30 bg-amber-400/10 text-amber-200";
+          }
+          return "border-crm-border bg-[#123753] text-white";
+        },
+        formatCallDuration(totalSeconds) {
+          const normalizedSeconds = Math.max(0, Number(totalSeconds) || 0);
+          const hours = Math.floor(normalizedSeconds / 3600);
+          const minutes = Math.floor((normalizedSeconds % 3600) / 60);
+          const seconds = normalizedSeconds % 60;
+          if (hours > 0) {
+            return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+          }
+          return `${minutes}:${String(seconds).padStart(2, "0")}`;
+        },
+        phoneCallDurationLabel(call) {
+          const totalSeconds = Math.max(
+            Number(call?.talk_duration_sec) || 0,
+            Number(call?.duration_sec) || 0
+          );
+          if (totalSeconds > 0) {
+            return this.formatCallDuration(totalSeconds);
+          }
+          const status = String(call?.status || "").trim();
+          if (status === "missed") return "Без ответа";
+          if (status === "ringing") return "Идет вызов";
+          if (status === "failed") return "Не состоялся";
+          if (status === "canceled") return "Отменен";
+          return "—";
+        },
+        phoneCallDisplayPhone(call) {
+          const direction = String(call?.direction || "").trim();
+          if (direction === "inbound") {
+            return String(call?.phone_from || call?.client_phone_normalized || call?.phone_to || "").trim();
+          }
+          return String(call?.phone_to || call?.client_phone_normalized || call?.phone_from || "").trim();
+        },
+        phoneCallStartedLabel(call) {
+          return this.formatEventTimestamp(
+            call?.started_at
+            || call?.answered_at
+            || call?.ended_at
+            || call?.created_at
+            || ""
+          );
         },
         hasVisibleFieldValue(value) {
           if (Array.isArray(value)) {
@@ -6218,6 +6468,7 @@
             events: item.events || ""
           };
           this.showModal = true;
+          this.ensurePhoneCallHistoryLoaded("lead", this.editingLeadId).catch(() => {});
         },
         openDealEditor(item) {
           this.clearUiErrors({ modalOnly: true });
@@ -6258,6 +6509,7 @@
           }
           this.loadTasksForDeal();
           this.showModal = true;
+          this.ensurePhoneCallHistoryLoaded("deal", this.editingDealId).catch(() => {});
         },
         openDealEditorById(dealId) {
           const normalizedId = this.toIntOrNull(dealId);
@@ -6307,6 +6559,7 @@
             isPrimary: !!item.isPrimary
           };
           this.showModal = true;
+          this.ensurePhoneCallHistoryLoaded("contact", this.editingContactId).catch(() => {});
         },
         openCompanyEditor(item) {
           this.clearUiErrors({ modalOnly: true });
@@ -6368,6 +6621,7 @@
           this.showCompanyLeadsPanel = false;
           this.loadContactsForCompany();
           this.showModal = true;
+          this.ensurePhoneCallHistoryLoaded("company", this.editingCompanyId).catch(() => {});
           this.enrichCompanyFromDadataByInn();
         },
         openTaskEditor(item, options = {}) {
