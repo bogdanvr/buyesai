@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -82,7 +83,17 @@ def _phone_call_status_from_api(payload: dict) -> str:
     return PhoneCallStatus.RINGING
 
 
-def _parse_novofon_datetime(value: str):
+def _resolve_novofon_timezone(account: TelephonyProviderAccount):
+    timezone_name = str((account.settings_json or {}).get("novofon_timezone") or "").strip()
+    if timezone_name:
+        try:
+            return ZoneInfo(timezone_name)
+        except Exception:
+            logger.warning("Invalid Novofon timezone in settings_json: %s", timezone_name)
+    return timezone.get_current_timezone()
+
+
+def _parse_novofon_datetime(value: str, *, source_timezone=None):
     raw = str(value or "").strip()
     if not raw:
         return None
@@ -93,7 +104,7 @@ def _parse_novofon_datetime(value: str):
         except ValueError:
             return None
     if timezone.is_naive(parsed):
-        return timezone.make_aware(parsed, timezone.get_current_timezone())
+        return timezone.make_aware(parsed, source_timezone or timezone.get_current_timezone())
     return parsed
 
 
@@ -144,7 +155,7 @@ def _resolve_history_employee_id(row: dict) -> str:
     return ""
 
 
-def _upsert_phone_call_from_history(*, account: TelephonyProviderAccount, row: dict) -> tuple[PhoneCall | None, bool]:
+def _upsert_phone_call_from_history(*, account: TelephonyProviderAccount, row: dict, source_timezone=None) -> tuple[PhoneCall | None, bool]:
     external_call_id = str(row.get("id") or "").strip()
     if not external_call_id:
         return None, False
@@ -176,9 +187,9 @@ def _upsert_phone_call_from_history(*, account: TelephonyProviderAccount, row: d
             "virtual_number": str(row.get("virtual_phone_number") or "").strip(),
             "crm_user": getattr(mapping, "crm_user", None),
             "responsible_user": getattr(mapping, "crm_user", None) or account.default_owner,
-            "started_at": _parse_novofon_datetime(row.get("start_time")),
-            "answered_at": _parse_novofon_datetime(row.get("start_time")) if (_int_or_none(row.get("talk_duration")) or 0) > 0 else None,
-            "ended_at": _parse_novofon_datetime(row.get("finish_time")),
+            "started_at": _parse_novofon_datetime(row.get("start_time"), source_timezone=source_timezone),
+            "answered_at": _parse_novofon_datetime(row.get("start_time"), source_timezone=source_timezone) if (_int_or_none(row.get("talk_duration")) or 0) > 0 else None,
+            "ended_at": _parse_novofon_datetime(row.get("finish_time"), source_timezone=source_timezone),
             "duration_sec": _int_or_none(row.get("total_duration")),
             "talk_duration_sec": _int_or_none(row.get("clean_talk_duration")) or _int_or_none(row.get("talk_duration")),
             "recording_url": str(row.get("full_record_file_link") or "").strip(),
@@ -194,10 +205,10 @@ def _upsert_phone_call_from_history(*, account: TelephonyProviderAccount, row: d
     call.virtual_number = str(row.get("virtual_phone_number") or call.virtual_number or "").strip()
     call.crm_user = getattr(mapping, "crm_user", None) or call.crm_user
     call.responsible_user = getattr(mapping, "crm_user", None) or call.responsible_user or account.default_owner
-    call.started_at = _parse_novofon_datetime(row.get("start_time")) or call.started_at
+    call.started_at = _parse_novofon_datetime(row.get("start_time"), source_timezone=source_timezone) or call.started_at
     if (_int_or_none(row.get("talk_duration")) or 0) > 0:
-        call.answered_at = _parse_novofon_datetime(row.get("start_time")) or call.answered_at
-    call.ended_at = _parse_novofon_datetime(row.get("finish_time")) or call.ended_at
+        call.answered_at = _parse_novofon_datetime(row.get("start_time"), source_timezone=source_timezone) or call.answered_at
+    call.ended_at = _parse_novofon_datetime(row.get("finish_time"), source_timezone=source_timezone) or call.ended_at
     call.duration_sec = _int_or_none(row.get("total_duration")) if row.get("total_duration") not in (None, "") else call.duration_sec
     call.talk_duration_sec = (
         _int_or_none(row.get("clean_talk_duration"))
@@ -249,14 +260,15 @@ def _create_unknown_lead(*, account: TelephonyProviderAccount, phone_normalized:
 
 
 def _ensure_binding_for_call(*, account: TelephonyProviderAccount, call: PhoneCall) -> PhoneCall:
-    if call.contact_id or call.company_id or call.lead_id or call.deal_id:
-        return call
-
     binding = resolve_call_binding(account=account, phone_normalized=call.client_phone_normalized)
-    call.contact = binding["contact"]
-    call.company = binding["company"]
-    call.lead = binding["lead"]
-    call.deal = binding["deal"]
+    if call.contact_id is None and binding["contact"] is not None:
+        call.contact = binding["contact"]
+    if call.company_id is None and binding["company"] is not None:
+        call.company = binding["company"]
+    if call.lead_id is None and binding["lead"] is not None:
+        call.lead = binding["lead"]
+    if call.deal_id is None and binding["deal"] is not None:
+        call.deal = binding["deal"]
     if call.responsible_user_id is None:
         call.responsible_user = (
             getattr(call.deal, "owner", None)
@@ -476,10 +488,16 @@ def check_novofon_connection(*, account: TelephonyProviderAccount | None = None)
         data_api_payload = client.ping()
         call_api_payload = client.probe_call_api()
         virtual_numbers = client.list_virtual_numbers()
+        account_data = (data_api_payload.get("data") or [{}])[0] if isinstance(data_api_payload.get("data"), list) else {}
+        novofon_timezone = str(account_data.get("timezone") or "").strip()
+        settings_json = dict(account.settings_json or {})
+        if novofon_timezone:
+            settings_json["novofon_timezone"] = novofon_timezone
+            account.settings_json = settings_json
         account.last_connection_checked_at = checked_at
         account.last_connection_status = "ok"
         account.last_connection_error = ""
-        account.save(update_fields=["last_connection_checked_at", "last_connection_status", "last_connection_error", "updated_at"])
+        account.save(update_fields=["settings_json", "last_connection_checked_at", "last_connection_status", "last_connection_error", "updated_at"])
         return {
             "ok": True,
             "payload": {
@@ -520,6 +538,7 @@ def import_novofon_calls_history(
         raise ValueError("Novofon Data API позволяет импортировать период не более 90 дней за один запуск.")
 
     client = _provider_client(account)
+    source_timezone = _resolve_novofon_timezone(account)
     imported = 0
     created_count = 0
     updated_count = 0
@@ -542,7 +561,7 @@ def import_novofon_calls_history(
         if not records:
             break
         for row in records:
-            call, created = _upsert_phone_call_from_history(account=account, row=row)
+            call, created = _upsert_phone_call_from_history(account=account, row=row, source_timezone=source_timezone)
             if call is None:
                 continue
             imported += 1

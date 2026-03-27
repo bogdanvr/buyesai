@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 import uuid
+from zoneinfo import ZoneInfo
 
 import requests
-from django.utils import timezone
 
 from integrations.models import TelephonyProviderAccount
 from integrations.novofon.selectors import normalize_phone
@@ -31,6 +31,16 @@ class NovofonClient:
         self.account = account
         self.data_api_base_url = str(account.api_base_url or "").strip().rstrip("/") or DEFAULT_DATA_API_BASE_URL
         self.call_api_base_url = str((account.settings_json or {}).get("call_api_base_url") or "").strip().rstrip("/") or DEFAULT_CALL_API_BASE_URL
+
+    def _novofon_timezone(self):
+        timezone_name = str((self.account.settings_json or {}).get("novofon_timezone") or "").strip()
+        if not timezone_name:
+            return None
+        try:
+            return ZoneInfo(timezone_name)
+        except Exception:
+            logger.warning("Invalid novofon_timezone in account settings: %s", timezone_name)
+            return None
 
     def _access_token(self) -> str:
         token = str(self.account.api_key or "").strip()
@@ -132,9 +142,10 @@ class NovofonClient:
         include_ongoing_calls: bool = False,
         fields: list[str] | None = None,
     ) -> dict:
+        source_timezone = self._novofon_timezone()
         params = {
-            "date_from": timezone.localtime(date_from).strftime("%Y-%m-%d %H:%M:%S"),
-            "date_till": timezone.localtime(date_till).strftime("%Y-%m-%d %H:%M:%S"),
+            "date_from": date_from.astimezone(source_timezone).strftime("%Y-%m-%d %H:%M:%S") if source_timezone else date_from.strftime("%Y-%m-%d %H:%M:%S"),
+            "date_till": date_till.astimezone(source_timezone).strftime("%Y-%m-%d %H:%M:%S") if source_timezone else date_till.strftime("%Y-%m-%d %H:%M:%S"),
             "limit": int(limit),
             "offset": int(offset),
             "include_ongoing_calls": bool(include_ongoing_calls),

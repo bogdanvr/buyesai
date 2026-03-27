@@ -1,4 +1,5 @@
 from unittest.mock import Mock, patch
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase
@@ -59,6 +60,30 @@ class NovofonClientRoutingTests(SimpleTestCase):
         payload = request_mock.call_args.kwargs["json"]
         self.assertEqual(payload["method"], "get.account")
         self.assertEqual(payload["params"]["access_token"], "token-1")
+
+    def test_calls_report_uses_novofon_timezone_from_settings(self):
+        account = TelephonyProviderAccount(
+            provider=TelephonyProvider.NOVOFON,
+            enabled=True,
+            api_key="token-1",
+            api_base_url="",
+            settings_json={"novofon_timezone": "Asia/Omsk"},
+        )
+        client = NovofonClient(account)
+        request_mock = Mock(return_value=self._FakeResponse({"result": {"metadata": {}, "data": []}}))
+
+        with patch("integrations.novofon.client.requests.post", request_mock):
+            client.get_calls_report(
+                date_from=timezone.datetime(2026, 3, 27, 0, 0, tzinfo=ZoneInfo("UTC")),
+                date_till=timezone.datetime(2026, 3, 27, 1, 0, tzinfo=ZoneInfo("UTC")),
+                limit=10,
+                offset=0,
+            )
+
+        payload = request_mock.call_args.kwargs["json"]
+        self.assertEqual(payload["method"], "get.calls_report")
+        self.assertEqual(payload["params"]["date_from"], "2026-03-27 06:00:00")
+        self.assertEqual(payload["params"]["date_till"], "2026-03-27 07:00:00")
 
     def test_initiate_call_uses_call_api_and_virtual_number(self):
         account = TelephonyProviderAccount(
@@ -391,3 +416,98 @@ class NovofonImportCallsApiTests(APITestCase):
         self.assertEqual(call.contact_id, self.contact.pk)
         self.assertEqual(call.deal_id, self.deal.pk)
         self.assertEqual(call.crm_user_id, self.user.pk)
+
+    @patch("integrations.novofon.services.NovofonClient.get_calls_report")
+    def test_import_calls_backfills_missing_lead_for_existing_phone_call(self, get_calls_report_mock):
+        now = timezone.now()
+        existing_call = PhoneCall.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            external_call_id="555002",
+            direction="inbound",
+            status="completed",
+            phone_from="+7 900 000-00-00",
+            phone_to="+7 495 000-00-00",
+            client_phone_normalized="79000000000",
+            contact=self.contact,
+            company=self.company,
+            deal=self.deal,
+        )
+        self.assertIsNone(existing_call.lead_id)
+
+        get_calls_report_mock.side_effect = [
+            {
+                "metadata": {"total_items": 1},
+                "data": [
+                    {
+                        "id": 555002,
+                        "start_time": now.strftime("%Y-%m-%d %H:%M:%S"),
+                        "finish_time": now.strftime("%Y-%m-%d %H:%M:%S"),
+                        "direction": "in",
+                        "is_lost": False,
+                        "contact_phone_number": "+7 900 000-00-00",
+                        "virtual_phone_number": "+7 495 000-00-00",
+                        "operator_phone_number": "101",
+                        "talk_duration": 45,
+                        "clean_talk_duration": 40,
+                        "total_duration": 50,
+                        "full_record_file_link": "https://media.novofon.ru/1/xyz",
+                        "communication_id": 7002,
+                        "last_answered_employee_id": "101",
+                        "employees": [{"employee_id": "101"}],
+                    }
+                ],
+            },
+            {
+                "metadata": {"total_items": 1},
+                "data": [],
+            },
+        ]
+
+        response = self.client.post(
+            reverse("telephony-novofon-import-calls"),
+            {"days": 7, "limit": 100, "max_records": 100},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        existing_call.refresh_from_db()
+        self.assertEqual(existing_call.lead_id, self.lead.pk)
+
+    @patch("integrations.novofon.services.NovofonClient.get_calls_report")
+    def test_import_calls_uses_novofon_timezone_for_naive_timestamps(self, get_calls_report_mock):
+        self.account.settings_json = {"novofon_timezone": "Asia/Omsk"}
+        self.account.save(update_fields=["settings_json", "updated_at"])
+        get_calls_report_mock.side_effect = [
+            {
+                "metadata": {"total_items": 1},
+                "data": [
+                    {
+                        "id": 555003,
+                        "start_time": "2026-03-27 12:00:00",
+                        "finish_time": "2026-03-27 12:10:00",
+                        "direction": "in",
+                        "is_lost": False,
+                        "contact_phone_number": "+7 900 000-00-00",
+                        "virtual_phone_number": "+7 495 000-00-00",
+                        "operator_phone_number": "101",
+                        "talk_duration": 60,
+                        "clean_talk_duration": 60,
+                        "total_duration": 600,
+                        "communication_id": 7003,
+                        "last_answered_employee_id": "101",
+                        "employees": [{"employee_id": "101"}],
+                    }
+                ],
+            },
+            {"metadata": {"total_items": 1}, "data": []},
+        ]
+
+        response = self.client.post(
+            reverse("telephony-novofon-import-calls"),
+            {"days": 7, "limit": 100, "max_records": 100},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        call = PhoneCall.objects.get(external_call_id="555003")
+        self.assertEqual(timezone.localtime(call.started_at, ZoneInfo("Asia/Omsk")).strftime("%Y-%m-%d %H:%M:%S"), "2026-03-27 12:00:00")
