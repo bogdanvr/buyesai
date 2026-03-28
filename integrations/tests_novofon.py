@@ -437,6 +437,16 @@ class NovofonSyncEmployeesApiTests(APITestCase):
         self.assertEqual(response.data["ok"], False)
         self.assertIn("get.employees", response.data["error"])
 
+    @patch("integrations.novofon.views.sync_novofon_employees")
+    def test_sync_employees_returns_json_for_unexpected_error(self, sync_novofon_employees_mock):
+        sync_novofon_employees_mock.side_effect = RuntimeError("boom")
+
+        response = self.client.post(reverse("telephony-novofon-sync-employees"))
+
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertEqual(response.data["ok"], False)
+        self.assertEqual(response.data["error"], "boom")
+
 
 class NovofonSettingsApiTests(APITestCase):
     def setUp(self):

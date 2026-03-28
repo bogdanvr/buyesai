@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -23,6 +25,9 @@ from integrations.novofon.services import (
     reprocess_novofon_event,
     sync_novofon_employees,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class NovofonSettingsAPIView(APIView):
@@ -57,6 +62,9 @@ class NovofonSyncEmployeesAPIView(APIView):
             return Response(payload)
         except (ValueError, NovofonClientError) as error:
             return Response({"ok": False, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.exception("Unexpected error during Novofon employee sync")
+            return Response({"ok": False, "error": str(error) or "unexpected_error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class NovofonCallAPIView(APIView):
