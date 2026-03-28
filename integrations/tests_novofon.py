@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
@@ -259,6 +260,18 @@ class NovofonWebhookApiTests(APITestCase):
         self.assertEqual(PhoneCall.objects.filter(external_call_id="call-1").count(), 1)
         statuses = list(TelephonyEventLog.objects.order_by("id").values_list("status", flat=True))
         self.assertEqual(statuses, [TelephonyEventStatus.PROCESSED, TelephonyEventStatus.IGNORED_DUPLICATE])
+
+    def test_webhook_accepts_raw_json_body_with_non_json_content_type(self):
+        response = self.client.generic(
+            "POST",
+            reverse("integrations-novofon-webhook"),
+            data=json.dumps(self._payload(event_id="event-raw-json")),
+            content_type="text/plain",
+            HTTP_X_WEBHOOK_SECRET="secret",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertTrue(TelephonyEventLog.objects.filter(external_event_id="event-raw-json").exists())
 
     def test_webhook_accepts_valid_signature_and_processes_official_payload(self):
         self.account.api_secret = "api-secret"

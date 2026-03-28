@@ -1,5 +1,7 @@
+import json
 import logging
 from datetime import timedelta
+from urllib.parse import parse_qsl
 
 from django.db.models import Q
 from django.utils import timezone
@@ -32,6 +34,25 @@ from integrations.novofon.services import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_novofon_request_payload(request) -> dict:
+    raw_body = request.body.decode("utf-8", errors="ignore").strip()
+    if not raw_body:
+        return {}
+
+    try:
+        parsed_json = json.loads(raw_body)
+        if isinstance(parsed_json, dict):
+            return parsed_json
+    except (TypeError, ValueError):
+        pass
+
+    parsed_pairs = parse_qsl(raw_body, keep_blank_values=True)
+    if parsed_pairs:
+        return {str(key or "").strip(): value for key, value in parsed_pairs}
+
+    return {}
 
 
 class NovofonSettingsAPIView(APIView):
@@ -225,8 +246,10 @@ class NovofonWebhookAPIView(APIView):
 
     def post(self, request):
         account = get_novofon_account(create=True)
-        payload = request.data if isinstance(request.data, dict) else {}
+        payload = _parse_novofon_request_payload(request)
         headers = dict(request.headers.items())
+        if not payload:
+            return Response({"ok": False, "error": "invalid_payload"}, status=status.HTTP_400_BAD_REQUEST)
         auth_error = validate_novofon_webhook_auth(
             payload=payload,
             headers=headers,
