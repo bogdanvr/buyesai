@@ -19,6 +19,7 @@ from django.conf.urls.static import static
 from django.urls import include, path
 from crm.admin import crm_admin_site
 from integrations.novofon.views import (
+    IncomingPhoneCallPopupAPIView,
     NovofonCallAPIView,
     NovofonCheckConnectionAPIView,
     NovofonImportCallsAPIView,
@@ -27,6 +28,7 @@ from integrations.novofon.views import (
     NovofonWebhookAPIView,
     PhoneCallDetailAPIView,
     PhoneCallListAPIView,
+    TelephonyHealthAPIView,
     TelephonyEventReprocessAPIView,
 )
 from main.views import (
@@ -74,6 +76,8 @@ urlpatterns = [
     path("api/telephony/novofon/call/", NovofonCallAPIView.as_view(), name="telephony-novofon-call"),
     path("api/telephony/calls/", PhoneCallListAPIView.as_view(), name="telephony-calls"),
     path("api/telephony/calls/<int:pk>/", PhoneCallDetailAPIView.as_view(), name="telephony-call-detail"),
+    path("api/telephony/incoming-calls/popup/", IncomingPhoneCallPopupAPIView.as_view(), name="telephony-incoming-call-popup"),
+    path("api/admin/telephony/health/", TelephonyHealthAPIView.as_view(), name="telephony-health"),
     path("api/admin/telephony/events/<int:pk>/reprocess/", TelephonyEventReprocessAPIView.as_view(), name="telephony-event-reprocess"),
     path("api/v1/", include("api.v1.urls")),
 ]

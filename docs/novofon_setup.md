@@ -15,6 +15,8 @@
   - `GET /api/telephony/calls/{id}/`
 - polling endpoint для popup входящего звонка:
   - `GET /api/telephony/incoming-calls/popup/`
+- health endpoint по очереди webhook:
+  - `GET /api/admin/telephony/health/`
 - reprocess событий:
   - `POST /api/admin/telephony/events/{id}/reprocess/`
 

@@ -12,6 +12,12 @@
 - `external_event_id`
 - `deduplication_key`
 
+Быстрый operational snapshot:
+
+```http
+GET /api/admin/telephony/health/
+```
+
 Типовые статусы:
 
 - `queued`
@@ -73,6 +79,12 @@ POST /api/admin/telephony/events/{id}/reprocess/
 ```bash
 python manage.py process_novofon_webhook_queue --limit 50 --retry-failed
 ```
+
+Что делает worker сейчас дополнительно:
+
+- повторяет `failed` события с exponential backoff;
+- не берёт `failed` событие снова мгновенно после ошибки;
+- умеет подбирать зависшие `processing` события после падения worker'а.
 
 ### Исходящий звонок не запускается
 

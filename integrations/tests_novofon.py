@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 from io import StringIO
@@ -25,6 +26,7 @@ from integrations.novofon.client import (
     NovofonClientError,
     NovofonClient,
 )
+from integrations.novofon.services import claim_novofon_events_for_processing
 from integrations.novofon.security import build_novofon_webhook_signature
 from integrations.novofon.selectors import normalize_phone
 
@@ -497,6 +499,111 @@ class IncomingPhoneCallPopupApiTests(APITestCase):
         self.assertEqual(response.data["items"][0]["target_entity_type"], "deal")
         self.assertEqual(response.data["items"][0]["target_entity_id"], self.deal.pk)
         self.assertEqual(response.data["next_call_id"], second_call.pk)
+
+
+class NovofonWebhookQueueClaimTests(APITestCase):
+    def test_failed_event_respects_backoff_before_reclaim(self):
+        recent_failed = TelephonyEventLog.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            event_type="call_completed",
+            external_call_id="failed-recent",
+            status=TelephonyEventStatus.FAILED,
+            retry_count=1,
+            processed_at=timezone.now(),
+        )
+        ready_failed = TelephonyEventLog.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            event_type="call_completed",
+            external_call_id="failed-ready",
+            status=TelephonyEventStatus.FAILED,
+            retry_count=1,
+            processed_at=timezone.now() - timedelta(seconds=45),
+        )
+
+        claimed = claim_novofon_events_for_processing(
+            limit=10,
+            retry_failed=True,
+            failed_backoff_base_seconds=30,
+            failed_backoff_max_seconds=300,
+            reclaim_stale_processing_after_seconds=0,
+        )
+
+        self.assertEqual([event.pk for event in claimed], [ready_failed.pk])
+        recent_failed.refresh_from_db()
+        ready_failed.refresh_from_db()
+        self.assertEqual(recent_failed.status, TelephonyEventStatus.FAILED)
+        self.assertEqual(ready_failed.status, TelephonyEventStatus.PROCESSING)
+
+    def test_stale_processing_event_is_reclaimed(self):
+        stale_processing = TelephonyEventLog.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            event_type="call_completed",
+            external_call_id="processing-stale",
+            status=TelephonyEventStatus.PROCESSING,
+            retry_count=1,
+            processed_at=timezone.now() - timedelta(minutes=10),
+        )
+
+        claimed = claim_novofon_events_for_processing(
+            limit=10,
+            retry_failed=False,
+            reclaim_stale_processing_after_seconds=300,
+        )
+
+        self.assertEqual([event.pk for event in claimed], [stale_processing.pk])
+        stale_processing.refresh_from_db()
+        self.assertEqual(stale_processing.status, TelephonyEventStatus.PROCESSING)
+        self.assertEqual(stale_processing.retry_count, 2)
+        self.assertIsNotNone(stale_processing.processed_at)
+
+
+class TelephonyHealthApiTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="telephony_health_admin",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_health_endpoint_returns_queue_counts_and_problem_events(self):
+        failed_event = TelephonyEventLog.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            event_type="call_completed",
+            external_call_id="health-failed",
+            status=TelephonyEventStatus.FAILED,
+            error_text="broken payload",
+            retry_count=2,
+            processed_at=timezone.now() - timedelta(minutes=2),
+        )
+        stale_processing = TelephonyEventLog.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            event_type="call_completed",
+            external_call_id="health-processing",
+            status=TelephonyEventStatus.PROCESSING,
+            retry_count=1,
+            processed_at=timezone.now() - timedelta(minutes=10),
+        )
+        queued_event = TelephonyEventLog.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            event_type="call_completed",
+            external_call_id="health-queued",
+            status=TelephonyEventStatus.QUEUED,
+        )
+
+        response = self.client.get(reverse("telephony-health"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["counts"]["queued"], 1)
+        self.assertEqual(response.data["counts"]["failed"], 1)
+        self.assertEqual(response.data["counts"]["processing"], 1)
+        self.assertEqual(response.data["counts"]["stale_processing"], 1)
+        returned_event_ids = {item["id"] for item in response.data["problem_events"]}
+        self.assertIn(failed_event.pk, returned_event_ids)
+        self.assertIn(stale_processing.pk, returned_event_ids)
+        self.assertIn(queued_event.pk, returned_event_ids)
+        stale_item = next(item for item in response.data["problem_events"] if item["id"] == stale_processing.pk)
+        self.assertEqual(stale_item["is_stale_processing"], True)
 
 
 class NovofonSyncEmployeesApiTests(APITestCase):

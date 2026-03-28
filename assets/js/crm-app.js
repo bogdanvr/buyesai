@@ -183,8 +183,27 @@
           isTelephonyConnectionChecking: false,
           isTelephonyEmployeesSyncing: false,
           isTelephonyCallsImporting: false,
+          isTelephonyHealthLoading: false,
+          telephonyHealth: {
+            counts: {
+              queued: 0,
+              failed: 0,
+              processing: 0,
+              staleProcessing: 0,
+              processed: 0,
+              ignoredDuplicate: 0,
+            },
+            latestEventAt: "",
+            oldestQueuedAt: "",
+            staleProcessingAfterSeconds: 0,
+            problemEvents: [],
+          },
           telephonySettingsLoaded: false,
           telephonyLastImportResult: null,
+          telephonyIncomingCallCursor: 0,
+          telephonyIncomingCallPopups: [],
+          isTelephonyIncomingCallsPolling: false,
+          telephonyIncomingCallsPollTimer: null,
           telephonyImportForm: {
             days: 30,
             limit: 500,
@@ -2291,6 +2310,231 @@
             text: String(text || "").trim(),
           };
         },
+        normalizeTelephonyHealth(payload = {}) {
+          const counts = (payload.counts && typeof payload.counts === "object" && !Array.isArray(payload.counts))
+            ? payload.counts
+            : {};
+          const problemEvents = Array.isArray(payload.problem_events)
+            ? payload.problem_events.map((item) => ({
+              id: this.toIntOrNull(item.id),
+              eventType: String(item.event_type || "").trim(),
+              externalCallId: String(item.external_call_id || "").trim(),
+              externalEventId: String(item.external_event_id || "").trim(),
+              status: String(item.status || "").trim(),
+              errorText: String(item.error_text || "").trim(),
+              receivedAt: String(item.received_at || "").trim(),
+              processedAt: String(item.processed_at || "").trim(),
+              retryCount: Math.max(0, Number(item.retry_count) || 0),
+              isStaleProcessing: !!item.is_stale_processing,
+            }))
+            : [];
+          return {
+            counts: {
+              queued: Math.max(0, Number(counts.queued) || 0),
+              failed: Math.max(0, Number(counts.failed) || 0),
+              processing: Math.max(0, Number(counts.processing) || 0),
+              staleProcessing: Math.max(0, Number(counts.stale_processing) || 0),
+              processed: Math.max(0, Number(counts.processed) || 0),
+              ignoredDuplicate: Math.max(0, Number(counts.ignored_duplicate) || 0),
+            },
+            latestEventAt: String(payload.latest_event_at || "").trim(),
+            oldestQueuedAt: String(payload.oldest_queued_at || "").trim(),
+            staleProcessingAfterSeconds: Math.max(0, Number(payload.stale_processing_after_seconds) || 0),
+            problemEvents,
+          };
+        },
+        telephonyHealthEventStatusLabel(event = {}) {
+          const status = String(event.status || "").trim().toLowerCase();
+          if (status === "failed") return "Ошибка";
+          if (status === "queued") return "В очереди";
+          if (status === "processing") return event.isStaleProcessing ? "Зависло в processing" : "Обрабатывается";
+          if (status === "processed") return "Обработано";
+          if (status === "ignored_duplicate") return "Дубликат";
+          return status || "Неизвестно";
+        },
+        telephonyHealthEventStatusClass(event = {}) {
+          const status = String(event.status || "").trim().toLowerCase();
+          if (status === "failed") return "border-red-400/30 bg-red-400/10 text-red-200";
+          if (status === "queued") return "border-amber-400/30 bg-amber-400/10 text-amber-200";
+          if (status === "processing" && event.isStaleProcessing) return "border-orange-400/30 bg-orange-400/10 text-orange-200";
+          if (status === "processing") return "border-sky-400/30 bg-sky-400/10 text-sky-200";
+          return "border-crm-border bg-[#12324e] text-crm-text";
+        },
+        async loadTelephonyHealth() {
+          this.isTelephonyHealthLoading = true;
+          try {
+            const payload = await this.apiRequest("/api/admin/telephony/health/");
+            this.telephonyHealth = this.normalizeTelephonyHealth(payload);
+          } catch (error) {
+            this.setTelephonyNotice(`Ошибка загрузки health-среза: ${error.message}`, "error");
+          } finally {
+            this.isTelephonyHealthLoading = false;
+          }
+        },
+        async reprocessTelephonyEvent(eventId) {
+          const normalizedEventId = this.toIntOrNull(eventId);
+          if (!normalizedEventId) return;
+          try {
+            await this.apiRequest(`/api/admin/telephony/events/${normalizedEventId}/reprocess/`, {
+              method: "POST",
+            });
+            this.setTelephonyNotice(`Событие #${normalizedEventId} возвращено в очередь.`);
+            await this.loadTelephonyHealth();
+          } catch (error) {
+            this.setTelephonyNotice(`Ошибка reprocess события #${normalizedEventId}: ${error.message}`, "error");
+          }
+        },
+        incomingCallPopupStorageKey() {
+          return `crm_seen_incoming_calls_v1_${String(this.currentUserId || "anon")}`;
+        },
+        incomingCallPopupKey(call = {}) {
+          return String(call.external_call_id || call.id || "").trim();
+        },
+        readSeenIncomingCallPopupMap() {
+          if (typeof window === "undefined") return {};
+          try {
+            const raw = window.localStorage.getItem(this.incomingCallPopupStorageKey());
+            const parsed = raw ? JSON.parse(raw) : {};
+            const cutoff = Date.now() - (6 * 60 * 60 * 1000);
+            const normalized = {};
+            Object.entries(parsed || {}).forEach(([key, value]) => {
+              const numericValue = Number(value) || 0;
+              if (key && numericValue >= cutoff) {
+                normalized[key] = numericValue;
+              }
+            });
+            window.localStorage.setItem(this.incomingCallPopupStorageKey(), JSON.stringify(normalized));
+            return normalized;
+          } catch (_) {
+            return {};
+          }
+        },
+        markIncomingCallPopupSeen(call = {}) {
+          const popupKey = this.incomingCallPopupKey(call);
+          if (!popupKey || typeof window === "undefined") return;
+          const seenMap = this.readSeenIncomingCallPopupMap();
+          seenMap[popupKey] = Date.now();
+          try {
+            window.localStorage.setItem(this.incomingCallPopupStorageKey(), JSON.stringify(seenMap));
+          } catch (_) {}
+        },
+        hasSeenIncomingCallPopup(call = {}) {
+          const popupKey = this.incomingCallPopupKey(call);
+          if (!popupKey) return false;
+          const seenMap = this.readSeenIncomingCallPopupMap();
+          return !!seenMap[popupKey];
+        },
+        enqueueIncomingCallPopup(call = {}) {
+          const popupKey = this.incomingCallPopupKey(call);
+          if (!popupKey || this.hasSeenIncomingCallPopup(call)) {
+            return;
+          }
+          const alreadyVisible = (this.telephonyIncomingCallPopups || []).some((item) => this.incomingCallPopupKey(item) === popupKey);
+          if (alreadyVisible) {
+            return;
+          }
+          this.markIncomingCallPopupSeen(call);
+          this.telephonyIncomingCallPopups = [
+            {
+              ...call,
+              popupKey,
+            },
+            ...(this.telephonyIncomingCallPopups || []),
+          ].slice(0, 3);
+        },
+        dismissIncomingCallPopup(callOrKey) {
+          const popupKey = typeof callOrKey === "string"
+            ? String(callOrKey || "").trim()
+            : this.incomingCallPopupKey(callOrKey || {});
+          if (!popupKey) return;
+          this.telephonyIncomingCallPopups = (this.telephonyIncomingCallPopups || []).filter(
+            (item) => this.incomingCallPopupKey(item) !== popupKey
+          );
+        },
+        incomingCallPopupStatusLabel(call = {}) {
+          const statusLabel = this.phoneCallStatusLabel(call.status);
+          if (statusLabel && statusLabel !== "Неизвестно") {
+            return statusLabel;
+          }
+          return "Входящий";
+        },
+        incomingCallPopupTargetTypeLabel(call = {}) {
+          const targetEntityType = String(call.target_entity_type || "").trim();
+          if (targetEntityType === "deal") return "Сделка";
+          if (targetEntityType === "lead") return "Лид";
+          if (targetEntityType === "contact") return "Контакт";
+          if (targetEntityType === "company") return "Компания";
+          return "";
+        },
+        incomingCallPopupOpenTarget(call = {}) {
+          const targetEntityType = String(call.target_entity_type || "").trim();
+          const targetEntityId = this.toIntOrNull(call.target_entity_id);
+          this.dismissIncomingCallPopup(call);
+          if (!targetEntityType || !targetEntityId) {
+            return;
+          }
+          if (targetEntityType === "deal") {
+            this.setSection("deals");
+            this.openDealEditorById(targetEntityId);
+            return;
+          }
+          if (targetEntityType === "lead") {
+            this.setSection("leads");
+            this.openLeadEditorById(targetEntityId);
+            return;
+          }
+          if (targetEntityType === "contact") {
+            this.setSection("contacts");
+            this.openContactEditorById(targetEntityId);
+            return;
+          }
+          if (targetEntityType === "company") {
+            this.setSection("companies");
+            this.openCompanyEditorById(targetEntityId);
+          }
+        },
+        ensureTelephonyIncomingCallsPolling() {
+          if (this.telephonyIncomingCallsPollTimer || typeof window === "undefined") return;
+          this.pollTelephonyIncomingCalls().catch(() => {});
+          this.telephonyIncomingCallsPollTimer = window.setInterval(() => {
+            this.pollTelephonyIncomingCalls().catch(() => {});
+          }, 5000);
+        },
+        stopTelephonyIncomingCallsPolling() {
+          if (this.telephonyIncomingCallsPollTimer && typeof window !== "undefined") {
+            window.clearInterval(this.telephonyIncomingCallsPollTimer);
+          }
+          this.telephonyIncomingCallsPollTimer = null;
+          this.isTelephonyIncomingCallsPolling = false;
+        },
+        async pollTelephonyIncomingCalls() {
+          if (this.isTelephonyIncomingCallsPolling) return;
+          if (typeof document !== "undefined" && document.hidden) return;
+          this.isTelephonyIncomingCallsPolling = true;
+          try {
+            const params = new URLSearchParams();
+            if (this.toIntOrNull(this.telephonyIncomingCallCursor)) {
+              params.set("after_id", String(this.toIntOrNull(this.telephonyIncomingCallCursor)));
+            }
+            params.set("limit", "20");
+            const query = params.toString();
+            const payload = await this.apiRequest(`/api/telephony/incoming-calls/popup/${query ? `?${query}` : ""}`);
+            const items = Array.isArray(payload?.items) ? payload.items : [];
+            const nextCallId = this.toIntOrNull(payload?.next_call_id);
+            if (nextCallId) {
+              this.telephonyIncomingCallCursor = nextCallId;
+            }
+            items.forEach((item) => this.enqueueIncomingCallPopup(item));
+            if (payload?.has_more) {
+              window.setTimeout(() => {
+                this.pollTelephonyIncomingCalls().catch(() => {});
+              }, 200);
+            }
+          } catch (_) {
+          } finally {
+            this.isTelephonyIncomingCallsPolling = false;
+          }
+        },
         normalizeTelephonySettings(payload = {}) {
           const allowedVirtualNumbersText = Array.isArray(payload.allowed_virtual_numbers)
             ? payload.allowed_virtual_numbers.map((item) => String(item || "").trim()).filter(Boolean).join("\n")
@@ -2371,6 +2615,7 @@
             const payload = await this.apiRequest("/api/telephony/novofon/settings/");
             this.telephonySettings = this.normalizeTelephonySettings(payload);
             this.telephonySettingsLoaded = true;
+            await this.loadTelephonyHealth();
           } catch (error) {
             this.errorMessage = `Ошибка загрузки телефонии: ${error.message}`;
             throw error;
@@ -2389,6 +2634,7 @@
             });
             this.telephonySettings = this.normalizeTelephonySettings(payload);
             this.telephonySettingsLoaded = true;
+            await this.loadTelephonyHealth();
             this.setTelephonyNotice("Настройки телефонии сохранены.");
           } catch (error) {
             this.setTelephonyNotice(`Ошибка сохранения: ${error.message}`, "error");
@@ -2427,6 +2673,7 @@
             });
             this.telephonySettings = this.normalizeTelephonySettings(payload);
             this.telephonySettingsLoaded = true;
+            await this.loadTelephonyHealth();
             const syncedCount = Number(payload?.sync_result?.count || 0);
             this.setTelephonyNotice(`Синхронизация завершена. Обновлено сотрудников: ${syncedCount}.`);
           } catch (error) {
@@ -2451,6 +2698,7 @@
               },
             });
             this.telephonyLastImportResult = result;
+            await this.loadTelephonyHealth();
             this.setTelephonyNotice(
               `Импорт завершён. Создано: ${Number(result?.created || 0)}, обновлено: ${Number(result?.updated || 0)}, всего обработано: ${Number(result?.imported || 0)}.`
             );
@@ -9113,6 +9361,8 @@
           if (section === "telephony") {
             if (!this.telephonySettingsLoaded) {
               this.reloadActiveSection();
+            } else {
+              this.loadTelephonyHealth().catch(() => {});
             }
             return;
           }
@@ -10226,6 +10476,7 @@
             this.errorMessage = `Ошибка загрузки телефонии: ${error.message}`;
           }
         }
+        this.ensureTelephonyIncomingCallsPolling();
         this.ensureAutomationNotificationsPolling();
         this.restoreFilters();
         window.setTimeout(() => this.hideStartupScreen(), 500);
@@ -10233,6 +10484,7 @@
       beforeUnmount() {
         document.removeEventListener("click", this.handleDocumentClick);
         document.removeEventListener("keydown", this.handleGlobalKeydown);
+        this.stopTelephonyIncomingCallsPolling();
         this.stopAutomationNotificationsPolling();
         this.stopCommunicationsPollingIfIdle();
       }

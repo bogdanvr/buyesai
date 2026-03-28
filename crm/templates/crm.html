@@ -908,6 +908,91 @@
               </section>
 
               <section class="rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel overflow-hidden">
+                <div class="border-b border-crm-border bg-[#10314d] px-5 py-4 flex items-center justify-between gap-3">
+                  <div>
+                    <div class="text-sm font-semibold text-white">Webhook Queue Health</div>
+                    <div class="mt-1 text-xs text-crm-muted">Очередь событий, failed и зависшие processing без перехода в admin.</div>
+                  </div>
+                  <button
+                    type="button"
+                    @click="loadTelephonyHealth"
+                    :disabled="isTelephonyHealthLoading"
+                    class="inline-flex h-9 items-center justify-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    [[ isTelephonyHealthLoading ? 'Обновляем...' : 'Обновить' ]]
+                  </button>
+                </div>
+                <div class="p-5 space-y-4">
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                      <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Queued</div>
+                      <div class="mt-2 text-2xl font-semibold text-white">[[ telephonyHealth.counts.queued || 0 ]]</div>
+                      <div class="mt-1 text-xs text-crm-muted">Старейшее: [[ telephonyHealth.oldestQueuedAt ? formatEventTimestamp(telephonyHealth.oldestQueuedAt) : '—' ]]</div>
+                    </div>
+                    <div class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                      <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Failed</div>
+                      <div class="mt-2 text-2xl font-semibold text-red-200">[[ telephonyHealth.counts.failed || 0 ]]</div>
+                      <div class="mt-1 text-xs text-crm-muted">Последнее событие: [[ telephonyHealth.latestEventAt ? formatEventTimestamp(telephonyHealth.latestEventAt) : '—' ]]</div>
+                    </div>
+                    <div class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                      <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Processing</div>
+                      <div class="mt-2 text-2xl font-semibold text-sky-200">[[ telephonyHealth.counts.processing || 0 ]]</div>
+                      <div class="mt-1 text-xs text-crm-muted">Stale: [[ telephonyHealth.counts.staleProcessing || 0 ]]</div>
+                    </div>
+                    <div class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                      <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Processed</div>
+                      <div class="mt-2 text-2xl font-semibold text-emerald-200">[[ telephonyHealth.counts.processed || 0 ]]</div>
+                      <div class="mt-1 text-xs text-crm-muted">Duplicates: [[ telephonyHealth.counts.ignoredDuplicate || 0 ]]</div>
+                    </div>
+                  </div>
+
+                  <div class="rounded-2xl border border-crm-border bg-[#102f4a] p-4 text-xs text-crm-muted">
+                    Stale processing threshold: [[ telephonyHealth.staleProcessingAfterSeconds || 0 ]] сек.
+                  </div>
+
+                  <div v-if="!(telephonyHealth.problemEvents || []).length" class="rounded-2xl border border-dashed border-crm-border bg-[#102f4a] px-4 py-5 text-sm text-crm-muted">
+                    Проблемных событий в очереди сейчас нет.
+                  </div>
+                  <div v-else class="space-y-3">
+                    <div
+                      v-for="event in telephonyHealth.problemEvents"
+                      :key="`telephony-health-event-${event.id}`"
+                      class="rounded-2xl border border-crm-border bg-[#102f4a] p-4"
+                    >
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <span class="inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-medium" :class="telephonyHealthEventStatusClass(event)">
+                              [[ telephonyHealthEventStatusLabel(event) ]]
+                            </span>
+                            <span class="text-sm font-semibold text-white">#[[ event.id ]]</span>
+                            <span class="text-xs text-crm-muted">[[ event.eventType || '—' ]]</span>
+                          </div>
+                          <div class="mt-2 text-xs text-crm-muted break-all">
+                            Call ID: [[ event.externalCallId || '—' ]] · Event ID: [[ event.externalEventId || '—' ]]
+                          </div>
+                          <div class="mt-1 text-xs text-crm-muted">
+                            Получено: [[ event.receivedAt ? formatEventTimestamp(event.receivedAt) : '—' ]] · Попыток: [[ event.retryCount || 0 ]]
+                          </div>
+                          <div v-if="event.errorText" class="mt-2 text-xs text-red-100 break-words">
+                            [[ event.errorText ]]
+                          </div>
+                        </div>
+                        <button
+                          v-if="event.status === 'failed'"
+                          type="button"
+                          @click="reprocessTelephonyEvent(event.id)"
+                          class="inline-flex h-9 shrink-0 items-center justify-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                        >
+                          Повторить
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel overflow-hidden">
                 <div class="border-b border-crm-border bg-[#10314d] px-5 py-4">
                   <div class="text-sm font-semibold text-white">Импорт истории звонков</div>
                   <div class="mt-1 text-xs text-crm-muted">Ручной импорт исторических звонков из Novofon.</div>

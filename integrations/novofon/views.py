@@ -1,13 +1,15 @@
 import logging
+from datetime import timedelta
 
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.db.models import Q
 
 from api.v1.pagination import StandardResultsSetPagination
-from integrations.models import PhoneCall, TelephonyEventLog
+from integrations.models import PhoneCall, TelephonyEventLog, TelephonyEventStatus, TelephonyProvider
 from integrations.novofon.client import NovofonClientError
 from integrations.novofon.serializers import (
     IncomingPhoneCallPopupSerializer,
@@ -158,6 +160,54 @@ class IncomingPhoneCallPopupAPIView(APIView):
                 "has_more": has_more,
             }
         )
+
+
+class TelephonyHealthAPIView(APIView):
+    def get(self, request):
+        stale_processing_after_seconds = 300
+        stale_before = timezone.now() - timedelta(seconds=stale_processing_after_seconds)
+        queryset = TelephonyEventLog.objects.filter(provider=TelephonyProvider.NOVOFON)
+        latest_event = queryset.order_by("-received_at", "-id").first()
+        problem_events = list(
+            queryset
+            .filter(
+                Q(status=TelephonyEventStatus.FAILED)
+                | Q(status=TelephonyEventStatus.QUEUED)
+                | Q(status=TelephonyEventStatus.PROCESSING)
+            )
+            .order_by("-received_at", "-id")[:10]
+        )
+        serialized_problem_events = []
+        for event in problem_events:
+            item = TelephonyEventLogSerializer(event).data
+            item["is_stale_processing"] = bool(
+                event.status == TelephonyEventStatus.PROCESSING
+                and event.processed_at is not None
+                and event.processed_at <= stale_before
+            )
+            serialized_problem_events.append(item)
+        oldest_queued = queryset.filter(status=TelephonyEventStatus.QUEUED).order_by("received_at", "id").first()
+        payload = {
+            "ok": True,
+            "provider": TelephonyProvider.NOVOFON,
+            "counts": {
+                "queued": queryset.filter(status=TelephonyEventStatus.QUEUED).count(),
+                "failed": queryset.filter(status=TelephonyEventStatus.FAILED).count(),
+                "processing": queryset.filter(status=TelephonyEventStatus.PROCESSING).count(),
+                "stale_processing": queryset.filter(
+                    status=TelephonyEventStatus.PROCESSING,
+                    processed_at__isnull=False,
+                    processed_at__lte=stale_before,
+                ).count(),
+                "processed": queryset.filter(status=TelephonyEventStatus.PROCESSED).count(),
+                "ignored_duplicate": queryset.filter(status=TelephonyEventStatus.IGNORED_DUPLICATE).count(),
+            },
+            "latest_event_at": getattr(latest_event, "received_at", None),
+            "oldest_queued_at": getattr(oldest_queued, "received_at", None),
+            "stale_processing_after_seconds": stale_processing_after_seconds,
+            "problem_events": serialized_problem_events,
+        }
+        return Response(payload)
 
 
 class TelephonyEventReprocessAPIView(APIView):

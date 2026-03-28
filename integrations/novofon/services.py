@@ -399,22 +399,114 @@ def requeue_novofon_event(event: TelephonyEventLog) -> dict:
     return {"ok": True, "queued": True, "event_id": event.pk}
 
 
-def claim_novofon_events_for_processing(*, limit: int = 25, retry_failed: bool = False, max_retries: int | None = None) -> list[TelephonyEventLog]:
-    normalized_limit = max(1, int(limit or 25))
-    statuses = [TelephonyEventStatus.QUEUED]
-    if retry_failed:
-        statuses.append(TelephonyEventStatus.FAILED)
+def _novofon_failed_retry_backoff_seconds(*, retry_count: int, base_seconds: int = 30, max_seconds: int = 900) -> int:
+    normalized_retry_count = max(1, int(retry_count or 1))
+    normalized_base = max(1, int(base_seconds or 30))
+    normalized_max = max(normalized_base, int(max_seconds or 900))
+    return min(normalized_max, normalized_base * (2 ** max(0, normalized_retry_count - 1)))
 
-    with transaction.atomic():
-        queryset = (
+
+def _claim_ready_event_ids(
+    *,
+    limit: int,
+    retry_failed: bool,
+    max_retries: int | None,
+    failed_backoff_base_seconds: int,
+    failed_backoff_max_seconds: int,
+    reclaim_stale_processing_after_seconds: int | None,
+) -> list[int]:
+    now = timezone.now()
+    selected_event_ids: list[int] = []
+    seen_event_ids: set[int] = set()
+
+    def _append_event_ids(ids):
+        for event_id in ids:
+            normalized_event_id = int(event_id)
+            if normalized_event_id in seen_event_ids:
+                continue
+            seen_event_ids.add(normalized_event_id)
+            selected_event_ids.append(normalized_event_id)
+            if len(selected_event_ids) >= limit:
+                break
+
+    queued_queryset = (
+        TelephonyEventLog.objects
+        .select_for_update(skip_locked=True)
+        .filter(provider=TelephonyProvider.NOVOFON, status=TelephonyEventStatus.QUEUED)
+        .order_by("received_at", "id")
+    )
+    if max_retries is not None:
+        queued_queryset = queued_queryset.filter(retry_count__lt=max(1, int(max_retries)))
+    _append_event_ids(queued_queryset.values_list("id", flat=True)[:limit])
+
+    remaining_slots = limit - len(selected_event_ids)
+    if retry_failed and remaining_slots > 0:
+        failed_queryset = (
             TelephonyEventLog.objects
             .select_for_update(skip_locked=True)
-            .filter(provider=TelephonyProvider.NOVOFON, status__in=statuses)
-            .order_by("received_at", "id")
+            .filter(provider=TelephonyProvider.NOVOFON, status=TelephonyEventStatus.FAILED)
+            .order_by("processed_at", "received_at", "id")
         )
         if max_retries is not None:
-            queryset = queryset.filter(retry_count__lt=max(1, int(max_retries)))
-        event_ids = list(queryset.values_list("id", flat=True)[:normalized_limit])
+            failed_queryset = failed_queryset.filter(retry_count__lt=max(1, int(max_retries)))
+        failed_candidates = list(failed_queryset[: max(remaining_slots * 4, remaining_slots)])
+        ready_failed_ids = []
+        for event in failed_candidates:
+            retry_at = (event.processed_at or event.received_at) + timedelta(
+                seconds=_novofon_failed_retry_backoff_seconds(
+                    retry_count=event.retry_count,
+                    base_seconds=failed_backoff_base_seconds,
+                    max_seconds=failed_backoff_max_seconds,
+                )
+            )
+            if retry_at <= now:
+                ready_failed_ids.append(event.pk)
+        _append_event_ids(ready_failed_ids)
+
+    remaining_slots = limit - len(selected_event_ids)
+    normalized_reclaim_seconds = None
+    if reclaim_stale_processing_after_seconds is not None and int(reclaim_stale_processing_after_seconds or 0) > 0:
+        normalized_reclaim_seconds = int(reclaim_stale_processing_after_seconds)
+    if normalized_reclaim_seconds and remaining_slots > 0:
+        stale_before = now - timedelta(seconds=normalized_reclaim_seconds)
+        processing_queryset = (
+            TelephonyEventLog.objects
+            .select_for_update(skip_locked=True)
+            .filter(
+                provider=TelephonyProvider.NOVOFON,
+                status=TelephonyEventStatus.PROCESSING,
+                processed_at__isnull=False,
+                processed_at__lte=stale_before,
+            )
+            .order_by("processed_at", "received_at", "id")
+        )
+        if max_retries is not None:
+            processing_queryset = processing_queryset.filter(retry_count__lt=max(1, int(max_retries)))
+        _append_event_ids(processing_queryset.values_list("id", flat=True)[:remaining_slots])
+
+    return selected_event_ids
+
+
+def claim_novofon_events_for_processing(
+    *,
+    limit: int = 25,
+    retry_failed: bool = False,
+    max_retries: int | None = None,
+    failed_backoff_base_seconds: int = 30,
+    failed_backoff_max_seconds: int = 900,
+    reclaim_stale_processing_after_seconds: int | None = 300,
+) -> list[TelephonyEventLog]:
+    normalized_limit = max(1, int(limit or 25))
+
+    with transaction.atomic():
+        event_ids = _claim_ready_event_ids(
+            limit=normalized_limit,
+            retry_failed=retry_failed,
+            max_retries=max_retries,
+            failed_backoff_base_seconds=failed_backoff_base_seconds,
+            failed_backoff_max_seconds=failed_backoff_max_seconds,
+            reclaim_stale_processing_after_seconds=reclaim_stale_processing_after_seconds,
+        )
         if not event_ids:
             return []
         (
@@ -422,7 +514,7 @@ def claim_novofon_events_for_processing(*, limit: int = 25, retry_failed: bool =
             .filter(pk__in=event_ids)
             .update(
                 status=TelephonyEventStatus.PROCESSING,
-                processed_at=None,
+                processed_at=timezone.now(),
                 error_text="",
                 retry_count=F("retry_count") + 1,
             )
@@ -469,8 +561,23 @@ def process_novofon_webhook_event(event: TelephonyEventLog) -> dict:
         return {"ok": False, "error": str(error)}
 
 
-def process_novofon_webhook_queue(*, limit: int = 25, retry_failed: bool = False, max_retries: int | None = None) -> dict:
-    events = claim_novofon_events_for_processing(limit=limit, retry_failed=retry_failed, max_retries=max_retries)
+def process_novofon_webhook_queue(
+    *,
+    limit: int = 25,
+    retry_failed: bool = False,
+    max_retries: int | None = None,
+    failed_backoff_base_seconds: int = 30,
+    failed_backoff_max_seconds: int = 900,
+    reclaim_stale_processing_after_seconds: int | None = 300,
+) -> dict:
+    events = claim_novofon_events_for_processing(
+        limit=limit,
+        retry_failed=retry_failed,
+        max_retries=max_retries,
+        failed_backoff_base_seconds=failed_backoff_base_seconds,
+        failed_backoff_max_seconds=failed_backoff_max_seconds,
+        reclaim_stale_processing_after_seconds=reclaim_stale_processing_after_seconds,
+    )
     results = []
     processed = 0
     succeeded = 0
