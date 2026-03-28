@@ -4138,16 +4138,20 @@
         },
         async apiRequest(url, options = {}) {
           const headers = { ...(options.headers || {}) };
+          const method = String(options.method || "GET").toUpperCase();
           const hasBody = options.body !== undefined;
           const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
-          if (hasBody) {
+          const requiresCsrf = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+          if (requiresCsrf) {
             headers["X-CSRFToken"] = this.getCsrfToken();
+          }
+          if (hasBody) {
             if (!isFormData) {
               headers["Content-Type"] = "application/json";
             }
           }
           const response = await fetch(url, {
-            method: options.method || "GET",
+            method,
             credentials: "same-origin",
             headers,
             body: hasBody ? (isFormData ? options.body : JSON.stringify(options.body)) : undefined
