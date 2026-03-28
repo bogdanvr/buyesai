@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from datetime import timedelta
 from urllib.parse import parse_qsl
 
@@ -65,11 +66,31 @@ def _unwrap_embedded_json_payload(payload: dict) -> dict:
         return payload
     if not (candidate.startswith("{") and candidate.endswith("}")):
         return payload
-    try:
-        parsed_json = json.loads(candidate)
-    except (TypeError, ValueError):
+    parsed_json = _parse_embedded_json_candidate(candidate)
+    if parsed_json is None:
         return payload
     return parsed_json if isinstance(parsed_json, dict) else payload
+
+
+def _repair_embedded_json_candidate(candidate: str) -> str:
+    return re.sub(
+        r'(:\s*)""([^"]*)""(?=\s*[,}])',
+        lambda match: match.group(1) + json.dumps(f'"{match.group(2)}"'),
+        candidate,
+    )
+
+
+def _parse_embedded_json_candidate(candidate: str):
+    try:
+        return json.loads(candidate)
+    except (TypeError, ValueError):
+        repaired_candidate = _repair_embedded_json_candidate(candidate)
+        if repaired_candidate == candidate:
+            return None
+        try:
+            return json.loads(repaired_candidate)
+        except (TypeError, ValueError):
+            return None
 
 
 def _parse_novofon_request_payload(request) -> dict:

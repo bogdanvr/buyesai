@@ -274,23 +274,21 @@ class NovofonWebhookApiTests(APITestCase):
         self.assertTrue(TelephonyEventLog.objects.filter(external_event_id="event-raw-json").exists())
 
     def test_webhook_accepts_embedded_json_payload_wrapped_as_single_key(self):
-        raw_payload = json.dumps(
-            {
-                "event_type": '"in_call_session"',
-                "call_session_id": "187020303",
-                "communication_id": "12323",
-                "direction": '"in"',
-                "calling_phone_number": '"79260000001"',
-                "called_phone_number": '"79260000002"',
-                "contact_phone_number": '"79000000000"',
-                "communication_number": "1",
-                "virtual_phone_number": '"74950000000"',
-                "notification_time": '"2026-03-28 16:30:00"',
-                "start_time": '"2026-03-28 16:29:07"',
-                "external_id": '"t456uy"',
-            },
-            ensure_ascii=False,
-            indent=2,
+        raw_payload = (
+            '{\n'
+            '  "event_type": ""in_call_session"",\n'
+            '  "call_session_id": "187020303",\n'
+            '  "communication_id": "12323",\n'
+            '  "direction": ""in"",\n'
+            '  "calling_phone_number": ""79260000001"",\n'
+            '  "called_phone_number": ""79260000002"",\n'
+            '  "contact_phone_number": ""79000000000"",\n'
+            '  "communication_number": "1",\n'
+            '  "virtual_phone_number": ""74950000000"",\n'
+            '  "notification_time": ""2026-03-28 16:30:00"",\n'
+            '  "start_time": ""2026-03-28 16:29:07"",\n'
+            '  "external_id": ""t456uy""\n'
+            '}'
         )
         wrapped_payload = json.dumps({raw_payload: ""}, ensure_ascii=False)
 
@@ -419,7 +417,7 @@ class NovofonWebhookApiTests(APITestCase):
 
     def test_queue_processor_handles_embedded_json_payload_saved_in_event_log(self):
         wrapped_payload = {
-            '{\n  "event_type": "\\"in_call_session\\"",\n  "call_session_id": "187020303",\n  "communication_id": "12323",\n  "direction": "\\"in\\"",\n  "calling_phone_number": "\\"79000000000\\"",\n  "called_phone_number": "\\"74950000000\\"",\n  "contact_phone_number": "\\"79000000000\\"",\n  "communication_number": "1",\n  "virtual_phone_number": "\\"74950000000\\"",\n  "notification_time": "\\"2026-03-28 16:30:00\\"",\n  "start_time": "\\"2026-03-28 16:29:07\\""\n}': ""
+            '{\n  "event_type": ""in_call_session"",\n  "call_session_id": "187020303",\n  "communication_id": "12323",\n  "direction": ""in"",\n  "calling_phone_number": ""79000000000"",\n  "called_phone_number": ""74950000000"",\n  "contact_phone_number": ""79000000000"",\n  "communication_number": "1",\n  "virtual_phone_number": ""74950000000"",\n  "notification_time": ""2026-03-28 16:30:00"",\n  "start_time": ""2026-03-28 16:29:07""\n}': ""
         }
         event = TelephonyEventLog.objects.create(
             provider=TelephonyProvider.NOVOFON,
