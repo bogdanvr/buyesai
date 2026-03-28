@@ -22,6 +22,7 @@ from integrations.models import (
 from integrations.novofon.client import (
     DEFAULT_CALL_API_BASE_URL,
     DEFAULT_DATA_API_BASE_URL,
+    NovofonClientError,
     NovofonClient,
 )
 from integrations.novofon.security import build_novofon_webhook_signature
@@ -425,6 +426,16 @@ class NovofonSyncEmployeesApiTests(APITestCase):
         mapping = TelephonyUserMapping.objects.get(provider_account=self.account, novofon_employee_id="emp-1")
         self.assertEqual(mapping.novofon_extension, "101")
         self.assertEqual(mapping.novofon_full_name, "Alice Example")
+
+    @patch("integrations.novofon.services.NovofonClient.list_employees")
+    def test_sync_employees_returns_api_error_instead_of_http_500(self, list_employees_mock):
+        list_employees_mock.side_effect = NovofonClientError("Метод get.employees недоступен для текущего токена.")
+
+        response = self.client.post(reverse("telephony-novofon-sync-employees"))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["ok"], False)
+        self.assertIn("get.employees", response.data["error"])
 
 
 class NovofonSettingsApiTests(APITestCase):

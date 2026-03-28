@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 
 from api.v1.pagination import StandardResultsSetPagination
 from integrations.models import PhoneCall, TelephonyEventLog
+from integrations.novofon.client import NovofonClientError
 from integrations.novofon.serializers import (
     NovofonCallRequestSerializer,
     NovofonCallImportRequestSerializer,
@@ -54,7 +55,7 @@ class NovofonSyncEmployeesAPIView(APIView):
             payload = NovofonSettingsSerializer(account).data
             payload["sync_result"] = result
             return Response(payload)
-        except ValueError as error:
+        except (ValueError, NovofonClientError) as error:
             return Response({"ok": False, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 

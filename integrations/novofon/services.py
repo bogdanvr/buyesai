@@ -508,6 +508,8 @@ def sync_novofon_employees(*, account: TelephonyProviderAccount | None = None) -
     employees = client.list_employees()
     synced_ids = []
     for employee in employees:
+        if not isinstance(employee, dict):
+            continue
         employee_id = str(employee.get("id") or employee.get("employee_id") or employee.get("uuid") or "").strip()
         if not employee_id:
             continue
