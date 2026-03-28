@@ -57,7 +57,7 @@ Fallback-вариант через cron:
 - `api_key`:
   access token / API key Novofon
 - `api_secret`:
-  можно оставить пустым, если используется доступ по ключу
+  секрет API. Если заполнен, CRM начинает требовать webhook header `Signature` и проверяет его по HMAC-SHA1/Base64
 - `api_base_url`:
   `https://dataapi-jsonrpc.novofon.ru/v2.0`
 - `settings_json.call_api_base_url`:
@@ -86,6 +86,31 @@ POST /api/telephony/novofon/sync-employees/
 python manage.py process_novofon_webhook_queue --limit 50 --retry-failed
 ```
 Рекомендуемый вариант: отдельный `systemd service` c интервалом `5` секунд.
+
+## Безопасность webhook
+
+Если у аккаунта заполнен `api_secret`, endpoint `/api/integrations/novofon/webhook/` принимает только webhook с корректным header `Signature`.
+Дополнительно можно оставить `webhook_shared_secret`: тогда CRM будет требовать и подпись, и shared secret.
+
+Поддерживаемые имена signature header:
+
+- `Signature`
+- `X-Signature`
+- `X-Novofon-Signature`
+
+Поддерживаемые поля канонического payload для webhook-обработки и проверки подписи:
+
+- `event`
+- `pbx_call_id`
+- `caller_id`
+- `called_did`
+- `destination`
+- `internal`
+- `call_start`
+- `notification_time`
+- `disposition`
+
+Если webhook приходит в старом адаптационном формате CRM, но у аккаунта уже включен `api_secret`, endpoint вернет `403 unsupported_signature_payload`.
 
 ## Импорт исторических звонков
 

@@ -24,6 +24,7 @@ from integrations.novofon.client import (
     DEFAULT_DATA_API_BASE_URL,
     NovofonClient,
 )
+from integrations.novofon.security import build_novofon_webhook_signature
 from integrations.novofon.selectors import normalize_phone
 
 
@@ -194,6 +195,20 @@ class NovofonWebhookApiTests(APITestCase):
             "duration": 42,
         }
 
+    def _signed_payload(self, *, event="NOTIFY_END", pbx_call_id="pbx-1"):
+        call_start = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+        return {
+            "event": event,
+            "pbx_call_id": pbx_call_id,
+            "caller_id": "+7 (900) 000-00-00",
+            "called_did": "+7 (495) 000-00-00",
+            "call_start": call_start,
+            "notification_time": call_start,
+            "disposition": "answered",
+            "duration": 42,
+            "internal": "101",
+        }
+
     def test_webhook_creates_phone_call_and_links_entities(self):
         response = self.client.post(
             reverse("integrations-novofon-webhook"),
@@ -240,6 +255,61 @@ class NovofonWebhookApiTests(APITestCase):
         self.assertEqual(PhoneCall.objects.filter(external_call_id="call-1").count(), 1)
         statuses = list(TelephonyEventLog.objects.order_by("id").values_list("status", flat=True))
         self.assertEqual(statuses, [TelephonyEventStatus.PROCESSED, TelephonyEventStatus.IGNORED_DUPLICATE])
+
+    def test_webhook_accepts_valid_signature_and_processes_official_payload(self):
+        self.account.api_secret = "api-secret"
+        self.account.webhook_shared_secret = ""
+        self.account.save(update_fields=["api_secret", "webhook_shared_secret"])
+        payload = self._signed_payload()
+        signature = build_novofon_webhook_signature(payload, secret=self.account.api_secret)
+
+        response = self.client.post(
+            reverse("integrations-novofon-webhook"),
+            payload,
+            format="json",
+            HTTP_SIGNATURE=signature,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        call_command("process_novofon_webhook_queue", stdout=StringIO())
+
+        call = PhoneCall.objects.get(external_call_id="pbx-1")
+        self.assertEqual(call.status, "answered")
+        self.assertEqual(call.direction, "inbound")
+        self.assertEqual(call.phone_from, "+7 (900) 000-00-00")
+        self.assertEqual(call.phone_to, "+7 (495) 000-00-00")
+        self.assertEqual(call.responsible_user_id, self.user.pk)
+
+    def test_webhook_rejects_missing_signature_when_api_secret_configured(self):
+        self.account.api_secret = "api-secret"
+        self.account.webhook_shared_secret = ""
+        self.account.save(update_fields=["api_secret", "webhook_shared_secret"])
+
+        response = self.client.post(
+            reverse("integrations-novofon-webhook"),
+            self._signed_payload(pbx_call_id="pbx-missing-signature"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["error"], "missing_signature")
+        self.assertFalse(TelephonyEventLog.objects.filter(external_call_id="pbx-missing-signature").exists())
+
+    def test_webhook_rejects_invalid_signature_when_api_secret_configured(self):
+        self.account.api_secret = "api-secret"
+        self.account.webhook_shared_secret = ""
+        self.account.save(update_fields=["api_secret", "webhook_shared_secret"])
+
+        response = self.client.post(
+            reverse("integrations-novofon-webhook"),
+            self._signed_payload(pbx_call_id="pbx-invalid-signature"),
+            format="json",
+            HTTP_SIGNATURE="invalid-signature",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["error"], "invalid_signature")
+        self.assertFalse(TelephonyEventLog.objects.filter(external_call_id="pbx-invalid-signature").exists())
 
     def test_reprocess_endpoint_requeues_failed_event(self):
         event = TelephonyEventLog.objects.create(

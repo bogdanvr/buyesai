@@ -12,6 +12,7 @@ from integrations.novofon.serializers import (
     PhoneCallSerializer,
     TelephonyEventLogSerializer,
 )
+from integrations.novofon.security import validate_novofon_webhook_auth
 from integrations.novofon.services import (
     check_novofon_connection,
     get_novofon_account,
@@ -127,16 +128,17 @@ class NovofonWebhookAPIView(APIView):
     def post(self, request):
         account = get_novofon_account(create=True)
         payload = request.data if isinstance(request.data, dict) else {}
-        if account and account.webhook_shared_secret:
-            provided_secret = str(
-                request.headers.get("X-Webhook-Secret")
-                or request.headers.get("X-Novofon-Secret")
-                or request.query_params.get("secret")
-                or ""
-            ).strip()
-            if provided_secret != str(account.webhook_shared_secret or "").strip():
-                return Response({"ok": False, "error": "invalid_secret"}, status=status.HTTP_403_FORBIDDEN)
-        event = queue_novofon_webhook_event(payload=payload, headers=dict(request.headers.items()))
+        headers = dict(request.headers.items())
+        auth_error = validate_novofon_webhook_auth(
+            payload=payload,
+            headers=headers,
+            api_secret=getattr(account, "api_secret", ""),
+            webhook_shared_secret=getattr(account, "webhook_shared_secret", ""),
+            query_secret=request.query_params.get("secret", ""),
+        )
+        if auth_error:
+            return Response({"ok": False, "error": auth_error}, status=status.HTTP_403_FORBIDDEN)
+        event = queue_novofon_webhook_event(payload=payload, headers=headers)
         return Response(
             {"ok": True, "event_id": event.pk, "queued": True, "status": event.status},
             status=status.HTTP_202_ACCEPTED,

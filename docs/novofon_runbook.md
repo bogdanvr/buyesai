@@ -54,8 +54,9 @@ POST /api/telephony/novofon/import-calls/
 
 1. Есть ли запись в `TelephonyEventLog`.
 2. Не вернулся ли `403 invalid_secret`.
-3. Есть ли `external_call_id` в payload.
-4. Что лежит в `error_text`.
+3. Не вернулся ли `403 missing_signature`, `403 invalid_signature` или `403 unsupported_signature_payload`.
+4. Есть ли `external_call_id` / `pbx_call_id` в payload.
+5. Что лежит в `error_text`.
 
 Если событие в `failed`, можно повторно обработать:
 
@@ -114,5 +115,4 @@ python manage.py process_novofon_webhook_queue --limit 50 --retry-failed
 
 ## Что еще остается
 
-- финальный format/signature verification webhook;
 - realtime popup по входящему звонку.

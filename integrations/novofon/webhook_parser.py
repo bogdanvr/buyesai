@@ -117,10 +117,14 @@ def _map_status(value: str, event_type: str) -> str:
     if raw in mapping:
         return mapping[raw]
     normalized_event = _string(event_type).lower()
+    if "start" in normalized_event:
+        return PhoneCallStatus.RINGING
     if "miss" in normalized_event or "no_answer" in normalized_event:
         return PhoneCallStatus.MISSED
     if "answer" in normalized_event:
         return PhoneCallStatus.ANSWERED
+    if "end" in normalized_event:
+        return PhoneCallStatus.COMPLETED
     if "complete" in normalized_event or "finish" in normalized_event:
         return PhoneCallStatus.COMPLETED
     if "cancel" in normalized_event:
@@ -134,13 +138,26 @@ def parse_novofon_webhook(payload: dict, headers: dict | None = None) -> ParsedN
     payload = payload if isinstance(payload, dict) else {}
     call = payload.get("call") if isinstance(payload.get("call"), dict) else {}
     event_type = _string(_pick(payload.get("event_type"), payload.get("event"), payload.get("type"), call.get("event_type"), call.get("event")))
-    external_event_id = _string(_pick(payload.get("event_id"), payload.get("id"), payload.get("webhook_id"), call.get("event_id")))
+    external_event_id = _string(
+        _pick(
+            payload.get("event_id"),
+            payload.get("id"),
+            payload.get("webhook_id"),
+            payload.get("notification_id"),
+            call.get("event_id"),
+        )
+    )
     external_call_id = _string(
         _pick(
+            payload.get("pbx_call_id"),
+            payload.get("call_session_id"),
             payload.get("call_id"),
             payload.get("callId"),
+            payload.get("communication_id"),
             payload.get("uniqueid"),
             payload.get("uuid"),
+            call.get("pbx_call_id"),
+            call.get("call_session_id"),
             call.get("call_id"),
             call.get("callId"),
             call.get("uniqueid"),
@@ -149,20 +166,150 @@ def parse_novofon_webhook(payload: dict, headers: dict | None = None) -> ParsedN
         )
     )
     direction = _map_direction(_pick(payload.get("direction"), call.get("direction")), event_type)
-    status = _map_status(_pick(payload.get("status"), call.get("status"), payload.get("call_status")), event_type)
-    phone_from = _string(_pick(payload.get("from"), payload.get("src"), payload.get("caller"), call.get("from"), call.get("src"), call.get("caller")))
-    phone_to = _string(_pick(payload.get("to"), payload.get("dst"), payload.get("callee"), call.get("to"), call.get("dst"), call.get("callee")))
-    virtual_number = _string(_pick(payload.get("virtual_number"), call.get("virtual_number"), payload.get("did"), call.get("did")))
-    employee_id = _string(_pick(payload.get("employee_id"), payload.get("manager_id"), call.get("employee_id"), call.get("manager_id")))
-    extension = _string(_pick(payload.get("extension"), payload.get("internal_number"), call.get("extension"), call.get("internal_number")))
-    started_at = _parse_timestamp(_pick(payload.get("started_at"), payload.get("start_time"), call.get("started_at"), call.get("start_time"), payload.get("timestamp")))
-    answered_at = _parse_timestamp(_pick(payload.get("answered_at"), payload.get("answer_time"), call.get("answered_at"), call.get("answer_time")))
-    ended_at = _parse_timestamp(_pick(payload.get("ended_at"), payload.get("end_time"), call.get("ended_at"), call.get("end_time")))
-    duration_sec = _parse_int(_pick(payload.get("duration_sec"), payload.get("duration"), call.get("duration_sec"), call.get("duration")))
-    talk_duration_sec = _parse_int(_pick(payload.get("talk_duration_sec"), payload.get("billsec"), call.get("talk_duration_sec"), call.get("billsec")))
-    recording_url = _string(_pick(payload.get("recording_url"), payload.get("record_url"), call.get("recording_url"), call.get("record_url")))
+    status = _map_status(
+        _pick(
+            payload.get("status"),
+            call.get("status"),
+            payload.get("call_status"),
+            payload.get("disposition"),
+            call.get("disposition"),
+        ),
+        event_type,
+    )
+    caller_phone = _string(
+        _pick(
+            payload.get("from"),
+            payload.get("src"),
+            payload.get("caller"),
+            payload.get("caller_id"),
+            payload.get("contact_phone_number"),
+            call.get("from"),
+            call.get("src"),
+            call.get("caller"),
+            call.get("caller_id"),
+            call.get("contact_phone_number"),
+        )
+    )
+    destination_phone = _string(
+        _pick(
+            payload.get("to"),
+            payload.get("dst"),
+            payload.get("callee"),
+            payload.get("destination"),
+            payload.get("contact_phone_number"),
+            call.get("to"),
+            call.get("dst"),
+            call.get("callee"),
+            call.get("destination"),
+            call.get("contact_phone_number"),
+        )
+    )
+    virtual_number = _string(
+        _pick(
+            payload.get("virtual_number"),
+            payload.get("virtual_phone_number"),
+            payload.get("did"),
+            payload.get("called_did"),
+            call.get("virtual_number"),
+            call.get("virtual_phone_number"),
+            call.get("did"),
+            call.get("called_did"),
+        )
+    )
+    employee_id = _string(
+        _pick(
+            payload.get("employee_id"),
+            payload.get("manager_id"),
+            payload.get("last_answered_employee_id"),
+            payload.get("first_answered_employee_id"),
+            call.get("employee_id"),
+            call.get("manager_id"),
+        )
+    )
+    extension = _string(
+        _pick(
+            payload.get("extension"),
+            payload.get("internal_number"),
+            payload.get("internal"),
+            payload.get("operator_phone_number"),
+            call.get("extension"),
+            call.get("internal_number"),
+            call.get("internal"),
+            call.get("operator_phone_number"),
+        )
+    )
+    started_at = _parse_timestamp(
+        _pick(
+            payload.get("started_at"),
+            payload.get("start_time"),
+            payload.get("call_start"),
+            call.get("started_at"),
+            call.get("start_time"),
+            call.get("call_start"),
+            payload.get("timestamp"),
+            payload.get("notification_time"),
+        )
+    )
+    answered_at = _parse_timestamp(
+        _pick(
+            payload.get("answered_at"),
+            payload.get("answer_time"),
+            call.get("answered_at"),
+            call.get("answer_time"),
+        )
+    )
+    ended_at = _parse_timestamp(
+        _pick(
+            payload.get("ended_at"),
+            payload.get("end_time"),
+            payload.get("call_end"),
+            call.get("ended_at"),
+            call.get("end_time"),
+            call.get("call_end"),
+            payload.get("notification_time"),
+        )
+    )
+    duration_sec = _parse_int(
+        _pick(
+            payload.get("duration_sec"),
+            payload.get("duration"),
+            payload.get("total_duration"),
+            call.get("duration_sec"),
+            call.get("duration"),
+            call.get("total_duration"),
+        )
+    )
+    talk_duration_sec = _parse_int(
+        _pick(
+            payload.get("talk_duration_sec"),
+            payload.get("talk_duration"),
+            payload.get("clean_talk_duration"),
+            payload.get("billsec"),
+            call.get("talk_duration_sec"),
+            call.get("talk_duration"),
+            call.get("clean_talk_duration"),
+            call.get("billsec"),
+        )
+    )
+    recording_url = _string(
+        _pick(
+            payload.get("recording_url"),
+            payload.get("record_url"),
+            payload.get("full_record_file_link"),
+            call.get("recording_url"),
+            call.get("record_url"),
+            call.get("full_record_file_link"),
+        )
+    )
 
-    client_phone_raw = phone_from if direction == PhoneCallDirection.INBOUND else phone_to
+    if direction == PhoneCallDirection.INBOUND:
+        phone_from = caller_phone
+        phone_to = virtual_number or destination_phone or extension
+        client_phone_raw = caller_phone
+    else:
+        phone_from = extension or virtual_number or caller_phone
+        phone_to = destination_phone or caller_phone
+        client_phone_raw = destination_phone or caller_phone
     client_phone_normalized = normalize_phone(client_phone_raw)
 
     dedup_source = external_event_id or "|".join(
