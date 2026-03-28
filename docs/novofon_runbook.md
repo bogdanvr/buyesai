@@ -64,7 +64,10 @@ POST /api/admin/telephony/events/{id}/reprocess/
 ```
 
 После этого событие вернётся в `queued`.
-Для фактической обработки нужно запустить:
+Для фактической обработки нужен worker:
+
+- рекомендуемый вариант: `systemd service`
+- fallback: ручной запуск команды
 
 ```bash
 python manage.py process_novofon_webhook_queue --limit 50 --retry-failed

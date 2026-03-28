@@ -42,7 +42,11 @@ env/bin/python manage.py migrate
 - `webhook_shared_secret`
 
 4. Проверить webhook URL.
-5. Настроить фоновую обработку webhook-событий, например через cron:
+5. Настроить фоновую обработку webhook-событий.
+
+Рекомендуемый вариант: `systemd service` из `deploy/systemd/buyesai-process-novofon-webhook-queue.service`.
+
+Fallback-вариант через cron:
 
 ```bash
 * * * * * /path/to/python manage.py process_novofon_webhook_queue --limit 50 --retry-failed
@@ -76,13 +80,12 @@ POST /api/telephony/novofon/sync-employees/
 ## Обработка webhook очереди
 
 `POST /api/integrations/novofon/webhook/` теперь только принимает событие и ставит его в очередь.
-Фактическая обработка происходит отдельной командой:
+Фактическая обработка происходит отдельной командой или systemd worker:
 
 ```bash
 python manage.py process_novofon_webhook_queue --limit 50 --retry-failed
 ```
-
-Рекомендуется запускать её из cron или отдельного worker loop.
+Рекомендуемый вариант: отдельный `systemd service` c интервалом `5` секунд.
 
 ## Импорт исторических звонков
 

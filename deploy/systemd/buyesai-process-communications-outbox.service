@@ -1,0 +1,20 @@
+[Unit]
+Description=BuyesAI CRM Communications Outbox Worker
+After=network.target
+
+[Service]
+Type=simple
+User=bogdan
+Group=bogdan
+WorkingDirectory=/home/bogdan/buyesai
+Environment=PROJECT_DIR=/home/bogdan/buyesai
+Environment=PYTHON_BIN=/home/bogdan/buyesai/env/bin/python
+Environment=PROCESS_COMMUNICATIONS_OUTBOX_INTERVAL_SEC=5
+Environment=PROCESS_COMMUNICATIONS_OUTBOX_LIMIT=100
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/bogdan/buyesai/scripts/systemd/run_process_communications_outbox.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

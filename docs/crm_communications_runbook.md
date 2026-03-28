@@ -147,14 +147,25 @@ python manage.py process_communications_outbox --telegram-only
 
 ## Рекомендуемый scheduler
 
-Минимальный набор:
+Рекомендуемый production-вариант: `systemd service` с коротким polling loop.
+
+Файлы для установки лежат в:
+
+- `deploy/systemd/buyesai-process-communications-outbox.service`
+- `deploy/systemd/buyesai-fetch-imap-inbox.service`
+- `docs/systemd_workers.md`
+
+Базовые интервалы:
+
+- `process_communications_outbox`: каждые `5` секунд
+- `fetch_imap_inbox`: каждые `60` секунд
+
+Если нужен временный fallback на cron, минимальный набор такой:
 
 ```bash
 */2 * * * * cd /path/to/project && /path/to/venv/bin/python manage.py fetch_imap_inbox
 * * * * * cd /path/to/project && /path/to/venv/bin/python manage.py process_communications_outbox --limit 100
 ```
-
-Если позже будет переход на Celery, эти команды можно заменить worker/beat задачами без изменения доменной модели.
 
 ## Признаки деградации
 

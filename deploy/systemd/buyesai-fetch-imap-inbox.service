@@ -1,0 +1,21 @@
+[Unit]
+Description=BuyesAI CRM Communications IMAP Poller
+After=network.target
+
+[Service]
+Type=simple
+User=bogdan
+Group=bogdan
+WorkingDirectory=/home/bogdan/buyesai
+Environment=PROJECT_DIR=/home/bogdan/buyesai
+Environment=PYTHON_BIN=/home/bogdan/buyesai/env/bin/python
+Environment=FETCH_IMAP_INBOX_INTERVAL_SEC=60
+Environment=FETCH_IMAP_INBOX_LIMIT=50
+Environment=FETCH_IMAP_INBOX_SEARCH=ALL
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/bogdan/buyesai/scripts/systemd/run_fetch_imap_inbox.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
