@@ -428,6 +428,28 @@ class NovofonSyncEmployeesApiTests(APITestCase):
         self.assertEqual(mapping.novofon_full_name, "Alice Example")
 
     @patch("integrations.novofon.services.NovofonClient.list_employees")
+    def test_sync_employees_uses_nested_extension_payload_instead_of_stringifying_object(self, list_employees_mock):
+        list_employees_mock.return_value = [
+            {
+                "id": "emp-2",
+                "extension": {
+                    "extension_phone_number": "102",
+                    "inner_phone_number": "202",
+                    "unexpected_payload": "x" * 300,
+                },
+                "full_name": "Bob Example",
+                "is_active": True,
+            }
+        ]
+
+        response = self.client.post(reverse("telephony-novofon-sync-employees"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mapping = TelephonyUserMapping.objects.get(provider_account=self.account, novofon_employee_id="emp-2")
+        self.assertEqual(mapping.novofon_extension, "102")
+        self.assertEqual(mapping.novofon_full_name, "Bob Example")
+
+    @patch("integrations.novofon.services.NovofonClient.list_employees")
     def test_sync_employees_returns_api_error_instead_of_http_500(self, list_employees_mock):
         list_employees_mock.side_effect = NovofonClientError("Метод get.employees недоступен для текущего токена.")
 

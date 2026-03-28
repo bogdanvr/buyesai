@@ -507,10 +507,13 @@ def sync_novofon_employees(*, account: TelephonyProviderAccount | None = None) -
     client = _provider_client(account)
     employees = client.list_employees()
     synced_ids = []
+    extension_max_length = TelephonyUserMapping._meta.get_field("novofon_extension").max_length or 64
+    employee_id_max_length = TelephonyUserMapping._meta.get_field("novofon_employee_id").max_length or 128
+    full_name_max_length = TelephonyUserMapping._meta.get_field("novofon_full_name").max_length or 255
     for employee in employees:
         if not isinstance(employee, dict):
             continue
-        employee_id = str(employee.get("id") or employee.get("employee_id") or employee.get("uuid") or "").strip()
+        employee_id = str(employee.get("id") or employee.get("employee_id") or employee.get("uuid") or "").strip()[:employee_id_max_length]
         if not employee_id:
             continue
         extension_payload = employee.get("extension") if isinstance(employee.get("extension"), dict) else {}
@@ -518,23 +521,24 @@ def sync_novofon_employees(*, account: TelephonyProviderAccount | None = None) -
             employee.get("phone_number")
             or employee.get("extension_phone_number")
             or employee.get("inner_phone_number")
-            or employee.get("extension")
             or extension_payload.get("extension_phone_number")
             or extension_payload.get("inner_phone_number")
+            or employee.get("extension")
             or ""
-        ).strip()
+        ).strip()[:extension_max_length]
+        full_name = str(employee.get("full_name") or employee.get("name") or "").strip()[:full_name_max_length]
         mapping, _created = TelephonyUserMapping.objects.get_or_create(
             provider_account=account,
             novofon_employee_id=employee_id,
             defaults={
                 "novofon_extension": extension_value,
-                "novofon_full_name": str(employee.get("full_name") or employee.get("name") or "").strip(),
+                "novofon_full_name": full_name,
                 "is_active": bool(employee.get("is_active", True)),
                 "external_payload": employee,
             },
         )
         mapping.novofon_extension = extension_value or mapping.novofon_extension or ""
-        mapping.novofon_full_name = str(employee.get("full_name") or employee.get("name") or mapping.novofon_full_name or "").strip()
+        mapping.novofon_full_name = full_name or mapping.novofon_full_name or ""
         mapping.is_active = bool(employee.get("is_active", True))
         mapping.external_payload = employee
         mapping.save()
