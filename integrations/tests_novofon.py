@@ -417,6 +417,28 @@ class NovofonWebhookApiTests(APITestCase):
         self.assertEqual(call.direction, PhoneCallDirection.INBOUND)
         self.assertEqual(call.recording_url, "https://media.novofon.ru/records/call-1.mp3")
 
+    def test_queue_processor_handles_embedded_json_payload_saved_in_event_log(self):
+        wrapped_payload = {
+            '{\n  "event_type": "\\"in_call_session\\"",\n  "call_session_id": "187020303",\n  "communication_id": "12323",\n  "direction": "\\"in\\"",\n  "calling_phone_number": "\\"79000000000\\"",\n  "called_phone_number": "\\"74950000000\\"",\n  "contact_phone_number": "\\"79000000000\\"",\n  "communication_number": "1",\n  "virtual_phone_number": "\\"74950000000\\"",\n  "notification_time": "\\"2026-03-28 16:30:00\\"",\n  "start_time": "\\"2026-03-28 16:29:07\\""\n}': ""
+        }
+        event = TelephonyEventLog.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            event_type="",
+            external_event_id="",
+            external_call_id="",
+            deduplication_key="embedded-json-payload",
+            payload_json=wrapped_payload,
+            headers_json={"Content-Type": "application/json"},
+            status=TelephonyEventStatus.QUEUED,
+        )
+
+        result = call_command("process_novofon_webhook_queue", stdout=StringIO())
+        self.assertIsNone(result)
+        event.refresh_from_db()
+        self.assertEqual(event.status, TelephonyEventStatus.PROCESSED)
+        call = PhoneCall.objects.get(external_call_id="187020303")
+        self.assertEqual(call.direction, PhoneCallDirection.INBOUND)
+
 
 class NovofonCallApiTests(APITestCase):
     def setUp(self):

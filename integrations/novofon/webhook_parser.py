@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone as dt_timezone
 
@@ -51,6 +52,11 @@ def _nested(payload: dict, *keys: str):
 
 
 def _string(value) -> str:
+    if isinstance(value, str):
+        normalized = value.strip()
+        while len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {'"', "'"}:
+            normalized = normalized[1:-1].strip()
+        return normalized
     return str(value or "").strip()
 
 
@@ -62,6 +68,30 @@ def _parse_int(value) -> int | None:
         return int(raw)
     except (TypeError, ValueError):
         return None
+
+
+def _normalize_payload(payload):
+    if isinstance(payload, dict):
+        return {str(key or "").strip(): _normalize_payload(value) for key, value in payload.items()}
+    if isinstance(payload, list):
+        return [_normalize_payload(item) for item in payload]
+    return _string(payload)
+
+
+def _unwrap_embedded_json_payload(payload: dict) -> dict:
+    if not isinstance(payload, dict) or len(payload) != 1:
+        return payload
+    (single_key, single_value), = payload.items()
+    candidate = str(single_key or "").strip()
+    if str(single_value or "").strip():
+        return payload
+    if not (candidate.startswith("{") and candidate.endswith("}")):
+        return payload
+    try:
+        parsed_json = json.loads(candidate)
+    except (TypeError, ValueError):
+        return payload
+    return parsed_json if isinstance(parsed_json, dict) else payload
 
 
 def _parse_timestamp(value) -> datetime | None:
@@ -136,6 +166,7 @@ def _map_status(value: str, event_type: str) -> str:
 
 def parse_novofon_webhook(payload: dict, headers: dict | None = None) -> ParsedNovofonEvent:
     payload = payload if isinstance(payload, dict) else {}
+    payload = _normalize_payload(_unwrap_embedded_json_payload(payload))
     call = payload.get("call") if isinstance(payload.get("call"), dict) else {}
     event_type = _string(_pick(payload.get("event_type"), payload.get("event"), payload.get("type"), call.get("event_type"), call.get("event")))
     external_event_id = _string(
