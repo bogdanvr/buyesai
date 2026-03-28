@@ -122,7 +122,7 @@ class NovofonClientRoutingTests(SimpleTestCase):
         request_mock = Mock(side_effect=request_side_effect)
         with patch("integrations.novofon.client.requests.post", request_mock):
             response = client.initiate_call(
-                employee_id="emp-1",
+                employee_id="25",
                 extension="101",
                 phone="+7 900 000-00-00",
                 comment="Перезвонить",
@@ -135,7 +135,7 @@ class NovofonClientRoutingTests(SimpleTestCase):
         self.assertEqual(payload["method"], "start.employee_call")
         self.assertEqual(payload["params"]["virtual_phone_number"], "74950000000")
         self.assertEqual(payload["params"]["contact"], "79000000000")
-        self.assertEqual(payload["params"]["employee"]["id"], "emp-1")
+        self.assertEqual(payload["params"]["employee"]["id"], 25)
         self.assertEqual(payload["params"]["external_id"], "crm_phone_call_77")
 
 
@@ -371,7 +371,7 @@ class NovofonCallApiTests(APITestCase):
         TelephonyUserMapping.objects.create(
             provider_account=self.account,
             crm_user=self.user,
-            novofon_employee_id="emp-2",
+            novofon_employee_id="25",
             novofon_extension="102",
             novofon_full_name="Caller Two",
             is_active=True,

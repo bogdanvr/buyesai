@@ -180,13 +180,21 @@ class NovofonClient:
             return active_virtual_numbers[0]
         raise NovofonClientError("В Novofon не найден активный виртуальный номер для исходящего звонка.")
 
+    def _normalize_employee_id(self, employee_id) -> int:
+        raw_employee_id = str(employee_id or "").strip()
+        if not raw_employee_id:
+            raise NovofonClientError("Не задан ID сотрудника Novofon для исходящего звонка.")
+        if not raw_employee_id.isdigit():
+            raise NovofonClientError("ID сотрудника Novofon должен быть числовым значением.")
+        return int(raw_employee_id)
+
     def initiate_call(self, *, employee_id: str, extension: str, phone: str, comment: str = "", external_context: dict | None = None) -> dict:
         normalized_phone = normalize_phone(phone)
         if not normalized_phone:
             raise NovofonClientError("Некорректный номер телефона для исходящего звонка.")
 
         virtual_phone_number = self._resolve_virtual_phone_number()
-        employee_payload = {"id": employee_id}
+        employee_payload = {"id": self._normalize_employee_id(employee_id)}
 
         params = {
             "first_call": "employee",
