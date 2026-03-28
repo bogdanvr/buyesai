@@ -3465,8 +3465,10 @@
         extractErrorMessage(data, fallback) {
           if (!data) return fallback;
           if (typeof data === "string") return data;
+          if (typeof data.error === "string" && data.error.trim()) return data.error;
+          if (typeof data.message === "string" && data.message.trim()) return data.message;
           if (typeof data.detail === "string") return data.detail;
-          const entries = Object.entries(data);
+          const entries = Object.entries(data).filter(([field]) => field !== "ok");
           if (!entries.length) return fallback;
           const [field, value] = entries[0];
           if (Array.isArray(value)) {
