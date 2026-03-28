@@ -187,9 +187,6 @@ class NovofonClient:
 
         virtual_phone_number = self._resolve_virtual_phone_number()
         employee_payload = {"id": employee_id}
-        employee_phone_number = str(extension or "").strip()
-        if employee_phone_number:
-            employee_payload["phone_number"] = employee_phone_number
 
         params = {
             "first_call": "employee",

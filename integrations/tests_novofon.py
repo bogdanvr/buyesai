@@ -136,7 +136,6 @@ class NovofonClientRoutingTests(SimpleTestCase):
         self.assertEqual(payload["params"]["virtual_phone_number"], "74950000000")
         self.assertEqual(payload["params"]["contact"], "79000000000")
         self.assertEqual(payload["params"]["employee"]["id"], "emp-1")
-        self.assertEqual(payload["params"]["employee"]["phone_number"], "101")
         self.assertEqual(payload["params"]["external_id"], "crm_phone_call_77")
 
 
