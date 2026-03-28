@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import F
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 
@@ -390,6 +391,45 @@ def queue_novofon_webhook_event(*, payload: dict, headers: dict | None = None) -
     )
 
 
+def requeue_novofon_event(event: TelephonyEventLog) -> dict:
+    event.status = TelephonyEventStatus.QUEUED
+    event.processed_at = None
+    event.error_text = ""
+    event.save(update_fields=["status", "processed_at", "error_text"])
+    return {"ok": True, "queued": True, "event_id": event.pk}
+
+
+def claim_novofon_events_for_processing(*, limit: int = 25, retry_failed: bool = False, max_retries: int | None = None) -> list[TelephonyEventLog]:
+    normalized_limit = max(1, int(limit or 25))
+    statuses = [TelephonyEventStatus.QUEUED]
+    if retry_failed:
+        statuses.append(TelephonyEventStatus.FAILED)
+
+    with transaction.atomic():
+        queryset = (
+            TelephonyEventLog.objects
+            .select_for_update(skip_locked=True)
+            .filter(provider=TelephonyProvider.NOVOFON, status__in=statuses)
+            .order_by("received_at", "id")
+        )
+        if max_retries is not None:
+            queryset = queryset.filter(retry_count__lt=max(1, int(max_retries)))
+        event_ids = list(queryset.values_list("id", flat=True)[:normalized_limit])
+        if not event_ids:
+            return []
+        (
+            TelephonyEventLog.objects
+            .filter(pk__in=event_ids)
+            .update(
+                status=TelephonyEventStatus.PROCESSING,
+                processed_at=None,
+                error_text="",
+                retry_count=F("retry_count") + 1,
+            )
+        )
+    return list(TelephonyEventLog.objects.filter(pk__in=event_ids).order_by("received_at", "id"))
+
+
 @transaction.atomic
 def process_novofon_webhook_event(event: TelephonyEventLog) -> dict:
     account = get_novofon_account(create=True)
@@ -425,17 +465,39 @@ def process_novofon_webhook_event(event: TelephonyEventLog) -> dict:
         event.status = TelephonyEventStatus.FAILED
         event.processed_at = timezone.now()
         event.error_text = str(error)
-        event.retry_count = int(event.retry_count or 0) + 1
-        event.save(update_fields=["status", "processed_at", "error_text", "retry_count"])
+        event.save(update_fields=["status", "processed_at", "error_text"])
         return {"ok": False, "error": str(error)}
 
 
+def process_novofon_webhook_queue(*, limit: int = 25, retry_failed: bool = False, max_retries: int | None = None) -> dict:
+    events = claim_novofon_events_for_processing(limit=limit, retry_failed=retry_failed, max_retries=max_retries)
+    results = []
+    processed = 0
+    succeeded = 0
+    failed = 0
+    duplicates = 0
+    for event in events:
+        result = process_novofon_webhook_event(event)
+        processed += 1
+        if result.get("duplicate"):
+            duplicates += 1
+        elif result.get("ok"):
+            succeeded += 1
+        else:
+            failed += 1
+        results.append({"event_id": event.pk, "result": result})
+    return {
+        "ok": True,
+        "processed": processed,
+        "succeeded": succeeded,
+        "failed": failed,
+        "duplicates": duplicates,
+        "results": results,
+    }
+
+
 def reprocess_novofon_event(event: TelephonyEventLog) -> dict:
-    event.retry_count = int(event.retry_count or 0) + 1
-    event.status = TelephonyEventStatus.QUEUED
-    event.error_text = ""
-    event.save(update_fields=["retry_count", "status", "error_text"])
-    return process_novofon_webhook_event(event)
+    return requeue_novofon_event(event)
 
 
 def sync_novofon_employees(*, account: TelephonyProviderAccount | None = None) -> dict:

@@ -5,6 +5,7 @@
 - хранение настроек провайдера Novofon в CRM;
 - синхронизация сотрудников Novofon в таблицу сопоставлений;
 - webhook endpoint `POST /api/integrations/novofon/webhook/`;
+- queue processor `python manage.py process_novofon_webhook_queue`;
 - запуск исходящего звонка через `POST /api/telephony/novofon/call/`;
 - ручной импорт исторических звонков через `POST /api/telephony/novofon/import-calls/`;
 - журнал событий телефонии;
@@ -41,6 +42,11 @@ env/bin/python manage.py migrate
 - `webhook_shared_secret`
 
 4. Проверить webhook URL.
+5. Настроить фоновую обработку webhook-событий, например через cron:
+
+```bash
+* * * * * /path/to/python manage.py process_novofon_webhook_queue --limit 50 --retry-failed
+```
 
 Рекомендуемые значения для Novofon:
 
@@ -66,6 +72,17 @@ POST /api/telephony/novofon/sync-employees/
 
 После синхронизации в таблице `TelephonyUserMapping` появятся сотрудники Novofon.
 Дальше им нужно назначить пользователей CRM.
+
+## Обработка webhook очереди
+
+`POST /api/integrations/novofon/webhook/` теперь только принимает событие и ставит его в очередь.
+Фактическая обработка происходит отдельной командой:
+
+```bash
+python manage.py process_novofon_webhook_queue --limit 50 --retry-failed
+```
+
+Рекомендуется запускать её из cron или отдельного worker loop.
 
 ## Импорт исторических звонков
 

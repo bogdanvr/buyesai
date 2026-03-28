@@ -15,6 +15,7 @@
 Типовые статусы:
 
 - `queued`
+- `processing`
 - `processed`
 - `failed`
 - `ignored_duplicate`
@@ -62,6 +63,13 @@ POST /api/telephony/novofon/import-calls/
 POST /api/admin/telephony/events/{id}/reprocess/
 ```
 
+После этого событие вернётся в `queued`.
+Для фактической обработки нужно запустить:
+
+```bash
+python manage.py process_novofon_webhook_queue --limit 50 --retry-failed
+```
+
 ### Исходящий звонок не запускается
 
 Проверить:
@@ -104,6 +112,4 @@ POST /api/admin/telephony/events/{id}/reprocess/
 ## Что еще остается
 
 - финальный format/signature verification webhook;
-- реальная асинхронная очередь вместо DB-backed process/reprocess модели;
-- экран настроек Novofon в CRM;
 - realtime popup по входящему звонку.

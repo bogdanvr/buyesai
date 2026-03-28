@@ -1,7 +1,9 @@
 from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
+from io import StringIO
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import SimpleTestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -200,32 +202,66 @@ class NovofonWebhookApiTests(APITestCase):
             HTTP_X_WEBHOOK_SECRET="secret",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        event = TelephonyEventLog.objects.get(pk=response.data["event_id"])
+        self.assertEqual(event.status, TelephonyEventStatus.QUEUED)
+        self.assertFalse(PhoneCall.objects.filter(external_call_id="call-1").exists())
+
+        out = StringIO()
+        call_command("process_novofon_webhook_queue", stdout=out)
+
         call = PhoneCall.objects.get(external_call_id="call-1")
         self.assertEqual(call.contact_id, self.contact.pk)
         self.assertEqual(call.company_id, self.company.pk)
         self.assertEqual(call.deal_id, self.deal.pk)
         self.assertEqual(call.responsible_user_id, self.user.pk)
         self.assertEqual(call.client_phone_normalized, "79000000000")
+        event.refresh_from_db()
+        self.assertEqual(event.status, TelephonyEventStatus.PROCESSED)
 
     def test_duplicate_webhook_is_marked_and_does_not_duplicate_call(self):
-        self.client.post(
+        first_response = self.client.post(
             reverse("integrations-novofon-webhook"),
             self._payload(event_id="event-dup"),
             format="json",
             HTTP_X_WEBHOOK_SECRET="secret",
         )
+        self.assertEqual(first_response.status_code, status.HTTP_202_ACCEPTED)
+        call_command("process_novofon_webhook_queue", stdout=StringIO())
         response = self.client.post(
             reverse("integrations-novofon-webhook"),
             self._payload(event_id="event-dup"),
             format="json",
             HTTP_X_WEBHOOK_SECRET="secret",
         )
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        call_command("process_novofon_webhook_queue", stdout=StringIO())
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(PhoneCall.objects.filter(external_call_id="call-1").count(), 1)
         statuses = list(TelephonyEventLog.objects.order_by("id").values_list("status", flat=True))
         self.assertEqual(statuses, [TelephonyEventStatus.PROCESSED, TelephonyEventStatus.IGNORED_DUPLICATE])
+
+    def test_reprocess_endpoint_requeues_failed_event(self):
+        event = TelephonyEventLog.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            event_type="call_completed",
+            external_event_id="event-failed",
+            external_call_id="call-failed",
+            deduplication_key="dedupe-failed",
+            payload_json=self._payload(event_id="event-failed"),
+            headers_json={"X-Webhook-Secret": "secret"},
+            status=TelephonyEventStatus.FAILED,
+            error_text="boom",
+            retry_count=2,
+        )
+
+        response = self.client.post(reverse("telephony-event-reprocess", kwargs={"pk": event.pk}))
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        event.refresh_from_db()
+        self.assertEqual(event.status, TelephonyEventStatus.QUEUED)
+        self.assertEqual(event.retry_count, 2)
+        self.assertEqual(event.error_text, "")
 
 
 class NovofonCallApiTests(APITestCase):

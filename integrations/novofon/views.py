@@ -17,7 +17,6 @@ from integrations.novofon.services import (
     get_novofon_account,
     import_novofon_calls_history,
     initiate_novofon_call,
-    process_novofon_webhook_event,
     queue_novofon_webhook_event,
     reprocess_novofon_event,
     sync_novofon_employees,
@@ -118,7 +117,8 @@ class TelephonyEventReprocessAPIView(APIView):
         if event is None:
             return Response({"detail": "Событие не найдено."}, status=status.HTTP_404_NOT_FOUND)
         result = reprocess_novofon_event(event)
-        return Response({"event": TelephonyEventLogSerializer(event).data, "result": result})
+        event.refresh_from_db()
+        return Response({"event": TelephonyEventLogSerializer(event).data, "result": result}, status=status.HTTP_202_ACCEPTED)
 
 
 class NovofonWebhookAPIView(APIView):
@@ -137,5 +137,7 @@ class NovofonWebhookAPIView(APIView):
             if provided_secret != str(account.webhook_shared_secret or "").strip():
                 return Response({"ok": False, "error": "invalid_secret"}, status=status.HTTP_403_FORBIDDEN)
         event = queue_novofon_webhook_event(payload=payload, headers=dict(request.headers.items()))
-        result = process_novofon_webhook_event(event)
-        return Response({"ok": True, "event_id": event.pk, "result": result}, status=status.HTTP_200_OK)
+        return Response(
+            {"ok": True, "event_id": event.pk, "queued": True, "status": event.status},
+            status=status.HTTP_202_ACCEPTED,
+        )

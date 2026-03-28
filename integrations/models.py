@@ -75,6 +75,7 @@ class PhoneCallStatus(models.TextChoices):
 class TelephonyEventStatus(models.TextChoices):
     RECEIVED = "received", "Получено"
     QUEUED = "queued", "В очереди"
+    PROCESSING = "processing", "Обрабатывается"
     PROCESSED = "processed", "Обработано"
     FAILED = "failed", "Ошибка"
     IGNORED_DUPLICATE = "ignored_duplicate", "Дубликат"
