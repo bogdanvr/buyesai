@@ -91,6 +91,8 @@ python manage.py process_novofon_webhook_queue --limit 50 --retry-failed
 ```
 Рекомендуемый вариант: отдельный `systemd service` c интервалом `5` секунд.
 
+Чтобы у свежих звонков появлялась ссылка на запись разговора, в личном кабинете Novofon нужно настроить отдельное уведомление типа "Записанный разговор". CRM поддерживает `file_link` и `call_record_file_info.file_link` и обновляет уже существующий `PhoneCall` после прихода такого webhook.
+
 ## Безопасность webhook
 
 Если у аккаунта заполнен `api_secret`, endpoint `/api/integrations/novofon/webhook/` принимает только webhook с корректным header `Signature`.

@@ -14,6 +14,8 @@ from rest_framework.test import APITestCase
 from crm.models import Client, Contact, Deal, DealStage, Lead
 from integrations.models import (
     PhoneCall,
+    PhoneCallDirection,
+    PhoneCallStatus,
     TelephonyEventLog,
     TelephonyEventStatus,
     TelephonyProvider,
@@ -334,6 +336,39 @@ class NovofonWebhookApiTests(APITestCase):
         self.assertEqual(event.status, TelephonyEventStatus.QUEUED)
         self.assertEqual(event.retry_count, 2)
         self.assertEqual(event.error_text, "")
+
+    def test_recording_event_updates_existing_call_recording_url(self):
+        initial_response = self.client.post(
+            reverse("integrations-novofon-webhook"),
+            self._payload(event_id="event-call-finished"),
+            format="json",
+            HTTP_X_WEBHOOK_SECRET="secret",
+        )
+        self.assertEqual(initial_response.status_code, status.HTTP_202_ACCEPTED)
+        call_command("process_novofon_webhook_queue", stdout=StringIO())
+
+        recording_payload = {
+            "event": "RECORD_CALL",
+            "event_id": "event-record-1",
+            "call_session_id": "call-1",
+            "call_record_file_info": {
+                "file_link": "https://media.novofon.ru/records/call-1.mp3",
+            },
+        }
+        recording_response = self.client.post(
+            reverse("integrations-novofon-webhook"),
+            recording_payload,
+            format="json",
+            HTTP_X_WEBHOOK_SECRET="secret",
+        )
+
+        self.assertEqual(recording_response.status_code, status.HTTP_202_ACCEPTED)
+        call_command("process_novofon_webhook_queue", stdout=StringIO())
+
+        call = PhoneCall.objects.get(external_call_id="call-1")
+        self.assertEqual(call.status, PhoneCallStatus.COMPLETED)
+        self.assertEqual(call.direction, PhoneCallDirection.INBOUND)
+        self.assertEqual(call.recording_url, "https://media.novofon.ru/records/call-1.mp3")
 
 
 class NovofonCallApiTests(APITestCase):

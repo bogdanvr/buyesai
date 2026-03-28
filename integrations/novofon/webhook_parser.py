@@ -295,7 +295,10 @@ def parse_novofon_webhook(payload: dict, headers: dict | None = None) -> ParsedN
         _pick(
             payload.get("recording_url"),
             payload.get("record_url"),
+            payload.get("file_link"),
             payload.get("full_record_file_link"),
+            _nested(payload, "call_record_file_info", "file_link"),
+            _nested(payload, "record_info", "file_link"),
             call.get("recording_url"),
             call.get("record_url"),
             call.get("full_record_file_link"),

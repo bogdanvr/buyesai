@@ -91,7 +91,7 @@ def _payload_signature_source(payload: dict) -> str:
         return f"{caller_phone}{called_phone}{call_start}"
     if event_name in {"NOTIFY_OUT_START", "NOTIFY_OUT_END"}:
         return f"{internal_phone}{called_phone}{call_start}"
-    if event_name == "NOTIFY_RECORD":
+    if event_name in {"NOTIFY_RECORD", "RECORD_CALL"}:
         return f"{pbx_call_id}{call_id_with_rec}"
     if event_name in {"NUMBER_LOOKUP", "CALL_TRACKING", "SMS"}:
         return _string(result_value)

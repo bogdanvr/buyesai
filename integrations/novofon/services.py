@@ -303,7 +303,7 @@ def _upsert_phone_call_from_event(*, account: TelephonyProviderAccount, parsed: 
         employee_id=parsed.employee_id,
         extension=parsed.extension,
     )
-    call, _created = PhoneCall.objects.get_or_create(
+    call, created = PhoneCall.objects.get_or_create(
         provider=TelephonyProvider.NOVOFON,
         external_call_id=parsed.external_call_id,
         defaults={
@@ -325,6 +325,14 @@ def _upsert_phone_call_from_event(*, account: TelephonyProviderAccount, parsed: 
             "raw_payload_last": parsed.raw_payload,
         },
     )
+
+    is_recording_update_event = "record" in str(parsed.event_type or "").strip().lower() and bool(parsed.recording_url)
+    if is_recording_update_event and not created:
+        call.external_parent_event_id = parsed.external_event_id or call.external_parent_event_id
+        call.recording_url = parsed.recording_url or call.recording_url
+        call.raw_payload_last = parsed.raw_payload or call.raw_payload_last
+        call.save(update_fields=["external_parent_event_id", "recording_url", "raw_payload_last", "updated_at"])
+        return call
 
     call.external_parent_event_id = parsed.external_event_id or call.external_parent_event_id
     call.direction = parsed.direction or call.direction
