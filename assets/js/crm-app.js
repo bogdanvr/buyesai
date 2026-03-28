@@ -174,6 +174,41 @@
           modalErrorMessage: "",
           isNovofonCallStarting: false,
           activeNovofonCallTarget: "",
+          telephonyNotice: {
+            type: "",
+            text: "",
+          },
+          isTelephonySettingsLoading: false,
+          isTelephonySettingsSaving: false,
+          isTelephonyConnectionChecking: false,
+          isTelephonyEmployeesSyncing: false,
+          isTelephonyCallsImporting: false,
+          telephonySettingsLoaded: false,
+          telephonyLastImportResult: null,
+          telephonyImportForm: {
+            days: 30,
+            limit: 500,
+            maxRecords: 5000,
+            includeOngoingCalls: false,
+          },
+          telephonySettings: {
+            enabled: false,
+            apiBaseUrl: "",
+            webhookPath: "",
+            webhookUrl: "",
+            defaultOwnerId: null,
+            createLeadForUnknownNumber: false,
+            createTaskForMissedCall: false,
+            linkCallsToOpenDealOnly: true,
+            allowedVirtualNumbersText: "",
+            isDebugLoggingEnabled: false,
+            hasApiSecret: false,
+            lastConnectionCheckedAt: "",
+            lastConnectionStatus: "",
+            lastConnectionError: "",
+            mappings: [],
+            settingsJson: {},
+          },
           phoneCallHistoryFilters: [
             { value: "all", label: "Все" },
             { value: "inbound", label: "Входящие" },
@@ -443,7 +478,8 @@
             { key: "contacts", label: "Контакты", shortLabel: "Контакты", icon: "◉" },
             { key: "companies", label: "Компании", shortLabel: "Компании", icon: "▣" },
             { key: "tasks", label: "Задачи", shortLabel: "Задачи", icon: "✓" },
-            { key: "touches", label: "Касания", shortLabel: "Касания", icon: "◌" }
+            { key: "touches", label: "Касания", shortLabel: "Касания", icon: "◌" },
+            { key: "telephony", label: "Телефония", shortLabel: "Телефония", icon: "☎" }
           ],
           datasets: {
             leads: [],
@@ -452,6 +488,7 @@
             companies: [],
             tasks: [],
             touches: [],
+            telephony: [],
             automationDrafts: [],
             automationQueue: [],
             automationMessageDrafts: []
@@ -459,6 +496,9 @@
         };
       },
       computed: {
+        isTelephonySection() {
+          return this.activeSection === "telephony";
+        },
         currentSectionTitle() {
           const titles = {
             leads: "Все лиды",
@@ -466,7 +506,8 @@
             contacts: "Все контакты",
             companies: "Все компании",
             tasks: "Все задачи",
-            touches: "Все касания"
+            touches: "Все касания",
+            telephony: "Телефония Novofon"
           };
           return titles[this.activeSection] || "CRM";
         },
@@ -477,7 +518,8 @@
             contacts: "контакт",
             companies: "компанию",
             tasks: "задачу",
-            touches: "касание"
+            touches: "касание",
+            telephony: "настройку"
           };
           return labels[this.activeSection] || "элемент";
         },
@@ -1510,7 +1552,8 @@
             deals: "сделок",
             contacts: "контактов",
             companies: "компаний",
-            tasks: "задач"
+            tasks: "задач",
+            telephony: "настроек"
           };
           return labels[this.activeSection] || "элементов";
         },
@@ -1518,9 +1561,39 @@
           return this.activeSection === "contacts" ? "о" : "";
         },
         currentItems() {
+          if (this.isTelephonySection) {
+            return [];
+          }
           return this.datasets[this.activeSection] || [];
         },
+        telephonyUserOptions() {
+          return (this.metaOptions.users || [])
+            .filter((user) => user && user.id)
+            .map((user) => ({
+              id: Number.parseInt(user.id, 10) || null,
+              label: user.full_name || user.username || `Пользователь #${user.id}`,
+            }))
+            .filter((user) => user.id);
+        },
+        telephonyConnectionStatusLabel() {
+          const status = String(this.telephonySettings.lastConnectionStatus || "").trim().toLowerCase();
+          if (status === "ok") return "Подключение проверено";
+          if (status === "error") return "Ошибка подключения";
+          return "Проверка не запускалась";
+        },
+        telephonyConnectionStatusClass() {
+          const status = String(this.telephonySettings.lastConnectionStatus || "").trim().toLowerCase();
+          if (status === "ok") return "border-emerald-400/30 bg-emerald-400/10 text-emerald-200";
+          if (status === "error") return "border-red-400/30 bg-red-400/10 text-red-200";
+          return "border-crm-border bg-[#123753] text-crm-text";
+        },
+        telephonyActiveMappingsCount() {
+          return (this.telephonySettings.mappings || []).filter((item) => item.isActive).length;
+        },
         activeFilterRows() {
+          if (this.isTelephonySection) {
+            return [];
+          }
           const rows = [];
           if (this.selectedStatusFilters.length) {
             rows.push({
@@ -1601,6 +1674,9 @@
           return rows;
         },
         filteredItems() {
+          if (this.isTelephonySection) {
+            return [];
+          }
           const q = this.search.trim().toLowerCase();
           const filtered = this.currentItems.filter((item) => {
             const matchesDealFilter =
@@ -2205,6 +2281,184 @@
           if (Array.isArray(data)) return data;
           if (data && Array.isArray(data.results)) return data.results;
           return [];
+        },
+        clearTelephonyNotice() {
+          this.telephonyNotice = { type: "", text: "" };
+        },
+        setTelephonyNotice(text, type = "success") {
+          this.telephonyNotice = {
+            type: String(type || "success").trim() || "success",
+            text: String(text || "").trim(),
+          };
+        },
+        normalizeTelephonySettings(payload = {}) {
+          const allowedVirtualNumbersText = Array.isArray(payload.allowed_virtual_numbers)
+            ? payload.allowed_virtual_numbers.map((item) => String(item || "").trim()).filter(Boolean).join("\n")
+            : "";
+          const mappings = Array.isArray(payload.mappings)
+            ? payload.mappings.map((item) => ({
+              id: this.toIntOrNull(item.id),
+              crmUserId: this.toIntOrNull(item.crm_user),
+              crmUserName: String(item.crm_user_name || "").trim(),
+              novofonEmployeeId: String(item.novofon_employee_id || "").trim(),
+              novofonExtension: String(item.novofon_extension || "").trim(),
+              novofonFullName: String(item.novofon_full_name || "").trim(),
+              isActive: item.is_active !== false,
+              isDefaultOwner: !!item.is_default_owner,
+            }))
+            : [];
+          return {
+            enabled: !!payload.enabled,
+            apiBaseUrl: String(payload.api_base_url || "").trim(),
+            webhookPath: String(payload.webhook_path || "").trim(),
+            webhookUrl: String(payload.webhook_url || "").trim(),
+            defaultOwnerId: this.toIntOrNull(payload.default_owner),
+            createLeadForUnknownNumber: !!payload.create_lead_for_unknown_number,
+            createTaskForMissedCall: !!payload.create_task_for_missed_call,
+            linkCallsToOpenDealOnly: payload.link_calls_to_open_deal_only !== false,
+            allowedVirtualNumbersText,
+            isDebugLoggingEnabled: !!payload.is_debug_logging_enabled,
+            hasApiSecret: !!payload.has_api_secret,
+            lastConnectionCheckedAt: String(payload.last_connection_checked_at || "").trim(),
+            lastConnectionStatus: String(payload.last_connection_status || "").trim(),
+            lastConnectionError: String(payload.last_connection_error || "").trim(),
+            mappings,
+            settingsJson: (payload.settings_json && typeof payload.settings_json === "object" && !Array.isArray(payload.settings_json))
+              ? { ...payload.settings_json }
+              : {},
+          };
+        },
+        telephonyAllowedVirtualNumbersList() {
+          return String(this.telephonySettings.allowedVirtualNumbersText || "")
+            .split(/\n|,|;/)
+            .map((item) => String(item || "").trim())
+            .filter(Boolean);
+        },
+        telephonySettingsSavePayload() {
+          return {
+            enabled: !!this.telephonySettings.enabled,
+            api_base_url: String(this.telephonySettings.apiBaseUrl || "").trim(),
+            webhook_path: String(this.telephonySettings.webhookPath || "").trim(),
+            default_owner: this.toIntOrNull(this.telephonySettings.defaultOwnerId),
+            create_lead_for_unknown_number: !!this.telephonySettings.createLeadForUnknownNumber,
+            create_task_for_missed_call: !!this.telephonySettings.createTaskForMissedCall,
+            link_calls_to_open_deal_only: !!this.telephonySettings.linkCallsToOpenDealOnly,
+            allowed_virtual_numbers: this.telephonyAllowedVirtualNumbersList(),
+            is_debug_logging_enabled: !!this.telephonySettings.isDebugLoggingEnabled,
+            settings_json: (this.telephonySettings.settingsJson && typeof this.telephonySettings.settingsJson === "object" && !Array.isArray(this.telephonySettings.settingsJson))
+              ? { ...this.telephonySettings.settingsJson }
+              : {},
+            mappings: (this.telephonySettings.mappings || [])
+              .filter((item) => String(item.novofonEmployeeId || "").trim())
+              .map((item) => ({
+                ...(this.toIntOrNull(item.id) ? { id: this.toIntOrNull(item.id) } : {}),
+                crm_user: this.toIntOrNull(item.crmUserId),
+                novofon_employee_id: String(item.novofonEmployeeId || "").trim(),
+                novofon_extension: String(item.novofonExtension || "").trim(),
+                novofon_full_name: String(item.novofonFullName || "").trim(),
+                is_active: item.isActive !== false,
+                is_default_owner: !!item.isDefaultOwner,
+              })),
+          };
+        },
+        async loadTelephonySettings(force = false) {
+          if (this.telephonySettingsLoaded && !force) {
+            return;
+          }
+          this.isTelephonySettingsLoading = true;
+          this.errorMessage = "";
+          try {
+            const payload = await this.apiRequest("/api/telephony/novofon/settings/");
+            this.telephonySettings = this.normalizeTelephonySettings(payload);
+            this.telephonySettingsLoaded = true;
+          } catch (error) {
+            this.errorMessage = `Ошибка загрузки телефонии: ${error.message}`;
+            throw error;
+          } finally {
+            this.isTelephonySettingsLoading = false;
+          }
+        },
+        async saveTelephonySettings() {
+          this.isTelephonySettingsSaving = true;
+          this.clearTelephonyNotice();
+          this.errorMessage = "";
+          try {
+            const payload = await this.apiRequest("/api/telephony/novofon/settings/", {
+              method: "PUT",
+              body: this.telephonySettingsSavePayload(),
+            });
+            this.telephonySettings = this.normalizeTelephonySettings(payload);
+            this.telephonySettingsLoaded = true;
+            this.setTelephonyNotice("Настройки телефонии сохранены.");
+          } catch (error) {
+            this.setTelephonyNotice(`Ошибка сохранения: ${error.message}`, "error");
+          } finally {
+            this.isTelephonySettingsSaving = false;
+          }
+        },
+        async checkTelephonyConnection() {
+          this.isTelephonyConnectionChecking = true;
+          this.clearTelephonyNotice();
+          this.errorMessage = "";
+          try {
+            const result = await this.apiRequest("/api/telephony/novofon/check-connection/", {
+              method: "POST",
+            });
+            await this.loadTelephonySettings(true);
+            if (result && result.ok) {
+              const virtualNumbersCount = Number(result?.payload?.virtual_numbers_count || 0);
+              this.setTelephonyNotice(`Подключение проверено. Активных виртуальных номеров: ${virtualNumbersCount}.`);
+            } else {
+              this.setTelephonyNotice(`Проверка завершилась ошибкой: ${result?.error || "неизвестная ошибка"}`, "error");
+            }
+          } catch (error) {
+            this.setTelephonyNotice(`Ошибка проверки подключения: ${error.message}`, "error");
+          } finally {
+            this.isTelephonyConnectionChecking = false;
+          }
+        },
+        async syncTelephonyEmployees() {
+          this.isTelephonyEmployeesSyncing = true;
+          this.clearTelephonyNotice();
+          this.errorMessage = "";
+          try {
+            const payload = await this.apiRequest("/api/telephony/novofon/sync-employees/", {
+              method: "POST",
+            });
+            this.telephonySettings = this.normalizeTelephonySettings(payload);
+            this.telephonySettingsLoaded = true;
+            const syncedCount = Number(payload?.sync_result?.count || 0);
+            this.setTelephonyNotice(`Синхронизация завершена. Обновлено сотрудников: ${syncedCount}.`);
+          } catch (error) {
+            this.setTelephonyNotice(`Ошибка синхронизации сотрудников: ${error.message}`, "error");
+          } finally {
+            this.isTelephonyEmployeesSyncing = false;
+          }
+        },
+        async importTelephonyCalls() {
+          this.isTelephonyCallsImporting = true;
+          this.clearTelephonyNotice();
+          this.errorMessage = "";
+          this.telephonyLastImportResult = null;
+          try {
+            const result = await this.apiRequest("/api/telephony/novofon/import-calls/", {
+              method: "POST",
+              body: {
+                days: Math.max(1, Number(this.telephonyImportForm.days || 30)),
+                limit: Math.max(1, Number(this.telephonyImportForm.limit || 500)),
+                max_records: Math.max(1, Number(this.telephonyImportForm.maxRecords || 5000)),
+                include_ongoing_calls: !!this.telephonyImportForm.includeOngoingCalls,
+              },
+            });
+            this.telephonyLastImportResult = result;
+            this.setTelephonyNotice(
+              `Импорт завершён. Создано: ${Number(result?.created || 0)}, обновлено: ${Number(result?.updated || 0)}, всего обработано: ${Number(result?.imported || 0)}.`
+            );
+          } catch (error) {
+            this.setTelephonyNotice(`Ошибка импорта звонков: ${error.message}`, "error");
+          } finally {
+            this.isTelephonyCallsImporting = false;
+          }
         },
         resolveActivePhoneCallHistoryTarget() {
           if (this.activeSection === "leads" && this.toIntOrNull(this.editingLeadId)) {
@@ -8728,7 +8982,11 @@
           this.isLoading = true;
           this.errorMessage = "";
           try {
-            await this.loadSection(this.activeSection);
+            if (this.isTelephonySection) {
+              await this.loadTelephonySettings(true);
+            } else {
+              await this.loadSection(this.activeSection);
+            }
             await Promise.all([this.loadAutomationDrafts(), this.loadAutomationQueue(), this.loadAutomationMessageDrafts()]);
           } catch (error) {
             this.errorMessage = `Ошибка обновления: ${error.message}`;
@@ -8783,6 +9041,7 @@
         setSection(section) {
           this.activeSection = section;
           window.localStorage.setItem("crm_active_section", section);
+          this.clearTelephonyNotice();
           this.leadSummaryEditingField = "";
           this.taskSummaryEditingField = "";
           this.companySummaryEditingField = "";
@@ -8845,7 +9104,13 @@
           this.companyContactsForActiveCompany = [];
           this.companyDocumentsForActiveCompany = [];
           this.companyDealDocumentGroups = [];
-          if (!this.datasets[section].length) {
+          if (section === "telephony") {
+            if (!this.telephonySettingsLoaded) {
+              this.reloadActiveSection();
+            }
+            return;
+          }
+          if (!Array.isArray(this.datasets[section]) || !this.datasets[section].length) {
             this.reloadActiveSection();
           }
         },
@@ -9936,7 +10201,10 @@
         document.addEventListener("click", this.handleDocumentClick);
         document.addEventListener("keydown", this.handleGlobalKeydown);
         const savedSection = window.localStorage.getItem("crm_active_section");
-        if (savedSection && Object.prototype.hasOwnProperty.call(SECTION_ENDPOINTS, savedSection)) {
+        if (
+          savedSection
+          && (Object.prototype.hasOwnProperty.call(SECTION_ENDPOINTS, savedSection) || savedSection === "telephony")
+        ) {
           this.activeSection = savedSection;
         }
         try {
@@ -9945,6 +10213,13 @@
           this.errorMessage = `Ошибка загрузки справочников: ${error.message}`;
         }
         await this.loadAllSections();
+        if (this.activeSection === "telephony") {
+          try {
+            await this.loadTelephonySettings();
+          } catch (error) {
+            this.errorMessage = `Ошибка загрузки телефонии: ${error.message}`;
+          }
+        }
         this.ensureAutomationNotificationsPolling();
         this.restoreFilters();
         window.setTimeout(() => this.hideStartupScreen(), 500);

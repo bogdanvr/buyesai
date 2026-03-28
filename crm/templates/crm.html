@@ -112,6 +112,9 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5"></path>
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 5h12a2 2 0 012 2v8a2 2 0 01-2 2h-5l-4 3v-3H6a2 2 0 01-2-2V7a2 2 0 012-2z"></path>
             </svg>
+            <svg v-else-if="item.key === 'telephony'" xmlns="http://www.w3.org/2000/svg" class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 4h4l2 5-2.5 1.5a15.5 15.5 0 006 6L16 14l5 2v4a2 2 0 01-2 2C10.163 22 2 13.837 2 5a2 2 0 012-2h1z"></path>
+            </svg>
             <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4"></path>
               <rect x="4" y="4" width="16" height="16" rx="2"></rect>
@@ -158,6 +161,9 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5"></path>
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 5h12a2 2 0 012 2v8a2 2 0 01-2 2h-5l-4 3v-3H6a2 2 0 01-2-2V7a2 2 0 012-2z"></path>
               </svg>
+              <svg v-else-if="item.key === 'telephony'" xmlns="http://www.w3.org/2000/svg" class="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 4h4l2 5-2.5 1.5a15.5 15.5 0 006 6L16 14l5 2v4a2 2 0 01-2 2C10.163 22 2 13.837 2 5a2 2 0 012-2h1z"></path>
+              </svg>
               <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4"></path>
                 <rect x="4" y="4" width="16" height="16" rx="2"></rect>
@@ -174,7 +180,7 @@
             <h1 class="text-xs md:text-2xl font-semibold tracking-[0.08em] md:tracking-wide uppercase">[[ currentSectionTitle ]]</h1>
           </div>
 
-          <div class="flex-1 min-w-0">
+          <div v-if="!isTelephonySection" class="flex-1 min-w-0">
             <label class="relative block">
               <span class="absolute inset-y-0 left-3 md:left-4 flex items-center text-crm-muted text-sm">⌕</span>
               <input
@@ -185,9 +191,15 @@
               />
             </label>
           </div>
+          <div v-else class="flex-1 min-w-0 rounded-2xl border border-crm-border bg-[#0a2740] px-4 py-3">
+            <div class="text-sm font-medium text-white">Операционные настройки интеграции Novofon</div>
+            <div class="mt-1 text-xs text-crm-muted">
+              Ключи API и секрет webhook остаются в admin. В CRM доступны только рабочие настройки, маппинги и сервисные действия.
+            </div>
+          </div>
 
           <div class="flex items-center justify-between xl:justify-end gap-2 xl:gap-4">
-            <div class="text-[11px] md:text-sm text-crm-muted whitespace-nowrap">
+            <div v-if="!isTelephonySection" class="text-[11px] md:text-sm text-crm-muted whitespace-nowrap">
               [[ filteredItems.length ]] элементов
             </div>
 
@@ -348,6 +360,7 @@
             </button>
 
             <button
+              v-if="!isTelephonySection"
               @click="openCreateModal"
               class="h-8 md:h-11 px-3 md:px-5 rounded-lg md:rounded-xl bg-crm-accent hover:bg-crm-accentHover text-[12px] md:text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
               :disabled="isSaving"
@@ -529,7 +542,7 @@
         <div v-if="errorMessage" class="mb-4 rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-red-200 text-sm">
           [[ errorMessage ]]
         </div>
-        <div v-if="activeFilterRows.length" class="mb-4 flex flex-wrap items-center gap-3">
+        <div v-if="!isTelephonySection && activeFilterRows.length" class="mb-4 flex flex-wrap items-center gap-3">
           <div
             v-for="filterRow in activeFilterRows"
             :key="`active-filter-${filterRow.key}`"
@@ -548,7 +561,33 @@
             </button>
           </div>
         </div>
-        <div class="flex gap-2 md:gap-3 overflow-x-auto pb-1">
+        <div v-if="isTelephonySection" class="flex gap-2 md:gap-3 overflow-x-auto pb-1">
+          <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
+            <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
+              <span class="text-crm-muted font-medium">Интеграция</span>
+              <span class="font-semibold text-white">[[ telephonySettings.enabled ? 'Включена' : 'Выключена' ]]</span>
+            </div>
+          </article>
+          <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
+            <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
+              <span class="text-crm-muted font-medium">Сотрудников</span>
+              <span class="font-semibold text-white">[[ (telephonySettings.mappings || []).length ]]</span>
+            </div>
+          </article>
+          <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
+            <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
+              <span class="text-crm-muted font-medium">Активных</span>
+              <span class="font-semibold text-white">[[ telephonyActiveMappingsCount ]]</span>
+            </div>
+          </article>
+          <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
+            <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
+              <span class="text-crm-muted font-medium">Статус</span>
+              <span class="font-semibold text-white">[[ telephonyConnectionStatusLabel ]]</span>
+            </div>
+          </article>
+        </div>
+        <div v-else class="flex gap-2 md:gap-3 overflow-x-auto pb-1">
           <template v-if="activeSection === 'companies'">
             <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
               <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
@@ -615,7 +654,247 @@
       </section>
 
       <section class="px-4 md:px-7 py-5 flex-1 min-h-0 overflow-hidden">
-        <div class="h-full min-h-0 rounded-[28px] border border-crm-border bg-[#0b2740] overflow-hidden shadow-panel md:min-h-[540px] flex flex-col">
+        <div v-if="isTelephonySection" class="h-full min-h-0 overflow-auto">
+          <div v-if="isLoading || isTelephonySettingsLoading" class="h-full rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel md:min-h-[540px] flex items-center justify-center text-sm text-crm-muted">
+            Загрузка настроек телефонии...
+          </div>
+          <div v-else class="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+            <div class="space-y-4">
+              <section class="rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel overflow-hidden">
+                <div class="border-b border-crm-border bg-[#10314d] px-5 py-4">
+                  <div class="text-sm font-semibold text-white">Рабочие настройки</div>
+                  <div class="mt-1 text-xs text-crm-muted">Без API-ключей и секретов. Эти поля остаются в admin.</div>
+                </div>
+                <div class="p-5 space-y-5">
+                  <div
+                    v-if="telephonyNotice.text"
+                    class="rounded-2xl border px-4 py-3 text-sm"
+                    :class="telephonyNotice.type === 'error' ? 'border-red-400/40 bg-red-400/10 text-red-200' : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100'"
+                  >
+                    [[ telephonyNotice.text ]]
+                  </div>
+
+                  <div class="grid gap-4 md:grid-cols-2">
+                    <label class="flex items-start gap-3 rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                      <input v-model="telephonySettings.enabled" type="checkbox" class="mt-1 h-4 w-4 rounded border-crm-border bg-transparent" />
+                      <span>
+                        <span class="block text-sm font-medium text-white">Включить интеграцию</span>
+                        <span class="mt-1 block text-xs text-crm-muted">Отключает API вызовы и импорт без смены admin-настроек.</span>
+                      </span>
+                    </label>
+                    <label class="flex items-start gap-3 rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                      <input v-model="telephonySettings.createLeadForUnknownNumber" type="checkbox" class="mt-1 h-4 w-4 rounded border-crm-border bg-transparent" />
+                      <span>
+                        <span class="block text-sm font-medium text-white">Создавать лид по неизвестному номеру</span>
+                        <span class="mt-1 block text-xs text-crm-muted">Если номер не найден среди контактов, компаний и лидов.</span>
+                      </span>
+                    </label>
+                    <label class="flex items-start gap-3 rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                      <input v-model="telephonySettings.createTaskForMissedCall" type="checkbox" class="mt-1 h-4 w-4 rounded border-crm-border bg-transparent" />
+                      <span>
+                        <span class="block text-sm font-medium text-white">Создавать задачу по пропущенному звонку</span>
+                        <span class="mt-1 block text-xs text-crm-muted">Автоматически ставит follow-up на ответственного.</span>
+                      </span>
+                    </label>
+                    <label class="flex items-start gap-3 rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                      <input v-model="telephonySettings.linkCallsToOpenDealOnly" type="checkbox" class="mt-1 h-4 w-4 rounded border-crm-border bg-transparent" />
+                      <span>
+                        <span class="block text-sm font-medium text-white">Привязывать только к открытым сделкам</span>
+                        <span class="mt-1 block text-xs text-crm-muted">Если выключено, CRM может подставлять последнюю сделку компании.</span>
+                      </span>
+                    </label>
+                  </div>
+
+                  <label class="flex items-start gap-3 rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                    <input v-model="telephonySettings.isDebugLoggingEnabled" type="checkbox" class="mt-1 h-4 w-4 rounded border-crm-border bg-transparent" />
+                    <span>
+                      <span class="block text-sm font-medium text-white">Расширенное логирование</span>
+                      <span class="mt-1 block text-xs text-crm-muted">Помогает при диагностике, но лучше включать только на время разбора проблем.</span>
+                    </span>
+                  </label>
+
+                  <div class="grid gap-4 md:grid-cols-2">
+                    <label class="block">
+                      <span class="text-sm text-crm-muted">Ответственный по умолчанию</span>
+                      <select v-model="telephonySettings.defaultOwnerId" class="mt-1 h-11 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                        <option :value="null">Не выбран</option>
+                        <option v-for="user in telephonyUserOptions" :key="`telephony-owner-${user.id}`" :value="user.id">[[ user.label ]]</option>
+                      </select>
+                    </label>
+                    <label class="block">
+                      <span class="text-sm text-crm-muted">Webhook endpoint</span>
+                      <input :value="telephonySettings.webhookUrl || telephonySettings.webhookPath || 'Не настроен'" type="text" readonly class="mt-1 h-11 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 text-crm-text outline-none" />
+                    </label>
+                  </div>
+
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Разрешённые виртуальные номера</span>
+                    <textarea v-model.trim="telephonySettings.allowedVirtualNumbersText" rows="4" class="mt-1 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 py-3 outline-none focus:border-crm-accent" placeholder="74950000000&#10;74951112233"></textarea>
+                    <span class="mt-2 block text-xs text-crm-muted">По одному номеру на строку. Если список пуст, CRM возьмёт первый активный номер Novofon.</span>
+                  </label>
+
+                  <div class="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      @click="saveTelephonySettings"
+                      :disabled="isTelephonySettingsSaving"
+                      class="inline-flex h-10 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      [[ isTelephonySettingsSaving ? 'Сохраняем...' : 'Сохранить настройки' ]]
+                    </button>
+                    <div class="text-xs text-crm-muted">
+                      API key и секрет webhook редактируются только в admin.
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel overflow-hidden">
+                <div class="border-b border-crm-border bg-[#10314d] px-5 py-4">
+                  <div class="text-sm font-semibold text-white">Сопоставление сотрудников</div>
+                  <div class="mt-1 text-xs text-crm-muted">Сначала выполните синхронизацию сотрудников из Novofon, затем назначьте пользователей CRM.</div>
+                </div>
+                <div class="p-5">
+                  <div v-if="!(telephonySettings.mappings || []).length" class="rounded-2xl border border-dashed border-crm-border bg-[#102f4a] px-4 py-6 text-sm text-crm-muted">
+                    Сотрудники Novofon ещё не синхронизированы.
+                  </div>
+                  <div v-else class="space-y-3">
+                    <div
+                      v-for="mapping in telephonySettings.mappings"
+                      :key="`telephony-mapping-${mapping.id || mapping.novofonEmployeeId}`"
+                      class="rounded-2xl border border-crm-border bg-[#102f4a] p-4"
+                    >
+                      <div class="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_160px_minmax(220px,0.9fr)]">
+                        <div class="min-w-0">
+                          <div class="text-sm font-semibold text-white break-words">[[ mapping.novofonFullName || `Сотрудник ${mapping.novofonEmployeeId}` ]]</div>
+                          <div class="mt-1 flex flex-wrap gap-2 text-xs text-crm-muted">
+                            <span>ID: [[ mapping.novofonEmployeeId || '—' ]]</span>
+                            <span>Внутренний: [[ mapping.novofonExtension || '—' ]]</span>
+                          </div>
+                        </div>
+                        <label class="block">
+                          <span class="text-xs text-crm-muted">Внутренний номер</span>
+                          <input v-model.trim="mapping.novofonExtension" type="text" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-xs text-crm-muted">Пользователь CRM</span>
+                          <select v-model="mapping.crmUserId" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent">
+                            <option :value="null">Не назначен</option>
+                            <option v-for="user in telephonyUserOptions" :key="`telephony-mapping-user-${mapping.id || mapping.novofonEmployeeId}-${user.id}`" :value="user.id">[[ user.label ]]</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div class="mt-4 flex flex-wrap gap-4">
+                        <label class="inline-flex items-center gap-2 text-sm text-crm-text">
+                          <input v-model="mapping.isActive" type="checkbox" class="h-4 w-4 rounded border-crm-border bg-transparent" />
+                          <span>Активен</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 text-sm text-crm-text">
+                          <input v-model="mapping.isDefaultOwner" type="checkbox" class="h-4 w-4 rounded border-crm-border bg-transparent" />
+                          <span>Использовать как default owner</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div class="space-y-4">
+              <section class="rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel overflow-hidden">
+                <div class="border-b border-crm-border bg-[#10314d] px-5 py-4">
+                  <div class="text-sm font-semibold text-white">Сервисные действия</div>
+                  <div class="mt-1 text-xs text-crm-muted">Проверка подключения и синхронизация сотрудников без выхода в admin.</div>
+                </div>
+                <div class="p-5 space-y-4">
+                  <div class="rounded-2xl border px-4 py-3 text-sm" :class="telephonyConnectionStatusClass">
+                    <div class="font-semibold">[[ telephonyConnectionStatusLabel ]]</div>
+                    <div class="mt-1 text-xs opacity-80">
+                      [[ telephonySettings.lastConnectionCheckedAt ? `Последняя проверка: ${formatEventTimestamp(telephonySettings.lastConnectionCheckedAt)}` : 'Проверка ещё не выполнялась.' ]]
+                    </div>
+                    <div v-if="telephonySettings.lastConnectionError" class="mt-2 text-xs text-red-100 break-words">
+                      [[ telephonySettings.lastConnectionError ]]
+                    </div>
+                  </div>
+
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      @click="checkTelephonyConnection"
+                      :disabled="isTelephonyConnectionChecking"
+                      class="inline-flex h-10 items-center justify-center rounded-xl border border-crm-border bg-[#123753] px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      [[ isTelephonyConnectionChecking ? 'Проверяем...' : 'Проверить подключение' ]]
+                    </button>
+                    <button
+                      type="button"
+                      @click="syncTelephonyEmployees"
+                      :disabled="isTelephonyEmployeesSyncing"
+                      class="inline-flex h-10 items-center justify-center rounded-xl border border-crm-border bg-[#123753] px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      [[ isTelephonyEmployeesSyncing ? 'Синхронизируем...' : 'Синхронизировать сотрудников' ]]
+                    </button>
+                  </div>
+
+                  <div class="rounded-2xl border border-crm-border bg-[#102f4a] p-4 text-sm text-crm-text">
+                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Техническая информация</div>
+                    <div class="mt-3 space-y-2">
+                      <div class="break-all"><span class="text-crm-muted">Webhook URL:</span> [[ telephonySettings.webhookUrl || 'Не задан' ]]</div>
+                      <div><span class="text-crm-muted">API secret в системе:</span> [[ telephonySettings.hasApiSecret ? 'Задан' : 'Не задан' ]]</div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel overflow-hidden">
+                <div class="border-b border-crm-border bg-[#10314d] px-5 py-4">
+                  <div class="text-sm font-semibold text-white">Импорт истории звонков</div>
+                  <div class="mt-1 text-xs text-crm-muted">Ручной импорт исторических звонков из Novofon.</div>
+                </div>
+                <div class="p-5 space-y-4">
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <label class="block">
+                      <span class="text-sm text-crm-muted">Дней назад</span>
+                      <input v-model.number="telephonyImportForm.days" type="number" min="1" max="90" class="mt-1 h-11 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                    </label>
+                    <label class="block">
+                      <span class="text-sm text-crm-muted">Лимит страницы</span>
+                      <input v-model.number="telephonyImportForm.limit" type="number" min="1" max="1000" class="mt-1 h-11 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                    </label>
+                    <label class="block">
+                      <span class="text-sm text-crm-muted">Максимум записей</span>
+                      <input v-model.number="telephonyImportForm.maxRecords" type="number" min="1" max="20000" class="mt-1 h-11 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                    </label>
+                    <label class="flex items-center gap-3 rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                      <input v-model="telephonyImportForm.includeOngoingCalls" type="checkbox" class="h-4 w-4 rounded border-crm-border bg-transparent" />
+                      <span class="text-sm text-crm-text">Включать незавершённые звонки</span>
+                    </label>
+                  </div>
+
+                  <button
+                    type="button"
+                    @click="importTelephonyCalls"
+                    :disabled="isTelephonyCallsImporting"
+                    class="inline-flex h-10 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    [[ isTelephonyCallsImporting ? 'Импортируем...' : 'Импортировать звонки' ]]
+                  </button>
+
+                  <div v-if="telephonyLastImportResult" class="rounded-2xl border border-crm-border bg-[#102f4a] p-4 text-sm text-crm-text">
+                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Последний результат импорта</div>
+                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                      <div>Импортировано: [[ telephonyLastImportResult.imported || 0 ]]</div>
+                      <div>Создано: [[ telephonyLastImportResult.created || 0 ]]</div>
+                      <div>Обновлено: [[ telephonyLastImportResult.updated || 0 ]]</div>
+                      <div>Missed follow-up: [[ telephonyLastImportResult.missed_followups || 0 ]]</div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+        <div v-else class="h-full min-h-0 rounded-[28px] border border-crm-border bg-[#0b2740] overflow-hidden shadow-panel md:min-h-[540px] flex flex-col">
           <div
             class="hidden lg:grid items-center border-b border-crm-border bg-[#10314d] text-crm-muted text-xs uppercase tracking-[0.16em]"
             :class="activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : (activeSection === 'deals' ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_150px_110px_160px]' : (activeSection === 'tasks' ? 'grid-cols-[72px_1.15fr_0.9fr_1fr_1fr_1fr_160px]' : (activeSection === 'touches' ? 'grid-cols-[72px_1.15fr_1fr_1fr_140px_160px_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]')))"

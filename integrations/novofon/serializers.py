@@ -99,7 +99,9 @@ class NovofonSettingsSerializer(serializers.ModelSerializer):
             instance.user_mappings.select_related("crm_user").order_by("novofon_full_name", "novofon_extension", "id"),
             many=True,
         ).data
+        data.pop("api_key", None)
         data.pop("api_secret", None)
+        data.pop("webhook_shared_secret", None)
         return data
 
     def update(self, instance, validated_data):

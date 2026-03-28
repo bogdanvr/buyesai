@@ -321,6 +321,91 @@ class NovofonSyncEmployeesApiTests(APITestCase):
         self.assertEqual(mapping.novofon_full_name, "Alice Example")
 
 
+class NovofonSettingsApiTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="novofon_settings_admin",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=self.user)
+        self.account = TelephonyProviderAccount.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            enabled=True,
+            api_key="visible-only-in-admin",
+            api_secret="secret-token",
+            api_base_url="https://dataapi-jsonrpc.novofon.ru/v2.0",
+            webhook_shared_secret="webhook-secret",
+            default_owner=self.user,
+            allowed_virtual_numbers=["74950000000"],
+            create_task_for_missed_call=True,
+            link_calls_to_open_deal_only=True,
+        )
+        self.mapping = TelephonyUserMapping.objects.create(
+            provider_account=self.account,
+            crm_user=self.user,
+            novofon_employee_id="emp-1",
+            novofon_extension="101",
+            novofon_full_name="Alice Example",
+            is_active=True,
+        )
+
+    def test_settings_response_hides_secret_fields(self):
+        response = self.client.get(reverse("telephony-novofon-settings"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("api_key", response.data)
+        self.assertNotIn("api_secret", response.data)
+        self.assertNotIn("webhook_shared_secret", response.data)
+        self.assertTrue(response.data["has_api_secret"])
+        self.assertEqual(len(response.data["mappings"]), 1)
+
+    def test_settings_update_preserves_secret_fields_when_omitted(self):
+        response = self.client.put(
+            reverse("telephony-novofon-settings"),
+            {
+                "enabled": False,
+                "api_base_url": "https://dataapi-jsonrpc.novofon.ru/v2.0",
+                "webhook_path": "/api/integrations/novofon/webhook/",
+                "default_owner": self.user.pk,
+                "create_lead_for_unknown_number": True,
+                "create_task_for_missed_call": False,
+                "link_calls_to_open_deal_only": False,
+                "allowed_virtual_numbers": ["74951112233", "74954445566"],
+                "is_debug_logging_enabled": True,
+                "settings_json": {"novofon_timezone": "Asia/Omsk"},
+                "mappings": [
+                    {
+                        "id": self.mapping.pk,
+                        "crm_user": self.user.pk,
+                        "novofon_employee_id": "emp-1",
+                        "novofon_extension": "102",
+                        "novofon_full_name": "Alice Updated",
+                        "is_active": True,
+                        "is_default_owner": True,
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.account.refresh_from_db()
+        self.mapping.refresh_from_db()
+        self.assertEqual(self.account.api_key, "visible-only-in-admin")
+        self.assertEqual(self.account.api_secret, "secret-token")
+        self.assertEqual(self.account.webhook_shared_secret, "webhook-secret")
+        self.assertFalse(self.account.enabled)
+        self.assertTrue(self.account.create_lead_for_unknown_number)
+        self.assertFalse(self.account.create_task_for_missed_call)
+        self.assertFalse(self.account.link_calls_to_open_deal_only)
+        self.assertEqual(self.account.allowed_virtual_numbers, ["74951112233", "74954445566"])
+        self.assertTrue(self.account.is_debug_logging_enabled)
+        self.assertEqual(self.mapping.novofon_extension, "102")
+        self.assertEqual(self.mapping.novofon_full_name, "Alice Updated")
+        self.assertTrue(self.mapping.is_default_owner)
+
+
 class NovofonImportCallsApiTests(APITestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(
