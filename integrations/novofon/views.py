@@ -4,11 +4,13 @@ from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.db.models import Q
 
 from api.v1.pagination import StandardResultsSetPagination
 from integrations.models import PhoneCall, TelephonyEventLog
 from integrations.novofon.client import NovofonClientError
 from integrations.novofon.serializers import (
+    IncomingPhoneCallPopupSerializer,
     NovofonCallRequestSerializer,
     NovofonCallImportRequestSerializer,
     NovofonSettingsSerializer,
@@ -119,6 +121,43 @@ class PhoneCallListAPIView(generics.ListAPIView):
 class PhoneCallDetailAPIView(generics.RetrieveAPIView):
     serializer_class = PhoneCallSerializer
     queryset = PhoneCall.objects.select_related("crm_user", "responsible_user", "contact", "company", "lead", "deal").all()
+
+
+class IncomingPhoneCallPopupAPIView(APIView):
+    def get(self, request):
+        raw_after_id = request.query_params.get("after_id")
+        raw_limit = request.query_params.get("limit")
+        try:
+            after_id = max(0, int(raw_after_id or 0))
+        except (TypeError, ValueError):
+            after_id = 0
+        try:
+            limit = min(50, max(1, int(raw_limit or 20)))
+        except (TypeError, ValueError):
+            limit = 20
+
+        queryset = (
+            PhoneCall.objects
+            .select_related("responsible_user", "contact", "company", "lead", "deal")
+            .filter(provider="novofon", direction="inbound")
+            .filter(Q(crm_user=request.user) | Q(responsible_user=request.user))
+            .order_by("id")
+        )
+        latest_call_id = queryset.order_by("-id").values_list("id", flat=True).first() or 0
+        if after_id <= 0:
+            return Response({"ok": True, "items": [], "next_call_id": latest_call_id, "has_more": False})
+
+        items = list(queryset.filter(pk__gt=after_id)[:limit])
+        next_call_id = items[-1].pk if items else after_id
+        has_more = queryset.filter(pk__gt=next_call_id).exists()
+        return Response(
+            {
+                "ok": True,
+                "items": IncomingPhoneCallPopupSerializer(items, many=True).data,
+                "next_call_id": next_call_id,
+                "has_more": has_more,
+            }
+        )
 
 
 class TelephonyEventReprocessAPIView(APIView):

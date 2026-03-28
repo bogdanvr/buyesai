@@ -13,6 +13,8 @@
 - API истории звонков:
   - `GET /api/telephony/calls/`
   - `GET /api/telephony/calls/{id}/`
+- polling endpoint для popup входящего звонка:
+  - `GET /api/telephony/incoming-calls/popup/`
 - reprocess событий:
   - `POST /api/admin/telephony/events/{id}/reprocess/`
 
@@ -202,6 +204,7 @@ Content-Type: application/json
 - `api_base_url` в CRM означает именно `Data API base URL`;
 - `Call API base URL` хранится в `settings_json.call_api_base_url`, если не задан, используется официальный дефолт `https://callapi-jsonrpc.novofon.ru/v4.0`;
 - webhook parser все еще остается адаптационным слоем, потому что контракт webhook отдельно от `Data API` / `Call API`.
+- popup входящего звонка в CRM работает через polling `GET /api/telephony/incoming-calls/popup/` с интервалом `5` секунд и не требует отдельного websocket stack.
 
 ## Ручная проверка
 

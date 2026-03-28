@@ -115,4 +115,4 @@ python manage.py process_novofon_webhook_queue --limit 50 --retry-failed
 
 ## Что еще остается
 
-- realtime popup по входящему звонку.
+- при необходимости заменить polling popup на websocket/SSE transport.

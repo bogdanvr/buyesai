@@ -395,6 +395,110 @@ class NovofonCallApiTests(APITestCase):
         self.assertEqual(call.crm_user_id, self.user.pk)
 
 
+class IncomingPhoneCallPopupApiTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="incoming_popup_user",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.other_user = get_user_model().objects.create_user(
+            username="incoming_popup_other",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=self.user)
+        self.company = Client.objects.create(name="Popup Co", phone="+7 900 111-22-33")
+        self.lead = Lead.objects.create(title="Popup Lead", phone="+7 900 111-22-33", assigned_to=self.user, client=self.company)
+        self.stage = DealStage.objects.create(
+            name="Popup Stage",
+            code="popup_stage",
+            order=20,
+            is_active=True,
+            is_final=False,
+        )
+        self.deal = Deal.objects.create(
+            title="Popup Deal",
+            client=self.company,
+            lead=self.lead,
+            stage=self.stage,
+            owner=self.user,
+        )
+
+    def test_initial_popup_poll_only_primes_cursor(self):
+        call = PhoneCall.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            external_call_id="popup-call-1",
+            direction="inbound",
+            status="ringing",
+            phone_from="+7 900 111-22-33",
+            phone_to="+7 495 111-22-33",
+            responsible_user=self.user,
+            company=self.company,
+            lead=self.lead,
+            deal=self.deal,
+        )
+
+        response = self.client.get(reverse("telephony-incoming-call-popup"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["items"], [])
+        self.assertEqual(response.data["next_call_id"], call.pk)
+
+    def test_popup_poll_returns_only_new_inbound_calls_for_current_user(self):
+        first_call = PhoneCall.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            external_call_id="popup-call-2",
+            direction="inbound",
+            status="ringing",
+            phone_from="+7 900 111-22-33",
+            phone_to="+7 495 111-22-33",
+            responsible_user=self.user,
+            company=self.company,
+            lead=self.lead,
+            deal=self.deal,
+        )
+        PhoneCall.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            external_call_id="popup-call-outbound",
+            direction="outbound",
+            status="ringing",
+            phone_from="101",
+            phone_to="+7 900 111-22-33",
+            responsible_user=self.user,
+        )
+        PhoneCall.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            external_call_id="popup-call-other-user",
+            direction="inbound",
+            status="ringing",
+            phone_from="+7 900 444-55-66",
+            phone_to="+7 495 111-22-33",
+            responsible_user=self.other_user,
+        )
+        second_call = PhoneCall.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            external_call_id="popup-call-3",
+            direction="inbound",
+            status="answered",
+            phone_from="+7 900 111-22-33",
+            phone_to="+7 495 111-22-33",
+            responsible_user=self.user,
+            company=self.company,
+            lead=self.lead,
+            deal=self.deal,
+        )
+
+        response = self.client.get(reverse("telephony-incoming-call-popup"), {"after_id": first_call.pk})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["items"]), 1)
+        self.assertEqual(response.data["items"][0]["id"], second_call.pk)
+        self.assertEqual(response.data["items"][0]["target_entity_type"], "deal")
+        self.assertEqual(response.data["items"][0]["target_entity_id"], self.deal.pk)
+        self.assertEqual(response.data["next_call_id"], second_call.pk)
+
+
 class NovofonSyncEmployeesApiTests(APITestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(

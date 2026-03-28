@@ -1,6 +1,7 @@
 from django.urls import path
 
 from integrations.novofon.views import (
+    IncomingPhoneCallPopupAPIView,
     NovofonCallAPIView,
     NovofonCheckConnectionAPIView,
     NovofonImportCallsAPIView,
@@ -21,6 +22,7 @@ urlpatterns = [
     path("call/", NovofonCallAPIView.as_view(), name="telephony-novofon-call"),
     path("calls/", PhoneCallListAPIView.as_view(), name="telephony-calls"),
     path("calls/<int:pk>/", PhoneCallDetailAPIView.as_view(), name="telephony-call-detail"),
+    path("incoming-calls/popup/", IncomingPhoneCallPopupAPIView.as_view(), name="telephony-incoming-call-popup"),
     path("events/<int:pk>/reprocess/", TelephonyEventReprocessAPIView.as_view(), name="telephony-event-reprocess"),
     path("webhook/", NovofonWebhookAPIView.as_view(), name="integrations-novofon-webhook"),
 ]

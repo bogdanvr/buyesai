@@ -221,6 +221,94 @@ class PhoneCallSerializer(serializers.ModelSerializer):
         ]
 
 
+class IncomingPhoneCallPopupSerializer(serializers.ModelSerializer):
+    responsible_user_name = serializers.SerializerMethodField()
+    contact_name = serializers.SerializerMethodField()
+    company_name = serializers.CharField(source="company.name", read_only=True)
+    lead_title = serializers.CharField(source="lead.title", read_only=True)
+    deal_title = serializers.CharField(source="deal.title", read_only=True)
+    display_phone = serializers.SerializerMethodField()
+    target_entity_type = serializers.SerializerMethodField()
+    target_entity_id = serializers.SerializerMethodField()
+    target_entity_label = serializers.SerializerMethodField()
+
+    def _user_name(self, user):
+        if user is None:
+            return ""
+        full_name = user.get_full_name() if hasattr(user, "get_full_name") else ""
+        return str(full_name or getattr(user, "username", "") or "").strip()
+
+    def get_responsible_user_name(self, obj):
+        return self._user_name(getattr(obj, "responsible_user", None))
+
+    def get_contact_name(self, obj):
+        contact = getattr(obj, "contact", None)
+        if contact is None:
+            return ""
+        full_name = f"{contact.first_name} {contact.last_name}".strip()
+        return full_name or contact.phone or f"Контакт #{contact.pk}"
+
+    def get_display_phone(self, obj):
+        if str(obj.direction or "").strip().lower() == "inbound":
+            return str(obj.phone_from or obj.client_phone_normalized or "").strip()
+        return str(obj.phone_to or obj.client_phone_normalized or "").strip()
+
+    def _target_meta(self, obj):
+        if getattr(obj, "deal_id", None):
+            return ("deal", obj.deal_id, str(getattr(obj.deal, "title", "") or f"Сделка #{obj.deal_id}").strip())
+        if getattr(obj, "lead_id", None):
+            return ("lead", obj.lead_id, str(getattr(obj.lead, "title", "") or f"Лид #{obj.lead_id}").strip())
+        if getattr(obj, "contact_id", None):
+            return ("contact", obj.contact_id, self.get_contact_name(obj))
+        if getattr(obj, "company_id", None):
+            company_name = str(getattr(obj.company, "name", "") or f"Компания #{obj.company_id}").strip()
+            return ("company", obj.company_id, company_name)
+        return ("", None, "")
+
+    def get_target_entity_type(self, obj):
+        return self._target_meta(obj)[0]
+
+    def get_target_entity_id(self, obj):
+        return self._target_meta(obj)[1]
+
+    def get_target_entity_label(self, obj):
+        return self._target_meta(obj)[2]
+
+    class Meta:
+        model = PhoneCall
+        fields = [
+            "id",
+            "external_call_id",
+            "direction",
+            "status",
+            "phone_from",
+            "phone_to",
+            "client_phone_normalized",
+            "virtual_number",
+            "responsible_user",
+            "responsible_user_name",
+            "contact",
+            "contact_name",
+            "company",
+            "company_name",
+            "lead",
+            "lead_title",
+            "deal",
+            "deal_title",
+            "started_at",
+            "answered_at",
+            "ended_at",
+            "duration_sec",
+            "talk_duration_sec",
+            "display_phone",
+            "target_entity_type",
+            "target_entity_id",
+            "target_entity_label",
+            "created_at",
+            "updated_at",
+        ]
+
+
 class TelephonyEventLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = TelephonyEventLog
