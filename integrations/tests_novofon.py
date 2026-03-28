@@ -273,6 +273,40 @@ class NovofonWebhookApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
         self.assertTrue(TelephonyEventLog.objects.filter(external_event_id="event-raw-json").exists())
 
+    def test_webhook_accepts_embedded_json_payload_wrapped_as_single_key(self):
+        raw_payload = json.dumps(
+            {
+                "event_type": '"in_call_session"',
+                "call_session_id": "187020303",
+                "communication_id": "12323",
+                "direction": '"in"',
+                "calling_phone_number": '"79260000001"',
+                "called_phone_number": '"79260000002"',
+                "contact_phone_number": '"79000000000"',
+                "communication_number": "1",
+                "virtual_phone_number": '"74950000000"',
+                "notification_time": '"2026-03-28 16:30:00"',
+                "start_time": '"2026-03-28 16:29:07"',
+                "external_id": '"t456uy"',
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        wrapped_payload = json.dumps({raw_payload: ""}, ensure_ascii=False)
+
+        response = self.client.generic(
+            "POST",
+            reverse("integrations-novofon-webhook"),
+            data=wrapped_payload,
+            content_type="application/json",
+            HTTP_X_WEBHOOK_SECRET="secret",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        event = TelephonyEventLog.objects.get(pk=response.data["event_id"])
+        self.assertEqual(event.external_call_id, "187020303")
+        self.assertEqual(event.event_type, "in_call_session")
+
     def test_webhook_accepts_valid_signature_and_processes_official_payload(self):
         self.account.api_secret = "api-secret"
         self.account.webhook_shared_secret = ""

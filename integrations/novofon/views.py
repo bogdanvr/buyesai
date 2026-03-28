@@ -36,6 +36,42 @@ from integrations.novofon.services import (
 logger = logging.getLogger(__name__)
 
 
+def _normalize_novofon_scalar(value):
+    if not isinstance(value, str):
+        return value
+    normalized = value.strip()
+    while len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {'"', "'"}:
+        normalized = normalized[1:-1].strip()
+    return normalized
+
+
+def _normalize_novofon_payload(payload):
+    if isinstance(payload, dict):
+        return {
+            str(key or "").strip(): _normalize_novofon_payload(value)
+            for key, value in payload.items()
+        }
+    if isinstance(payload, list):
+        return [_normalize_novofon_payload(item) for item in payload]
+    return _normalize_novofon_scalar(payload)
+
+
+def _unwrap_embedded_json_payload(payload: dict) -> dict:
+    if not isinstance(payload, dict) or len(payload) != 1:
+        return payload
+    (single_key, single_value), = payload.items()
+    candidate = str(single_key or "").strip()
+    if str(single_value or "").strip():
+        return payload
+    if not (candidate.startswith("{") and candidate.endswith("}")):
+        return payload
+    try:
+        parsed_json = json.loads(candidate)
+    except (TypeError, ValueError):
+        return payload
+    return parsed_json if isinstance(parsed_json, dict) else payload
+
+
 def _parse_novofon_request_payload(request) -> dict:
     raw_body = request.body.decode("utf-8", errors="ignore").strip()
     if not raw_body:
@@ -44,13 +80,14 @@ def _parse_novofon_request_payload(request) -> dict:
     try:
         parsed_json = json.loads(raw_body)
         if isinstance(parsed_json, dict):
-            return parsed_json
+            return _normalize_novofon_payload(_unwrap_embedded_json_payload(parsed_json))
     except (TypeError, ValueError):
         pass
 
     parsed_pairs = parse_qsl(raw_body, keep_blank_values=True)
     if parsed_pairs:
-        return {str(key or "").strip(): value for key, value in parsed_pairs}
+        parsed_form = {str(key or "").strip(): value for key, value in parsed_pairs}
+        return _normalize_novofon_payload(_unwrap_embedded_json_payload(parsed_form))
 
     return {}
 
