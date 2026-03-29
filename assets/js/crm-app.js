@@ -149,6 +149,7 @@
           showCompanyDealsPanel: false,
           showCompanyLeadsPanel: false,
           showCompanyWorkRules: false,
+          showCompanyPhoneCallHistory: false,
           showCompanyNoteDraft: false,
           showCompanyOkvedDetails: false,
           showCompanyRequisites: false,
@@ -247,6 +248,8 @@
             companies: TIMELINE_FILTER_OPTIONS.map((item) => item.value),
           },
           phoneCallHistories: {},
+          showDealPhoneCallHistory: false,
+          showLeadPhoneCallHistory: false,
           forms: {
             leads: {
               title: "",
@@ -3822,6 +3825,7 @@
           this.showCompanyRequisites = normalized === "requisites" ? this.showCompanyRequisites : false;
           this.showCompanyContactsPanel = normalized === "contacts" ? this.showCompanyContactsPanel : false;
           this.showCompanyDocumentsPanel = normalized === "documents" ? this.showCompanyDocumentsPanel : false;
+          this.showCompanyPhoneCallHistory = normalized === "phoneCallHistory" ? this.showCompanyPhoneCallHistory : false;
           this.showCompanyCommunicationsPanel = normalized === "communications" ? this.showCompanyCommunicationsPanel : false;
           this.showCompanyWorkRules = normalized === "workRules" ? this.showCompanyWorkRules : false;
           this.showCompanyDealsPanel = normalized === "deals" ? this.showCompanyDealsPanel : false;
@@ -3838,6 +3842,8 @@
               ? this.showCompanyContactsPanel
               : normalized === "documents"
                 ? this.showCompanyDocumentsPanel
+              : normalized === "phoneCallHistory"
+                ? this.showCompanyPhoneCallHistory
               : normalized === "communications"
                 ? this.showCompanyCommunicationsPanel
               : normalized === "workRules"
@@ -3854,6 +3860,7 @@
           if (normalized === "requisites") this.showCompanyRequisites = true;
           if (normalized === "contacts") this.showCompanyContactsPanel = true;
           if (normalized === "documents") this.showCompanyDocumentsPanel = true;
+          if (normalized === "phoneCallHistory") this.showCompanyPhoneCallHistory = true;
           if (normalized === "communications") this.showCompanyCommunicationsPanel = true;
           if (normalized === "workRules") this.showCompanyWorkRules = true;
           if (normalized === "deals") this.showCompanyDealsPanel = true;
@@ -3870,6 +3877,13 @@
           this.toggleExclusiveCompanyPanel("documents");
           if (!wasOpen && this.showCompanyDocumentsPanel) {
             await this.loadCompanyDocuments();
+          }
+        },
+        async toggleCompanyPhoneCallHistoryPanel() {
+          const wasOpen = this.showCompanyPhoneCallHistory;
+          this.toggleExclusiveCompanyPanel("phoneCallHistory");
+          if (!wasOpen && this.showCompanyPhoneCallHistory) {
+            await this.ensurePhoneCallHistoryLoaded("company", this.editingCompanyId);
           }
         },
         async toggleCompanyCommunicationsPanel() {
@@ -7047,6 +7061,7 @@
           this.resetExpandedOptionalFields();
           this.editingLeadId = item.id;
           this.showLeadDocumentsPanel = false;
+          this.showLeadPhoneCallHistory = false;
           this.leadDocumentsForActiveLead = [];
           this.forms.leads = {
             title: item.title || "",
@@ -7068,7 +7083,6 @@
             events: item.events || ""
           };
           this.showModal = true;
-          this.ensurePhoneCallHistoryLoaded("lead", this.editingLeadId).catch(() => {});
         },
         openDealEditor(item) {
           this.clearUiErrors({ modalOnly: true });
@@ -7097,6 +7111,7 @@
           this.showDealTaskForm = false;
           this.resetDealCommunicationsState();
           this.showDealDocumentsPanel = false;
+          this.showDealPhoneCallHistory = false;
           this.dealDocumentsForActiveDeal = [];
           this.resetDealCompanyForm();
           this.showDealCompanyForm = false;
@@ -7109,7 +7124,6 @@
           }
           this.loadTasksForDeal();
           this.showModal = true;
-          this.ensurePhoneCallHistoryLoaded("deal", this.editingDealId).catch(() => {});
         },
         openDealEditorById(dealId) {
           const normalizedId = this.toIntOrNull(dealId);
@@ -7176,6 +7190,7 @@
           this.showCompanyWorkRules = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDocumentsPanel = false;
+          this.showCompanyPhoneCallHistory = false;
           this.resetCompanyCommunicationsState();
           this.showCompanyDealsPanel = false;
           this.showCompanyLeadsPanel = false;
@@ -7214,6 +7229,7 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDocumentsPanel = false;
+          this.showCompanyPhoneCallHistory = false;
           this.resetCompanyCommunicationsState();
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
@@ -7221,7 +7237,6 @@
           this.showCompanyLeadsPanel = false;
           this.loadContactsForCompany();
           this.showModal = true;
-          this.ensurePhoneCallHistoryLoaded("company", this.editingCompanyId).catch(() => {});
           this.enrichCompanyFromDadataByInn();
         },
         openTaskEditor(item, options = {}) {
@@ -7282,6 +7297,7 @@
               showDealContactsPanel: !!this.showDealContactsPanel,
               showDealDocumentsPanel: !!this.showDealDocumentsPanel,
               showDealCommunicationsPanel: !!this.showDealCommunicationsPanel,
+              showDealPhoneCallHistory: !!this.showDealPhoneCallHistory,
               showDealContactForm: !!this.showDealContactForm,
             };
           }
@@ -7291,6 +7307,7 @@
               editingLeadId: this.toIntOrNull(this.editingLeadId),
               leadSummaryEditingField: String(this.leadSummaryEditingField || ""),
               showLeadDocumentsPanel: !!this.showLeadDocumentsPanel,
+              showLeadPhoneCallHistory: !!this.showLeadPhoneCallHistory,
             };
           }
           return null;
@@ -7326,6 +7343,7 @@
             this.showDealContactsPanel = !!context.showDealContactsPanel;
             this.showDealDocumentsPanel = !!context.showDealDocumentsPanel;
             this.showDealCommunicationsPanel = !!context.showDealCommunicationsPanel;
+            this.showDealPhoneCallHistory = !!context.showDealPhoneCallHistory;
             this.showDealContactForm = !!context.showDealContactForm;
             await this.loadTasksForDeal();
             if (this.toIntOrNull(this.forms.deals.companyId)) {
@@ -7337,6 +7355,9 @@
             if (this.showDealCommunicationsPanel) {
               await this.loadDealCommunications();
             }
+            if (this.showDealPhoneCallHistory) {
+              await this.ensurePhoneCallHistoryLoaded("deal", this.editingDealId);
+            }
             return true;
           }
           if (context.section === "leads") {
@@ -7344,8 +7365,12 @@
             this.editingLeadId = this.toIntOrNull(context.editingLeadId);
             this.leadSummaryEditingField = String(context.leadSummaryEditingField || "");
             this.showLeadDocumentsPanel = !!context.showLeadDocumentsPanel;
+            this.showLeadPhoneCallHistory = !!context.showLeadPhoneCallHistory;
             if (this.showLeadDocumentsPanel) {
               await this.loadLeadDocuments();
+            }
+            if (this.showLeadPhoneCallHistory) {
+              await this.ensurePhoneCallHistoryLoaded("lead", this.editingLeadId);
             }
             return true;
           }
@@ -7430,6 +7455,7 @@
             this.showDealDocumentsPanel = false;
             this.showDealContactsPanel = false;
             this.showDealCommunicationsPanel = false;
+            this.showDealPhoneCallHistory = false;
             this.stopCommunicationsPollingIfIdle();
           }
         },
@@ -7461,6 +7487,7 @@
             this.showDealDocumentsPanel = false;
             this.showDealTaskForm = false;
             this.showDealCommunicationsPanel = false;
+            this.showDealPhoneCallHistory = false;
             this.stopCommunicationsPollingIfIdle();
             await this.loadContactsForSelectedDealCompany();
             return;
@@ -7474,6 +7501,7 @@
             this.showDealDocumentsPanel = false;
             this.showDealContactsPanel = false;
             this.showDealTaskForm = false;
+            this.showDealPhoneCallHistory = false;
             await this.loadDealCommunications({ preserveSelection: false });
             return;
           }
@@ -7843,6 +7871,11 @@
         },
         quickToggleDealTaskForm() {
           this.showDealTaskForm = true;
+          this.showDealPhoneCallHistory = false;
+          this.showDealDocumentsPanel = false;
+          this.showDealContactsPanel = false;
+          this.showDealCommunicationsPanel = false;
+          this.stopCommunicationsPollingIfIdle();
           this.$nextTick(() => {
             const panel = document.getElementById("deal-task-panel");
             if (panel && typeof panel.scrollIntoView === "function") {
@@ -7861,6 +7894,11 @@
         prepareDealTaskFromAutomation(item) {
           if (!item) return;
           this.showDealTaskForm = true;
+          this.showDealPhoneCallHistory = false;
+          this.showDealDocumentsPanel = false;
+          this.showDealContactsPanel = false;
+          this.showDealCommunicationsPanel = false;
+          this.stopCommunicationsPollingIfIdle();
           this.resetDealTaskForm();
           this.dealTaskForm.subject = String(item.title || item.recommendedAction || "").trim();
           this.dealTaskForm.taskCategoryId = this.toIntOrNull(item.taskCategoryId || item.defaultTaskCategoryId);
@@ -8083,8 +8121,23 @@
             this.showDealContactsPanel = false;
             this.showDealTaskForm = false;
             this.showDealCommunicationsPanel = false;
+            this.showDealPhoneCallHistory = false;
             this.stopCommunicationsPollingIfIdle();
             await this.loadDealDocuments();
+          }
+        },
+        async toggleDealPhoneCallHistoryPanel() {
+          if (!this.editingDealId) {
+            return;
+          }
+          this.showDealPhoneCallHistory = !this.showDealPhoneCallHistory;
+          if (this.showDealPhoneCallHistory) {
+            this.showDealContactsPanel = false;
+            this.showDealTaskForm = false;
+            this.showDealCommunicationsPanel = false;
+            this.showDealDocumentsPanel = false;
+            this.stopCommunicationsPollingIfIdle();
+            await this.ensurePhoneCallHistoryLoaded("deal", this.editingDealId);
           }
         },
         openDealDocumentPicker() {
@@ -8169,7 +8222,18 @@
         async toggleLeadDocumentsPanel() {
           this.showLeadDocumentsPanel = !this.showLeadDocumentsPanel;
           if (this.showLeadDocumentsPanel) {
+            this.showLeadPhoneCallHistory = false;
             await this.loadLeadDocuments();
+          }
+        },
+        async toggleLeadPhoneCallHistoryPanel() {
+          if (!this.editingLeadId) {
+            return;
+          }
+          this.showLeadPhoneCallHistory = !this.showLeadPhoneCallHistory;
+          if (this.showLeadPhoneCallHistory) {
+            this.showLeadDocumentsPanel = false;
+            await this.ensurePhoneCallHistoryLoaded("lead", this.editingLeadId);
           }
         },
         openLeadDocumentPicker() {
@@ -9492,7 +9556,9 @@
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
           this.showDealDocumentsPanel = false;
+          this.showDealPhoneCallHistory = false;
           this.showLeadDocumentsPanel = false;
+          this.showLeadPhoneCallHistory = false;
           this.resetDealCommunicationsState();
           this.showDealContactForm = false;
           this.resetDealCompanyForm();
@@ -9505,6 +9571,7 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDocumentsPanel = false;
+          this.showCompanyPhoneCallHistory = false;
           this.resetCompanyCommunicationsState();
           this.showCompanyRequisites = false;
           this.showCompanyWorkRules = false;
@@ -9574,7 +9641,9 @@
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
           this.showDealDocumentsPanel = false;
+          this.showDealPhoneCallHistory = false;
           this.showLeadDocumentsPanel = false;
+          this.showLeadPhoneCallHistory = false;
           this.resetDealCommunicationsState();
           this.showDealContactForm = false;
           this.resetDealCompanyForm();
@@ -9587,6 +9656,7 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDocumentsPanel = false;
+          this.showCompanyPhoneCallHistory = false;
           this.resetCompanyCommunicationsState();
           this.showCompanyRequisites = false;
           this.showCompanyWorkRules = false;
