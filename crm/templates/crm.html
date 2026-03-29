@@ -2068,10 +2068,25 @@
                   </span>
                 </div>
               </div>
-              <div v-if="leadTimelineItems.length">
+              <div v-if="parsedLeadEventItems.length">
                 <div class="text-sm text-crm-muted">События</div>
                 <div class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
-                  <div class="space-y-3">
+                  <div class="mb-3 flex flex-wrap gap-2">
+                    <button
+                      v-for="filterOption in timelineFilterOptions"
+                      :key="`lead-timeline-filter-${filterOption.value}`"
+                      type="button"
+                      @click="toggleTimelineFilter('leads', filterOption.value)"
+                      class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition"
+                      :class="timelineFilterButtonClass('leads', filterOption.value)"
+                    >
+                      [[ filterOption.label ]]
+                    </button>
+                  </div>
+                  <div v-if="!leadTimelineItems.length" class="text-sm text-crm-muted">
+                    По выбранным фильтрам событий нет.
+                  </div>
+                  <div v-else class="space-y-3">
                     <div
                       v-for="(timelineItem, eventIndex) in leadTimelineItems"
                       :key="`lead-event-${editingLeadId || 'new'}-${timelineItem.id || eventIndex}`"
@@ -2271,6 +2286,7 @@
                         <span class="text-white min-w-0 [overflow-wrap:anywhere]">[[ dealTimelinePrimaryEvent(timelineItem).result || dealTimelinePrimaryEvent(timelineItem).title || 'Системное событие' ]]</span>
                       </div>
                     </template>
+                  </div>
                   </div>
                   </div>
                 </div>
@@ -3215,11 +3231,23 @@
               <span class="text-sm text-crm-muted">Причина провала</span>
               <textarea v-model="forms.deals.failureReason" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
-            <label v-if="dealTimelineItems.length" class="block md:col-span-2">
+            <label v-if="parsedDealEventItems.length" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">События</span>
               <div class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                <div class="mb-3 flex flex-wrap gap-2">
+                  <button
+                    v-for="filterOption in timelineFilterOptions"
+                    :key="`deal-timeline-filter-${filterOption.value}`"
+                    type="button"
+                    @click="toggleTimelineFilter('deals', filterOption.value)"
+                    class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition"
+                    :class="timelineFilterButtonClass('deals', filterOption.value)"
+                  >
+                    [[ filterOption.label ]]
+                  </button>
+                </div>
                 <div v-if="!dealTimelineItems.length" class="text-sm text-crm-muted">
-                  Событий пока нет.
+                  По выбранным фильтрам событий нет.
                 </div>
                 <div v-else class="space-y-3">
                   <div
@@ -5023,7 +5051,7 @@
               <textarea v-if="showCompanyNoteDraft" v-model="forms.companies.noteDraft" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
               <textarea v-if="forms.companies.notes.trim()" :value="forms.companies.notes" rows="3" readonly class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none opacity-90 cursor-not-allowed"></textarea>
             </div>
-            <div v-if="companyTimelineItems.length" class="block md:col-span-2">
+            <div v-if="parsedCompanyEventItems.length" class="block md:col-span-2">
               <button
                 type="button"
                 @click="toggleCompanyEvents"
@@ -5037,8 +5065,20 @@
                 </div>
               </button>
               <div v-if="showCompanyEvents" class="mt-2 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                <div class="mb-3 flex flex-wrap gap-2">
+                  <button
+                    v-for="filterOption in timelineFilterOptions"
+                    :key="`company-timeline-filter-${filterOption.value}`"
+                    type="button"
+                    @click="toggleTimelineFilter('companies', filterOption.value)"
+                    class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition"
+                    :class="timelineFilterButtonClass('companies', filterOption.value)"
+                  >
+                    [[ filterOption.label ]]
+                  </button>
+                </div>
                 <div v-if="!companyTimelineItems.length" class="text-sm text-crm-muted">
-                  Событий пока нет.
+                  По выбранным фильтрам событий нет.
                 </div>
                 <div v-else class="space-y-3">
                   <div

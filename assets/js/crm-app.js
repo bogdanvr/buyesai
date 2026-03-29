@@ -14,6 +14,12 @@
       touches: "/api/v1/touches/?page_size=100"
     };
     const FILTERS_STORAGE_KEY = "crm_section_filters";
+    const TIMELINE_FILTER_OPTIONS = [
+      { value: "messages", label: "Сообщения" },
+      { value: "email", label: "Email" },
+      { value: "touches", label: "Касания" },
+      { value: "tasks", label: "Задачи" }
+    ];
 
     const LEAD_STATUS_LABELS = {
       new: "Новый",
@@ -234,6 +240,12 @@
             { value: "outbound", label: "Исходящие" },
             { value: "missed", label: "Пропущенные" },
           ],
+          timelineFilterOptions: TIMELINE_FILTER_OPTIONS.slice(),
+          timelineFilters: {
+            leads: TIMELINE_FILTER_OPTIONS.map((item) => item.value),
+            deals: TIMELINE_FILTER_OPTIONS.map((item) => item.value),
+            companies: TIMELINE_FILTER_OPTIONS.map((item) => item.value),
+          },
           phoneCallHistories: {},
           forms: {
             leads: {
@@ -1195,20 +1207,29 @@
         parsedDealEventItems() {
           return this.parseEventLog(this.forms.deals.events);
         },
+        filteredDealEventItems() {
+          return this.filterTimelineItems("deals", this.parsedDealEventItems);
+        },
         dealTimelineItems() {
-          return this.groupDealTimelineEvents(this.parsedDealEventItems);
+          return this.groupDealTimelineEvents(this.filteredDealEventItems);
         },
         parsedLeadEventItems() {
           return this.parseEventLog(this.leadEventLog(this.forms.leads));
         },
+        filteredLeadEventItems() {
+          return this.filterTimelineItems("leads", this.parsedLeadEventItems);
+        },
         leadTimelineItems() {
-          return this.groupDealTimelineEvents(this.parsedLeadEventItems);
+          return this.groupDealTimelineEvents(this.filteredLeadEventItems);
         },
         parsedCompanyEventItems() {
           return this.parseEventLog(this.forms.companies.events);
         },
+        filteredCompanyEventItems() {
+          return this.filterTimelineItems("companies", this.parsedCompanyEventItems);
+        },
         companyTimelineItems() {
-          return this.groupDealTimelineEvents(this.parsedCompanyEventItems);
+          return this.groupDealTimelineEvents(this.filteredCompanyEventItems);
         },
         companySummaryDeals() {
           const companyId = this.toIntOrNull(this.editingCompanyId);
@@ -2861,6 +2882,69 @@
           return isActive
             ? "border-crm-accent bg-crm-accent/15 text-white"
             : "border-crm-border bg-[#123753] text-crm-muted hover:border-crm-accent/70 hover:text-white";
+        },
+        timelineFilterButtonClass(section, filterValue) {
+          const normalizedSection = String(section || "").trim();
+          const normalizedValue = String(filterValue || "").trim();
+          const selected = Array.isArray(this.timelineFilters?.[normalizedSection]) ? this.timelineFilters[normalizedSection] : [];
+          const isActive = selected.includes(normalizedValue);
+          return isActive
+            ? "border-crm-accent bg-crm-accent/15 text-white"
+            : "border-crm-border bg-[#123753] text-crm-muted hover:border-crm-accent/70 hover:text-white";
+        },
+        toggleTimelineFilter(section, filterValue) {
+          const normalizedSection = String(section || "").trim();
+          const normalizedValue = String(filterValue || "").trim();
+          if (!normalizedSection || !normalizedValue) return;
+          const current = Array.isArray(this.timelineFilters?.[normalizedSection]) ? this.timelineFilters[normalizedSection] : [];
+          const next = current.includes(normalizedValue)
+            ? current.filter((item) => item !== normalizedValue)
+            : [...current, normalizedValue];
+          this.timelineFilters = {
+            ...this.timelineFilters,
+            [normalizedSection]: next,
+          };
+        },
+        resolveTimelineEventCategory(eventItem) {
+          if (!eventItem || typeof eventItem !== "object") return "";
+          const eventType = String(eventItem.eventType || "").trim().toLowerCase();
+          const renderType = String(eventItem.renderType || "").trim().toLowerCase();
+          const communicationChannel = String(eventItem.communicationChannel || "").trim().toLowerCase();
+          const hasCommunicationBinding = !!(
+            this.toIntOrNull(eventItem.communicationMessageId)
+            || this.toIntOrNull(eventItem.conversationId)
+            || communicationChannel
+          );
+          if (
+            renderType === "task"
+            || eventType === "task"
+            || eventType === "internal_task_completed"
+            || eventType.indexOf("client_task_completed_") === 0
+          ) {
+            return "tasks";
+          }
+          if (eventType === "touch" || this.toIntOrNull(eventItem.touchId)) {
+            if (communicationChannel === "email") {
+              return "email";
+            }
+            if (hasCommunicationBinding) {
+              return "messages";
+            }
+            return "touches";
+          }
+          return "";
+        },
+        shouldIncludeTimelineEvent(section, eventItem) {
+          const normalizedSection = String(section || "").trim();
+          const selected = Array.isArray(this.timelineFilters?.[normalizedSection]) ? this.timelineFilters[normalizedSection] : [];
+          const category = this.resolveTimelineEventCategory(eventItem);
+          if (!category) {
+            return selected.length === this.timelineFilterOptions.length;
+          }
+          return selected.includes(category);
+        },
+        filterTimelineItems(section, items) {
+          return (Array.isArray(items) ? items : []).filter((eventItem) => this.shouldIncludeTimelineEvent(section, eventItem));
         },
         phoneCallDirectionLabel(direction) {
           const normalized = String(direction || "").trim();
