@@ -630,6 +630,34 @@ class TaskResultAndEventsTests(APITestCase):
         self.assertEqual(response.data["owner"], self.user.pk)
         self.assertEqual(response.data["owner_name"], self.user.username)
 
+    def test_task_can_store_checklist_items(self):
+        response = self.client.post(
+            reverse("activities-list"),
+            {
+                "type": ActivityType.TASK,
+                "subject": "Подготовить коммерческое предложение",
+                "deal": self.deal.pk,
+                "client": self.company.pk,
+                "due_at": "2026-03-20T10:00:00+06:00",
+                "checklist": [
+                    {"id": "draft", "text": "Собрать вводные", "is_done": True},
+                    {"id": "send", "text": "Отправить клиенту", "is_done": False},
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["checklist"], [
+            {"id": "draft", "text": "Собрать вводные", "is_done": True},
+            {"id": "send", "text": "Отправить клиенту", "is_done": False},
+        ])
+        task = Activity.objects.get(pk=response.data["id"])
+        self.assertEqual(task.checklist, [
+            {"id": "draft", "text": "Собрать вводные", "is_done": True},
+            {"id": "send", "text": "Отправить клиенту", "is_done": False},
+        ])
+
     def test_task_defaults_owner_to_current_user(self):
         response = self.client.post(
             reverse("activities-list"),

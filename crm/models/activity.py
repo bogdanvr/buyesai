@@ -282,6 +282,7 @@ class Activity(TimestampedModel):
         default=TaskReminderOffset.MINUTES_30,
         verbose_name="Напомнить за",
     )
+    checklist = models.JSONField(default=list, blank=True, verbose_name="Чек-лист")
     deadline_reminder_sent_at = models.DateTimeField(
         blank=True,
         null=True,
