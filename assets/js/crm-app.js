@@ -65,6 +65,7 @@
           showModal: false,
           currentUserId,
           modalParentContext: null,
+          isSectionLazyLoadingReady: false,
           isLoading: false,
           isSaving: false,
           showStatusFilter: false,
@@ -138,6 +139,8 @@
           touchResultPromptVisible: false,
           touchResultPromptText: "",
           showAllTouchResults: false,
+          automationDataLoaded: false,
+          automationDataLoadPromise: null,
           isCompanyContactSaving: false,
           isCompanyContactsLoading: false,
           isCompanyDocumentsLoading: false,
@@ -534,6 +537,14 @@
             automationDrafts: [],
             automationQueue: [],
             automationMessageDrafts: []
+          },
+          sectionCollectionState: {
+            leads: { loaded: false, next: "", isLoadingMore: false },
+            deals: { loaded: false, next: "", isLoadingMore: false },
+            contacts: { loaded: false, next: "", isLoadingMore: false },
+            companies: { loaded: false, next: "", isLoadingMore: false },
+            tasks: { loaded: false, next: "", isLoadingMore: false },
+            touches: { loaded: false, next: "", isLoadingMore: false },
           }
         };
       },
@@ -1621,6 +1632,9 @@
           }
           return this.datasets[this.activeSection] || [];
         },
+        activeSectionCollectionState() {
+          return this.sectionCollectionState?.[this.activeSection] || { loaded: false, next: "", isLoadingMore: false };
+        },
         telephonyUserOptions() {
           return (this.metaOptions.users || [])
             .filter((user) => user && user.id)
@@ -2019,6 +2033,19 @@
           this.syncStatsQuickFilterForSection(previousValue);
           this.applyStatusFiltersForSection(nextValue);
           this.applyStatsQuickFilterForSection(nextValue);
+          if (
+            this.isSectionLazyLoadingReady
+            && nextValue
+            && !this.isTelephonySection
+            && !this.sectionCollectionState?.[nextValue]?.loaded
+            && !this.isLoading
+          ) {
+            this.reloadActiveSection();
+          }
+          if (this.isSectionLazyLoadingReady && this.sectionUsesAutomationData(nextValue)) {
+            this.ensureAutomationDataLoaded().catch(() => {});
+            this.ensureAutomationNotificationsPolling();
+          }
         },
         "forms.tasks.taskCategoryId": {
           handler() {
@@ -3648,6 +3675,20 @@
           const payload = await this.apiRequest(`/api/v1/activities/${normalizedTaskId}/`);
           return this.mapTask(payload);
         },
+        async fetchLeadById(leadId) {
+          const normalizedLeadId = this.toIntOrNull(leadId);
+          if (!normalizedLeadId) {
+            throw new Error("Некорректный ID лида");
+          }
+
+          const existingLead = this.datasets.leads.find((item) => String(item.id) === String(normalizedLeadId));
+          if (existingLead) {
+            return existingLead;
+          }
+
+          const payload = await this.apiRequest(`/api/v1/leads/${normalizedLeadId}/`);
+          return this.mapLead(payload);
+        },
         async fetchDealById(dealId) {
           const normalizedDealId = this.toIntOrNull(dealId);
           if (!normalizedDealId) {
@@ -4152,6 +4193,27 @@
             this.pollAutomationNotifications().catch(() => {});
           }, 30000);
         },
+        sectionUsesAutomationData(section) {
+          return ["deals", "tasks", "touches"].includes(String(section || "").trim());
+        },
+        async ensureAutomationDataLoaded(force = false) {
+          if (!force && this.automationDataLoaded) {
+            return;
+          }
+          if (this.automationDataLoadPromise) {
+            return this.automationDataLoadPromise;
+          }
+          this.automationDataLoadPromise = Promise.all([
+            this.loadAutomationDrafts(),
+            this.loadAutomationQueue(),
+            this.loadAutomationMessageDrafts(),
+          ]).then(() => {
+            this.automationDataLoaded = true;
+          }).finally(() => {
+            this.automationDataLoadPromise = null;
+          });
+          return this.automationDataLoadPromise;
+        },
         stopAutomationNotificationsPolling() {
           if (this.automationNotificationsPollTimer && typeof window !== "undefined") {
             window.clearInterval(this.automationNotificationsPollTimer);
@@ -4200,13 +4262,10 @@
         async pollAutomationNotifications() {
           if (this.isAutomationNotificationsPolling) return;
           if (typeof document !== "undefined" && document.hidden) return;
+          if (!this.automationDataLoaded) return;
           this.isAutomationNotificationsPolling = true;
           try {
-            await Promise.all([
-              this.loadAutomationDrafts(),
-              this.loadAutomationQueue(),
-              this.loadAutomationMessageDrafts(),
-            ]);
+            await this.ensureAutomationDataLoaded(true);
           } finally {
             this.isAutomationNotificationsPolling = false;
           }
@@ -5025,6 +5084,8 @@
             this.showTaskDealFilter = false;
             this.showTouchCompanyFilter = false;
             this.showTouchDealFilter = false;
+            this.ensureAutomationDataLoaded().catch(() => {});
+            this.ensureAutomationNotificationsPolling();
             this.loadUnboundCommunications({ preserveSelection: true, silent: true }).catch(() => {});
           } else {
             this.managerNotificationDraftPreviewId = "";
@@ -7214,28 +7275,34 @@
           this.loadTasksForDeal();
           this.showModal = true;
         },
-        openDealEditorById(dealId) {
+        async openDealEditorById(dealId) {
           const normalizedId = this.toIntOrNull(dealId);
           if (!normalizedId) return;
-          const deal = (this.datasets.deals || []).find((item) => String(item.id) === String(normalizedId));
-          if (deal) {
+          try {
+            const deal = await this.fetchDealById(normalizedId);
             this.openDealEditor(deal);
+          } catch (error) {
+            this.errorMessage = `Ошибка открытия сделки: ${error.message}`;
           }
         },
-        openLeadEditorById(leadId) {
+        async openLeadEditorById(leadId) {
           const normalizedId = this.toIntOrNull(leadId);
           if (!normalizedId) return;
-          const lead = (this.datasets.leads || []).find((item) => String(item.id) === String(normalizedId));
-          if (lead) {
+          try {
+            const lead = await this.fetchLeadById(normalizedId);
             this.openLeadEditor(lead);
+          } catch (error) {
+            this.errorMessage = `Ошибка открытия лида: ${error.message}`;
           }
         },
-        openCompanyEditorById(companyId) {
+        async openCompanyEditorById(companyId) {
           const normalizedId = this.toIntOrNull(companyId);
           if (!normalizedId) return;
-          const company = (this.datasets.companies || []).find((item) => String(item.id) === String(normalizedId));
-          if (company) {
+          try {
+            const company = await this.fetchCompanyById(normalizedId);
             this.openCompanyEditor(company);
+          } catch (error) {
+            this.errorMessage = `Ошибка открытия компании: ${error.message}`;
           }
         },
         openContactEditor(item) {
@@ -9501,17 +9568,73 @@
             updatedAt: item.updated_at || null,
           };
         },
-        async loadSection(section) {
+        mapSectionRecords(section, records) {
+          if (section === "leads") return records.map(this.mapLead);
+          if (section === "deals") return records.map(this.mapDeal);
+          if (section === "contacts") return records.map(this.mapContact);
+          if (section === "companies") return records.map(this.mapClient);
+          if (section === "tasks") return records.map(this.mapTask);
+          if (section === "touches") return records.map(this.mapTouch);
+          return [];
+        },
+        mergeSectionRecords(existingRecords, nextRecords) {
+          const merged = [];
+          const seenIds = new Set();
+          [...(Array.isArray(existingRecords) ? existingRecords : []), ...(Array.isArray(nextRecords) ? nextRecords : [])]
+            .forEach((item) => {
+              const key = String(item?.id || "");
+              if (!key || seenIds.has(key)) {
+                return;
+              }
+              seenIds.add(key);
+              merged.push(item);
+            });
+          return merged;
+        },
+        async loadSection(section, options = {}) {
           const endpoint = SECTION_ENDPOINTS[section];
           if (!endpoint) return;
-          const payload = await this.apiRequest(endpoint);
-          const records = this.normalizePaginatedResponse(payload);
-          if (section === "leads") this.datasets.leads = records.map(this.mapLead);
-          if (section === "deals") this.datasets.deals = records.map(this.mapDeal);
-          if (section === "contacts") this.datasets.contacts = records.map(this.mapContact);
-          if (section === "companies") this.datasets.companies = records.map(this.mapClient);
-          if (section === "tasks") this.datasets.tasks = records.map(this.mapTask);
-          if (section === "touches") this.datasets.touches = records.map(this.mapTouch);
+          const { append = false, url = "", force = false } = options;
+          const requestUrl = String(url || endpoint).trim();
+          if (!requestUrl) return;
+          const currentState = this.sectionCollectionState?.[section] || { loaded: false, next: "", isLoadingMore: false };
+          if (append && (!currentState.next || currentState.isLoadingMore)) {
+            return;
+          }
+
+          this.sectionCollectionState = {
+            ...this.sectionCollectionState,
+            [section]: {
+              ...currentState,
+              isLoadingMore: append,
+            },
+          };
+
+          try {
+            const payload = await this.apiRequest(requestUrl);
+            const records = this.mapSectionRecords(section, this.normalizePaginatedResponse(payload));
+            const nextUrl = String(payload?.next || "").trim();
+            this.datasets[section] = append
+              ? this.mergeSectionRecords(this.datasets[section], records)
+              : records;
+            this.sectionCollectionState = {
+              ...this.sectionCollectionState,
+              [section]: {
+                loaded: true,
+                next: nextUrl,
+                isLoadingMore: false,
+              },
+            };
+          } catch (error) {
+            this.sectionCollectionState = {
+              ...this.sectionCollectionState,
+              [section]: {
+                ...currentState,
+                isLoadingMore: false,
+              },
+            };
+            throw error;
+          }
         },
         async loadAutomationDrafts() {
           const payload = await this.apiRequest("/api/v1/automation-drafts/?status=pending&page_size=200");
@@ -9532,10 +9655,13 @@
           this.isLoading = true;
           this.errorMessage = "";
           try {
-            await Promise.all(
-              Object.keys(SECTION_ENDPOINTS).map((section) => this.loadSection(section))
-            );
-            await Promise.all([this.loadAutomationDrafts(), this.loadAutomationQueue(), this.loadAutomationMessageDrafts()]);
+            if (!this.isTelephonySection) {
+              await this.loadSection(this.activeSection, { force: true });
+            }
+            if (this.sectionUsesAutomationData(this.activeSection)) {
+              await this.ensureAutomationDataLoaded();
+              this.ensureAutomationNotificationsPolling();
+            }
           } catch (error) {
             this.errorMessage = `Ошибка загрузки данных: ${error.message}`;
           } finally {
@@ -9549,13 +9675,41 @@
             if (this.isTelephonySection) {
               await this.loadTelephonySettings(true);
             } else {
-              await this.loadSection(this.activeSection);
+              await this.loadSection(this.activeSection, { force: true });
             }
-            await Promise.all([this.loadAutomationDrafts(), this.loadAutomationQueue(), this.loadAutomationMessageDrafts()]);
+            if (this.sectionUsesAutomationData(this.activeSection)) {
+              await this.ensureAutomationDataLoaded(true);
+              this.ensureAutomationNotificationsPolling();
+            }
           } catch (error) {
             this.errorMessage = `Ошибка обновления: ${error.message}`;
           } finally {
             this.isLoading = false;
+          }
+        },
+        async loadNextPageForActiveSection() {
+          if (this.isTelephonySection) {
+            return;
+          }
+          const section = String(this.activeSection || "").trim();
+          const state = this.sectionCollectionState?.[section];
+          if (!state?.next || state?.isLoadingMore) {
+            return;
+          }
+          try {
+            await this.loadSection(section, { append: true, url: state.next });
+          } catch (error) {
+            this.errorMessage = `Ошибка догрузки списка: ${error.message}`;
+          }
+        },
+        handleListScroll(event) {
+          const container = event?.target;
+          if (!container || this.isLoading || this.activeSectionCollectionState?.isLoadingMore) {
+            return;
+          }
+          const remaining = Number(container.scrollHeight || 0) - Number(container.scrollTop || 0) - Number(container.clientHeight || 0);
+          if (remaining <= 180) {
+            this.loadNextPageForActiveSection();
           }
         },
         handleSourceSelectChange(section) {
@@ -9678,9 +9832,6 @@
               this.loadTelephonyHealth().catch(() => {});
             }
             return;
-          }
-          if (!Array.isArray(this.datasets[section]) || !this.datasets[section].length) {
-            this.reloadActiveSection();
           }
         },
         resetSearch() {
@@ -10790,6 +10941,7 @@
           this.errorMessage = `Ошибка загрузки справочников: ${error.message}`;
         }
         await this.loadAllSections();
+        this.isSectionLazyLoadingReady = true;
         if (this.activeSection === "telephony") {
           try {
             await this.loadTelephonySettings();
@@ -10798,7 +10950,6 @@
           }
         }
         this.ensureTelephonyIncomingCallsPolling();
-        this.ensureAutomationNotificationsPolling();
         this.restoreFilters();
         window.setTimeout(() => this.hideStartupScreen(), 500);
       },
