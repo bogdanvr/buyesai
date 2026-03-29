@@ -260,17 +260,21 @@
           </div>
 
           <div class="flex items-center justify-between xl:justify-end gap-2 xl:gap-4">
-            <div v-if="!isTelephonySection" class="text-[11px] md:text-sm text-crm-muted whitespace-nowrap">
-              [[ filteredItems.length ]] элементов
-            </div>
-
             <div class="relative" data-manager-notifications>
               <button
                 type="button"
                 @click="toggleManagerNotifications"
                 class="relative h-8 md:h-11 px-2.5 md:px-4 rounded-lg md:rounded-xl border border-crm-border bg-[#13314e] text-[12px] md:text-sm font-medium hover:border-crm-accent hover:text-white transition whitespace-nowrap"
               >
-                <span>Уведомления</span>
+                <span class="inline-flex items-center gap-2">
+                  <span>Уведомления</span>
+                  <span
+                    v-if="managerNotificationsCount"
+                    class="inline-flex min-w-[20px] items-center justify-center rounded-full bg-crm-accent px-1.5 py-0.5 text-[11px] font-semibold text-white"
+                  >
+                    [[ managerNotificationsCount ]]
+                  </span>
+                </span>
               </button>
 
               <div
