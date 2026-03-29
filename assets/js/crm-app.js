@@ -504,6 +504,7 @@
             { value: 120, label: "2 часа" },
             { value: 180, label: "3 часа" }
           ],
+          taskChecklistHideCompleted: false,
           sidebarItems: [
             { key: "leads", label: "Лиды", shortLabel: "Лиды", icon: "◎" },
             { key: "deals", label: "Сделки", shortLabel: "Сделки", icon: "◔" },
@@ -5891,6 +5892,7 @@
             companyNote: "",
             status: "todo",
           };
+          this.taskChecklistHideCompleted = false;
           this.showModal = true;
         },
         handleAutomationQuickAction(item, actionId) {
@@ -7255,6 +7257,7 @@
             companyNote: item.companyNote || "",
             status: item.taskStatus || item.status || "todo"
           };
+          this.taskChecklistHideCompleted = false;
           this.resetTaskFollowUpForm();
           this.showModal = true;
           this.loadTaskTouchOptions();
@@ -7563,10 +7566,20 @@
             .filter((item, itemIndex) => itemIndex !== index);
         },
         visibleTaskChecklist() {
-          return this.normalizeTaskChecklist(this.forms.tasks.checklist);
+          return this.normalizeTaskChecklist(this.forms.tasks.checklist)
+            .map((item, index) => ({
+              ...item,
+              originalIndex: index,
+            }))
+            .filter((item) => !(this.taskChecklistHideCompleted && item.isDone));
         },
         hasTaskChecklist() {
-          return this.visibleTaskChecklist().length > 0;
+          return this.normalizeTaskChecklist(this.forms.tasks.checklist).length > 0;
+        },
+        hasHiddenCompletedTaskChecklistItems() {
+          return this.taskChecklistHideCompleted
+            && this.normalizeTaskChecklist(this.forms.tasks.checklist).some((item) => item.isDone)
+            && !this.visibleTaskChecklist().length;
         },
         hasPreparedTouchFollowUp() {
           return !!(
@@ -9581,6 +9594,7 @@
           this.showCompanyLeadsPanel = false;
           this.showCompanyNoteDraft = false;
           this.showCompanyOkvedDetails = false;
+          this.taskChecklistHideCompleted = false;
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
           this.companyDocumentsForActiveCompany = [];
@@ -9633,6 +9647,7 @@
           this.showCompanyLeadsPanel = false;
           this.showCompanyLeadsPanel = false;
           this.showCompanyOkvedDetails = false;
+          this.taskChecklistHideCompleted = false;
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
           this.showModal = true;
