@@ -646,27 +646,43 @@
         </div>
         <div v-else class="flex gap-2 md:gap-3 overflow-x-auto pb-1">
           <template v-if="activeSection === 'companies'">
-            <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
+            <button type="button" @click="setStatsQuickFilter('')" :class="statsCardClass('')" class="shrink-0 rounded-2xl border px-3 py-2.5 shadow-panel min-w-fit transition hover:border-crm-accent">
               <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
                 <span class="text-crm-muted font-medium">Всего</span>
                 <span class="font-semibold text-white">[[ companyStats.totalCount ]]</span>
               </div>
-            </article>
-            <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
+            </button>
+            <button type="button" @click="setStatsQuickFilter('active')" :class="statsCardClass('active')" class="shrink-0 rounded-2xl border px-3 py-2.5 shadow-panel min-w-fit transition hover:border-crm-accent">
               <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
                 <span class="text-crm-muted font-medium">Активных</span>
                 <span class="font-semibold text-white">[[ companyStats.activeCount ]]</span>
               </div>
-            </article>
-            <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
+            </button>
+            <button type="button" @click="setStatsQuickFilter('in_progress')" :class="statsCardClass('in_progress')" class="shrink-0 rounded-2xl border px-3 py-2.5 shadow-panel min-w-fit transition hover:border-crm-accent">
               <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
                 <span class="text-crm-muted font-medium">В работе</span>
                 <span class="font-semibold text-white">[[ companyStats.inProgressCount ]]</span>
               </div>
-            </article>
+            </button>
           </template>
           <template v-else>
-            <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
+            <button
+              v-if="activeSection === 'leads' || activeSection === 'deals' || activeSection === 'tasks'"
+              type="button"
+              @click="setStatsQuickFilter('')"
+              :class="statsCardClass('')"
+              class="shrink-0 rounded-2xl border px-3 py-2.5 shadow-panel min-w-fit transition hover:border-crm-accent"
+            >
+              <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
+                <span class="text-crm-muted font-medium">Всего</span>
+                <span class="font-semibold text-white">[[ stats.totalCount ]]</span>
+                <template v-if="showStatsAmount">
+                  <span class="text-crm-muted font-medium">на сумму</span>
+                  <span class="font-semibold text-white">[[ formatRubAmount(stats.totalAmountRub) ]]</span>
+                </template>
+              </div>
+            </button>
+            <article v-else class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
               <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
                 <span class="text-crm-muted font-medium">Всего</span>
                 <span class="font-semibold text-white">[[ stats.totalCount ]]</span>
@@ -676,7 +692,23 @@
                 </template>
               </div>
             </article>
-            <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
+            <button
+              v-if="activeSection === 'leads' || activeSection === 'deals' || activeSection === 'tasks'"
+              type="button"
+              @click="setStatsQuickFilter('new')"
+              :class="statsCardClass('new')"
+              class="shrink-0 rounded-2xl border px-3 py-2.5 shadow-panel min-w-fit transition hover:border-crm-accent"
+            >
+              <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
+                <span class="text-crm-muted font-medium">Новых</span>
+                <span class="font-semibold text-white">[[ stats.newCount ]]</span>
+                <template v-if="showStatsAmount">
+                  <span class="text-crm-muted font-medium">на сумму</span>
+                  <span class="font-semibold text-white">[[ formatRubAmount(stats.newAmountRub) ]]</span>
+                </template>
+              </div>
+            </button>
+            <article v-else class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
               <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
                 <span class="text-crm-muted font-medium">Новых</span>
                 <span class="font-semibold text-white">[[ stats.newCount ]]</span>
@@ -686,7 +718,23 @@
                 </template>
               </div>
             </article>
-            <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
+            <button
+              v-if="activeSection === 'leads' || activeSection === 'deals' || activeSection === 'tasks'"
+              type="button"
+              @click="setStatsQuickFilter('progress')"
+              :class="statsCardClass('progress')"
+              class="shrink-0 rounded-2xl border px-3 py-2.5 shadow-panel min-w-fit transition hover:border-crm-accent"
+            >
+              <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
+                <span class="text-crm-muted font-medium">В работе</span>
+                <span class="font-semibold text-white">[[ stats.inProgressCount ]]</span>
+                <template v-if="showStatsAmount">
+                  <span class="text-crm-muted font-medium">на сумму</span>
+                  <span class="font-semibold text-white">[[ formatRubAmount(stats.inProgressAmountRub) ]]</span>
+                </template>
+              </div>
+            </button>
+            <article v-else class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
               <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
                 <span class="text-crm-muted font-medium">В работе</span>
                 <span class="font-semibold text-white">[[ stats.inProgressCount ]]</span>
@@ -696,7 +744,23 @@
                 </template>
               </div>
             </article>
-            <article class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
+            <button
+              v-if="activeSection === 'leads' || activeSection === 'deals' || activeSection === 'tasks'"
+              type="button"
+              @click="setStatsQuickFilter('done')"
+              :class="statsCardClass('done')"
+              class="shrink-0 rounded-2xl border px-3 py-2.5 shadow-panel min-w-fit transition hover:border-crm-accent"
+            >
+              <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
+                <span class="text-crm-muted font-medium">Завершено</span>
+                <span class="font-semibold text-white">[[ stats.doneCount ]]</span>
+                <template v-if="showStatsAmount">
+                  <span class="text-crm-muted font-medium">на сумму</span>
+                  <span class="font-semibold text-white">[[ formatRubAmount(stats.doneAmountRub) ]]</span>
+                </template>
+              </div>
+            </button>
+            <article v-else class="shrink-0 rounded-2xl border border-crm-border bg-crm-panel px-3 py-2.5 shadow-panel min-w-fit">
               <div class="flex items-center gap-2 text-[13px] md:text-[15px] whitespace-nowrap">
                 <span class="text-crm-muted font-medium">Завершено</span>
                 <span class="font-semibold text-white">[[ stats.doneCount ]]</span>

@@ -100,6 +100,12 @@
             tasks: [],
             touches: [],
           },
+          statsQuickFilterBySection: {
+            leads: "",
+            deals: "",
+            companies: "",
+            tasks: "",
+          },
           selectedTaskCompanyFilters: [],
           selectedTaskCategoryFilters: [],
           selectedTouchCompanyFilters: [],
@@ -1722,7 +1728,7 @@
           }
           return rows;
         },
-        filteredItems() {
+        filteredItemsBase() {
           if (this.isTelephonySection) {
             return [];
           }
@@ -1800,6 +1806,17 @@
             return left.index - right.index;
           });
           return ordered.map((entry) => entry.item);
+        },
+        activeStatsQuickFilter() {
+          const section = String(this.activeSection || "").trim();
+          return String(this.statsQuickFilterBySection?.[section] || "").trim();
+        },
+        filteredItems() {
+          const quickFilter = this.activeStatsQuickFilter;
+          if (!quickFilter) {
+            return this.filteredItemsBase;
+          }
+          return this.filteredItemsBase.filter((item) => this.itemMatchesStatsQuickFilter(item, quickFilter));
         },
         statusFilterOptions() {
           const labels = new Set(
@@ -1943,7 +1960,7 @@
           ));
         },
         stats() {
-          const items = this.filteredItems;
+          const items = this.filteredItemsBase;
           const newItems = items.filter((item) => this.getItemStatusBucket(item) === "new");
           const inProgressItems = items.filter((item) => this.getItemStatusBucket(item) === "progress");
           const doneItems = items.filter((item) => this.getItemStatusBucket(item) === "done");
@@ -1967,7 +1984,7 @@
             };
           }
 
-          const companies = this.filteredItems;
+          const companies = this.filteredItemsBase;
           return {
             totalCount: companies.length,
             activeCount: companies.filter((item) => item.isActive !== false).length,
@@ -1999,7 +2016,9 @@
         },
         activeSection(nextValue, previousValue) {
           this.syncStatusFiltersForSection(previousValue);
+          this.syncStatsQuickFilterForSection(previousValue);
           this.applyStatusFiltersForSection(nextValue);
+          this.applyStatsQuickFilterForSection(nextValue);
         },
         "forms.tasks.taskCategoryId": {
           handler() {
@@ -6515,6 +6534,9 @@
         statusFilterSections() {
           return ["leads", "deals", "contacts", "companies", "tasks", "touches"];
         },
+        statsQuickFilterSections() {
+          return ["leads", "deals", "companies", "tasks"];
+        },
         syncStatusFiltersForSection(section) {
           const normalizedSection = String(section || "").trim();
           if (!this.statusFilterSections().includes(normalizedSection)) {
@@ -6542,11 +6564,76 @@
           });
           return normalized;
         },
+        syncStatsQuickFilterForSection(section) {
+          const normalizedSection = String(section || "").trim();
+          if (!this.statsQuickFilterSections().includes(normalizedSection)) {
+            return;
+          }
+          this.statsQuickFilterBySection = {
+            ...this.statsQuickFilterBySection,
+            [normalizedSection]: String(this.statsQuickFilterBySection?.[normalizedSection] || "").trim(),
+          };
+        },
+        applyStatsQuickFilterForSection(section) {
+          const normalizedSection = String(section || "").trim();
+          if (!this.statsQuickFilterSections().includes(normalizedSection)) {
+            return;
+          }
+          this.statsQuickFilterBySection = {
+            ...this.statsQuickFilterBySection,
+            [normalizedSection]: String(this.statsQuickFilterBySection?.[normalizedSection] || "").trim(),
+          };
+        },
+        normalizeStatsQuickFilterBySection(payload) {
+          const normalized = {};
+          this.statsQuickFilterSections().forEach((section) => {
+            normalized[section] = String(payload?.[section] || "").trim();
+          });
+          return normalized;
+        },
+        itemMatchesStatsQuickFilter(item, filterValue) {
+          const normalizedFilter = String(filterValue || "").trim();
+          if (!normalizedFilter) {
+            return true;
+          }
+          if (this.activeSection === "companies") {
+            if (normalizedFilter === "active") {
+              return item?.isActive !== false;
+            }
+            if (normalizedFilter === "in_progress") {
+              return this.companyHasActiveDeals(item?.id);
+            }
+            return true;
+          }
+          return this.getItemStatusBucket(item) === normalizedFilter;
+        },
+        isStatsQuickFilterActive(filterValue) {
+          return String(this.activeStatsQuickFilter || "") === String(filterValue || "");
+        },
+        setStatsQuickFilter(filterValue = "") {
+          const section = String(this.activeSection || "").trim();
+          if (!this.statsQuickFilterSections().includes(section)) {
+            return;
+          }
+          const normalizedValue = String(filterValue || "").trim();
+          this.statsQuickFilterBySection = {
+            ...this.statsQuickFilterBySection,
+            [section]: normalizedValue,
+          };
+          this.persistFilters();
+        },
+        statsCardClass(filterValue = "") {
+          return this.isStatsQuickFilterActive(filterValue)
+            ? "border-crm-accent bg-crm-accent/12 shadow-[0_0_0_1px_rgba(96,165,250,0.18)_inset]"
+            : "border-crm-border bg-crm-panel";
+        },
         persistFilters() {
           this.syncStatusFiltersForSection(this.activeSection);
+          this.syncStatsQuickFilterForSection(this.activeSection);
           try {
             window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({
               statusFiltersBySection: this.statusFiltersBySection,
+              statsQuickFilterBySection: this.statsQuickFilterBySection,
               dealCompanyFilterId: this.dealCompanyFilterId,
               dealCompanyFilterLabel: this.dealCompanyFilterLabel,
               selectedTaskCompanyFilters: this.selectedTaskCompanyFilters,
@@ -6566,6 +6653,7 @@
             if (!rawValue) return;
             const payload = JSON.parse(rawValue);
             const normalizedStatusFilters = this.normalizeStatusFiltersBySection(payload?.statusFiltersBySection);
+            this.statsQuickFilterBySection = this.normalizeStatsQuickFilterBySection(payload?.statsQuickFilterBySection);
             if (Array.isArray(payload?.selectedStatusFilters)) {
               normalizedStatusFilters[this.activeSection] = payload.selectedStatusFilters
                 .map((item) => String(item || "").trim())
@@ -6573,6 +6661,7 @@
             }
             this.statusFiltersBySection = normalizedStatusFilters;
             this.applyStatusFiltersForSection(this.activeSection);
+            this.applyStatsQuickFilterForSection(this.activeSection);
             this.dealCompanyFilterId = payload?.dealCompanyFilterId ? String(payload.dealCompanyFilterId).trim() : null;
             this.dealCompanyFilterLabel = String(payload?.dealCompanyFilterLabel || "").trim();
             this.selectedTaskCompanyFilters = Array.isArray(payload?.selectedTaskCompanyFilters)
