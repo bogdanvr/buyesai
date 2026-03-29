@@ -5455,20 +5455,22 @@
                   <div class="text-sm font-semibold text-white">Чек-лист</div>
                   <div class="mt-1 text-xs text-crm-muted">Разбей задачу на отдельные шаги и отмечай выполнение по пунктам.</div>
                 </div>
-                <button
-                  v-if="!hasTaskChecklist()"
-                  type="button"
-                  @click="createTaskChecklist"
-                  class="inline-flex h-10 items-center rounded-xl border border-crm-border bg-[#123753] px-4 text-sm font-semibold text-crm-accent hover:border-crm-accent transition shrink-0"
-                >
-                  Создать чек-лист
-                </button>
+                <div class="flex items-center gap-3 shrink-0">
+                  <label v-if="hasTaskChecklist()" class="inline-flex items-center gap-2 text-sm text-crm-muted">
+                    <input v-model="taskChecklistHideCompleted" type="checkbox" class="h-4 w-4 rounded border-crm-border bg-transparent" />
+                    <span>Скрывать выполненные</span>
+                  </label>
+                  <button
+                    v-if="!hasTaskChecklist()"
+                    type="button"
+                    @click="createTaskChecklist"
+                    class="inline-flex h-10 items-center rounded-xl border border-crm-border bg-[#123753] px-4 text-sm font-semibold text-crm-accent hover:border-crm-accent transition"
+                  >
+                    Создать чек-лист
+                  </button>
+                </div>
               </div>
               <div v-if="hasTaskChecklist()" class="mt-4 space-y-3">
-                <label class="inline-flex items-center gap-2 text-sm text-crm-muted">
-                  <input v-model="taskChecklistHideCompleted" type="checkbox" class="h-4 w-4 rounded border-crm-border bg-transparent" />
-                  <span>Скрывать выполненные</span>
-                </label>
                 <div v-if="hasHiddenCompletedTaskChecklistItems()" class="rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 text-xs text-crm-muted">
                   Все пункты выполнены и скрыты этим фильтром.
                 </div>
