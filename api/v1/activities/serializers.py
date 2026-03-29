@@ -17,6 +17,7 @@ User = get_user_model()
 
 class ActivitySerializer(serializers.ModelSerializer):
     subject = serializers.CharField(required=False, allow_blank=True)
+    checklist = serializers.ListField(required=False)
     owner = serializers.PrimaryKeyRelatedField(
         source="created_by",
         queryset=User.objects.filter(is_active=True, is_staff=True),
@@ -191,6 +192,23 @@ class ActivitySerializer(serializers.ModelSerializer):
                     )
         return attrs
 
+    def validate_checklist(self, value):
+        if value in (None, ""):
+            return []
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Чек-лист должен быть массивом пунктов.")
+        normalized = []
+        for index, item in enumerate(value):
+            if not isinstance(item, dict):
+                raise serializers.ValidationError(f"Пункт чек-листа #{index + 1} должен быть объектом.")
+            text = str(item.get("text") or "").strip()
+            normalized.append({
+                "id": str(item.get("id") or "").strip() or f"item-{index + 1}",
+                "text": text,
+                "is_done": bool(item.get("is_done")),
+            })
+        return normalized
+
     def create(self, validated_data):
         if validated_data.get("status") == TaskStatus.DONE:
             validated_data["completed_at"] = validated_data.get("completed_at") or timezone.now()
@@ -232,6 +250,7 @@ class ActivitySerializer(serializers.ModelSerializer):
             "related_touch",
             "related_touch_subject",
             "deadline_reminder_offset_minutes",
+            "checklist",
             "completed_at",
             "is_done",
             "has_follow_up_task",

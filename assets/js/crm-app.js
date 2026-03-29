@@ -337,6 +337,7 @@
               relatedTouchId: null,
               dueAt: "",
               reminderOffsetMinutes: 30,
+              checklist: [],
               description: "",
               result: "",
               saveCompanyNote: false,
@@ -1509,6 +1510,10 @@
         },
         taskSummaryDueLabel() {
           return this.forms.tasks.dueAt ? this.formatDueLabel(this.forms.tasks.dueAt) : "Не указан";
+        },
+        taskSummaryReminderLabel() {
+          const normalizedValue = Number(this.forms.tasks.reminderOffsetMinutes || 30);
+          return (this.taskReminderOptions || []).find((option) => Number(option.value) === normalizedValue)?.label || `${normalizedValue} мин`;
         },
         currentTaskTypeHasAutomaticFollowUp() {
           const taskType = this.resolveTaskTypeById(this.forms.tasks.taskTypeId);
@@ -5879,6 +5884,7 @@
             relatedTouchId: null,
             dueAt: resolvedDueAt ? this.toDateTimeLocal(resolvedDueAt) : "",
             reminderOffsetMinutes: 30,
+            checklist: [],
             description: "",
             result: "",
             saveCompanyNote: false,
@@ -7242,6 +7248,7 @@
             relatedTouchId: this.toIntOrNull(item.relatedTouchId),
             dueAt: this.toDateTimeLocal(item.dueAtRaw),
             reminderOffsetMinutes: Number(item.reminderOffsetMinutes || 30),
+            checklist: this.normalizeTaskChecklist(item.checklist),
             description: item.description || "",
             result: item.result || this.resolveTaskTypeDefaultResultById(item.taskTypeId),
             saveCompanyNote: !!item.saveCompanyNote,
@@ -7508,6 +7515,58 @@
             reminderOffsetMinutes: 30,
             description: ""
           };
+        },
+        createTaskChecklistItem(overrides = {}) {
+          return {
+            id: String(overrides.id || `checklist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
+            text: String(overrides.text || "").trim(),
+            isDone: !!(overrides.isDone ?? overrides.is_done),
+          };
+        },
+        normalizeTaskChecklist(items) {
+          return (Array.isArray(items) ? items : [])
+            .filter((item) => item && typeof item === "object")
+            .map((item) => this.createTaskChecklistItem(item));
+        },
+        serializeTaskChecklist(items) {
+          return this.normalizeTaskChecklist(items)
+            .map((item) => ({
+              id: item.id,
+              text: String(item.text || "").trim(),
+              is_done: !!item.isDone,
+            }))
+            .filter((item) => item.text);
+        },
+        ensureTaskChecklistVisible() {
+          if (!this.expandedOptionalFields.tasks) {
+            this.expandedOptionalFields.tasks = {};
+          }
+          this.expandedOptionalFields.tasks = {
+            ...this.expandedOptionalFields.tasks,
+            checklist: true,
+          };
+        },
+        createTaskChecklist() {
+          this.ensureTaskChecklistVisible();
+          if (!this.normalizeTaskChecklist(this.forms.tasks.checklist).length) {
+            this.forms.tasks.checklist = [this.createTaskChecklistItem()];
+          }
+        },
+        addTaskChecklistItem() {
+          const nextChecklist = this.normalizeTaskChecklist(this.forms.tasks.checklist);
+          nextChecklist.push(this.createTaskChecklistItem());
+          this.forms.tasks.checklist = nextChecklist;
+          this.ensureTaskChecklistVisible();
+        },
+        removeTaskChecklistItem(index) {
+          this.forms.tasks.checklist = this.normalizeTaskChecklist(this.forms.tasks.checklist)
+            .filter((item, itemIndex) => itemIndex !== index);
+        },
+        visibleTaskChecklist() {
+          return this.normalizeTaskChecklist(this.forms.tasks.checklist);
+        },
+        hasTaskChecklist() {
+          return this.visibleTaskChecklist().length > 0;
         },
         hasPreparedTouchFollowUp() {
           return !!(
@@ -9066,6 +9125,7 @@
             ownerId: item.owner || this.toIntOrNull(item.created_by) || null,
             ownerName: item.owner_name || "",
             description: item.description || "",
+            checklist: this.normalizeTaskChecklist(item.checklist),
             result: item.result || "",
             saveCompanyNote: !!item.save_company_note,
             companyNote: item.company_note || "",
@@ -9666,10 +9726,11 @@
               leadId: null,
               dealId: null,
               relatedTouchId: null,
-              dueAt: "",
-              reminderOffsetMinutes: 30,
-              description: "",
-              result: "",
+            dueAt: "",
+            reminderOffsetMinutes: 30,
+            checklist: [],
+            description: "",
+            result: "",
               saveCompanyNote: false,
               companyNote: "",
               status: "todo"
@@ -10196,6 +10257,7 @@
               communication_channel: communicationChannelId,
               priority: form.priority || "medium",
               description: form.description.trim(),
+              checklist: this.serializeTaskChecklist(form.checklist),
               result: form.result.trim(),
               due_at: this.toIsoDateTime(form.dueAt),
               deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
@@ -10242,6 +10304,7 @@
               communication_channel: communicationChannelId,
               priority: form.priority || "medium",
               description: form.description.trim(),
+              checklist: this.serializeTaskChecklist(form.checklist),
               result: form.result.trim(),
               due_at: this.toIsoDateTime(form.dueAt),
               deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
