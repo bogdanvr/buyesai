@@ -22,6 +22,16 @@ from crm.models import SettlementAllocation, SettlementContract, SettlementDocum
 ZERO = Decimal("0.00")
 
 
+def _expected_receivable_key(document):
+    deal_id = getattr(document, "deal_id", None)
+    if deal_id:
+        return ("deal", int(deal_id))
+    contract_id = getattr(document, "contract_id", None)
+    if contract_id:
+        return ("contract", int(contract_id))
+    return ("document", int(getattr(document, "pk", 0) or 0))
+
+
 def build_settlement_stats(documents):
     today = timezone.localdate()
     expected_receivable = ZERO
@@ -31,15 +41,20 @@ def build_settlement_stats(documents):
     advances_issued = ZERO
     overdue = ZERO
     nearest_due_date = None
+    invoices_by_key = {}
+    realizations_by_key = {}
 
     for document in documents:
         open_amount = Decimal(document.open_amount or 0)
         if open_amount <= ZERO:
             continue
         if document.is_expected_receivable:
-            expected_receivable += open_amount
+            key = _expected_receivable_key(document)
+            invoices_by_key[key] = invoices_by_key.get(key, ZERO) + open_amount
         if document.is_receivable:
             receivable += open_amount
+            key = _expected_receivable_key(document)
+            realizations_by_key[key] = realizations_by_key.get(key, ZERO) + Decimal(document.amount or 0)
         if document.is_payable:
             payable += open_amount
         if document.is_advance_received:
@@ -51,6 +66,9 @@ def build_settlement_stats(documents):
                 nearest_due_date = document.due_date
             if document.due_date < today:
                 overdue += open_amount
+
+    for key, invoice_amount in invoices_by_key.items():
+        expected_receivable += max(invoice_amount - realizations_by_key.get(key, ZERO), ZERO)
 
     balance = receivable + advances_issued - payable - advances_received
     return {

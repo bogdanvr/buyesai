@@ -129,6 +129,43 @@ class SettlementsApiTests(APITestCase):
         self.assertEqual(Decimal(summary_response.data["overview"]["advances_received"]), Decimal("0.00"))
         self.assertEqual(Decimal(summary_response.data["overview"]["balance"]), Decimal("70000.00"))
 
+    def test_invoice_expected_receivable_is_reduced_by_realization_of_same_deal(self):
+        invoice_response = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "deal": self.deal.pk,
+                "document_type": "invoice",
+                "document_date": "2026-03-30",
+                "currency": "RUB",
+                "amount": "100000.00",
+                "number": "",
+            },
+            format="json",
+        )
+        self.assertEqual(invoice_response.status_code, status.HTTP_201_CREATED, invoice_response.content.decode())
+
+        realization_response = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "deal": self.deal.pk,
+                "document_type": "realization",
+                "document_date": "2026-03-31",
+                "currency": "RUB",
+                "amount": "40000.00",
+                "number": "",
+                "realization_status": "created",
+            },
+            format="json",
+        )
+        self.assertEqual(realization_response.status_code, status.HTTP_201_CREATED, realization_response.content.decode())
+
+        summary_response = self.client.get(f"{reverse('settlement-summary')}?client={self.company.pk}")
+        self.assertEqual(summary_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(summary_response.data["overview"]["expected_receivable"]), Decimal("60000.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["receivable"]), Decimal("40000.00"))
+
     def test_realization_requires_deal(self):
         response = self.client.post(
             reverse("settlement-documents-list"),
