@@ -4564,6 +4564,19 @@
                             <div class="mt-1 text-white">[[ formatSettlementAmount(document.openAmount, document.currency) ]]</div>
                           </div>
                         </div>
+                        <div v-if="document.documentType === 'realization'" class="mt-3 max-w-xs">
+                          <label class="block">
+                            <span class="text-xs uppercase tracking-[0.12em] text-crm-muted">Статус акта</span>
+                            <select
+                              :value="document.realizationStatus || 'created'"
+                              @change="updateCompanySettlementRealizationStatus(document, $event.target.value)"
+                              :disabled="isCompanySettlementDocumentStatusSaving(document.id)"
+                              class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <option v-for="option in settlementRealizationStatusOptions" :key="`settlement-realization-inline-${document.id}-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                            </select>
+                          </label>
+                        </div>
                         <div v-if="document.fileUrl" class="mt-3 text-xs text-crm-muted [overflow-wrap:anywhere]">
                           Файл: <a :href="document.fileUrl" target="_blank" rel="noopener noreferrer" class="text-white transition hover:text-crm-accent">[[ document.originalName || 'Открыть документ' ]]</a>
                           <span v-if="document.fileSize"> • [[ formatFileSize(document.fileSize) ]]</span>

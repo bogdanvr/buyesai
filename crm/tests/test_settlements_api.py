@@ -24,7 +24,7 @@ class SettlementsApiTests(APITestCase):
         self.media_root = tempfile.mkdtemp()
         self.addCleanup(lambda: shutil.rmtree(self.media_root, ignore_errors=True))
 
-    def test_incoming_payment_without_act_becomes_advance_and_manual_offset_keeps_balance(self):
+    def test_old_advance_is_automatically_offset_when_act_is_created(self):
         payment_response = self.client.post(
             reverse("settlement-documents-list"),
             {
@@ -60,18 +60,6 @@ class SettlementsApiTests(APITestCase):
             format="json",
         )
         self.assertEqual(realization_response.status_code, status.HTTP_201_CREATED, realization_response.content.decode())
-
-        allocation_response = self.client.post(
-            reverse("settlement-allocations-list"),
-            {
-                "source_document": payment_response.data["id"],
-                "target_document": realization_response.data["id"],
-                "amount": "120000.00",
-                "allocated_at": "2026-03-31",
-            },
-            format="json",
-        )
-        self.assertEqual(allocation_response.status_code, status.HTTP_201_CREATED, allocation_response.content.decode())
 
         realization = SettlementDocument.objects.get(pk=realization_response.data["id"])
         payment = SettlementDocument.objects.get(pk=payment_response.data["id"])

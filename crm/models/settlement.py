@@ -234,9 +234,11 @@ class SettlementDocument(TimestampedModel):
             self.recalculate_open_amount(save=True)
 
     def auto_allocate_on_create(self):
-        if self.document_type != self.DocumentType.INCOMING_PAYMENT:
+        if self.document_type == self.DocumentType.INCOMING_PAYMENT:
+            self.auto_allocate_to_realizations()
             return
-        self.auto_allocate_to_realizations()
+        if self.document_type == self.DocumentType.REALIZATION:
+            self.auto_allocate_from_received_advances()
 
     def auto_allocate_to_realizations(self):
         current_open_amount = Decimal(self.open_amount or ZERO_DECIMAL)
@@ -274,6 +276,53 @@ class SettlementDocument(TimestampedModel):
             SettlementAllocation.objects.create(
                 source_document=self,
                 target_document=target,
+                amount=allocation_amount,
+                allocated_at=self.document_date or timezone.localdate(),
+            )
+
+    def auto_allocate_from_received_advances(self):
+        current_open_amount = Decimal(self.open_amount or ZERO_DECIMAL)
+        if current_open_amount <= ZERO_DECIMAL:
+            return
+
+        queryset = SettlementDocument.objects.select_for_update().filter(
+            client_id=self.client_id,
+            open_amount__gt=ZERO_DECIMAL,
+        ).exclude(pk=self.pk).filter(
+            models.Q(document_type=self.DocumentType.INCOMING_PAYMENT)
+            | models.Q(
+                document_type=self.DocumentType.ADVANCE,
+                flow_direction=self.FlowDirection.INCOMING,
+            )
+        )
+        if self.contract_id:
+            queryset = queryset.filter(
+                models.Q(contract_id=self.contract_id) | models.Q(contract_id__isnull=True)
+            )
+
+        sources = sorted(
+            queryset,
+            key=lambda item: (
+                item.contract_id != self.contract_id if self.contract_id else False,
+                item.document_date or date.max,
+                item.pk or 0,
+            ),
+        )
+
+        for source in sources:
+            self.recalculate_open_amount(save=True)
+            source.recalculate_open_amount(save=True)
+            target_open_amount = Decimal(self.open_amount or ZERO_DECIMAL)
+            source_open_amount = Decimal(source.open_amount or ZERO_DECIMAL)
+            if target_open_amount <= ZERO_DECIMAL:
+                break
+            if source_open_amount <= ZERO_DECIMAL:
+                continue
+
+            allocation_amount = min(source_open_amount, target_open_amount)
+            SettlementAllocation.objects.create(
+                source_document=source,
+                target_document=self,
                 amount=allocation_amount,
                 allocated_at=self.document_date or timezone.localdate(),
             )

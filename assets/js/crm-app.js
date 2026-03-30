@@ -501,6 +501,7 @@
           companyDealDocumentGroups: [],
           companySettlementContracts: [],
           companySettlementDocuments: [],
+          companySettlementDocumentStatusSaving: {},
           companySettlementSummary: {
             overview: {
               expectedReceivable: 0,
@@ -4152,6 +4153,7 @@
           this.isCompanySettlementSaving = false;
           this.companySettlementContracts = [];
           this.companySettlementDocuments = [];
+          this.companySettlementDocumentStatusSaving = {};
           this.companySettlementSummary = this.defaultCompanySettlementSummary();
           this.resetCompanySettlementContractForm();
           this.resetCompanySettlementDocumentForm();
@@ -4273,10 +4275,46 @@
           this.companySettlementDocumentForm.file = file;
           this.companySettlementDocumentForm.fileName = file?.name || "";
         },
+        isCompanySettlementDocumentStatusSaving(documentId) {
+          return !!this.companySettlementDocumentStatusSaving[String(this.toIntOrNull(documentId) || "")];
+        },
         clearCompanySettlementDocumentFileInput() {
           const input = this.$refs.companySettlementDocumentFileInput;
           if (input) {
             input.value = "";
+          }
+        },
+        async updateCompanySettlementRealizationStatus(document, nextStatus) {
+          const documentId = this.toIntOrNull(document?.id);
+          const normalizedStatus = String(nextStatus || "").trim();
+          if (!documentId || !normalizedStatus || String(document?.documentType || "") !== "realization") {
+            return;
+          }
+          if (String(document.realizationStatus || "") === normalizedStatus) {
+            return;
+          }
+          this.companySettlementDocumentStatusSaving = {
+            ...this.companySettlementDocumentStatusSaving,
+            [String(documentId)]: true,
+          };
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            const updated = await this.apiRequest(`/api/v1/settlements/documents/${documentId}/`, {
+              method: "PATCH",
+              body: {
+                realization_status: normalizedStatus,
+              },
+            });
+            const normalizedDocument = this.normalizeCompanySettlementDocument(updated);
+            this.companySettlementDocuments = this.companySettlementDocuments.map((item) => (
+              this.toIntOrNull(item.id) === documentId ? { ...item, ...normalizedDocument } : item
+            ));
+          } catch (error) {
+            this.setUiError(`Ошибка обновления статуса акта: ${error.message}`, { modal: true });
+          } finally {
+            const nextSavingState = { ...this.companySettlementDocumentStatusSaving };
+            delete nextSavingState[String(documentId)];
+            this.companySettlementDocumentStatusSaving = nextSavingState;
           }
         },
         companySettlementSourceDocuments() {
