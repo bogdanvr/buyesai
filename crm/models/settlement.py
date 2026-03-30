@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -142,7 +143,6 @@ class SettlementDocument(TimestampedModel):
     @property
     def can_allocate_as_target(self) -> bool:
         return self.document_type in {
-            self.DocumentType.INVOICE,
             self.DocumentType.REALIZATION,
             self.DocumentType.SUPPLIER_RECEIPT,
             self.DocumentType.ADVANCE,
@@ -162,7 +162,10 @@ class SettlementDocument(TimestampedModel):
 
     @property
     def is_advance_received(self) -> bool:
-        return self.document_type == self.DocumentType.ADVANCE and self.flow_direction == self.FlowDirection.INCOMING
+        return (
+            self.document_type == self.DocumentType.INCOMING_PAYMENT
+            or (self.document_type == self.DocumentType.ADVANCE and self.flow_direction == self.FlowDirection.INCOMING)
+        )
 
     @property
     def is_advance_issued(self) -> bool:
@@ -224,8 +227,56 @@ class SettlementDocument(TimestampedModel):
         creating = self.pk is None
         if creating and (self.open_amount in (None, "", ZERO_DECIMAL) or Decimal(self.open_amount or ZERO_DECIMAL) <= ZERO_DECIMAL):
             self.open_amount = self.amount
-        super().save(*args, **kwargs)
-        self.recalculate_open_amount(save=True)
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            if creating:
+                self.auto_allocate_on_create()
+            self.recalculate_open_amount(save=True)
+
+    def auto_allocate_on_create(self):
+        if self.document_type != self.DocumentType.INCOMING_PAYMENT:
+            return
+        self.auto_allocate_to_realizations()
+
+    def auto_allocate_to_realizations(self):
+        current_open_amount = Decimal(self.open_amount or ZERO_DECIMAL)
+        if current_open_amount <= ZERO_DECIMAL:
+            return
+
+        queryset = SettlementDocument.objects.select_for_update().filter(
+            client_id=self.client_id,
+            document_type=self.DocumentType.REALIZATION,
+            open_amount__gt=ZERO_DECIMAL,
+        ).exclude(pk=self.pk)
+        if self.contract_id:
+            queryset = queryset.filter(contract_id=self.contract_id)
+
+        targets = sorted(
+            queryset,
+            key=lambda item: (
+                item.due_date or date.max,
+                item.document_date or date.max,
+                item.pk or 0,
+            ),
+        )
+
+        for target in targets:
+            self.recalculate_open_amount(save=True)
+            target.recalculate_open_amount(save=True)
+            available_amount = Decimal(self.open_amount or ZERO_DECIMAL)
+            target_open_amount = Decimal(target.open_amount or ZERO_DECIMAL)
+            if available_amount <= ZERO_DECIMAL:
+                break
+            if target_open_amount <= ZERO_DECIMAL:
+                continue
+
+            allocation_amount = min(available_amount, target_open_amount)
+            SettlementAllocation.objects.create(
+                source_document=self,
+                target_document=target,
+                amount=allocation_amount,
+                allocated_at=self.document_date or timezone.localdate(),
+            )
 
     def recalculate_open_amount(self, save: bool = True):
         source_total = self.outgoing_allocations.aggregate(total=Sum("amount")).get("total") or ZERO_DECIMAL

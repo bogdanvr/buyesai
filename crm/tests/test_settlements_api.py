@@ -24,21 +24,88 @@ class SettlementsApiTests(APITestCase):
         self.media_root = tempfile.mkdtemp()
         self.addCleanup(lambda: shutil.rmtree(self.media_root, ignore_errors=True))
 
-    def test_partial_allocation_keeps_document_balance_and_history(self):
-        invoice_response = self.client.post(
+    def test_incoming_payment_without_act_becomes_advance_and_manual_offset_keeps_balance(self):
+        payment_response = self.client.post(
             reverse("settlement-documents-list"),
             {
                 "client": self.company.pk,
-                "document_type": "invoice",
-                "number": "INV-001",
+                "document_type": "incoming_payment",
+                "number": "PAY-ADV-001",
                 "document_date": "2026-03-30",
-                "due_date": "2026-04-10",
                 "currency": "RUB",
-                "amount": "100000.00",
+                "amount": "200000.00",
             },
             format="json",
         )
-        self.assertEqual(invoice_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(payment_response.status_code, status.HTTP_201_CREATED, payment_response.content.decode())
+        self.assertFalse(payment_response.data["can_allocate_as_target"])
+
+        summary_response = self.client.get(f"{reverse('settlement-summary')}?client={self.company.pk}")
+        self.assertEqual(summary_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(summary_response.data["overview"]["advances_received"]), Decimal("200000.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["receivable"]), Decimal("0.00"))
+
+        realization_response = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "document_type": "realization",
+                "number": "ACT-001",
+                "document_date": "2026-03-31",
+                "due_date": "2026-04-10",
+                "currency": "RUB",
+                "amount": "120000.00",
+                "realization_status": "created",
+            },
+            format="json",
+        )
+        self.assertEqual(realization_response.status_code, status.HTTP_201_CREATED, realization_response.content.decode())
+
+        allocation_response = self.client.post(
+            reverse("settlement-allocations-list"),
+            {
+                "source_document": payment_response.data["id"],
+                "target_document": realization_response.data["id"],
+                "amount": "120000.00",
+                "allocated_at": "2026-03-31",
+            },
+            format="json",
+        )
+        self.assertEqual(allocation_response.status_code, status.HTTP_201_CREATED, allocation_response.content.decode())
+
+        realization = SettlementDocument.objects.get(pk=realization_response.data["id"])
+        payment = SettlementDocument.objects.get(pk=payment_response.data["id"])
+        self.assertEqual(realization.open_amount, Decimal("0.00"))
+        self.assertEqual(payment.open_amount, Decimal("80000.00"))
+
+        detail_response = self.client.get(reverse("settlement-documents-detail", kwargs={"pk": realization.pk}))
+        self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(detail_response.data["open_amount"]), Decimal("0.00"))
+        self.assertEqual(len(detail_response.data["allocation_history"]), 1)
+        self.assertEqual(detail_response.data["allocation_history"][0]["history_role"], "incoming")
+
+        summary_response = self.client.get(f"{reverse('settlement-summary')}?client={self.company.pk}")
+        self.assertEqual(summary_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(summary_response.data["overview"]["advances_received"]), Decimal("80000.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["receivable"]), Decimal("0.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["balance"]), Decimal("-80000.00"))
+
+    def test_incoming_payment_after_act_automatically_reduces_debt(self):
+        realization_response = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "document_type": "realization",
+                "number": "ACT-001",
+                "document_date": "2026-03-30",
+                "due_date": "2026-04-05",
+                "currency": "RUB",
+                "amount": "120000.00",
+                "realization_status": "sent_to_client",
+            },
+            format="json",
+        )
+        self.assertEqual(realization_response.status_code, status.HTTP_201_CREATED, realization_response.content.decode())
 
         payment_response = self.client.post(
             reverse("settlement-documents-list"),
@@ -48,66 +115,28 @@ class SettlementsApiTests(APITestCase):
                 "number": "PAY-001",
                 "document_date": "2026-03-31",
                 "currency": "RUB",
-                "amount": "40000.00",
+                "amount": "50000.00",
             },
             format="json",
         )
-        self.assertEqual(payment_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(payment_response.status_code, status.HTTP_201_CREATED, payment_response.content.decode())
 
-        allocation_response = self.client.post(
-            reverse("settlement-allocations-list"),
-            {
-                "source_document": payment_response.data["id"],
-                "target_document": invoice_response.data["id"],
-                "amount": "40000.00",
-                "allocated_at": "2026-03-31",
-            },
-            format="json",
-        )
-        self.assertEqual(allocation_response.status_code, status.HTTP_201_CREATED)
-
-        invoice = SettlementDocument.objects.get(pk=invoice_response.data["id"])
+        realization = SettlementDocument.objects.get(pk=realization_response.data["id"])
         payment = SettlementDocument.objects.get(pk=payment_response.data["id"])
-        self.assertEqual(invoice.open_amount, Decimal("60000.00"))
+        self.assertEqual(realization.open_amount, Decimal("70000.00"))
         self.assertEqual(payment.open_amount, Decimal("0.00"))
 
-        detail_response = self.client.get(reverse("settlement-documents-detail", kwargs={"pk": invoice.pk}))
-        self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Decimal(detail_response.data["open_amount"]), Decimal("60000.00"))
-        self.assertEqual(len(detail_response.data["allocation_history"]), 1)
-        self.assertEqual(detail_response.data["allocation_history"][0]["history_role"], "incoming")
-
-        summary_response = self.client.get(f"{reverse('settlement-summary')}?client={self.company.pk}")
-        self.assertEqual(summary_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Decimal(summary_response.data["overview"]["expected_receivable"]), Decimal("60000.00"))
-        self.assertEqual(Decimal(summary_response.data["overview"]["receivable"]), Decimal("0.00"))
-        self.assertEqual(Decimal(summary_response.data["overview"]["balance"]), Decimal("0.00"))
-
-    def test_realization_forms_actual_receivable_and_has_status(self):
-        response = self.client.post(
-            reverse("settlement-documents-list"),
-            {
-                "client": self.company.pk,
-                "document_type": "realization",
-                "number": "ACT-001",
-                "document_date": "2026-03-30",
-                "due_date": "2026-04-05",
-                "currency": "RUB",
-                "amount": "75000.00",
-                "realization_status": "sent_to_client",
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content.decode())
-        self.assertEqual(response.data["realization_status"], "sent_to_client")
-        self.assertEqual(response.data["realization_status_label"], "Отправлен клиенту")
+        payment_detail = self.client.get(reverse("settlement-documents-detail", kwargs={"pk": payment.pk}))
+        self.assertEqual(payment_detail.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(payment_detail.data["allocation_history"]), 1)
+        self.assertEqual(payment_detail.data["allocation_history"][0]["history_role"], "outgoing")
 
         summary_response = self.client.get(f"{reverse('settlement-summary')}?client={self.company.pk}")
         self.assertEqual(summary_response.status_code, status.HTTP_200_OK)
         self.assertEqual(Decimal(summary_response.data["overview"]["expected_receivable"]), Decimal("0.00"))
-        self.assertEqual(Decimal(summary_response.data["overview"]["receivable"]), Decimal("75000.00"))
-        self.assertEqual(Decimal(summary_response.data["overview"]["balance"]), Decimal("75000.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["receivable"]), Decimal("70000.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["advances_received"]), Decimal("0.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["balance"]), Decimal("70000.00"))
 
     @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
     def test_can_upload_file_for_settlement_document(self):
