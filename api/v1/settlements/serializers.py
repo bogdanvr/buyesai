@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.urls import reverse
 from rest_framework import serializers
 
 from crm.models import SettlementAllocation, SettlementContract, SettlementDocument
@@ -69,6 +70,9 @@ class SettlementDocumentSerializer(serializers.ModelSerializer):
     allocation_history = serializers.SerializerMethodField()
     can_allocate_as_source = serializers.BooleanField(read_only=True)
     can_allocate_as_target = serializers.BooleanField(read_only=True)
+    file_url = serializers.SerializerMethodField()
+    download_url = serializers.SerializerMethodField()
+    file_size = serializers.SerializerMethodField()
 
     def get_contract_name(self, obj):
         contract = getattr(obj, "contract", None)
@@ -98,6 +102,41 @@ class SettlementDocumentSerializer(serializers.ModelSerializer):
         history.sort(key=lambda item: (item.get("allocated_at") or "", item.get("id") or 0), reverse=True)
         return history
 
+    def get_file_url(self, obj):
+        file_field = getattr(obj, "file", None)
+        if not file_field:
+            return ""
+        try:
+            return file_field.url
+        except Exception:
+            return ""
+
+    def get_download_url(self, obj):
+        if not getattr(obj, "file", None):
+            return ""
+        request = self.context.get("request")
+        relative_url = reverse("settlement-documents-download", kwargs={"pk": obj.pk})
+        return request.build_absolute_uri(relative_url) if request is not None else relative_url
+
+    def get_file_size(self, obj):
+        file_field = getattr(obj, "file", None)
+        if not file_field:
+            return 0
+        try:
+            return int(file_field.size or 0)
+        except Exception:
+            return 0
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        uploaded_file = attrs.get("file")
+        original_name = str(attrs.get("original_name") or "").strip()
+        if uploaded_file is not None:
+            attrs["original_name"] = str(original_name or getattr(uploaded_file, "name", "") or "").strip()[:255]
+        else:
+            attrs["original_name"] = original_name[:255]
+        return attrs
+
     class Meta:
         model = SettlementDocument
         fields = [
@@ -119,6 +158,11 @@ class SettlementDocumentSerializer(serializers.ModelSerializer):
             "open_amount",
             "closed_amount",
             "note",
+            "file",
+            "file_url",
+            "download_url",
+            "original_name",
+            "file_size",
             "can_allocate_as_source",
             "can_allocate_as_target",
             "allocation_history",

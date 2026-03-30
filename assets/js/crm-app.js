@@ -527,6 +527,8 @@
             amount: "",
             currency: "RUB",
             note: "",
+            file: null,
+            fileName: "",
           },
           companySettlementAllocationForm: {
             sourceDocumentId: null,
@@ -4105,7 +4107,10 @@
             amount: "",
             currency: this.forms.companies.currency || "RUB",
             note: "",
+            file: null,
+            fileName: "",
           };
+          this.clearCompanySettlementDocumentFileInput();
         },
         resetCompanySettlementAllocationForm() {
           this.companySettlementAllocationForm = {
@@ -4211,6 +4216,9 @@
             openAmount: Number(item.open_amount || 0),
             closedAmount: Number(item.closed_amount || 0),
             note: item.note || "",
+            originalName: item.original_name || item.originalName || "",
+            fileUrl: item.download_url || item.downloadUrl || item.file_url || item.fileUrl || "",
+            fileSize: Number.parseInt(item.file_size || item.fileSize || 0, 10) || 0,
             canAllocateAsSource: !!item.can_allocate_as_source,
             canAllocateAsTarget: !!item.can_allocate_as_target,
             allocationHistory: Array.isArray(item.allocation_history)
@@ -4232,6 +4240,18 @@
               : [],
           };
         },
+        handleCompanySettlementDocumentFileInput(event) {
+          const input = event?.target;
+          const file = input?.files && input.files[0] ? input.files[0] : null;
+          this.companySettlementDocumentForm.file = file;
+          this.companySettlementDocumentForm.fileName = file?.name || "";
+        },
+        clearCompanySettlementDocumentFileInput() {
+          const input = this.$refs.companySettlementDocumentFileInput;
+          if (input) {
+            input.value = "";
+          }
+        },
         companySettlementSourceDocuments() {
           return (this.companySettlementDocuments || []).filter((item) => item.canAllocateAsSource && Number(item.openAmount || 0) > 0);
         },
@@ -4252,7 +4272,7 @@
               this.apiRequest(`/api/v1/settlements/contracts/?client=${this.editingCompanyId}&page_size=100`),
               this.apiRequest(`/api/v1/settlements/documents/?client=${this.editingCompanyId}&page_size=200`),
             ]);
-            this.companySettlementSummary = this.normalizeCompanySettlementSummary(summaryPayload);
+            const normalizedSummary = this.normalizeCompanySettlementSummary(summaryPayload);
             this.companySettlementContracts = this.normalizePaginatedResponse(contractsPayload).map((item) => ({
               id: this.toIntOrNull(item.id),
               title: item.title || "",
@@ -4263,6 +4283,35 @@
               note: item.note || "",
               isActive: item.is_active !== false,
             }));
+            const existingContractIds = new Set(
+              (normalizedSummary.contracts || [])
+                .map((item) => this.toIntOrNull(item.contractId))
+                .filter(Boolean)
+            );
+            const emptyContracts = this.companySettlementContracts
+              .filter((contract) => !existingContractIds.has(this.toIntOrNull(contract.id)))
+              .map((contract) => ({
+                contractId: this.toIntOrNull(contract.id),
+                title: contract.title || contract.number || `Договор #${contract.id}`,
+                number: contract.number || "",
+                currency: contract.currency || this.forms.companies.currency || "RUB",
+                documentsCount: 0,
+                stats: {
+                  receivable: 0,
+                  payable: 0,
+                  advancesReceived: 0,
+                  advancesIssued: 0,
+                  overdue: 0,
+                  nearestDueDate: "",
+                  balance: 0,
+                },
+              }));
+            this.companySettlementSummary = {
+              ...normalizedSummary,
+              contracts: [...(normalizedSummary.contracts || []), ...emptyContracts].sort((left, right) => (
+                String(left.title || "").localeCompare(String(right.title || ""), "ru")
+              )),
+            };
             this.companySettlementDocuments = this.normalizePaginatedResponse(documentsPayload).map((item) => this.normalizeCompanySettlementDocument(item));
           } catch (error) {
             this.setUiError(`Ошибка загрузки взаиморасчетов: ${error.message}`, { modal: true });
@@ -4316,24 +4365,52 @@
           this.isCompanySettlementSaving = true;
           this.clearUiErrors({ modalOnly: true });
           try {
-            await this.apiRequest("/api/v1/settlements/documents/", {
-              method: "POST",
-              body: {
-                client: this.editingCompanyId,
-                contract: this.toIntOrNull(this.companySettlementDocumentForm.contractId),
-                document_type: this.companySettlementDocumentForm.documentType,
-                flow_direction: this.settlementDocumentNeedsDirection(this.companySettlementDocumentForm.documentType)
-                  ? this.companySettlementDocumentForm.flowDirection
-                  : "",
-                title: this.companySettlementDocumentForm.title.trim(),
-                number: this.companySettlementDocumentForm.number.trim(),
-                document_date: this.companySettlementDocumentForm.documentDate || new Date().toISOString().slice(0, 10),
-                due_date: this.companySettlementDocumentForm.dueDate || null,
-                currency: this.companySettlementDocumentForm.currency || this.forms.companies.currency || "RUB",
-                amount: amount.toFixed(2),
-                note: this.companySettlementDocumentForm.note.trim(),
-              },
-            });
+            const file = this.companySettlementDocumentForm.file || null;
+            const contractId = this.toIntOrNull(this.companySettlementDocumentForm.contractId);
+            const payload = {
+              client: this.editingCompanyId,
+              contract: contractId,
+              document_type: this.companySettlementDocumentForm.documentType,
+              flow_direction: this.settlementDocumentNeedsDirection(this.companySettlementDocumentForm.documentType)
+                ? this.companySettlementDocumentForm.flowDirection
+                : "",
+              title: this.companySettlementDocumentForm.title.trim(),
+              number: this.companySettlementDocumentForm.number.trim(),
+              document_date: this.companySettlementDocumentForm.documentDate || new Date().toISOString().slice(0, 10),
+              due_date: this.companySettlementDocumentForm.dueDate || null,
+              currency: this.companySettlementDocumentForm.currency || this.forms.companies.currency || "RUB",
+              amount: amount.toFixed(2),
+              note: this.companySettlementDocumentForm.note.trim(),
+            };
+            if (file) {
+              const formData = new FormData();
+              formData.append("client", String(this.editingCompanyId));
+              if (contractId) {
+                formData.append("contract", String(contractId));
+              }
+              formData.append("document_type", payload.document_type);
+              formData.append("flow_direction", payload.flow_direction || "");
+              formData.append("title", payload.title);
+              formData.append("number", payload.number);
+              formData.append("document_date", payload.document_date);
+              if (payload.due_date) {
+                formData.append("due_date", payload.due_date);
+              }
+              formData.append("currency", payload.currency);
+              formData.append("amount", payload.amount);
+              formData.append("note", payload.note);
+              formData.append("file", file);
+              formData.append("original_name", this.companySettlementDocumentForm.fileName || file.name || "");
+              await this.apiRequest("/api/v1/settlements/documents/", {
+                method: "POST",
+                body: formData,
+              });
+            } else {
+              await this.apiRequest("/api/v1/settlements/documents/", {
+                method: "POST",
+                body: payload,
+              });
+            }
             this.resetCompanySettlementDocumentForm();
             this.showCompanySettlementDocumentForm = false;
             await this.loadCompanySettlements();

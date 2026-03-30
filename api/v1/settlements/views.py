@@ -1,7 +1,11 @@
 from decimal import Decimal
+import mimetypes
 
+from django.http import FileResponse, Http404
 from django.db.models import Q
 from django.utils import timezone
+from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
@@ -69,6 +73,7 @@ class SettlementContractViewSet(ModelViewSet):
 
 class SettlementDocumentViewSet(ModelViewSet):
     serializer_class = SettlementDocumentSerializer
+    parser_classes = (JSONParser, MultiPartParser, FormParser)
 
     def get_queryset(self):
         queryset = SettlementDocument.objects.select_related("client", "contract").prefetch_related(
@@ -85,6 +90,23 @@ class SettlementDocumentViewSet(ModelViewSet):
         if document_type:
             queryset = queryset.filter(document_type=document_type)
         return queryset
+
+    @action(detail=True, methods=["get"], url_path="download")
+    def download(self, request, pk=None):
+        instance = self.get_object()
+        file_field = getattr(instance, "file", None)
+        if not file_field:
+            raise Http404("Файл не найден.")
+        try:
+            file_handle = file_field.open("rb")
+        except FileNotFoundError as exc:
+            raise Http404("Файл не найден.") from exc
+
+        filename = instance.original_name or file_field.name.rsplit("/", 1)[-1]
+        content_type, _ = mimetypes.guess_type(filename)
+        response = FileResponse(file_handle, as_attachment=False, filename=filename, content_type=content_type or "application/octet-stream")
+        response["Content-Disposition"] = f'inline; filename="{filename}"'
+        return response
 
 
 class SettlementAllocationViewSet(ModelViewSet):

@@ -1,6 +1,10 @@
 from decimal import Decimal
+import shutil
+import tempfile
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test.utils import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -17,6 +21,8 @@ class SettlementsApiTests(APITestCase):
         )
         self.client.force_authenticate(user=user)
         self.company = Client.objects.create(name="Acme", currency="RUB")
+        self.media_root = tempfile.mkdtemp()
+        self.addCleanup(lambda: shutil.rmtree(self.media_root, ignore_errors=True))
 
     def test_partial_allocation_keeps_document_balance_and_history(self):
         invoice_response = self.client.post(
@@ -75,3 +81,32 @@ class SettlementsApiTests(APITestCase):
         self.assertEqual(summary_response.status_code, status.HTTP_200_OK)
         self.assertEqual(Decimal(summary_response.data["overview"]["receivable"]), Decimal("60000.00"))
         self.assertEqual(Decimal(summary_response.data["overview"]["balance"]), Decimal("60000.00"))
+
+    @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
+    def test_can_upload_file_for_settlement_document(self):
+        uploaded_file = SimpleUploadedFile("invoice-100000.pdf", b"%PDF-1.4", content_type="application/pdf")
+
+        with override_settings(MEDIA_ROOT=self.media_root):
+            response = self.client.post(
+                reverse("settlement-documents-list"),
+                {
+                    "client": self.company.pk,
+                    "document_type": "invoice",
+                    "number": "INV-FILE-001",
+                    "document_date": "2026-03-30",
+                    "currency": "RUB",
+                    "amount": "100000.00",
+                    "file": uploaded_file,
+                    "original_name": "invoice-100000.pdf",
+                },
+                format="multipart",
+            )
+
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content.decode())
+            self.assertTrue(response.data["download_url"].endswith(f"/api/v1/settlements/documents/{response.data['id']}/download/"))
+            self.assertIn(f"company_{self.company.pk}/settlements/", response.data["file_url"])
+            self.assertEqual(response.data["original_name"], "invoice-100000.pdf")
+
+            download_response = self.client.get(reverse("settlement-documents-download", kwargs={"pk": response.data["id"]}))
+            self.assertEqual(download_response.status_code, status.HTTP_200_OK)
+            self.assertEqual(download_response["Content-Disposition"], 'inline; filename="invoice-100000.pdf"')

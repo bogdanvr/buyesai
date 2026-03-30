@@ -5,10 +5,17 @@ from django.db import models, transaction
 from django.db.models import Sum
 from django.utils import timezone
 
+from crm.models.client import truncate_upload_filename
 from crm.models.common import TimestampedModel
 
 
 ZERO_DECIMAL = Decimal("0.00")
+
+
+def settlement_document_upload_to(instance, filename: str) -> str:
+    client_id = getattr(instance, "client_id", None) or getattr(getattr(instance, "client", None), "id", None) or "new"
+    safe_name = truncate_upload_filename(filename)
+    return f"company_{client_id}/settlements/{safe_name}"
 
 
 class SettlementContract(TimestampedModel):
@@ -85,6 +92,14 @@ class SettlementDocument(TimestampedModel):
     amount = models.DecimalField(max_digits=14, decimal_places=2, default=ZERO_DECIMAL, verbose_name="Сумма")
     open_amount = models.DecimalField(max_digits=14, decimal_places=2, default=ZERO_DECIMAL, verbose_name="Остаток")
     note = models.TextField(blank=True, default="", verbose_name="Комментарий")
+    file = models.FileField(
+        upload_to=settlement_document_upload_to,
+        max_length=500,
+        blank=True,
+        null=True,
+        verbose_name="Файл",
+    )
+    original_name = models.CharField(max_length=255, blank=True, default="", verbose_name="Название файла")
 
     class Meta:
         verbose_name = "Документ взаиморасчетов"
