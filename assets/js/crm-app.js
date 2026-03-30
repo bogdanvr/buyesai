@@ -53,6 +53,25 @@
       { value: "high", label: "Высокий" }
     ];
 
+    const SETTLEMENT_DOCUMENT_TYPE_OPTIONS = [
+      { value: "invoice", label: "Счет" },
+      { value: "realization", label: "Реализация / акт / накладная" },
+      { value: "supplier_receipt", label: "Поступление от поставщика" },
+      { value: "incoming_payment", label: "Оплата входящая" },
+      { value: "outgoing_payment", label: "Оплата исходящая" },
+      { value: "debt_adjustment", label: "Корректировка долга" },
+      { value: "refund", label: "Возврат" },
+      { value: "advance", label: "Аванс" },
+      { value: "advance_offset", label: "Зачет аванса" },
+    ];
+
+    const SETTLEMENT_DIRECTION_OPTIONS = [
+      { value: "incoming", label: "Входящий" },
+      { value: "outgoing", label: "Исходящий" },
+    ];
+
+    const SETTLEMENT_DIRECTION_REQUIRED_TYPES = ["debt_adjustment", "refund", "advance", "advance_offset"];
+
     const app = createApp({
       compilerOptions: {
         delimiters: ["[[", "]]"]
@@ -162,6 +181,12 @@
           showCompanyNoteDraft: false,
           showCompanyOkvedDetails: false,
           showCompanyRequisites: false,
+          showCompanySettlementsPanel: false,
+          showCompanySettlementContractForm: false,
+          showCompanySettlementDocumentForm: false,
+          showCompanySettlementAllocationForm: false,
+          isCompanySettlementsLoading: false,
+          isCompanySettlementSaving: false,
           leadSummaryEditingField: "",
           dealSummaryEditingField: "",
           taskSummaryEditingField: "",
@@ -468,6 +493,50 @@
           companyContactsForActiveCompany: [],
           companyDocumentsForActiveCompany: [],
           companyDealDocumentGroups: [],
+          companySettlementContracts: [],
+          companySettlementDocuments: [],
+          companySettlementSummary: {
+            overview: {
+              receivable: 0,
+              payable: 0,
+              advancesReceived: 0,
+              advancesIssued: 0,
+              overdue: 0,
+              nearestDueDate: "",
+              balance: 0,
+            },
+            contracts: [],
+          },
+          companySettlementContractForm: {
+            title: "",
+            number: "",
+            currency: "RUB",
+            startDate: "",
+            endDate: "",
+            note: "",
+            isActive: true,
+          },
+          companySettlementDocumentForm: {
+            contractId: null,
+            documentType: "invoice",
+            flowDirection: "",
+            title: "",
+            number: "",
+            documentDate: "",
+            dueDate: "",
+            amount: "",
+            currency: "RUB",
+            note: "",
+          },
+          companySettlementAllocationForm: {
+            sourceDocumentId: null,
+            targetDocumentId: null,
+            amount: "",
+            allocatedAt: "",
+            note: "",
+          },
+          settlementDocumentTypeOptions: SETTLEMENT_DOCUMENT_TYPE_OPTIONS.slice(),
+          settlementDirectionOptions: SETTLEMENT_DIRECTION_OPTIONS.slice(),
           companyCommunications: [],
           companyConversationMessages: [],
           activeCompanyConversationId: null,
@@ -3905,6 +3974,7 @@
         closeCompanyPanels(exceptKey = "") {
           const normalized = String(exceptKey || "");
           this.showCompanyRequisites = normalized === "requisites" ? this.showCompanyRequisites : false;
+          this.showCompanySettlementsPanel = normalized === "settlements" ? this.showCompanySettlementsPanel : false;
           this.showCompanyContactsPanel = normalized === "contacts" ? this.showCompanyContactsPanel : false;
           this.showCompanyDocumentsPanel = normalized === "documents" ? this.showCompanyDocumentsPanel : false;
           this.showCompanyPhoneCallHistory = normalized === "phoneCallHistory" ? this.showCompanyPhoneCallHistory : false;
@@ -3920,6 +3990,8 @@
           const normalized = String(panelKey || "");
           const currentState = normalized === "requisites"
             ? this.showCompanyRequisites
+            : normalized === "settlements"
+              ? this.showCompanySettlementsPanel
             : normalized === "contacts"
               ? this.showCompanyContactsPanel
               : normalized === "documents"
@@ -3940,6 +4012,7 @@
             return;
           }
           if (normalized === "requisites") this.showCompanyRequisites = true;
+          if (normalized === "settlements") this.showCompanySettlementsPanel = true;
           if (normalized === "contacts") this.showCompanyContactsPanel = true;
           if (normalized === "documents") this.showCompanyDocumentsPanel = true;
           if (normalized === "phoneCallHistory") this.showCompanyPhoneCallHistory = true;
@@ -3950,6 +4023,13 @@
         },
         toggleCompanyRequisites() {
           this.toggleExclusiveCompanyPanel("requisites");
+        },
+        async toggleCompanySettlementsPanel() {
+          const wasOpen = this.showCompanySettlementsPanel;
+          this.toggleExclusiveCompanyPanel("settlements");
+          if (!wasOpen && this.showCompanySettlementsPanel) {
+            await this.loadCompanySettlements();
+          }
         },
         toggleCompanyWorkRules() {
           this.toggleExclusiveCompanyPanel("workRules");
@@ -3984,6 +4064,322 @@
         },
         toggleCompanyLeadsPanel() {
           this.toggleExclusiveCompanyPanel("leads");
+        },
+        settlementDocumentNeedsDirection(documentType) {
+          return SETTLEMENT_DIRECTION_REQUIRED_TYPES.includes(String(documentType || "").trim());
+        },
+        defaultCompanySettlementSummary() {
+          return {
+            overview: {
+              receivable: 0,
+              payable: 0,
+              advancesReceived: 0,
+              advancesIssued: 0,
+              overdue: 0,
+              nearestDueDate: "",
+              balance: 0,
+            },
+            contracts: [],
+          };
+        },
+        resetCompanySettlementContractForm() {
+          this.companySettlementContractForm = {
+            title: "",
+            number: "",
+            currency: this.forms.companies.currency || "RUB",
+            startDate: "",
+            endDate: "",
+            note: "",
+            isActive: true,
+          };
+        },
+        resetCompanySettlementDocumentForm() {
+          this.companySettlementDocumentForm = {
+            contractId: null,
+            documentType: "invoice",
+            flowDirection: "",
+            title: "",
+            number: "",
+            documentDate: new Date().toISOString().slice(0, 10),
+            dueDate: "",
+            amount: "",
+            currency: this.forms.companies.currency || "RUB",
+            note: "",
+          };
+        },
+        resetCompanySettlementAllocationForm() {
+          this.companySettlementAllocationForm = {
+            sourceDocumentId: null,
+            targetDocumentId: null,
+            amount: "",
+            allocatedAt: new Date().toISOString().slice(0, 10),
+            note: "",
+          };
+        },
+        resetCompanySettlementState() {
+          this.showCompanySettlementContractForm = false;
+          this.showCompanySettlementDocumentForm = false;
+          this.showCompanySettlementAllocationForm = false;
+          this.isCompanySettlementsLoading = false;
+          this.isCompanySettlementSaving = false;
+          this.companySettlementContracts = [];
+          this.companySettlementDocuments = [];
+          this.companySettlementSummary = this.defaultCompanySettlementSummary();
+          this.resetCompanySettlementContractForm();
+          this.resetCompanySettlementDocumentForm();
+          this.resetCompanySettlementAllocationForm();
+        },
+        formatSettlementDate(value) {
+          if (!value) return "Не указана";
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) return "Не указана";
+          return date.toLocaleDateString("ru-RU");
+        },
+        formatSettlementAmount(amount, currency = "RUB") {
+          const numeric = Number(amount || 0);
+          const safeCurrency = String(currency || "RUB").trim() || "RUB";
+          return `${numeric.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${safeCurrency}`;
+        },
+        settlementDocumentStatusLabel(document) {
+          const openAmount = Number(document?.openAmount || 0);
+          const closedAmount = Number(document?.closedAmount || 0);
+          if (openAmount <= 0) return "Закрыт";
+          if (closedAmount > 0) return "Частично закрыт";
+          return "Открыт";
+        },
+        settlementDocumentStatusClass(document) {
+          const openAmount = Number(document?.openAmount || 0);
+          const closedAmount = Number(document?.closedAmount || 0);
+          if (openAmount <= 0) return "border-emerald-400/30 bg-emerald-400/10 text-emerald-200";
+          if (closedAmount > 0) return "border-amber-400/30 bg-amber-400/10 text-amber-200";
+          return "border-sky-400/30 bg-sky-400/10 text-sky-200";
+        },
+        settlementHistoryRoleLabel(item) {
+          const role = String(item?.historyRole || item?.history_role || "").trim();
+          return role === "outgoing" ? "Исходящее распределение" : "Входящее распределение";
+        },
+        normalizeCompanySettlementSummary(payload = {}) {
+          const overview = payload && typeof payload.overview === "object" ? payload.overview : {};
+          const contracts = Array.isArray(payload.contracts) ? payload.contracts : [];
+          return {
+            overview: {
+              receivable: Number(overview.receivable || 0),
+              payable: Number(overview.payable || 0),
+              advancesReceived: Number(overview.advances_received || 0),
+              advancesIssued: Number(overview.advances_issued || 0),
+              overdue: Number(overview.overdue || 0),
+              nearestDueDate: overview.nearest_due_date || "",
+              balance: Number(overview.balance || 0),
+            },
+            contracts: contracts.map((contract) => {
+              const stats = contract && typeof contract.stats === "object" ? contract.stats : {};
+              return {
+                contractId: this.toIntOrNull(contract.contract_id),
+                title: contract.title || "Без договора",
+                number: contract.number || "",
+                currency: contract.currency || this.forms.companies.currency || "RUB",
+                documentsCount: Number(contract.documents_count || 0),
+                stats: {
+                  receivable: Number(stats.receivable || 0),
+                  payable: Number(stats.payable || 0),
+                  advancesReceived: Number(stats.advances_received || 0),
+                  advancesIssued: Number(stats.advances_issued || 0),
+                  overdue: Number(stats.overdue || 0),
+                  nearestDueDate: stats.nearest_due_date || "",
+                  balance: Number(stats.balance || 0),
+                },
+              };
+            }),
+          };
+        },
+        normalizeCompanySettlementDocument(item = {}) {
+          return {
+            id: this.toIntOrNull(item.id),
+            clientId: this.toIntOrNull(item.client),
+            contractId: this.toIntOrNull(item.contract),
+            contractName: item.contract_name || "Без договора",
+            documentType: item.document_type || "",
+            documentTypeLabel: item.document_type_label || "",
+            flowDirection: item.flow_direction || "",
+            flowDirectionLabel: item.flow_direction_label || "",
+            title: item.title || "",
+            number: item.number || "",
+            documentDate: item.document_date || "",
+            dueDate: item.due_date || "",
+            currency: item.currency || this.forms.companies.currency || "RUB",
+            amount: Number(item.amount || 0),
+            openAmount: Number(item.open_amount || 0),
+            closedAmount: Number(item.closed_amount || 0),
+            note: item.note || "",
+            canAllocateAsSource: !!item.can_allocate_as_source,
+            canAllocateAsTarget: !!item.can_allocate_as_target,
+            allocationHistory: Array.isArray(item.allocation_history)
+              ? item.allocation_history.map((entry) => ({
+                id: this.toIntOrNull(entry.id),
+                historyRole: entry.history_role || "",
+                amount: Number(entry.amount || 0),
+                allocatedAt: entry.allocated_at || "",
+                note: entry.note || "",
+                sourceDocumentId: this.toIntOrNull(entry.source_document_id),
+                sourceDocumentTypeLabel: entry.source_document_type_label || "",
+                sourceDocumentNumber: entry.source_document_number || "",
+                sourceDocumentTitle: entry.source_document_title || "",
+                targetDocumentId: this.toIntOrNull(entry.target_document_id),
+                targetDocumentTypeLabel: entry.target_document_type_label || "",
+                targetDocumentNumber: entry.target_document_number || "",
+                targetDocumentTitle: entry.target_document_title || "",
+              }))
+              : [],
+          };
+        },
+        companySettlementSourceDocuments() {
+          return (this.companySettlementDocuments || []).filter((item) => item.canAllocateAsSource && Number(item.openAmount || 0) > 0);
+        },
+        companySettlementTargetDocuments() {
+          return (this.companySettlementDocuments || []).filter((item) => item.canAllocateAsTarget && Number(item.openAmount || 0) > 0);
+        },
+        async loadCompanySettlements() {
+          if (!this.editingCompanyId) {
+            this.companySettlementContracts = [];
+            this.companySettlementDocuments = [];
+            this.companySettlementSummary = this.defaultCompanySettlementSummary();
+            return;
+          }
+          this.isCompanySettlementsLoading = true;
+          try {
+            const [summaryPayload, contractsPayload, documentsPayload] = await Promise.all([
+              this.apiRequest(`/api/v1/settlements/summary/?client=${this.editingCompanyId}`),
+              this.apiRequest(`/api/v1/settlements/contracts/?client=${this.editingCompanyId}&page_size=100`),
+              this.apiRequest(`/api/v1/settlements/documents/?client=${this.editingCompanyId}&page_size=200`),
+            ]);
+            this.companySettlementSummary = this.normalizeCompanySettlementSummary(summaryPayload);
+            this.companySettlementContracts = this.normalizePaginatedResponse(contractsPayload).map((item) => ({
+              id: this.toIntOrNull(item.id),
+              title: item.title || "",
+              number: item.number || "",
+              currency: item.currency || this.forms.companies.currency || "RUB",
+              startDate: item.start_date || "",
+              endDate: item.end_date || "",
+              note: item.note || "",
+              isActive: item.is_active !== false,
+            }));
+            this.companySettlementDocuments = this.normalizePaginatedResponse(documentsPayload).map((item) => this.normalizeCompanySettlementDocument(item));
+          } catch (error) {
+            this.setUiError(`Ошибка загрузки взаиморасчетов: ${error.message}`, { modal: true });
+            this.companySettlementSummary = this.defaultCompanySettlementSummary();
+            this.companySettlementContracts = [];
+            this.companySettlementDocuments = [];
+          } finally {
+            this.isCompanySettlementsLoading = false;
+          }
+        },
+        async createCompanySettlementContract() {
+          if (!this.editingCompanyId) {
+            throw new Error("Сначала откройте компанию");
+          }
+          this.isCompanySettlementSaving = true;
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            await this.apiRequest("/api/v1/settlements/contracts/", {
+              method: "POST",
+              body: {
+                client: this.editingCompanyId,
+                title: this.companySettlementContractForm.title.trim(),
+                number: this.companySettlementContractForm.number.trim(),
+                currency: this.companySettlementContractForm.currency || this.forms.companies.currency || "RUB",
+                start_date: this.companySettlementContractForm.startDate || null,
+                end_date: this.companySettlementContractForm.endDate || null,
+                note: this.companySettlementContractForm.note.trim(),
+                is_active: !!this.companySettlementContractForm.isActive,
+              },
+            });
+            this.resetCompanySettlementContractForm();
+            this.showCompanySettlementContractForm = false;
+            await this.loadCompanySettlements();
+          } catch (error) {
+            this.setUiError(`Ошибка создания договора: ${error.message}`, { modal: true });
+          } finally {
+            this.isCompanySettlementSaving = false;
+          }
+        },
+        async createCompanySettlementDocument() {
+          if (!this.editingCompanyId) {
+            throw new Error("Сначала откройте компанию");
+          }
+          const amount = Number(this.companySettlementDocumentForm.amount || 0);
+          if (!Number.isFinite(amount) || amount <= 0) {
+            throw new Error("Укажите сумму документа больше нуля");
+          }
+          if (this.settlementDocumentNeedsDirection(this.companySettlementDocumentForm.documentType) && !this.companySettlementDocumentForm.flowDirection) {
+            throw new Error("Укажите направление документа");
+          }
+          this.isCompanySettlementSaving = true;
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            await this.apiRequest("/api/v1/settlements/documents/", {
+              method: "POST",
+              body: {
+                client: this.editingCompanyId,
+                contract: this.toIntOrNull(this.companySettlementDocumentForm.contractId),
+                document_type: this.companySettlementDocumentForm.documentType,
+                flow_direction: this.settlementDocumentNeedsDirection(this.companySettlementDocumentForm.documentType)
+                  ? this.companySettlementDocumentForm.flowDirection
+                  : "",
+                title: this.companySettlementDocumentForm.title.trim(),
+                number: this.companySettlementDocumentForm.number.trim(),
+                document_date: this.companySettlementDocumentForm.documentDate || new Date().toISOString().slice(0, 10),
+                due_date: this.companySettlementDocumentForm.dueDate || null,
+                currency: this.companySettlementDocumentForm.currency || this.forms.companies.currency || "RUB",
+                amount: amount.toFixed(2),
+                note: this.companySettlementDocumentForm.note.trim(),
+              },
+            });
+            this.resetCompanySettlementDocumentForm();
+            this.showCompanySettlementDocumentForm = false;
+            await this.loadCompanySettlements();
+          } catch (error) {
+            this.setUiError(`Ошибка создания документа: ${error.message}`, { modal: true });
+          } finally {
+            this.isCompanySettlementSaving = false;
+          }
+        },
+        async createCompanySettlementAllocation() {
+          if (!this.editingCompanyId) {
+            throw new Error("Сначала откройте компанию");
+          }
+          const amount = Number(this.companySettlementAllocationForm.amount || 0);
+          const sourceDocumentId = this.toIntOrNull(this.companySettlementAllocationForm.sourceDocumentId);
+          const targetDocumentId = this.toIntOrNull(this.companySettlementAllocationForm.targetDocumentId);
+          if (!sourceDocumentId || !targetDocumentId) {
+            throw new Error("Выберите документы источника и закрытия");
+          }
+          if (sourceDocumentId === targetDocumentId) {
+            throw new Error("Источник и закрываемый документ должны различаться");
+          }
+          if (!Number.isFinite(amount) || amount <= 0) {
+            throw new Error("Укажите сумму закрытия больше нуля");
+          }
+          this.isCompanySettlementSaving = true;
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            await this.apiRequest("/api/v1/settlements/allocations/", {
+              method: "POST",
+              body: {
+                source_document: sourceDocumentId,
+                target_document: targetDocumentId,
+                amount: amount.toFixed(2),
+                allocated_at: this.companySettlementAllocationForm.allocatedAt || new Date().toISOString().slice(0, 10),
+                note: this.companySettlementAllocationForm.note.trim(),
+              },
+            });
+            this.resetCompanySettlementAllocationForm();
+            this.showCompanySettlementAllocationForm = false;
+            await this.loadCompanySettlements();
+          } catch (error) {
+            this.setUiError(`Ошибка закрытия документа: ${error.message}`, { modal: true });
+          } finally {
+            this.isCompanySettlementSaving = false;
+          }
         },
         communicationChannelLabel(value) {
           const code = String(value || "").trim().toLowerCase();
@@ -7368,6 +7764,7 @@
           this.showCompanyWorkRules = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDocumentsPanel = false;
+          this.showCompanySettlementsPanel = false;
           this.showCompanyPhoneCallHistory = false;
           this.resetCompanyCommunicationsState();
           this.showCompanyDealsPanel = false;
@@ -7376,6 +7773,7 @@
           this.showCompanyNoteDraft = false;
           this.companyDocumentsForActiveCompany = [];
           this.companyDealDocumentGroups = [];
+          this.resetCompanySettlementState();
           this.resetExpandedOptionalFields();
           const normalizedOkveds = this.normalizeCompanyOkveds(item.okveds, item.okved, item.industry);
           const resolvedIndustry = this.resolvePrimaryIndustry(item.industry, item.okved, normalizedOkveds);
@@ -7411,12 +7809,16 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDocumentsPanel = false;
+          this.showCompanySettlementsPanel = false;
           this.showCompanyPhoneCallHistory = false;
           this.resetCompanyCommunicationsState();
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
           this.showCompanyLeadsPanel = false;
           this.showCompanyLeadsPanel = false;
+          this.resetCompanySettlementContractForm();
+          this.resetCompanySettlementDocumentForm();
+          this.resetCompanySettlementAllocationForm();
           this.loadContactsForCompany();
           this.showModal = true;
           this.enrichCompanyFromDadataByInn();
@@ -9850,9 +10252,11 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDocumentsPanel = false;
+          this.showCompanySettlementsPanel = false;
           this.showCompanyPhoneCallHistory = false;
           this.resetCompanyCommunicationsState();
           this.showCompanyRequisites = false;
+          this.showCompanySettlementsPanel = false;
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
           this.showCompanyLeadsPanel = false;
@@ -9861,6 +10265,7 @@
           this.companyContactsForActiveCompany = [];
           this.companyDocumentsForActiveCompany = [];
           this.companyDealDocumentGroups = [];
+          this.resetCompanySettlementState();
           if (section === "telephony") {
             if (!this.telephonySettingsLoaded) {
               this.reloadActiveSection();
@@ -9932,9 +10337,11 @@
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDocumentsPanel = false;
+          this.showCompanySettlementsPanel = false;
           this.showCompanyPhoneCallHistory = false;
           this.resetCompanyCommunicationsState();
           this.showCompanyRequisites = false;
+          this.showCompanySettlementsPanel = false;
           this.showCompanyWorkRules = false;
           this.showCompanyDealsPanel = false;
           this.showCompanyLeadsPanel = false;
@@ -9945,6 +10352,7 @@
           this.companyContactsForActiveCompany = [];
           this.companyDocumentsForActiveCompany = [];
           this.companyDealDocumentGroups = [];
+          this.resetCompanySettlementState();
         },
         openCreateModal() {
           this.clearUiErrors({ modalOnly: true });
@@ -9964,6 +10372,7 @@
           this.resetExpandedOptionalFields();
           this.showCompanyNoteDraft = false;
           this.showCompanyRequisites = false;
+          this.showCompanySettlementsPanel = false;
           this.showCompanyWorkRules = false;
           this.showCompanyContactsPanel = false;
           this.showCompanyDealsPanel = false;
@@ -9986,6 +10395,7 @@
           this.touchCompanyDocuments = [];
           this.showCompanyContactForm = false;
           this.showCompanyContactsPanel = false;
+          this.showCompanySettlementsPanel = false;
           this.resetCompanyCommunicationsState();
           this.resetUnboundCommunicationsState();
           this.showCompanyWorkRules = false;
@@ -9996,6 +10406,7 @@
           this.taskChecklistHideCompleted = false;
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
+          this.resetCompanySettlementState();
           this.showModal = true;
         },
         getDefaultForm(section) {

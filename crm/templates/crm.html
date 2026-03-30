@@ -4174,6 +4174,14 @@
                 </button>
                 <button
                   type="button"
+                  @click="toggleCompanySettlementsPanel"
+                  class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                >
+                  <span>Взаиморасчёты</span>
+                  <span class="text-crm-accent text-xs">[[ showCompanySettlementsPanel ? '−' : '+' ]]</span>
+                </button>
+                <button
+                  type="button"
                   @click="toggleCompanyContactsPanel"
                   class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
                 >
@@ -4228,6 +4236,317 @@
                   <span>Лиды</span>
                   <span class="text-crm-accent text-xs">[[ showCompanyLeadsPanel ? '−' : '+' ]]</span>
                 </button>
+              </div>
+              <div v-if="showCompanySettlementsPanel && editingCompanyId" class="mt-4 rounded-2xl border border-crm-border/80 bg-[#102f4a] p-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div class="text-sm font-semibold text-white">Взаиморасчёты</div>
+                    <div class="text-xs text-crm-muted">[[ forms.companies.name || `Компания #${editingCompanyId}` ]]</div>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      @click="showCompanySettlementContractForm = !showCompanySettlementContractForm"
+                      class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-medium text-white transition hover:border-crm-accent"
+                    >
+                      [[ showCompanySettlementContractForm ? 'Скрыть договор' : 'Добавить договор' ]]
+                    </button>
+                    <button
+                      type="button"
+                      @click="showCompanySettlementDocumentForm = !showCompanySettlementDocumentForm"
+                      class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-medium text-white transition hover:border-crm-accent"
+                    >
+                      [[ showCompanySettlementDocumentForm ? 'Скрыть документ' : 'Добавить документ' ]]
+                    </button>
+                    <button
+                      type="button"
+                      @click="showCompanySettlementAllocationForm = !showCompanySettlementAllocationForm"
+                      class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-medium text-white transition hover:border-crm-accent"
+                    >
+                      [[ showCompanySettlementAllocationForm ? 'Скрыть закрытие' : 'Закрыть документ' ]]
+                    </button>
+                  </div>
+                </div>
+                <div v-if="isCompanySettlementsLoading" class="mt-4 text-sm text-crm-muted">Загрузка взаиморасчётов...</div>
+                <template v-else>
+                  <div class="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    <div class="rounded-xl border border-crm-border bg-[#0d2942] p-3">
+                      <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дебиторская задолженность</div>
+                      <div class="mt-2 text-sm font-semibold text-white">[[ formatSettlementAmount(companySettlementSummary.overview.receivable, forms.companies.currency || 'RUB') ]]</div>
+                    </div>
+                    <div class="rounded-xl border border-crm-border bg-[#0d2942] p-3">
+                      <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Кредиторская задолженность</div>
+                      <div class="mt-2 text-sm font-semibold text-white">[[ formatSettlementAmount(companySettlementSummary.overview.payable, forms.companies.currency || 'RUB') ]]</div>
+                    </div>
+                    <div class="rounded-xl border border-crm-border bg-[#0d2942] p-3">
+                      <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Авансы полученные</div>
+                      <div class="mt-2 text-sm font-semibold text-white">[[ formatSettlementAmount(companySettlementSummary.overview.advancesReceived, forms.companies.currency || 'RUB') ]]</div>
+                    </div>
+                    <div class="rounded-xl border border-crm-border bg-[#0d2942] p-3">
+                      <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Авансы выданные</div>
+                      <div class="mt-2 text-sm font-semibold text-white">[[ formatSettlementAmount(companySettlementSummary.overview.advancesIssued, forms.companies.currency || 'RUB') ]]</div>
+                    </div>
+                    <div class="rounded-xl border border-crm-border bg-[#0d2942] p-3">
+                      <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Просрочка</div>
+                      <div class="mt-2 text-sm font-semibold text-white">[[ formatSettlementAmount(companySettlementSummary.overview.overdue, forms.companies.currency || 'RUB') ]]</div>
+                    </div>
+                    <div class="rounded-xl border border-crm-border bg-[#0d2942] p-3">
+                      <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Ближайший платёж</div>
+                      <div class="mt-2 text-sm font-semibold text-white">[[ companySettlementSummary.overview.nearestDueDate ? formatSettlementDate(companySettlementSummary.overview.nearestDueDate) : 'Не указан' ]]</div>
+                      <div class="mt-1 text-xs text-crm-muted">Баланс: [[ formatSettlementAmount(companySettlementSummary.overview.balance, forms.companies.currency || 'RUB') ]]</div>
+                    </div>
+                  </div>
+
+                  <div v-if="showCompanySettlementContractForm || showCompanySettlementDocumentForm || showCompanySettlementAllocationForm" class="mt-4 grid grid-cols-1 xl:grid-cols-3 gap-4">
+                    <div v-if="showCompanySettlementContractForm" class="rounded-xl border border-crm-border bg-[#0d2942] p-4 space-y-3">
+                      <div class="text-sm font-semibold text-white">Новый договор</div>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Название</span>
+                        <input v-model="companySettlementContractForm.title" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                      </label>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Номер</span>
+                        <input v-model="companySettlementContractForm.number" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                      </label>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Валюта</span>
+                        <select v-model="companySettlementContractForm.currency" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                          <option value="RUB">RUB</option>
+                          <option value="KZT">KZT</option>
+                          <option value="USD">USD</option>
+                          <option value="EUR">EUR</option>
+                        </select>
+                      </label>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Дата начала</span>
+                          <input v-model="companySettlementContractForm.startDate" type="date" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Дата окончания</span>
+                          <input v-model="companySettlementContractForm.endDate" type="date" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                      </div>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Комментарий</span>
+                        <textarea v-model="companySettlementContractForm.note" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
+                      </label>
+                      <button type="button" @click="createCompanySettlementContract" :disabled="isCompanySettlementSaving" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
+                        [[ isCompanySettlementSaving ? 'Сохраняем...' : 'Сохранить договор' ]]
+                      </button>
+                    </div>
+
+                    <div v-if="showCompanySettlementDocumentForm" class="rounded-xl border border-crm-border bg-[#0d2942] p-4 space-y-3">
+                      <div class="text-sm font-semibold text-white">Новый документ</div>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Договор</span>
+                        <select v-model="companySettlementDocumentForm.contractId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                          <option :value="null">Без договора</option>
+                          <option v-for="contract in companySettlementContracts" :key="`settlement-contract-option-${contract.id}`" :value="contract.id">
+                            [[ contract.number || contract.title || `Договор #${contract.id}` ]]
+                          </option>
+                        </select>
+                      </label>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Тип документа</span>
+                        <select v-model="companySettlementDocumentForm.documentType" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                          <option v-for="option in settlementDocumentTypeOptions" :key="`settlement-doc-type-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                        </select>
+                      </label>
+                      <label v-if="settlementDocumentNeedsDirection(companySettlementDocumentForm.documentType)" class="block">
+                        <span class="text-sm text-crm-muted">Направление</span>
+                        <select v-model="companySettlementDocumentForm.flowDirection" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                          <option value="">Выберите направление</option>
+                          <option v-for="option in settlementDirectionOptions" :key="`settlement-direction-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                        </select>
+                      </label>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Номер</span>
+                          <input v-model="companySettlementDocumentForm.number" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Название</span>
+                          <input v-model="companySettlementDocumentForm.title" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Дата документа</span>
+                          <input v-model="companySettlementDocumentForm.documentDate" type="date" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Срок оплаты</span>
+                          <input v-model="companySettlementDocumentForm.dueDate" type="date" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Сумма</span>
+                          <input v-model="companySettlementDocumentForm.amount" type="number" min="0" step="0.01" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Валюта</span>
+                          <select v-model="companySettlementDocumentForm.currency" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                            <option value="RUB">RUB</option>
+                            <option value="KZT">KZT</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                          </select>
+                        </label>
+                      </div>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Комментарий</span>
+                        <textarea v-model="companySettlementDocumentForm.note" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
+                      </label>
+                      <button type="button" @click="createCompanySettlementDocument" :disabled="isCompanySettlementSaving" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
+                        [[ isCompanySettlementSaving ? 'Сохраняем...' : 'Сохранить документ' ]]
+                      </button>
+                    </div>
+
+                    <div v-if="showCompanySettlementAllocationForm" class="rounded-xl border border-crm-border bg-[#0d2942] p-4 space-y-3">
+                      <div class="text-sm font-semibold text-white">Частичное закрытие</div>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Документ-источник</span>
+                        <select v-model="companySettlementAllocationForm.sourceDocumentId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                          <option :value="null">Выберите документ</option>
+                          <option v-for="document in companySettlementSourceDocuments()" :key="`settlement-source-${document.id}`" :value="document.id">
+                            [[ document.documentTypeLabel ]] • [[ document.number || document.title || `#${document.id}` ]] • остаток [[ formatSettlementAmount(document.openAmount, document.currency) ]]
+                          </option>
+                        </select>
+                      </label>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Закрываемый документ</span>
+                        <select v-model="companySettlementAllocationForm.targetDocumentId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                          <option :value="null">Выберите документ</option>
+                          <option v-for="document in companySettlementTargetDocuments()" :key="`settlement-target-${document.id}`" :value="document.id">
+                            [[ document.documentTypeLabel ]] • [[ document.number || document.title || `#${document.id}` ]] • остаток [[ formatSettlementAmount(document.openAmount, document.currency) ]]
+                          </option>
+                        </select>
+                      </label>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Сумма закрытия</span>
+                          <input v-model="companySettlementAllocationForm.amount" type="number" min="0" step="0.01" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Дата</span>
+                          <input v-model="companySettlementAllocationForm.allocatedAt" type="date" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                      </div>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Комментарий</span>
+                        <textarea v-model="companySettlementAllocationForm.note" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
+                      </label>
+                      <button type="button" @click="createCompanySettlementAllocation" :disabled="isCompanySettlementSaving" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
+                        [[ isCompanySettlementSaving ? 'Сохраняем...' : 'Сохранить закрытие' ]]
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="mt-4">
+                    <div class="text-[11px] uppercase tracking-[0.14em] text-crm-muted">Сводка по договорам</div>
+                    <div v-if="!companySettlementSummary.contracts.length" class="mt-2 rounded-xl border border-dashed border-crm-border bg-[#0d2942] px-4 py-3 text-sm text-crm-muted">
+                      Договоров и остатков пока нет.
+                    </div>
+                    <div v-else class="mt-2 grid grid-cols-1 xl:grid-cols-2 gap-3">
+                      <div v-for="contract in companySettlementSummary.contracts" :key="`company-settlement-contract-${contract.contractId || 'none'}-${contract.title}`" class="rounded-xl border border-crm-border bg-[#0d2942] p-4">
+                        <div class="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <div class="text-sm font-semibold text-white">[[ contract.title || 'Без договора' ]]</div>
+                            <div class="text-xs text-crm-muted">
+                              <span v-if="contract.number">№ [[ contract.number ]]</span>
+                              <span v-if="contract.number"> • </span>
+                              [[ contract.documentsCount ]] документов
+                            </div>
+                          </div>
+                          <div class="text-sm font-semibold text-white">[[ formatSettlementAmount(contract.stats.balance, contract.currency) ]]</div>
+                        </div>
+                        <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+                          <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
+                            <div class="text-crm-muted">Нам должны</div>
+                            <div class="mt-1 text-white">[[ formatSettlementAmount(contract.stats.receivable, contract.currency) ]]</div>
+                          </div>
+                          <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
+                            <div class="text-crm-muted">Мы должны</div>
+                            <div class="mt-1 text-white">[[ formatSettlementAmount(contract.stats.payable, contract.currency) ]]</div>
+                          </div>
+                          <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
+                            <div class="text-crm-muted">Авансы полученные</div>
+                            <div class="mt-1 text-white">[[ formatSettlementAmount(contract.stats.advancesReceived, contract.currency) ]]</div>
+                          </div>
+                          <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
+                            <div class="text-crm-muted">Авансы выданные</div>
+                            <div class="mt-1 text-white">[[ formatSettlementAmount(contract.stats.advancesIssued, contract.currency) ]]</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="mt-4">
+                    <div class="text-[11px] uppercase tracking-[0.14em] text-crm-muted">Документы взаиморасчётов</div>
+                    <div v-if="!companySettlementDocuments.length" class="mt-2 rounded-xl border border-dashed border-crm-border bg-[#0d2942] px-4 py-3 text-sm text-crm-muted">
+                      Документы ещё не добавлены.
+                    </div>
+                    <div v-else class="mt-2 space-y-3">
+                      <div v-for="document in companySettlementDocuments" :key="`company-settlement-document-${document.id}`" class="rounded-xl border border-crm-border bg-[#0d2942] p-4">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                          <div class="min-w-0">
+                            <div class="text-sm font-semibold text-white">
+                              [[ document.documentTypeLabel ]]
+                              <span v-if="document.number">№ [[ document.number ]]</span>
+                              <span v-else-if="document.title">[[ document.title ]]</span>
+                            </div>
+                            <div class="mt-1 text-xs text-crm-muted [overflow-wrap:anywhere]">
+                              [[ document.contractName || 'Без договора' ]] • от [[ formatSettlementDate(document.documentDate) ]]
+                              <span v-if="document.dueDate"> • оплатить до [[ formatSettlementDate(document.dueDate) ]]</span>
+                              <span v-if="document.flowDirectionLabel"> • [[ document.flowDirectionLabel ]]</span>
+                            </div>
+                          </div>
+                          <span :class="settlementDocumentStatusClass(document)" class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold">
+                            [[ settlementDocumentStatusLabel(document) ]]
+                          </span>
+                        </div>
+                        <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                          <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
+                            <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Сумма документа</div>
+                            <div class="mt-1 text-white">[[ formatSettlementAmount(document.amount, document.currency) ]]</div>
+                          </div>
+                          <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
+                            <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Закрыто</div>
+                            <div class="mt-1 text-white">[[ formatSettlementAmount(document.closedAmount, document.currency) ]]</div>
+                          </div>
+                          <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
+                            <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Остаток</div>
+                            <div class="mt-1 text-white">[[ formatSettlementAmount(document.openAmount, document.currency) ]]</div>
+                          </div>
+                        </div>
+                        <div v-if="document.note" class="mt-3 text-sm text-crm-muted whitespace-pre-line break-words">[[ document.note ]]</div>
+                        <div class="mt-3">
+                          <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">История оплат и закрытий</div>
+                          <div v-if="!document.allocationHistory.length" class="mt-2 text-sm text-crm-muted">
+                            История закрытий пока пустая.
+                          </div>
+                          <div v-else class="mt-2 space-y-2">
+                            <div v-for="historyItem in document.allocationHistory" :key="`company-settlement-history-${document.id}-${historyItem.id}`" class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
+                              <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div class="text-xs font-medium text-white">[[ settlementHistoryRoleLabel(historyItem) ]]</div>
+                                <div class="text-xs text-crm-muted">[[ formatSettlementDate(historyItem.allocatedAt) ]]</div>
+                              </div>
+                              <div class="mt-1 text-sm text-white">[[ formatSettlementAmount(historyItem.amount, document.currency) ]]</div>
+                              <div class="mt-1 text-xs text-crm-muted [overflow-wrap:anywhere]">
+                                Источник: [[ historyItem.sourceDocumentTypeLabel ]] [[ historyItem.sourceDocumentNumber || historyItem.sourceDocumentTitle || `#${historyItem.sourceDocumentId}` ]]
+                                • Цель: [[ historyItem.targetDocumentTypeLabel ]] [[ historyItem.targetDocumentNumber || historyItem.targetDocumentTitle || `#${historyItem.targetDocumentId}` ]]
+                              </div>
+                              <div v-if="historyItem.note" class="mt-1 text-xs text-crm-muted whitespace-pre-line break-words">[[ historyItem.note ]]</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
               </div>
               <div v-if="showCompanyPhoneCallHistory && editingCompanyId" class="mt-4 rounded-2xl border border-crm-border/80 bg-[#102f4a] p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">

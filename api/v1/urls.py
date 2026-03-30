@@ -14,6 +14,7 @@ urlpatterns = [
     path("clients/", include("api.v1.clients.urls")),
     path("activities/", include("api.v1.activities.urls")),
     path("touches/", include("api.v1.touches.urls")),
+    path("settlements/", include("api.v1.settlements.urls")),
     path("meta/", include("api.v1.meta.urls")),
     path("webhooks/", include("api.v1.webhooks.urls")),
 ]
