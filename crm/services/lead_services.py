@@ -211,6 +211,59 @@ def _upsert_director_contact(*, client: Client, director: dict) -> None:
         contact.save(update_fields=update_fields)
 
 
+def _upsert_contact_from_lead(*, client: Client, lead: Lead) -> None:
+    full_name = _text_or_empty(getattr(lead, "name", ""))
+    phone = _text_or_empty(getattr(lead, "phone", ""))
+    email = _text_or_empty(getattr(lead, "email", ""))
+    if not full_name and not phone and not email:
+        return
+
+    first_name, last_name = _split_full_name(full_name)
+    contact = None
+    if email:
+        contact = Contact.objects.filter(client=client, email__iexact=email).order_by("id").first()
+    if contact is None and (first_name or last_name):
+        contact = (
+            Contact.objects.filter(
+                client=client,
+                first_name__iexact=first_name,
+                last_name__iexact=last_name,
+            )
+            .order_by("id")
+            .first()
+        )
+    if contact is None and phone:
+        contact = Contact.objects.filter(client=client, phone=phone).order_by("id").first()
+
+    if contact is None:
+        Contact.objects.create(
+            client=client,
+            first_name=first_name,
+            last_name=last_name,
+            phone=phone,
+            email=email,
+            is_primary=not Contact.objects.filter(client=client, is_primary=True).exists(),
+        )
+        return
+
+    update_fields = []
+    if first_name and contact.first_name != first_name:
+        contact.first_name = first_name
+        update_fields.append("first_name")
+    if last_name and contact.last_name != last_name:
+        contact.last_name = last_name
+        update_fields.append("last_name")
+    if phone and contact.phone != phone:
+        contact.phone = phone
+        update_fields.append("phone")
+    if email and contact.email != email:
+        contact.email = email
+        update_fields.append("email")
+    if update_fields:
+        update_fields.append("updated_at")
+        contact.save(update_fields=update_fields)
+
+
 def _find_duplicate_lead(*, payload: dict, website_session=None) -> Lead | None:
     if website_session is not None:
         existing = (
@@ -498,6 +551,16 @@ def convert_lead_to_deal(
     lead.client = target_client
     lead.converted_at = timezone.now()
     lead.save(update_fields=["client", "converted_at", "updated_at"])
+    if target_client is not None:
+        client_update_fields = []
+        lead_email = _text_or_empty(lead.email)
+        if lead_email and not _text_or_empty(target_client.email):
+            target_client.email = lead_email
+            client_update_fields.append("email")
+        if client_update_fields:
+            client_update_fields.append("updated_at")
+            target_client.save(update_fields=client_update_fields)
+        _upsert_contact_from_lead(client=target_client, lead=lead)
     if target_client is not None:
         for lead_document in lead.documents.all().order_by("id"):
             if ClientDocument.objects.filter(

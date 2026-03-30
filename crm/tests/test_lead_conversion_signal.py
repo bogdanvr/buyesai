@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
-from crm.models import Activity, ClientDocument, Deal, DealStage, Lead, LeadDocument, LeadStatus, Touch
+from crm.models import Activity, ClientDocument, Contact, Deal, DealStage, Lead, LeadDocument, LeadStatus, Touch
 from crm.models.activity import ActivityType, TaskStatus
 from crm.models.touch import TouchDirection
 
@@ -192,3 +192,25 @@ class LeadAutoConvertSignalTests(TestCase):
                 self.assertEqual(company_document.original_name, "brief.pdf")
                 self.assertEqual(company_document.uploaded_by, self.user)
                 self.assertTrue(company_document.file.name.endswith("brief.pdf"))
+
+    def test_converted_lead_creates_company_contact_and_fills_company_email(self):
+        lead = Lead.objects.create(
+            title="Lead with contact",
+            company="Acme",
+            name="Иван Иванов",
+            email="ivan@acme.test",
+            phone="+7 900 123-45-67",
+            status=self.converted_status,
+            assigned_to=self.user,
+        )
+
+        company = lead.client
+        self.assertIsNotNone(company)
+        self.assertEqual(company.email, "ivan@acme.test")
+
+        contact = Contact.objects.filter(client=company).get()
+        self.assertEqual(contact.first_name, "Иван")
+        self.assertEqual(contact.last_name, "Иванов")
+        self.assertEqual(contact.email, "ivan@acme.test")
+        self.assertEqual(contact.phone, "+7 900 123-45-67")
+        self.assertTrue(contact.is_primary)
