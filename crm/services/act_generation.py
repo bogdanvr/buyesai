@@ -30,6 +30,30 @@ RUSSIAN_MONTHS = {
     12: "декабря",
 }
 
+RUSSIAN_HUNDREDS = ["", "сто", "двести", "триста", "четыреста", "пятьсот", "шестьсот", "семьсот", "восемьсот", "девятьсот"]
+RUSSIAN_TENS = ["", "", "двадцать", "тридцать", "сорок", "пятьдесят", "шестьдесят", "семьдесят", "восемьдесят", "девяносто"]
+RUSSIAN_TEENS = [
+    "десять",
+    "одиннадцать",
+    "двенадцать",
+    "тринадцать",
+    "четырнадцать",
+    "пятнадцать",
+    "шестнадцать",
+    "семнадцать",
+    "восемнадцать",
+    "девятнадцать",
+]
+RUSSIAN_UNITS_MALE = ["", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"]
+RUSSIAN_UNITS_FEMALE = ["", "одна", "две", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"]
+
+CURRENCY_WORD_FORMS = {
+    "RUB": (("рубль", "рубля", "рублей"), ("копейка", "копейки", "копеек")),
+    "KZT": (("тенге", "тенге", "тенге"), ("тиын", "тиына", "тиынов")),
+    "USD": (("доллар", "доллара", "долларов"), ("цент", "цента", "центов")),
+    "EUR": (("евро", "евро", "евро"), ("цент", "цента", "центов")),
+}
+
 
 @dataclass(frozen=True)
 class ActLineItem:
@@ -75,6 +99,78 @@ def _format_compact_number(value: Decimal | int | float | str) -> str:
     if "." in text:
         text = text.rstrip("0").rstrip(".")
     return text.replace(".", ",")
+
+
+def _pluralize(number: int, forms: tuple[str, str, str]) -> str:
+    value = abs(int(number)) % 100
+    if 10 < value < 20:
+        return forms[2]
+    value = value % 10
+    if value == 1:
+        return forms[0]
+    if 1 < value < 5:
+        return forms[1]
+    return forms[2]
+
+
+def _triad_to_words(number: int, female: bool = False) -> str:
+    if number <= 0:
+        return ""
+    hundreds = number // 100
+    tens_units = number % 100
+    tens = tens_units // 10
+    units = tens_units % 10
+    parts = []
+    if hundreds:
+        parts.append(RUSSIAN_HUNDREDS[hundreds])
+    if 10 <= tens_units <= 19:
+        parts.append(RUSSIAN_TEENS[tens_units - 10])
+    else:
+        if tens:
+            parts.append(RUSSIAN_TENS[tens])
+        if units:
+            parts.append((RUSSIAN_UNITS_FEMALE if female else RUSSIAN_UNITS_MALE)[units])
+    return " ".join(part for part in parts if part)
+
+
+def _number_to_russian_words(number: int) -> str:
+    if number == 0:
+        return "ноль"
+
+    scales = [
+        (("миллиард", "миллиарда", "миллиардов"), False),
+        (("миллион", "миллиона", "миллионов"), False),
+        (("тысяча", "тысячи", "тысяч"), True),
+    ]
+
+    parts = []
+    billions = number // 1_000_000_000
+    millions = (number // 1_000_000) % 1000
+    thousands = (number // 1000) % 1000
+    remainder = number % 1000
+    chunks = [billions, millions, thousands]
+
+    for chunk, (forms, female) in zip(chunks, scales):
+        if not chunk:
+            continue
+        parts.append(_triad_to_words(chunk, female=female))
+        parts.append(_pluralize(chunk, forms))
+
+    if remainder:
+        parts.append(_triad_to_words(remainder))
+
+    return " ".join(part for part in parts if part)
+
+
+def _amount_in_words(value: Decimal | int | float | str, currency: str) -> str:
+    amount = _quantize_money(value)
+    currency_code = _normalize_text(currency).upper() or "RUB"
+    major_forms, minor_forms = CURRENCY_WORD_FORMS.get(currency_code, CURRENCY_WORD_FORMS["RUB"])
+    major = int(amount)
+    minor = int((amount - Decimal(major)) * 100)
+    major_words = _number_to_russian_words(major)
+    phrase = f"{major_words} {_pluralize(major, major_forms)} {minor:02d} {_pluralize(minor, minor_forms)}"
+    return phrase[:1].upper() + phrase[1:]
 
 
 def _build_party_details(name: str, requisites_parts: list[str]) -> str:
@@ -161,12 +257,220 @@ def _table_cell(text: str, *, width: int, bold: bool = False, align: str = "left
     )
 
 
+def _table_cell_custom(
+    text: str,
+    *,
+    width: int,
+    bold: bool = False,
+    align: str = "left",
+    size: int = 22,
+    shaded: bool = False,
+    grid_span: int | None = None,
+    spacing_after: int = 60,
+) -> str:
+    shading_xml = '<w:shd w:val="clear" w:color="auto" w:fill="D9E7F5"/>' if shaded else ""
+    grid_span_xml = f'<w:gridSpan w:val="{int(grid_span)}"/>' if grid_span and int(grid_span) > 1 else ""
+    return (
+        "<w:tc>"
+        f'<w:tcPr><w:tcW w:w="{width}" w:type="dxa"/>{grid_span_xml}{shading_xml}</w:tcPr>'
+        f"{_paragraph(text, bold=bold, align=align, size=size, spacing_after=spacing_after)}"
+        "</w:tc>"
+    )
+
+
 def _service_table(items: list[ActLineItem]) -> str:
     widths = [700, 4800, 1200, 900, 1600, 1700]
     headers = ["№", "Наименование работ, услуг", "Кол-во", "Ед.", "Цена", "Сумма"]
     header_xml = "".join(
         _table_cell(text, width=width, bold=True, align="center", shaded=True)
         for text, width in zip(headers, widths)
+    )
+    rows_xml = "".join(
+        (
+            "<w:tr>"
+            f"{_table_cell(str(index), width=widths[0], align='center')}"
+            f"{_table_cell(item.description, width=widths[1])}"
+            f"{_table_cell(_format_compact_number(item.quantity), width=widths[2], align='center')}"
+            f"{_table_cell(item.unit or 'час', width=widths[3], align='center')}"
+            f"{_table_cell(_format_amount(item.price), width=widths[4], align='right')}"
+            f"{_table_cell(_format_amount(item.total), width=widths[5], align='right')}"
+            "</w:tr>"
+        )
+        for index, item in enumerate(items, start=1)
+    )
+    grid_xml = "".join(f'<w:gridCol w:w="{width}"/>' for width in widths)
+    borders_xml = (
+        "<w:tblBorders>"
+        '<w:top w:val="single" w:sz="8" w:space="0" w:color="222222"/>'
+        '<w:left w:val="single" w:sz="8" w:space="0" w:color="222222"/>'
+        '<w:bottom w:val="single" w:sz="8" w:space="0" w:color="222222"/>'
+        '<w:right w:val="single" w:sz="8" w:space="0" w:color="222222"/>'
+        '<w:insideH w:val="single" w:sz="6" w:space="0" w:color="666666"/>'
+        '<w:insideV w:val="single" w:sz="6" w:space="0" w:color="666666"/>'
+        "</w:tblBorders>"
+    )
+    return (
+        "<w:tbl>"
+        f"<w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/>{borders_xml}</w:tblPr>"
+        f"<w:tblGrid>{grid_xml}</w:tblGrid>"
+        f"<w:tr>{header_xml}</w:tr>"
+        f"{rows_xml}"
+        "</w:tbl>"
+    )
+
+
+def _invoice_payment_table(executor_company: Client) -> str:
+    widths = [3600, 1600, 900, 2800]
+    bank_name = _normalize_text(executor_company.bank_name) or "Банк не указан"
+    bik = _normalize_text(executor_company.bik) or "-"
+    correspondent_account = _normalize_text(executor_company.correspondent_account) or "-"
+    settlement_account = _normalize_text(executor_company.settlement_account or executor_company.iban) or "-"
+    settlement_label = "Сч. №" if _normalize_text(executor_company.currency).upper() == "RUB" else "IBAN"
+    inn = _normalize_text(executor_company.inn) or "-"
+    kpp = _normalize_text(executor_company.kpp) or "-"
+    recipient_name = _company_name(executor_company, "Получатель")
+    rows_xml = "".join([
+        "<w:tr>"
+        f"{_table_cell_custom(bank_name, width=widths[0] + widths[1], bold=True, size=22, grid_span=2)}"
+        f"{_table_cell_custom('БИК', width=widths[2], bold=True, size=20)}"
+        f"{_table_cell_custom(bik, width=widths[3], size=22)}"
+        "</w:tr>",
+        "<w:tr>"
+        f"{_table_cell_custom('Банк получателя', width=widths[0] + widths[1], size=18, grid_span=2)}"
+        f"{_table_cell_custom('Сч. №', width=widths[2], bold=True, size=20)}"
+        f"{_table_cell_custom(correspondent_account, width=widths[3], size=22)}"
+        "</w:tr>",
+        "<w:tr>"
+        f"{_table_cell_custom(f'ИНН {inn}', width=widths[0], bold=True, size=20)}"
+        f"{_table_cell_custom(f'КПП {kpp}', width=widths[1], bold=True, size=20)}"
+        f"{_table_cell_custom(settlement_label, width=widths[2], bold=True, size=20)}"
+        f"{_table_cell_custom(settlement_account, width=widths[3], size=22)}"
+        "</w:tr>",
+        "<w:tr>"
+        f"{_table_cell_custom(recipient_name, width=widths[0] + widths[1], size=22, grid_span=2)}"
+        f"{_table_cell_custom('', width=widths[2], size=20)}"
+        f"{_table_cell_custom('', width=widths[3], size=20)}"
+        "</w:tr>",
+        "<w:tr>"
+        f"{_table_cell_custom('Получатель', width=widths[0] + widths[1], size=18, grid_span=2)}"
+        f"{_table_cell_custom('', width=widths[2], size=20)}"
+        f"{_table_cell_custom('', width=widths[3], size=20)}"
+        "</w:tr>",
+    ])
+    grid_xml = "".join(f'<w:gridCol w:w="{width}"/>' for width in widths)
+    borders_xml = (
+        "<w:tblBorders>"
+        '<w:top w:val="single" w:sz="10" w:space="0" w:color="222222"/>'
+        '<w:left w:val="single" w:sz="10" w:space="0" w:color="222222"/>'
+        '<w:bottom w:val="single" w:sz="10" w:space="0" w:color="222222"/>'
+        '<w:right w:val="single" w:sz="10" w:space="0" w:color="222222"/>'
+        '<w:insideH w:val="single" w:sz="8" w:space="0" w:color="222222"/>'
+        '<w:insideV w:val="single" w:sz="8" w:space="0" w:color="222222"/>'
+        "</w:tblBorders>"
+    )
+    return (
+        "<w:tbl>"
+        f"<w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/>{borders_xml}</w:tblPr>"
+        f"<w:tblGrid>{grid_xml}</w:tblGrid>"
+        f"{rows_xml}"
+        "</w:tbl>"
+    )
+
+
+def _invoice_items_table(items: list[ActLineItem]) -> str:
+    widths = [600, 5600, 1100, 800, 1300, 1600]
+    headers = ["№", "Товары (работы, услуги)", "Кол-во", "Ед.", "Цена", "Сумма"]
+    header_xml = "".join(
+        _table_cell_custom(text, width=width, bold=True, align="center", size=22, shaded=True)
+        for text, width in zip(headers, widths)
+    )
+    rows_xml = "".join(
+        (
+            "<w:tr>"
+            f"{_table_cell_custom(str(index), width=widths[0], align='center', size=20)}"
+            f"{_table_cell_custom(item.description, width=widths[1], size=20)}"
+            f"{_table_cell_custom(_format_compact_number(item.quantity), width=widths[2], align='right', size=20)}"
+            f"{_table_cell_custom(item.unit or 'шт.', width=widths[3], align='center', size=20)}"
+            f"{_table_cell_custom(_format_amount(item.price), width=widths[4], align='right', size=20)}"
+            f"{_table_cell_custom(_format_amount(item.total), width=widths[5], align='right', size=20)}"
+            "</w:tr>"
+        )
+        for index, item in enumerate(items, start=1)
+    )
+    grid_xml = "".join(f'<w:gridCol w:w="{width}"/>' for width in widths)
+    borders_xml = (
+        "<w:tblBorders>"
+        '<w:top w:val="single" w:sz="10" w:space="0" w:color="222222"/>'
+        '<w:left w:val="single" w:sz="10" w:space="0" w:color="222222"/>'
+        '<w:bottom w:val="single" w:sz="10" w:space="0" w:color="222222"/>'
+        '<w:right w:val="single" w:sz="10" w:space="0" w:color="222222"/>'
+        '<w:insideH w:val="single" w:sz="8" w:space="0" w:color="222222"/>'
+        '<w:insideV w:val="single" w:sz="8" w:space="0" w:color="222222"/>'
+        "</w:tblBorders>"
+    )
+    return (
+        "<w:tbl>"
+        f"<w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/>{borders_xml}</w:tblPr>"
+        f"<w:tblGrid>{grid_xml}</w:tblGrid>"
+        f"<w:tr>{header_xml}</w:tr>"
+        f"{rows_xml}"
+        "</w:tbl>"
+    )
+
+
+def _invoice_totals_table(amount: Decimal, currency: str) -> str:
+    widths = [2200, 1800]
+    rows = [
+        ("Итого:", _format_amount(amount)),
+        ("Без налога (НДС)", "-"),
+        ("Всего к оплате:", f"{_format_amount(amount)} {currency}"),
+    ]
+    row_xml = "".join(
+        "<w:tr>"
+        f"{_table_cell_custom(label, width=widths[0], bold=True, align='right', size=22, spacing_after=40)}"
+        f"{_table_cell_custom(value, width=widths[1], bold=True, align='right', size=22, spacing_after=40)}"
+        "</w:tr>"
+        for label, value in rows
+    )
+    grid_xml = "".join(f'<w:gridCol w:w="{width}"/>' for width in widths)
+    borders_xml = (
+        "<w:tblBorders>"
+        '<w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/>'
+        '<w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/>'
+        "</w:tblBorders>"
+    )
+    return (
+        "<w:tbl>"
+        f"<w:tblPr>{borders_xml}<w:jc w:val=\"right\"/></w:tblPr>"
+        f"<w:tblGrid>{grid_xml}</w:tblGrid>"
+        f"{row_xml}"
+        "</w:tbl>"
+    )
+
+
+def _invoice_footer_signatures() -> str:
+    widths = [2500, 2800, 1700, 2200]
+    grid_xml = "".join(f'<w:gridCol w:w="{width}"/>' for width in widths)
+    borders_xml = (
+        "<w:tblBorders>"
+        '<w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/>'
+        '<w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/>'
+        "</w:tblBorders>"
+    )
+    row1 = (
+        "<w:tr>"
+        f"{_table_cell_custom('Руководитель', width=widths[0], bold=True, size=22, spacing_after=20)}"
+        f"{_table_cell_custom('________________________', width=widths[1], size=22, spacing_after=20)}"
+        f"{_table_cell_custom('Бухгалтер', width=widths[2], bold=True, size=22, spacing_after=20)}"
+        f"{_table_cell_custom('________________________', width=widths[3], size=22, spacing_after=20)}"
+        "</w:tr>"
+    )
+    return (
+        "<w:tbl>"
+        f"<w:tblPr>{borders_xml}</w:tblPr>"
+        f"<w:tblGrid>{grid_xml}</w:tblGrid>"
+        f"{row1}"
+        "</w:tbl>"
     )
     rows_xml = "".join(
         (
@@ -428,17 +732,42 @@ def build_invoice_docx_bytes(*, settlement_document: SettlementDocument, deal: D
     line_items = [_coerce_line_item(item) for item in items]
     amount = Decimal(settlement_document.amount or 0)
     currency = _normalize_text(settlement_document.currency) or "RUB"
-    document_xml = _service_document_xml(
-        title=title,
-        executor_line=executor_requisites,
-        customer_line=customer_line,
-        basis_line=basis_line,
-        items=line_items,
-        amount=amount,
-        currency=currency,
-        summary_line=f"Всего к оплате { _format_amount(amount) } {currency}.",
-        footer_text="Просим оплатить указанные услуги в соответствии с условиями договора.",
-        include_signatures=False,
+    amount_in_words = _amount_in_words(amount, currency)
+    footer_lines = [
+        f"Всего наименований {len(line_items)}, на сумму {_format_amount(amount)} {currency}.",
+        amount_in_words,
+    ]
+    if settlement_document.due_date:
+        footer_lines.append(f"Оплатить не позднее {_format_date_short(settlement_document.due_date)}")
+    footer_lines.extend([
+        "Оплата данного счета означает согласие с условиями поставки товара или оказания услуг.",
+        "Уведомление об оплате желательно направить поставщику.",
+    ])
+    body = [
+        _invoice_payment_table(executor_company),
+        _paragraph("", spacing_after=90),
+        _paragraph(title, bold=True, align="left", size=34, spacing_after=180),
+        _paragraph(f"Поставщик\n(Исполнитель): {executor_requisites}", size=22, spacing_after=120),
+        _paragraph(f"Покупатель\n(Заказчик): {customer_line}", size=22, spacing_after=120),
+        _paragraph(f"Основание: {basis_line}", size=22, spacing_after=160),
+        _invoice_items_table(line_items),
+        _paragraph("", spacing_after=70),
+        _invoice_totals_table(amount, currency),
+        _paragraph("", spacing_after=40),
+        _paragraph("\n".join(footer_lines), bold=False, align="left", size=22, spacing_after=220),
+        _invoice_footer_signatures(),
+        (
+            "<w:sectPr>"
+            '<w:pgSz w:w="11906" w:h="16838"/>'
+            '<w:pgMar w:top="900" w:right="850" w:bottom="1134" w:left="850" w:header="708" w:footer="708" w:gutter="0"/>'
+            "</w:sectPr>"
+        ),
+    ]
+    document_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f"<w:body>{''.join(body)}</w:body>"
+        "</w:document>"
     )
 
     output = BytesIO()
