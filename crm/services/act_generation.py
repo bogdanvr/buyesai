@@ -54,6 +54,12 @@ CURRENCY_WORD_FORMS = {
     "EUR": (("евро", "евро", "евро"), ("цент", "цента", "центов")),
 }
 
+PAGE_MARGIN_TOP = "1134"
+PAGE_MARGIN_SIDE = "1134"
+PAGE_MARGIN_BOTTOM = "1134"
+PAGE_HEADER_MARGIN = "708"
+PAGE_FOOTER_MARGIN = "708"
+
 
 @dataclass(frozen=True)
 class ActLineItem:
@@ -581,7 +587,8 @@ def _service_document_xml(
         (
             "<w:sectPr>"
             '<w:pgSz w:w="11906" w:h="16838"/>'
-            '<w:pgMar w:top="1134" w:right="850" w:bottom="1134" w:left="850" w:header="708" w:footer="708" w:gutter="0"/>'
+            f'<w:pgMar w:top="{PAGE_MARGIN_TOP}" w:right="{PAGE_MARGIN_SIDE}" w:bottom="{PAGE_MARGIN_BOTTOM}" '
+            f'w:left="{PAGE_MARGIN_SIDE}" w:header="{PAGE_HEADER_MARGIN}" w:footer="{PAGE_FOOTER_MARGIN}" w:gutter="0"/>'
             "</w:sectPr>"
         ),
     ]
@@ -759,7 +766,8 @@ def build_invoice_docx_bytes(*, settlement_document: SettlementDocument, deal: D
         (
             "<w:sectPr>"
             '<w:pgSz w:w="11906" w:h="16838"/>'
-            '<w:pgMar w:top="900" w:right="850" w:bottom="1134" w:left="850" w:header="708" w:footer="708" w:gutter="0"/>'
+            f'<w:pgMar w:top="{PAGE_MARGIN_TOP}" w:right="{PAGE_MARGIN_SIDE}" w:bottom="{PAGE_MARGIN_BOTTOM}" '
+            f'w:left="{PAGE_MARGIN_SIDE}" w:header="{PAGE_HEADER_MARGIN}" w:footer="{PAGE_FOOTER_MARGIN}" w:gutter="0"/>'
             "</w:sectPr>"
         ),
     ]
