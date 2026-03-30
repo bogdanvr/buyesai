@@ -470,6 +470,7 @@
           dealTasksForActiveDeal: [],
           dealDocumentsForActiveDeal: [],
           showDealActGenerator: false,
+          dealDocumentGeneratorType: "",
           dealActGeneratorForm: {
             executorCompanyId: null,
             items: [],
@@ -762,6 +763,32 @@
           const companyId = this.toIntOrNull(this.forms.deals.companyId) || this.toIntOrNull(this.editingDealItem?.clientId);
           const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId)) || null;
           return company?.currency || this.editingDealItem?.currency || "RUB";
+        },
+        dealDocumentGeneratorMeta() {
+          if (this.dealDocumentGeneratorType === "invoice") {
+            return {
+              title: "Параметры счета",
+              subtitle: "Выберите собственную организацию и проверьте строки счета перед генерацией.",
+              submitLabel: "Сгенерировать счет",
+              preparingLabel: "Подготовка счета...",
+              endpoint: "/api/v1/deal-documents/generate-invoice/",
+              successPanelLabel: "Счет",
+              emptyItemsMessage: "Добавьте хотя бы одну строку счета.",
+              openErrorLabel: "счета",
+              generateErrorLabel: "счета",
+            };
+          }
+          return {
+            title: "Параметры акта",
+            subtitle: "Выберите собственную организацию и проверьте строки документа перед генерацией.",
+            submitLabel: "Сгенерировать акт",
+            preparingLabel: "Подготовка акта...",
+            endpoint: "/api/v1/deal-documents/generate-act/",
+            successPanelLabel: "Акт",
+            emptyItemsMessage: "Добавьте хотя бы одну строку акта.",
+            openErrorLabel: "акта",
+            generateErrorLabel: "акта",
+          };
         },
         dealActGeneratorTotal() {
           return (this.dealActGeneratorForm.items || []).reduce((total, item) => {
@@ -8862,10 +8889,11 @@
           const records = this.normalizePaginatedResponse(payload).map((item) => this.mapClient(item));
           this.datasets.companies = this.mergeSectionRecords(this.datasets.companies, records);
         },
-        async openDealActGenerator() {
+        async openDealDocumentGenerator(type = "act") {
           if (!this.editingDealId || this.isDealDocumentUploading || this.isDealActGenerating || this.isDealActGeneratorPreparing) {
             return;
           }
+          this.dealDocumentGeneratorType = String(type || "act").trim() === "invoice" ? "invoice" : "act";
           this.isDealActGeneratorPreparing = true;
           this.clearUiErrors({ modalOnly: true });
           try {
@@ -8873,13 +8901,21 @@
             this.resetDealActGeneratorForm();
             this.showDealActGenerator = true;
           } catch (error) {
-            this.setUiError(`Ошибка подготовки акта: ${error.message}`, { modal: true });
+            this.setUiError(`Ошибка подготовки ${this.dealDocumentGeneratorMeta.openErrorLabel}: ${error.message}`, { modal: true });
+            this.dealDocumentGeneratorType = "";
           } finally {
             this.isDealActGeneratorPreparing = false;
           }
         },
+        async openDealActGenerator() {
+          await this.openDealDocumentGenerator("act");
+        },
+        async openDealInvoiceGenerator() {
+          await this.openDealDocumentGenerator("invoice");
+        },
         closeDealActGenerator() {
           this.showDealActGenerator = false;
+          this.dealDocumentGeneratorType = "";
         },
         addDealActGeneratorItem() {
           const lastItem = Array.isArray(this.dealActGeneratorForm.items) && this.dealActGeneratorForm.items.length
@@ -8935,7 +8971,7 @@
             };
           });
           if (!normalizedItems.length) {
-            throw new Error("Добавьте хотя бы одну строку акта.");
+            throw new Error(this.dealDocumentGeneratorMeta.emptyItemsMessage);
           }
           return {
             deal: this.editingDealId,
@@ -9170,7 +9206,7 @@
             input.click();
           }
         },
-        async generateDealAct() {
+        async generateDealDocumentFromGenerator() {
           if (!this.editingDealId) {
             return;
           }
@@ -9178,7 +9214,7 @@
           this.clearUiErrors({ modalOnly: true });
           try {
             const payload = this.buildDealActGeneratorPayload();
-            const created = await this.apiRequest("/api/v1/deal-documents/generate-act/", {
+            const created = await this.apiRequest(this.dealDocumentGeneratorMeta.endpoint, {
               method: "POST",
               body: payload,
             });
@@ -9188,8 +9224,9 @@
             ];
             this.showDealDocumentsPanel = true;
             this.showDealActGenerator = false;
+            this.dealDocumentGeneratorType = "";
           } catch (error) {
-            this.setUiError(`Ошибка генерации акта: ${error.message}`, { modal: true });
+            this.setUiError(`Ошибка генерации ${this.dealDocumentGeneratorMeta.generateErrorLabel}: ${error.message}`, { modal: true });
           } finally {
             this.isDealActGenerating = false;
           }
@@ -10700,6 +10737,7 @@
           this.showDealContactsPanel = false;
           this.showDealDocumentsPanel = false;
           this.showDealActGenerator = false;
+          this.dealDocumentGeneratorType = "";
           this.showDealPhoneCallHistory = false;
           this.showLeadDocumentsPanel = false;
           this.showLeadPhoneCallHistory = false;
@@ -10859,6 +10897,7 @@
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
           this.showDealActGenerator = false;
+          this.dealDocumentGeneratorType = "";
           this.resetDealCommunicationsState();
           this.showDealContactForm = false;
           this.resetDealCompanyForm();

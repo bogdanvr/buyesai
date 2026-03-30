@@ -12,7 +12,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from api.v1.deal_documents.serializers import DealActGenerateSerializer, DealDocumentSerializer
 from crm.models import DealDocument
-from crm.services.act_generation import generate_deal_act
+from crm.services.act_generation import generate_deal_act, generate_deal_invoice
 
 
 class DealDocumentViewSet(ModelViewSet):
@@ -35,6 +35,23 @@ class DealDocumentViewSet(ModelViewSet):
         request_serializer.is_valid(raise_exception=True)
         try:
             deal_document, _ = generate_deal_act(
+                deal=request_serializer.validated_data["deal"],
+                executor_company=request_serializer.validated_data["executor_company"],
+                items=request_serializer.validated_data["items"],
+                uploaded_by=request.user,
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(getattr(exc, "message_dict", None) or getattr(exc, "messages", None) or {"detail": str(exc)})
+
+        serializer = self.get_serializer(deal_document)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["post"], url_path="generate-invoice")
+    def generate_invoice(self, request):
+        request_serializer = DealActGenerateSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        try:
+            deal_document, _ = generate_deal_invoice(
                 deal=request_serializer.validated_data["deal"],
                 executor_company=request_serializer.validated_data["executor_company"],
                 items=request_serializer.validated_data["items"],

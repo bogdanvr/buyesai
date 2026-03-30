@@ -235,6 +235,33 @@ def _signatures_table(executor_name: str, customer_name: str) -> str:
 
 
 def _document_xml(*, title: str, executor_line: str, customer_line: str, basis_line: str, items: list[ActLineItem], amount: Decimal, currency: str) -> str:
+    return _service_document_xml(
+        title=title,
+        executor_line=executor_line,
+        customer_line=customer_line,
+        basis_line=basis_line,
+        items=items,
+        amount=amount,
+        currency=currency,
+        summary_line=f"Всего оказано услуг на сумму {_format_amount(amount)} {currency}.",
+        footer_text="Вышеперечисленные услуги выполнены полностью и в срок. Заказчик претензий по объему, качеству и срокам оказания услуг не имеет.",
+        include_signatures=True,
+    )
+
+
+def _service_document_xml(
+    *,
+    title: str,
+    executor_line: str,
+    customer_line: str,
+    basis_line: str,
+    items: list[ActLineItem],
+    amount: Decimal,
+    currency: str,
+    summary_line: str,
+    footer_text: str,
+    include_signatures: bool,
+) -> str:
     amount_text = _format_amount(amount)
     body = [
         _paragraph(title, bold=True, align="center", size=30, spacing_after=200),
@@ -244,9 +271,9 @@ def _document_xml(*, title: str, executor_line: str, customer_line: str, basis_l
         _service_table(items),
         _paragraph("", spacing_after=80),
         _paragraph(f"Итого: {amount_text} {currency}", bold=True, align="right", size=24, spacing_after=160),
-        _paragraph(f"Всего оказано услуг на сумму {amount_text} {currency}.", size=22),
-        _paragraph("Вышеперечисленные услуги выполнены полностью и в срок. Заказчик претензий по объему, качеству и срокам оказания услуг не имеет.", size=22, spacing_after=260),
-        _signatures_table(executor_line.split(',')[0], customer_line.split(',')[0]),
+        _paragraph(summary_line, size=22),
+        _paragraph(footer_text, size=22, spacing_after=260),
+        _signatures_table(executor_line.split(',')[0], customer_line.split(',')[0]) if include_signatures else "",
         (
             "<w:sectPr>"
             '<w:pgSz w:w="11906" w:h="16838"/>'
@@ -308,13 +335,17 @@ def _document_relationships_xml() -> str:
 
 
 def _core_properties_xml() -> str:
+    return _document_core_properties_xml("Акт об оказании услуг")
+
+
+def _document_core_properties_xml(title: str) -> str:
     now_iso = timezone.now().replace(microsecond=0).isoformat()
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
         'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" '
         'xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
-        "<dc:title>Акт об оказании услуг</dc:title>"
+        f"<dc:title>{escape(title)}</dc:title>"
         "<dc:creator>CRM</dc:creator>"
         "<cp:lastModifiedBy>CRM</cp:lastModifiedBy>"
         f'<dcterms:created xsi:type="dcterms:W3CDTF">{now_iso}</dcterms:created>'
@@ -375,7 +406,7 @@ def build_act_docx_bytes(*, settlement_document: SettlementDocument, deal: Deal,
     with ZipFile(output, "w", ZIP_DEFLATED) as archive:
         archive.writestr("[Content_Types].xml", _content_types_xml())
         archive.writestr("_rels/.rels", _root_relationships_xml())
-        archive.writestr("docProps/core.xml", _core_properties_xml())
+        archive.writestr("docProps/core.xml", _document_core_properties_xml("Акт об оказании услуг"))
         archive.writestr("docProps/app.xml", _app_properties_xml())
         archive.writestr("word/document.xml", document_xml)
         archive.writestr("word/styles.xml", _styles_xml())
@@ -383,16 +414,67 @@ def build_act_docx_bytes(*, settlement_document: SettlementDocument, deal: Deal,
     return output.getvalue()
 
 
-def generate_deal_act(*, deal: Deal, executor_company: Client, items: list[ActLineItem | dict], uploaded_by=None) -> tuple[DealDocument, SettlementDocument]:
+def build_invoice_docx_bytes(*, settlement_document: SettlementDocument, deal: Deal, executor_company: Client, items: list[ActLineItem | dict]) -> bytes:
+    _, executor_requisites = _executor_details(executor_company)
+    _, customer_line = _customer_details(deal)
+    contract = getattr(settlement_document, "contract", None)
+    basis_line = _normalize_text(getattr(contract, "number", "")) or _normalize_text(getattr(contract, "title", ""))
+    if basis_line:
+        basis_line = f"Договор {basis_line}"
+    else:
+        basis_line = f"Сделка «{_normalize_text(deal.title) or f'#{deal.pk}'}»"
+
+    title = f"Счет на оплату № {settlement_document.number} от {_format_date_human(settlement_document.document_date)}"
+    line_items = [_coerce_line_item(item) for item in items]
+    amount = Decimal(settlement_document.amount or 0)
+    currency = _normalize_text(settlement_document.currency) or "RUB"
+    document_xml = _service_document_xml(
+        title=title,
+        executor_line=executor_requisites,
+        customer_line=customer_line,
+        basis_line=basis_line,
+        items=line_items,
+        amount=amount,
+        currency=currency,
+        summary_line=f"Всего к оплате { _format_amount(amount) } {currency}.",
+        footer_text="Просим оплатить указанные услуги в соответствии с условиями договора.",
+        include_signatures=False,
+    )
+
+    output = BytesIO()
+    with ZipFile(output, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", _content_types_xml())
+        archive.writestr("_rels/.rels", _root_relationships_xml())
+        archive.writestr("docProps/core.xml", _document_core_properties_xml("Счет на оплату"))
+        archive.writestr("docProps/app.xml", _app_properties_xml())
+        archive.writestr("word/document.xml", document_xml)
+        archive.writestr("word/styles.xml", _styles_xml())
+        archive.writestr("word/_rels/document.xml.rels", _document_relationships_xml())
+    return output.getvalue()
+
+
+def _generate_deal_service_document(
+    *,
+    deal: Deal,
+    executor_company: Client,
+    items: list[ActLineItem | dict],
+    uploaded_by,
+    document_type: str,
+    settlement_title: str,
+    original_label: str,
+    file_prefix: str,
+    builder,
+    realization_status: str = "",
+) -> tuple[DealDocument, SettlementDocument]:
     client = getattr(deal, "client", None)
     if client is None:
-        raise ValidationError({"deal": "Для генерации акта у сделки должна быть выбрана компания."})
+        raise ValidationError({"deal": "Для генерации документа у сделки должна быть выбрана компания."})
     line_items = [_coerce_line_item(item) for item in items]
     if not line_items:
-        raise ValidationError({"items": "Добавьте хотя бы одну строку акта."})
+        raise ValidationError({"items": "Добавьте хотя бы одну строку документа."})
     amount = sum((item.total for item in line_items), Decimal("0.00"))
     if amount <= 0:
-        raise ValidationError({"items": "Сумма акта должна быть больше нуля."})
+        raise ValidationError({"items": "Сумма документа должна быть больше нуля."})
 
     with transaction.atomic():
         contract = SettlementContract.objects.filter(client_id=client.pk, is_active=True).order_by("-created_at", "-id").first()
@@ -406,17 +488,17 @@ def generate_deal_act(*, deal: Deal, executor_company: Client, items: list[ActLi
             client=client,
             contract=contract,
             deal=deal,
-            document_type=SettlementDocument.DocumentType.REALIZATION,
-            title="Акт об оказании услуг",
+            document_type=document_type,
+            title=settlement_title,
             document_date=timezone.localdate(),
             currency=resolved_currency,
             amount=amount,
-            realization_status=SettlementDocument.RealizationStatus.CREATED,
+            realization_status=realization_status,
         )
 
-        file_name = f"act-{settlement_document.number or settlement_document.pk}.docx"
-        original_name = f"Акт № {settlement_document.number} от {_format_date_short(settlement_document.document_date)}.docx"
-        document_bytes = build_act_docx_bytes(
+        file_name = f"{file_prefix}-{settlement_document.number or settlement_document.pk}.docx"
+        original_name = f"{original_label} № {settlement_document.number} от {_format_date_short(settlement_document.document_date)}.docx"
+        document_bytes = builder(
             settlement_document=settlement_document,
             deal=deal,
             executor_company=executor_company,
@@ -431,3 +513,32 @@ def generate_deal_act(*, deal: Deal, executor_company: Client, items: list[ActLi
         deal_document.file.save(file_name, content, save=False)
         deal_document.save()
         return deal_document, settlement_document
+
+
+def generate_deal_act(*, deal: Deal, executor_company: Client, items: list[ActLineItem | dict], uploaded_by=None) -> tuple[DealDocument, SettlementDocument]:
+    return _generate_deal_service_document(
+        deal=deal,
+        executor_company=executor_company,
+        items=items,
+        uploaded_by=uploaded_by,
+        document_type=SettlementDocument.DocumentType.REALIZATION,
+        settlement_title="Акт об оказании услуг",
+        original_label="Акт",
+        file_prefix="act",
+        builder=build_act_docx_bytes,
+        realization_status=SettlementDocument.RealizationStatus.CREATED,
+    )
+
+
+def generate_deal_invoice(*, deal: Deal, executor_company: Client, items: list[ActLineItem | dict], uploaded_by=None) -> tuple[DealDocument, SettlementDocument]:
+    return _generate_deal_service_document(
+        deal=deal,
+        executor_company=executor_company,
+        items=items,
+        uploaded_by=uploaded_by,
+        document_type=SettlementDocument.DocumentType.INVOICE,
+        settlement_title="Счет на оплату",
+        original_label="Счет",
+        file_prefix="invoice",
+        builder=build_invoice_docx_bytes,
+    )

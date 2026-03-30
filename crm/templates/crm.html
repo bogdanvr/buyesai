@@ -3045,11 +3045,19 @@
                 <div class="flex items-center gap-2">
                   <button
                     type="button"
+                    @click="openDealInvoiceGenerator"
+                    :disabled="isDealActGenerating || isDealDocumentUploading || isDealActGeneratorPreparing"
+                    class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span>[[ isDealActGeneratorPreparing && dealDocumentGeneratorType === 'invoice' ? dealDocumentGeneratorMeta.preparingLabel : 'Сгенерировать счет' ]]</span>
+                  </button>
+                  <button
+                    type="button"
                     @click="openDealActGenerator"
                     :disabled="isDealActGenerating || isDealDocumentUploading || isDealActGeneratorPreparing"
                     class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <span>[[ isDealActGeneratorPreparing ? 'Подготовка...' : 'Сгенерировать акт' ]]</span>
+                    <span>[[ isDealActGeneratorPreparing && dealDocumentGeneratorType === 'act' ? dealDocumentGeneratorMeta.preparingLabel : 'Сгенерировать акт' ]]</span>
                   </button>
                   <input
                     ref="dealDocumentInput"
@@ -6189,8 +6197,8 @@
             <div class="w-full max-w-4xl rounded-[24px] border border-crm-border bg-[#0f2f4a] shadow-panel">
               <div class="flex items-start justify-between gap-4 border-b border-crm-border px-4 py-4 md:px-6">
                 <div class="min-w-0">
-                  <div class="text-lg font-semibold text-white">Параметры акта</div>
-                  <div class="mt-1 text-sm text-crm-muted">Выберите собственную организацию и проверьте строки документа перед генерацией.</div>
+                  <div class="text-lg font-semibold text-white">[[ dealDocumentGeneratorMeta.title ]]</div>
+                  <div class="mt-1 text-sm text-crm-muted">[[ dealDocumentGeneratorMeta.subtitle ]]</div>
                 </div>
                 <button type="button" @click="closeDealActGenerator" class="h-10 w-10 shrink-0 rounded-xl border border-crm-border bg-[#123753] text-white transition hover:border-crm-accent">✕</button>
               </div>
@@ -6252,8 +6260,8 @@
               </div>
               <div class="flex flex-col gap-2 border-t border-crm-border bg-[#0f2f4a]/95 px-4 py-4 md:flex-row md:items-center md:justify-end md:px-6">
                 <button type="button" @click="closeDealActGenerator" class="h-11 rounded-xl border border-crm-border bg-transparent px-5 transition hover:bg-white/5">Отмена</button>
-                <button type="button" @click="generateDealAct" :disabled="isDealActGenerating || isDealActGeneratorPreparing || !ownCompanyOptions.length" class="h-11 rounded-xl bg-crm-accent px-5 font-semibold text-white transition hover:bg-crm-accentHover disabled:cursor-not-allowed disabled:opacity-60">
-                  [[ isDealActGenerating ? 'Генерируем...' : 'Сгенерировать акт' ]]
+                <button type="button" @click="generateDealDocumentFromGenerator" :disabled="isDealActGenerating || isDealActGeneratorPreparing || !ownCompanyOptions.length" class="h-11 rounded-xl bg-crm-accent px-5 font-semibold text-white transition hover:bg-crm-accentHover disabled:cursor-not-allowed disabled:opacity-60">
+                  [[ isDealActGenerating ? 'Генерируем...' : dealDocumentGeneratorMeta.submitLabel ]]
                 </button>
               </div>
             </div>

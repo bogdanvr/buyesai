@@ -152,3 +152,42 @@ class DealDocumentsApiTests(APITestCase):
         download_response = self.client.get(reverse("deal-documents-download", kwargs={"pk": generated_document.pk}))
         self.assertEqual(download_response.status_code, status.HTTP_200_OK)
         self.assertIn("filename*=utf-8''", download_response["Content-Disposition"])
+
+    @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
+    def test_can_generate_invoice_document_for_deal(self):
+        response = self.client.post(
+            reverse("deal-documents-generate-invoice"),
+            {
+                "deal": self.deal.pk,
+                "executor_company": self.own_company.pk,
+                "items": [
+                    {
+                        "description": "Переводческое сопровождение",
+                        "quantity": "3.00",
+                        "unit": "час",
+                        "price": "12000.00",
+                    },
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content.decode())
+        invoice = SettlementDocument.objects.get(deal=self.deal, document_type=SettlementDocument.DocumentType.INVOICE)
+        self.assertEqual(str(invoice.amount), "36000.00")
+        self.assertEqual(invoice.number, "1235")
+        self.assertEqual(invoice.title, "Счет на оплату")
+        self.assertEqual(invoice.currency, "KZT")
+        self.assertTrue(bool(invoice.file))
+
+        generated_document = DealDocument.objects.get(pk=response.data["id"])
+        self.assertEqual(invoice.original_name, generated_document.original_name)
+        self.assertIn("Счет", generated_document.original_name)
+
+        with generated_document.file.open("rb") as file_handle:
+            archive = ZipFile(file_handle)
+            document_xml = archive.read("word/document.xml").decode("utf-8")
+
+        self.assertIn("Счет на оплату", document_xml)
+        self.assertIn("Переводческое сопровождение", document_xml)
+        self.assertIn("36000,00", document_xml.replace(" ", ""))
