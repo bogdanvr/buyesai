@@ -162,6 +162,7 @@
           isDealCommunicationSending: false,
           isDealCommunicationStarting: false,
           isDealDocumentUploading: false,
+          isDealActGeneratorPreparing: false,
           isDealActGenerating: false,
           isTouchDocumentsLoading: false,
           isTouchDocumentUploading: false,
@@ -468,6 +469,11 @@
           },
           dealTasksForActiveDeal: [],
           dealDocumentsForActiveDeal: [],
+          showDealActGenerator: false,
+          dealActGeneratorForm: {
+            executorCompanyId: null,
+            items: [],
+          },
           leadDocumentsForActiveLead: [],
           dealCommunications: [],
           dealManualBindingConversations: [],
@@ -745,6 +751,22 @@
             id: company.id,
             name: company.name,
           }));
+        },
+        ownCompanyOptions() {
+          return (this.datasets.companies || [])
+            .filter((company) => String(company.companyType || "") === "own")
+            .slice()
+            .sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""), "ru"));
+        },
+        dealActGeneratorCurrency() {
+          const companyId = this.toIntOrNull(this.forms.deals.companyId) || this.toIntOrNull(this.editingDealItem?.clientId);
+          const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId)) || null;
+          return company?.currency || this.editingDealItem?.currency || "RUB";
+        },
+        dealActGeneratorTotal() {
+          return (this.dealActGeneratorForm.items || []).reduce((total, item) => {
+            return total + (this.parseFlexibleNumber(item.quantity) * this.parseFlexibleNumber(item.price));
+          }, 0);
         },
         isCreatingCompany() {
           return this.activeSection === "companies" && !this.editingCompanyId;
@@ -2385,6 +2407,17 @@
           if (current === "0" || current === "0.0" || current === "0.00") {
             target[field] = "";
           }
+        },
+        parseFlexibleNumber(value) {
+          const normalized = String(value ?? "")
+            .replace(/\s+/g, "")
+            .replace(",", ".")
+            .trim();
+          if (!normalized) {
+            return 0;
+          }
+          const numeric = Number(normalized);
+          return Number.isFinite(numeric) ? numeric : 0;
         },
         resizeTextareaById(id) {
           const element = document.getElementById(id);
@@ -7948,8 +7981,13 @@
           this.showDealTaskForm = false;
           this.resetDealCommunicationsState();
           this.showDealDocumentsPanel = false;
+          this.showDealActGenerator = false;
           this.showDealPhoneCallHistory = false;
           this.dealDocumentsForActiveDeal = [];
+          this.dealActGeneratorForm = {
+            executorCompanyId: null,
+            items: [],
+          };
           this.resetDealCompanyForm();
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
@@ -8777,6 +8815,134 @@
           if (size < 1024 * 1024) return `${(size / 1024).toFixed(1).replace(".0", "")} КБ`;
           return `${(size / (1024 * 1024)).toFixed(1).replace(".0", "")} МБ`;
         },
+        preferredOwnCompanyId() {
+          const preferred = Array.isArray(this.ownCompanyOptions) && this.ownCompanyOptions.length
+            ? this.ownCompanyOptions[0]
+            : null;
+          return this.toIntOrNull(preferred?.id);
+        },
+        defaultDealActLineDescription() {
+          return String(this.forms.deals.title || this.editingDealItem?.title || "").trim() || "Услуги по сделке";
+        },
+        defaultDealActLinePrice() {
+          const amount = this.parseFlexibleNumber(this.forms.deals.amount || this.editingDealItem?.amount);
+          return amount > 0 ? amount.toFixed(2) : "";
+        },
+        createDealActGeneratorItem(overrides = {}) {
+          const normalizedDescription = typeof overrides.description === "string"
+            ? overrides.description
+            : this.defaultDealActLineDescription();
+          const normalizedQuantity = overrides.quantity !== undefined && overrides.quantity !== null
+            ? String(overrides.quantity)
+            : "1";
+          const normalizedUnit = typeof overrides.unit === "string" && overrides.unit.trim()
+            ? overrides.unit.trim()
+            : "час";
+          const normalizedPrice = overrides.price !== undefined && overrides.price !== null
+            ? String(overrides.price)
+            : this.defaultDealActLinePrice();
+          return {
+            description: normalizedDescription,
+            quantity: normalizedQuantity,
+            unit: normalizedUnit,
+            price: normalizedPrice,
+          };
+        },
+        resetDealActGeneratorForm() {
+          this.dealActGeneratorForm = {
+            executorCompanyId: this.preferredOwnCompanyId(),
+            items: [this.createDealActGeneratorItem()],
+          };
+        },
+        async ensureOwnCompaniesLoaded() {
+          if (Array.isArray(this.ownCompanyOptions) && this.ownCompanyOptions.length) {
+            return;
+          }
+          const payload = await this.apiRequest("/api/v1/clients/?company_type=own&page_size=200");
+          const records = this.normalizePaginatedResponse(payload).map((item) => this.mapClient(item));
+          this.datasets.companies = this.mergeSectionRecords(this.datasets.companies, records);
+        },
+        async openDealActGenerator() {
+          if (!this.editingDealId || this.isDealDocumentUploading || this.isDealActGenerating || this.isDealActGeneratorPreparing) {
+            return;
+          }
+          this.isDealActGeneratorPreparing = true;
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            await this.ensureOwnCompaniesLoaded();
+            this.resetDealActGeneratorForm();
+            this.showDealActGenerator = true;
+          } catch (error) {
+            this.setUiError(`Ошибка подготовки акта: ${error.message}`, { modal: true });
+          } finally {
+            this.isDealActGeneratorPreparing = false;
+          }
+        },
+        closeDealActGenerator() {
+          this.showDealActGenerator = false;
+        },
+        addDealActGeneratorItem() {
+          const lastItem = Array.isArray(this.dealActGeneratorForm.items) && this.dealActGeneratorForm.items.length
+            ? this.dealActGeneratorForm.items[this.dealActGeneratorForm.items.length - 1]
+            : null;
+          this.dealActGeneratorForm.items = [
+            ...(this.dealActGeneratorForm.items || []),
+            this.createDealActGeneratorItem({
+              description: "",
+              quantity: "1",
+              unit: lastItem?.unit || "час",
+              price: "",
+            }),
+          ];
+        },
+        removeDealActGeneratorItem(index) {
+          const items = Array.isArray(this.dealActGeneratorForm.items) ? this.dealActGeneratorForm.items.slice() : [];
+          if (items.length <= 1) {
+            this.dealActGeneratorForm.items = [this.createDealActGeneratorItem({ description: "", quantity: "1", price: "" })];
+            return;
+          }
+          items.splice(index, 1);
+          this.dealActGeneratorForm.items = items;
+        },
+        dealActGeneratorItemTotal(item) {
+          return this.parseFlexibleNumber(item?.quantity) * this.parseFlexibleNumber(item?.price);
+        },
+        buildDealActGeneratorPayload() {
+          const executorCompanyId = this.toIntOrNull(this.dealActGeneratorForm.executorCompanyId);
+          if (!executorCompanyId) {
+            throw new Error("Выберите собственную организацию.");
+          }
+          const normalizedItems = (this.dealActGeneratorForm.items || []).map((item, index) => {
+            const description = String(item?.description || "").trim();
+            const quantity = this.parseFlexibleNumber(item?.quantity);
+            const price = this.parseFlexibleNumber(item?.price);
+            const unit = String(item?.unit || "").trim() || "час";
+            const rowNumber = index + 1;
+            if (!description) {
+              throw new Error(`Заполните наименование в строке ${rowNumber}.`);
+            }
+            if (quantity <= 0) {
+              throw new Error(`Укажите количество больше нуля в строке ${rowNumber}.`);
+            }
+            if (price <= 0) {
+              throw new Error(`Укажите стоимость больше нуля в строке ${rowNumber}.`);
+            }
+            return {
+              description,
+              quantity: quantity.toFixed(2),
+              unit,
+              price: price.toFixed(2),
+            };
+          });
+          if (!normalizedItems.length) {
+            throw new Error("Добавьте хотя бы одну строку акта.");
+          }
+          return {
+            deal: this.editingDealId,
+            executor_company: executorCompanyId,
+            items: normalizedItems,
+          };
+        },
         mapDealDocument(item) {
           return {
             id: item.id,
@@ -9011,17 +9177,17 @@
           this.isDealActGenerating = true;
           this.clearUiErrors({ modalOnly: true });
           try {
+            const payload = this.buildDealActGeneratorPayload();
             const created = await this.apiRequest("/api/v1/deal-documents/generate-act/", {
               method: "POST",
-              body: {
-                deal: this.editingDealId,
-              },
+              body: payload,
             });
             this.dealDocumentsForActiveDeal = [
               this.mapDealDocument(created),
               ...this.dealDocumentsForActiveDeal,
             ];
             this.showDealDocumentsPanel = true;
+            this.showDealActGenerator = false;
           } catch (error) {
             this.setUiError(`Ошибка генерации акта: ${error.message}`, { modal: true });
           } finally {
@@ -10533,6 +10699,7 @@
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
           this.showDealDocumentsPanel = false;
+          this.showDealActGenerator = false;
           this.showDealPhoneCallHistory = false;
           this.showLeadDocumentsPanel = false;
           this.showLeadPhoneCallHistory = false;
@@ -10542,6 +10709,10 @@
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.dealDocumentsForActiveDeal = [];
+          this.dealActGeneratorForm = {
+            executorCompanyId: null,
+            items: [],
+          };
           this.leadDocumentsForActiveLead = [];
           this.touchDealDocuments = [];
           this.touchCompanyDocuments = [];
@@ -10618,6 +10789,7 @@
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
           this.showDealDocumentsPanel = false;
+          this.showDealActGenerator = false;
           this.showDealPhoneCallHistory = false;
           this.showLeadDocumentsPanel = false;
           this.showLeadPhoneCallHistory = false;
@@ -10627,6 +10799,10 @@
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.dealDocumentsForActiveDeal = [];
+          this.dealActGeneratorForm = {
+            executorCompanyId: null,
+            items: [],
+          };
           this.leadDocumentsForActiveLead = [];
           this.touchDealDocuments = [];
           this.touchCompanyDocuments = [];
@@ -10682,11 +10858,16 @@
           this.cancelSourceCreate();
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
+          this.showDealActGenerator = false;
           this.resetDealCommunicationsState();
           this.showDealContactForm = false;
           this.resetDealCompanyForm();
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
+          this.dealActGeneratorForm = {
+            executorCompanyId: null,
+            items: [],
+          };
           this.touchDealDocuments = [];
           this.touchCompanyDocuments = [];
           this.showCompanyContactForm = false;

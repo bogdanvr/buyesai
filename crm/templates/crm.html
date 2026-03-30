@@ -1623,7 +1623,7 @@
       </section>
 
       <div v-if="showModal" class="fixed inset-0 z-50 flex items-start md:items-center justify-center p-2 md:p-4 overflow-y-auto bg-black/55 backdrop-blur-sm">
-        <div class="w-full max-w-none md:max-w-5xl rounded-[24px] md:rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel h-[calc(100dvh-1rem)] md:h-auto md:max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col">
+        <div class="relative w-full max-w-none md:max-w-5xl rounded-[24px] md:rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel h-[calc(100dvh-1rem)] md:h-auto md:max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col">
           <div class="px-4 md:px-6 py-4 md:py-5 border-b border-crm-border flex items-start justify-between gap-4 shrink-0">
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
@@ -3045,11 +3045,11 @@
                 <div class="flex items-center gap-2">
                   <button
                     type="button"
-                    @click="generateDealAct"
-                    :disabled="isDealActGenerating || isDealDocumentUploading"
+                    @click="openDealActGenerator"
+                    :disabled="isDealActGenerating || isDealDocumentUploading || isDealActGeneratorPreparing"
                     class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <span>[[ isDealActGenerating ? 'Генерируем...' : 'Сгенерировать акт' ]]</span>
+                    <span>[[ isDealActGeneratorPreparing ? 'Подготовка...' : 'Сгенерировать акт' ]]</span>
                   </button>
                   <input
                     ref="dealDocumentInput"
@@ -6181,6 +6181,83 @@
             </div>
             </div>
           </form>
+          <div
+            v-if="showDealActGenerator"
+            class="absolute inset-0 z-20 flex items-center justify-center bg-black/55 p-3 md:p-6 backdrop-blur-sm"
+            @click.self="closeDealActGenerator"
+          >
+            <div class="w-full max-w-4xl rounded-[24px] border border-crm-border bg-[#0f2f4a] shadow-panel">
+              <div class="flex items-start justify-between gap-4 border-b border-crm-border px-4 py-4 md:px-6">
+                <div class="min-w-0">
+                  <div class="text-lg font-semibold text-white">Параметры акта</div>
+                  <div class="mt-1 text-sm text-crm-muted">Выберите собственную организацию и проверьте строки документа перед генерацией.</div>
+                </div>
+                <button type="button" @click="closeDealActGenerator" class="h-10 w-10 shrink-0 rounded-xl border border-crm-border bg-[#123753] text-white transition hover:border-crm-accent">✕</button>
+              </div>
+              <div class="max-h-[70dvh] overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Собственная организация</span>
+                    <select v-model="dealActGeneratorForm.executorCompanyId" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent">
+                      <option :value="null">Не выбрана</option>
+                      <option v-for="company in ownCompanyOptions" :key="`deal-act-own-company-${company.id}`" :value="company.id">[[ company.name ]]</option>
+                    </select>
+                  </label>
+                  <div class="rounded-2xl border border-crm-border/80 bg-[#102f4a] px-4 py-3">
+                    <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Итого по акту</div>
+                    <div class="mt-1 text-lg font-semibold text-white">[[ formatSettlementAmount(dealActGeneratorTotal, dealActGeneratorCurrency) ]]</div>
+                  </div>
+                </div>
+                <div v-if="!ownCompanyOptions.length" class="mt-4 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                  В списке нет собственных организаций. Создайте компанию с типом «Собственные организации».
+                </div>
+                <div class="mt-5 rounded-2xl border border-crm-border/80 bg-[#102f4a] p-4">
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div class="text-sm font-semibold text-white">Строки акта</div>
+                      <div class="mt-1 text-xs text-crm-muted">Можно скорректировать строку из сделки или добавить несколько услуг.</div>
+                    </div>
+                    <button type="button" @click="addDealActGeneratorItem" class="inline-flex h-9 items-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent">
+                      Добавить строку
+                    </button>
+                  </div>
+                  <div class="mt-4 space-y-3">
+                    <div v-for="(item, index) in dealActGeneratorForm.items" :key="`deal-act-item-${index}`" class="rounded-2xl border border-crm-border/70 bg-[#0b2740] p-3">
+                      <div class="flex items-center justify-between gap-3">
+                        <div class="text-sm font-medium text-white">Строка [[ index + 1 ]]</div>
+                        <button type="button" @click="removeDealActGeneratorItem(index)" class="text-sm text-crm-muted transition hover:text-red-200">Удалить</button>
+                      </div>
+                      <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-12">
+                        <label class="block md:col-span-6">
+                          <span class="text-sm text-crm-muted">Наименование услуги</span>
+                          <textarea v-model="item.description" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"></textarea>
+                        </label>
+                        <label class="block md:col-span-2">
+                          <span class="text-sm text-crm-muted">Количество / часы</span>
+                          <input v-model="item.quantity" type="text" inputmode="decimal" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block md:col-span-2">
+                          <span class="text-sm text-crm-muted">Ед.</span>
+                          <input v-model="item.unit" type="text" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block md:col-span-2">
+                          <span class="text-sm text-crm-muted">Стоимость</span>
+                          <input v-model="item.price" type="text" inputmode="decimal" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent" />
+                        </label>
+                      </div>
+                      <div class="mt-3 text-sm text-crm-muted">Сумма строки: <span class="font-medium text-white">[[ formatSettlementAmount(dealActGeneratorItemTotal(item), dealActGeneratorCurrency) ]]</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="flex flex-col gap-2 border-t border-crm-border bg-[#0f2f4a]/95 px-4 py-4 md:flex-row md:items-center md:justify-end md:px-6">
+                <button type="button" @click="closeDealActGenerator" class="h-11 rounded-xl border border-crm-border bg-transparent px-5 transition hover:bg-white/5">Отмена</button>
+                <button type="button" @click="generateDealAct" :disabled="isDealActGenerating || isDealActGeneratorPreparing || !ownCompanyOptions.length" class="h-11 rounded-xl bg-crm-accent px-5 font-semibold text-white transition hover:bg-crm-accentHover disabled:cursor-not-allowed disabled:opacity-60">
+                  [[ isDealActGenerating ? 'Генерируем...' : 'Сгенерировать акт' ]]
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>

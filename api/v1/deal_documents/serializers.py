@@ -1,7 +1,7 @@
 from django.urls import reverse
 from rest_framework import serializers
 
-from crm.models import DealDocument
+from crm.models import Client, Deal, DealDocument
 
 
 class DealDocumentSerializer(serializers.ModelSerializer):
@@ -65,3 +65,43 @@ class DealDocumentSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ("uploaded_by", "created_at", "updated_at")
+
+
+class DealActLineItemSerializer(serializers.Serializer):
+    description = serializers.CharField(max_length=500)
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=2)
+    unit = serializers.CharField(max_length=32, allow_blank=True, required=False, default="час")
+    price = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+    def validate_description(self, value):
+        normalized = str(value or "").strip()
+        if not normalized:
+            raise serializers.ValidationError("Заполните наименование услуги.")
+        return normalized
+
+    def validate_quantity(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Количество должно быть больше нуля.")
+        return value
+
+    def validate_price(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Стоимость должна быть больше нуля.")
+        return value
+
+    def validate_unit(self, value):
+        normalized = str(value or "").strip()
+        return normalized or "час"
+
+
+class DealActGenerateSerializer(serializers.Serializer):
+    deal = serializers.PrimaryKeyRelatedField(queryset=Deal.objects.select_related("client"))
+    executor_company = serializers.PrimaryKeyRelatedField(
+        queryset=Client.objects.filter(company_type=Client.CompanyType.OWN)
+    )
+    items = DealActLineItemSerializer(many=True)
+
+    def validate_items(self, value):
+        if not value:
+            raise serializers.ValidationError("Добавьте хотя бы одну строку акта.")
+        return value

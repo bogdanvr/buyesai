@@ -99,3 +99,14 @@ class ClientNameUniquenessTests(APITestCase):
         self.assertEqual(detail_response.data["kpp"], "550301001")
         self.assertEqual(detail_response.data["settlement_account"], "40702810900000000001")
         self.assertEqual(detail_response.data["correspondent_account"], "30101810400000000225")
+
+    def test_can_filter_companies_by_type(self):
+        own_company = Client.objects.create(name="Own Company", company_type=Client.CompanyType.OWN)
+        Client.objects.create(name="Customer Company", company_type=Client.CompanyType.CLIENT)
+
+        response = self.client.get(reverse("clients-list"), {"company_type": "own"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"] if isinstance(response.data, dict) and "results" in response.data else response.data
+        result_ids = {item["id"] for item in results}
+        self.assertEqual(result_ids, {own_company.pk})

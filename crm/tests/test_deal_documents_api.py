@@ -29,6 +29,20 @@ class DealDocumentsApiTests(APITestCase):
             correspondent_account="30101810200000000593",
             currency="KZT",
         )
+        self.own_company = Client.objects.create(
+            name="Buseys",
+            legal_name='ООО "Buseys"',
+            company_type=Client.CompanyType.OWN,
+            inn="5501999999",
+            kpp="550101001",
+            ogrn="1205500003763",
+            address="г. Омск, ул. Гагарина, д. 3",
+            bank_name="АО Альфа-Банк",
+            bik="044525593",
+            settlement_account="40702810000000000009",
+            correspondent_account="30101810200000000593",
+            currency="KZT",
+        )
         self.deal = Deal.objects.create(title="Сделка для документов", client=self.company, amount="77000.00", currency="RUB")
 
     @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
@@ -83,16 +97,27 @@ class DealDocumentsApiTests(APITestCase):
         self.assertIn("document_name: brief.docx", self.company.events)
         self.assertIn(f"document_url: {expected_url}", self.company.events)
 
-    @override_settings(
-        ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"],
-        CRM_ACT_EXECUTOR_NAME='ООО "Buseys"',
-        CRM_ACT_EXECUTOR_REQUISITES="ИНН 5501999999, КПП 550101001, г. Омск, р/с 40702810000000000009, АО Альфа-Банк, БИК 044525593",
-    )
+    @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
     def test_can_generate_act_document_for_deal(self):
         response = self.client.post(
             reverse("deal-documents-generate-act"),
             {
                 "deal": self.deal.pk,
+                "executor_company": self.own_company.pk,
+                "items": [
+                    {
+                        "description": "Письменный перевод и оформление текста",
+                        "quantity": "12.00",
+                        "unit": "час",
+                        "price": "3500.00",
+                    },
+                    {
+                        "description": "Устный последовательный перевод",
+                        "quantity": "2.00",
+                        "unit": "час",
+                        "price": "5000.00",
+                    },
+                ],
             },
             format="json",
         )
@@ -102,7 +127,7 @@ class DealDocumentsApiTests(APITestCase):
         self.assertTrue(response.data["original_name"].endswith(".docx"))
 
         realization = SettlementDocument.objects.get(deal=self.deal, document_type=SettlementDocument.DocumentType.REALIZATION)
-        self.assertEqual(str(realization.amount), "77000.00")
+        self.assertEqual(str(realization.amount), "52000.00")
         self.assertEqual(realization.number, "1235")
         self.assertEqual(realization.currency, "KZT")
 
@@ -116,8 +141,10 @@ class DealDocumentsApiTests(APITestCase):
             document_xml = archive.read("word/document.xml").decode("utf-8")
 
         self.assertIn("Акт об оказании услуг", document_xml)
-        self.assertIn("Сделка для документов", document_xml)
-        self.assertIn("77000,00", document_xml.replace(" ", ""))
+        self.assertIn('ООО "Buseys"', document_xml)
+        self.assertIn("Письменный перевод и оформление текста", document_xml)
+        self.assertIn("Устный последовательный перевод", document_xml)
+        self.assertIn("52000,00", document_xml.replace(" ", ""))
         self.assertIn("KZT", document_xml)
 
         download_response = self.client.get(reverse("deal-documents-download", kwargs={"pk": generated_document.pk}))

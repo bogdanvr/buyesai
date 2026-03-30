@@ -1,18 +1,18 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZipFile
 from xml.sax.saxutils import escape
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
-from crm.models import Deal, DealDocument, SettlementContract, SettlementDocument
+from crm.models import Client, Deal, DealDocument, SettlementContract, SettlementDocument
 
 
 RUSSIAN_MONTHS = {
@@ -31,6 +31,18 @@ RUSSIAN_MONTHS = {
 }
 
 
+@dataclass(frozen=True)
+class ActLineItem:
+    description: str
+    quantity: Decimal
+    unit: str
+    price: Decimal
+
+    @property
+    def total(self) -> Decimal:
+        return _quantize_money(self.quantity * self.price)
+
+
 def _format_date_human(value: date | None) -> str:
     if value is None:
         value = timezone.localdate()
@@ -44,13 +56,25 @@ def _format_date_short(value: date | None) -> str:
 
 
 def _format_amount(value: Decimal | int | float | str) -> str:
-    amount = Decimal(value or 0).quantize(Decimal("0.01"))
+    amount = _quantize_money(value)
     formatted = f"{amount:,.2f}"
     return formatted.replace(",", " ").replace(".", ",")
 
 
 def _normalize_text(value: str | None) -> str:
     return str(value or "").strip()
+
+
+def _quantize_money(value: Decimal | int | float | str) -> Decimal:
+    return Decimal(value or 0).quantize(Decimal("0.01"))
+
+
+def _format_compact_number(value: Decimal | int | float | str) -> str:
+    normalized_value = Decimal(value or 0)
+    text = format(normalized_value, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text.replace(".", ",")
 
 
 def _build_party_details(name: str, requisites_parts: list[str]) -> str:
@@ -60,31 +84,39 @@ def _build_party_details(name: str, requisites_parts: list[str]) -> str:
     return f"{name}, {', '.join(normalized_parts)}"
 
 
-def _executor_details() -> tuple[str, str]:
-    name = _normalize_text(getattr(settings, "CRM_ACT_EXECUTOR_NAME", "")) or "Исполнитель"
-    requisites = _normalize_text(getattr(settings, "CRM_ACT_EXECUTOR_REQUISITES", "")) or "Реквизиты исполнителя не заполнены"
-    return name, requisites
+def _company_name(company: Client, fallback_name: str) -> str:
+    return _normalize_text(company.legal_name) or _normalize_text(company.name) or fallback_name
+
+
+def _company_details(company: Client, fallback_name: str) -> tuple[str, str]:
+    company_name = _company_name(company, fallback_name)
+    account_value = _normalize_text(company.settlement_account or company.iban)
+    account_label = "р/с" if _normalize_text(company.currency).upper() == "RUB" else "IBAN"
+    requisites_parts = [
+        f"ИНН {company.inn}" if company.inn else "",
+        f"КПП {company.kpp}" if company.kpp else "",
+        f"ОГРН {company.ogrn}" if company.ogrn else "",
+        company.address or company.actual_address or "",
+        f"{account_label} {account_value}" if account_value else "",
+        f"БИК {company.bik}" if company.bik else "",
+        f"к/с {company.correspondent_account}" if company.correspondent_account else "",
+        company.bank_name or "",
+        company.bank_details or "",
+    ]
+    return company_name, _build_party_details(company_name, requisites_parts)
+
+
+def _executor_details(executor_company: Client) -> tuple[str, str]:
+    if executor_company.company_type != Client.CompanyType.OWN:
+        raise ValidationError({"executor_company": "Выберите собственную организацию."})
+    return _company_details(executor_company, f"Исполнитель #{executor_company.pk}")
 
 
 def _customer_details(deal: Deal) -> tuple[str, str]:
     client = deal.client
     if client is None:
         raise ValidationError({"deal": "Для генерации акта у сделки должна быть выбрана компания."})
-    customer_name = _normalize_text(client.legal_name) or _normalize_text(client.name) or f"Компания #{client.pk}"
-    account_value = _normalize_text(client.settlement_account or client.iban)
-    account_label = "р/с" if _normalize_text(client.currency).upper() == "RUB" else "IBAN"
-    requisites_parts = [
-        f"ИНН {client.inn}" if client.inn else "",
-        f"КПП {client.kpp}" if client.kpp else "",
-        f"ОГРН {client.ogrn}" if client.ogrn else "",
-        client.address or client.actual_address or "",
-        f"{account_label} {account_value}" if account_value else "",
-        f"БИК {client.bik}" if client.bik else "",
-        f"к/с {client.correspondent_account}" if client.correspondent_account else "",
-        client.bank_name or "",
-        client.bank_details or "",
-    ]
-    return customer_name, _build_party_details(customer_name, requisites_parts)
+    return _company_details(client, f"Компания #{client.pk}")
 
 
 def _paragraph(text: str = "", *, bold: bool = False, align: str = "left", size: int = 24, spacing_after: int = 120) -> str:
@@ -129,22 +161,26 @@ def _table_cell(text: str, *, width: int, bold: bool = False, align: str = "left
     )
 
 
-def _service_table(service_name: str, amount: Decimal, currency: str) -> str:
+def _service_table(items: list[ActLineItem]) -> str:
     widths = [700, 4800, 1200, 900, 1600, 1700]
     headers = ["№", "Наименование работ, услуг", "Кол-во", "Ед.", "Цена", "Сумма"]
     header_xml = "".join(
         _table_cell(text, width=width, bold=True, align="center", shaded=True)
         for text, width in zip(headers, widths)
     )
-    amount_text = _format_amount(amount)
-    row_xml = "".join([
-        _table_cell("1", width=widths[0], align="center"),
-        _table_cell(service_name, width=widths[1]),
-        _table_cell("1", width=widths[2], align="center"),
-        _table_cell("усл.", width=widths[3], align="center"),
-        _table_cell(amount_text, width=widths[4], align="right"),
-        _table_cell(amount_text, width=widths[5], align="right"),
-    ])
+    rows_xml = "".join(
+        (
+            "<w:tr>"
+            f"{_table_cell(str(index), width=widths[0], align='center')}"
+            f"{_table_cell(item.description, width=widths[1])}"
+            f"{_table_cell(_format_compact_number(item.quantity), width=widths[2], align='center')}"
+            f"{_table_cell(item.unit or 'час', width=widths[3], align='center')}"
+            f"{_table_cell(_format_amount(item.price), width=widths[4], align='right')}"
+            f"{_table_cell(_format_amount(item.total), width=widths[5], align='right')}"
+            "</w:tr>"
+        )
+        for index, item in enumerate(items, start=1)
+    )
     grid_xml = "".join(f'<w:gridCol w:w="{width}"/>' for width in widths)
     borders_xml = (
         "<w:tblBorders>"
@@ -161,7 +197,7 @@ def _service_table(service_name: str, amount: Decimal, currency: str) -> str:
         f"<w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/>{borders_xml}</w:tblPr>"
         f"<w:tblGrid>{grid_xml}</w:tblGrid>"
         f"<w:tr>{header_xml}</w:tr>"
-        f"<w:tr>{row_xml}</w:tr>"
+        f"{rows_xml}"
         "</w:tbl>"
     )
 
@@ -198,14 +234,14 @@ def _signatures_table(executor_name: str, customer_name: str) -> str:
     )
 
 
-def _document_xml(*, title: str, executor_line: str, customer_line: str, basis_line: str, service_name: str, amount: Decimal, currency: str) -> str:
+def _document_xml(*, title: str, executor_line: str, customer_line: str, basis_line: str, items: list[ActLineItem], amount: Decimal, currency: str) -> str:
     amount_text = _format_amount(amount)
     body = [
         _paragraph(title, bold=True, align="center", size=30, spacing_after=200),
         _paragraph(f"Исполнитель: {executor_line}", size=22),
         _paragraph(f"Заказчик: {customer_line}", size=22),
         _paragraph(f"Основание: {basis_line}", size=22, spacing_after=180),
-        _service_table(service_name, amount, currency),
+        _service_table(items),
         _paragraph("", spacing_after=80),
         _paragraph(f"Итого: {amount_text} {currency}", bold=True, align="right", size=24, spacing_after=160),
         _paragraph(f"Всего оказано услуг на сумму {amount_text} {currency}.", size=22),
@@ -297,8 +333,22 @@ def _app_properties_xml() -> str:
     )
 
 
-def build_act_docx_bytes(*, settlement_document: SettlementDocument, deal: Deal) -> bytes:
-    executor_name, executor_requisites = _executor_details()
+def _coerce_line_item(raw_item: ActLineItem | dict) -> ActLineItem:
+    if isinstance(raw_item, ActLineItem):
+        return raw_item
+    description = _normalize_text(raw_item.get("description"))
+    unit = _normalize_text(raw_item.get("unit")) or "час"
+    quantity = _quantize_money(raw_item.get("quantity"))
+    price = _quantize_money(raw_item.get("price"))
+    if not description:
+        raise ValidationError({"items": "Заполните наименование услуги."})
+    if quantity <= 0 or price <= 0:
+        raise ValidationError({"items": "Количество и стоимость должны быть больше нуля."})
+    return ActLineItem(description=description, quantity=quantity, unit=unit, price=price)
+
+
+def build_act_docx_bytes(*, settlement_document: SettlementDocument, deal: Deal, executor_company: Client, items: list[ActLineItem | dict]) -> bytes:
+    executor_name, executor_requisites = _executor_details(executor_company)
     customer_name, customer_line = _customer_details(deal)
     contract = getattr(settlement_document, "contract", None)
     basis_line = _normalize_text(getattr(contract, "number", "")) or _normalize_text(getattr(contract, "title", ""))
@@ -308,15 +358,15 @@ def build_act_docx_bytes(*, settlement_document: SettlementDocument, deal: Deal)
         basis_line = f"Сделка «{_normalize_text(deal.title) or f'#{deal.pk}'}»"
 
     title = f"Акт об оказании услуг № {settlement_document.number} от {_format_date_human(settlement_document.document_date)}"
-    service_name = _normalize_text(deal.title) or "Услуги по сделке"
+    line_items = [_coerce_line_item(item) for item in items]
     amount = Decimal(settlement_document.amount or 0)
     currency = _normalize_text(settlement_document.currency) or "RUB"
     document_xml = _document_xml(
         title=title,
-        executor_line=_build_party_details(executor_name, [executor_requisites]),
+        executor_line=executor_requisites,
         customer_line=customer_line,
         basis_line=basis_line,
-        service_name=service_name,
+        items=line_items,
         amount=amount,
         currency=currency,
     )
@@ -333,13 +383,16 @@ def build_act_docx_bytes(*, settlement_document: SettlementDocument, deal: Deal)
     return output.getvalue()
 
 
-def generate_deal_act(*, deal: Deal, uploaded_by=None) -> tuple[DealDocument, SettlementDocument]:
+def generate_deal_act(*, deal: Deal, executor_company: Client, items: list[ActLineItem | dict], uploaded_by=None) -> tuple[DealDocument, SettlementDocument]:
     client = getattr(deal, "client", None)
     if client is None:
         raise ValidationError({"deal": "Для генерации акта у сделки должна быть выбрана компания."})
-    amount = Decimal(getattr(deal, "amount", 0) or 0)
+    line_items = [_coerce_line_item(item) for item in items]
+    if not line_items:
+        raise ValidationError({"items": "Добавьте хотя бы одну строку акта."})
+    amount = sum((item.total for item in line_items), Decimal("0.00"))
     if amount <= 0:
-        raise ValidationError({"deal": "Для генерации акта у сделки должна быть указана сумма больше нуля."})
+        raise ValidationError({"items": "Сумма акта должна быть больше нуля."})
 
     with transaction.atomic():
         contract = SettlementContract.objects.filter(client_id=client.pk, is_active=True).order_by("-created_at", "-id").first()
@@ -363,7 +416,15 @@ def generate_deal_act(*, deal: Deal, uploaded_by=None) -> tuple[DealDocument, Se
 
         file_name = f"act-{settlement_document.number or settlement_document.pk}.docx"
         original_name = f"Акт № {settlement_document.number} от {_format_date_short(settlement_document.document_date)}.docx"
-        content = ContentFile(build_act_docx_bytes(settlement_document=settlement_document, deal=deal), name=file_name)
+        content = ContentFile(
+            build_act_docx_bytes(
+                settlement_document=settlement_document,
+                deal=deal,
+                executor_company=executor_company,
+                items=line_items,
+            ),
+            name=file_name,
+        )
         deal_document = DealDocument(deal=deal, original_name=original_name, uploaded_by=uploaded_by)
         deal_document.file.save(file_name, content, save=False)
         deal_document.save()

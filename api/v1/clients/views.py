@@ -12,8 +12,11 @@ class ClientViewSet(ModelViewSet):
         queryset = list_clients()
         is_active = self.request.query_params.get("is_active")
         search_query = self.request.query_params.get("q")
+        company_type = str(self.request.query_params.get("company_type") or "").strip()
         if is_active in {"true", "false"}:
             queryset = queryset.filter(is_active=is_active == "true")
+        if company_type:
+            queryset = queryset.filter(company_type=company_type)
         queryset = apply_text_search(
             queryset,
             search_query,

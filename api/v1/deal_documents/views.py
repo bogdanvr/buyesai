@@ -10,8 +10,8 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.viewsets import ModelViewSet
 
-from api.v1.deal_documents.serializers import DealDocumentSerializer
-from crm.models import Deal, DealDocument
+from api.v1.deal_documents.serializers import DealActGenerateSerializer, DealDocumentSerializer
+from crm.models import DealDocument
 from crm.services.act_generation import generate_deal_act
 
 
@@ -31,14 +31,15 @@ class DealDocumentViewSet(ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="generate-act")
     def generate_act(self, request):
-        deal_id = request.data.get("deal")
-        if not deal_id:
-            raise ValidationError({"deal": "Укажите сделку."})
-        deal = Deal.objects.select_related("client").filter(pk=deal_id).first()
-        if deal is None:
-            raise ValidationError({"deal": "Сделка не найдена."})
+        request_serializer = DealActGenerateSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
         try:
-            deal_document, _ = generate_deal_act(deal=deal, uploaded_by=request.user)
+            deal_document, _ = generate_deal_act(
+                deal=request_serializer.validated_data["deal"],
+                executor_company=request_serializer.validated_data["executor_company"],
+                items=request_serializer.validated_data["items"],
+                uploaded_by=request.user,
+            )
         except DjangoValidationError as exc:
             raise ValidationError(getattr(exc, "message_dict", None) or getattr(exc, "messages", None) or {"detail": str(exc)})
 
