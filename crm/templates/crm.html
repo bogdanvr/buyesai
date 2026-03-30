@@ -4533,7 +4533,6 @@
                               <span v-if="document.dealTitle"> • [[ document.dealTitle ]]</span>
                               <span v-if="document.dueDate"> • оплатить до [[ formatSettlementDate(document.dueDate) ]]</span>
                               <span v-if="document.flowDirectionLabel"> • [[ document.flowDirectionLabel ]]</span>
-                              <span v-if="document.realizationStatusLabel"> • [[ document.realizationStatusLabel ]]</span>
                             </div>
                           </div>
                           <div class="flex items-center gap-2">
@@ -4553,6 +4552,17 @@
                             <span :class="settlementDocumentStatusClass(document)" class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold">
                               [[ settlementDocumentStatusLabel(document) ]]
                             </span>
+                            <button
+                              v-if="document.documentType === 'realization'"
+                              type="button"
+                              :title="isCompanySettlementDocumentStatusSaving(document.id) ? 'Сохраняем статус...' : 'Кликните, чтобы сменить статус акта'"
+                              :class="settlementRealizationStatusClass(document)"
+                              :disabled="isCompanySettlementDocumentStatusSaving(document.id)"
+                              @click="cycleCompanySettlementRealizationStatus(document)"
+                              class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              [[ isCompanySettlementDocumentStatusSaving(document.id) ? 'Сохраняем...' : settlementRealizationStatusLabel(document) ]]
+                            </button>
                           </div>
                         </div>
                         <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
@@ -4568,19 +4578,6 @@
                             <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Остаток</div>
                             <div class="mt-1 text-white">[[ formatSettlementAmount(document.openAmount, document.currency) ]]</div>
                           </div>
-                        </div>
-                        <div v-if="document.documentType === 'realization'" class="mt-3 max-w-xs">
-                          <label class="block">
-                            <span class="text-xs uppercase tracking-[0.12em] text-crm-muted">Статус акта</span>
-                            <select
-                              :value="document.realizationStatus || 'created'"
-                              @change="updateCompanySettlementRealizationStatus(document, $event.target.value)"
-                              :disabled="isCompanySettlementDocumentStatusSaving(document.id)"
-                              class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <option v-for="option in settlementRealizationStatusOptions" :key="`settlement-realization-inline-${document.id}-${option.value}`" :value="option.value">[[ option.label ]]</option>
-                            </select>
-                          </label>
                         </div>
                         <div v-if="document.fileUrl" class="mt-3 text-xs text-crm-muted [overflow-wrap:anywhere]">
                           Файл: <a :href="document.fileUrl" target="_blank" rel="noopener noreferrer" class="text-white transition hover:text-crm-accent">[[ document.originalName || 'Открыть документ' ]]</a>

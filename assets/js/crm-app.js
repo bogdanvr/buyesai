@@ -4210,9 +4210,9 @@
         settlementDocumentStatusLabel(document) {
           const openAmount = Number(document?.openAmount || 0);
           const closedAmount = Number(document?.closedAmount || 0);
-          if (openAmount <= 0) return "Закрыт";
-          if (closedAmount > 0) return "Частично закрыт";
-          return "Открыт";
+          if (openAmount <= 0) return "Погашен";
+          if (closedAmount > 0) return "Частично погашен";
+          return "Не погашен";
         },
         settlementDocumentStatusClass(document) {
           const openAmount = Number(document?.openAmount || 0);
@@ -4220,6 +4220,29 @@
           if (openAmount <= 0) return "border-emerald-400/30 bg-emerald-400/10 text-emerald-200";
           if (closedAmount > 0) return "border-amber-400/30 bg-amber-400/10 text-amber-200";
           return "border-sky-400/30 bg-sky-400/10 text-sky-200";
+        },
+        settlementRealizationStatusLabel(document) {
+          const status = String(document?.realizationStatus || "created").trim() || "created";
+          const option = (this.settlementRealizationStatusOptions || []).find((item) => String(item.value || "") === status);
+          return option?.label || "Создан";
+        },
+        settlementRealizationStatusClass(document) {
+          const status = String(document?.realizationStatus || "created").trim() || "created";
+          if (status === "signed") return "border-emerald-400/30 bg-emerald-400/10 text-emerald-200";
+          if (status === "sent_to_client") return "border-amber-400/30 bg-amber-400/10 text-amber-200";
+          return "border-slate-300/25 bg-slate-300/10 text-slate-100";
+        },
+        nextSettlementRealizationStatus(document) {
+          const statusOrder = (this.settlementRealizationStatusOptions || []).map((item) => String(item.value || "")).filter(Boolean);
+          if (!statusOrder.length) {
+            return "created";
+          }
+          const currentStatus = String(document?.realizationStatus || "created").trim() || "created";
+          const currentIndex = statusOrder.indexOf(currentStatus);
+          if (currentIndex === -1 || currentIndex === statusOrder.length - 1) {
+            return statusOrder[0];
+          }
+          return statusOrder[currentIndex + 1];
         },
         settlementHistoryRoleLabel(item) {
           const role = String(item?.historyRole || item?.history_role || "").trim();
@@ -4355,6 +4378,15 @@
             delete nextSavingState[String(documentId)];
             this.companySettlementDocumentStatusSaving = nextSavingState;
           }
+        },
+        async cycleCompanySettlementRealizationStatus(document) {
+          if (String(document?.documentType || "") !== "realization") {
+            return;
+          }
+          if (this.isCompanySettlementDocumentStatusSaving(document?.id)) {
+            return;
+          }
+          await this.updateCompanySettlementRealizationStatus(document, this.nextSettlementRealizationStatus(document));
         },
         companySettlementSourceDocuments() {
           return (this.companySettlementDocuments || []).filter((item) => item.canAllocateAsSource && Number(item.openAmount || 0) > 0);
