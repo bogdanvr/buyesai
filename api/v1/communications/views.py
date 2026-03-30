@@ -18,7 +18,11 @@ from api.v1.communications.serializers import (
     MessageSerializer,
 )
 from crm.models import Client, Contact, Deal, DealDocument, TouchResult
-from crm_communications.document_delivery import attach_deal_document_pdf_to_message
+from crm_communications.deal_document_shares import (
+    apply_share_link_to_message,
+    create_document_share,
+    record_share_message_status,
+)
 from crm_communications.email_outbound import EmailOutboundMessageService
 from crm_communications.models import Conversation, ConversationRoute, DeliveryFailureQueue, Message, MessageAttemptLog
 from crm_communications.services import ConversationBindingService, MessageQueueService, TelegramOutboundMessageService, normalize_telegram_key
@@ -162,7 +166,7 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
         except ValueError as exc:
             return Response({"deal_document": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         if deal_document is not None and conversation.channel != "email":
-            return Response({"deal_document": "Отправка документа с PDF-вложением сейчас поддерживается только для email-диалогов."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"deal_document": "Отправка документа ссылкой сейчас поддерживается только для email-диалогов."}, status=status.HTTP_400_BAD_REQUEST)
         message = Message.objects.create(
             conversation=conversation,
             channel=conversation.channel,
@@ -178,9 +182,16 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
             body_preview=str(payload.get("body_text") or payload.get("subject") or "").strip()[:500],
             external_recipient_key=str(payload.get("recipient") or "").strip(),
         )
+        share = None
         if deal_document is not None:
             try:
-                attach_deal_document_pdf_to_message(message=message, document=deal_document)
+                share = create_document_share(document=deal_document, message=message, request=request)
+                apply_share_link_to_message(
+                    message=message,
+                    share=share,
+                    document_name=str(deal_document.original_name or "").strip() or "документ",
+                    request=request,
+                )
             except DjangoValidationError as exc:
                 message.delete()
                 return Response(getattr(exc, "message_dict", None) or {"deal_document": getattr(exc, "messages", [str(exc)])}, status=status.HTTP_400_BAD_REQUEST)
@@ -197,6 +208,8 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
             touch_summary=str(payload.get("touch_summary") or "").strip(),
         )
         message.refresh_from_db()
+        if share is not None:
+            record_share_message_status(share=share, message=message)
         return Response(MessageSerializer(message, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["post"])
@@ -221,7 +234,7 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
         except ValueError as exc:
             return Response({"deal_document": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         if deal_document is not None and channel != "email":
-            return Response({"deal_document": "Отправка документа с PDF-вложением сейчас поддерживается только для email-диалогов."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"deal_document": "Отправка документа ссылкой сейчас поддерживается только для email-диалогов."}, status=status.HTTP_400_BAD_REQUEST)
 
         conversation = Conversation.objects.create(
             channel=channel,
@@ -270,9 +283,16 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
             body_preview=str(body_text or subject or "").strip()[:500],
             external_recipient_key=recipient,
         )
+        share = None
         if deal_document is not None:
             try:
-                attach_deal_document_pdf_to_message(message=message, document=deal_document)
+                share = create_document_share(document=deal_document, message=message, request=request)
+                apply_share_link_to_message(
+                    message=message,
+                    share=share,
+                    document_name=str(deal_document.original_name or "").strip() or "документ",
+                    request=request,
+                )
             except DjangoValidationError as exc:
                 message.delete()
                 return Response(getattr(exc, "message_dict", None) or {"deal_document": getattr(exc, "messages", [str(exc)])}, status=status.HTTP_400_BAD_REQUEST)
@@ -290,6 +310,8 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
             touch_summary=str(payload.get("touch_summary") or "").strip(),
         )
         message.refresh_from_db()
+        if share is not None:
+            record_share_message_status(share=share, message=message)
         return Response(
             {
                 "conversation": ConversationSerializer(conversation, context={"request": request}).data,

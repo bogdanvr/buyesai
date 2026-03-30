@@ -2,6 +2,8 @@ from django.urls import reverse
 from rest_framework import serializers
 
 from crm.models import Client, Deal, DealDocument
+from crm_communications.deal_document_shares import build_share_download_url, build_share_public_url
+from crm_communications.models import DealDocumentShare, DealDocumentShareEvent
 
 
 class DealDocumentSerializer(serializers.ModelSerializer):
@@ -105,3 +107,70 @@ class DealActGenerateSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("Добавьте хотя бы одну строку акта.")
         return value
+
+
+class DealDocumentShareEventSerializer(serializers.ModelSerializer):
+    event_type_label = serializers.CharField(source="get_event_type_display", read_only=True)
+
+    class Meta:
+        model = DealDocumentShareEvent
+        fields = [
+            "id",
+            "event_type",
+            "event_type_label",
+            "happened_at",
+            "ip_address",
+            "user_agent",
+            "metadata",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
+class DealDocumentShareSerializer(serializers.ModelSerializer):
+    public_url = serializers.SerializerMethodField()
+    download_url = serializers.SerializerMethodField()
+    message_status = serializers.CharField(source="message.status", read_only=True)
+    sent_at = serializers.DateTimeField(source="message.sent_at", read_only=True)
+    failed_at = serializers.DateTimeField(source="message.failed_at", read_only=True)
+    last_error_message = serializers.CharField(source="message.last_error_message", read_only=True)
+    subject = serializers.CharField(source="message.subject", read_only=True)
+    recipient = serializers.SerializerMethodField()
+    events = DealDocumentShareEventSerializer(many=True, read_only=True)
+
+    def get_public_url(self, obj):
+        return build_share_public_url(share=obj, request=self.context.get("request"))
+
+    def get_download_url(self, obj):
+        return build_share_download_url(share=obj, request=self.context.get("request"))
+
+    def get_recipient(self, obj):
+        return str(getattr(obj, "recipient", "") or getattr(getattr(obj, "message", None), "external_recipient_key", "") or "").strip()
+
+    class Meta:
+        model = DealDocumentShare
+        fields = [
+            "id",
+            "channel",
+            "recipient",
+            "message_status",
+            "sent_at",
+            "failed_at",
+            "last_error_message",
+            "subject",
+            "public_url",
+            "download_url",
+            "first_opened_at",
+            "last_opened_at",
+            "last_downloaded_at",
+            "open_count",
+            "download_count",
+            "first_open_ip",
+            "last_open_ip",
+            "first_open_user_agent",
+            "last_open_user_agent",
+            "events",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields

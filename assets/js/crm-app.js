@@ -161,6 +161,7 @@
           isDealCommunicationsLoading: false,
           isDealDocumentSendSidebarPreparing: false,
           isDealDocumentSendLoading: false,
+          isDealDocumentDeliveryHistoryLoading: false,
           isDealDocumentSendMessagesLoading: false,
           isDealConversationMessagesLoading: false,
           isDealCommunicationSending: false,
@@ -488,6 +489,7 @@
           dealConversationMessages: [],
           activeDealConversationId: null,
           dealDocumentSendConversations: [],
+          dealDocumentDeliveryHistory: [],
           dealDocumentSendMessages: [],
           activeDealDocumentSendConversationId: null,
           showDealDocumentSendStartForm: false,
@@ -4807,6 +4809,13 @@
           };
           return labels[code] || "Без статуса";
         },
+        communicationMessageStatusClass(value) {
+          const code = String(value || "").trim().toLowerCase();
+          if (code === "sent" || code === "delivered") return "border-emerald-400/30 bg-emerald-400/10 text-emerald-200";
+          if (code === "queued" || code === "sending") return "border-amber-400/30 bg-amber-400/10 text-amber-200";
+          if (code === "failed" || code === "requires_manual_retry") return "border-red-400/30 bg-red-400/10 text-red-200";
+          return "border-crm-border bg-[#12324e] text-crm-text";
+        },
         communicationMessageDirectionLabel(value) {
           return String(value || "").trim().toLowerCase() === "incoming" ? "Входящее" : "Исходящее";
         },
@@ -4865,6 +4874,45 @@
               sizeBytes: Number.parseInt(attachment.size_bytes || 0, 10) || 0,
               fileUrl: attachment.file_url || "",
             })) : [],
+          };
+        },
+        mapDealDocumentDeliveryEvent(item) {
+          const metadata = item && typeof item.metadata === "object" && !Array.isArray(item.metadata) ? item.metadata : {};
+          return {
+            id: this.toIntOrNull(item.id),
+            eventType: String(item.event_type || "").trim(),
+            eventTypeLabel: String(item.event_type_label || "").trim() || "Событие",
+            happenedAt: String(item.happened_at || item.created_at || "").trim(),
+            ipAddress: String(item.ip_address || "").trim(),
+            userAgent: String(item.user_agent || "").trim(),
+            metadata,
+          };
+        },
+        mapDealDocumentDeliveryShare(item) {
+          return {
+            id: this.toIntOrNull(item.id),
+            channel: String(item.channel || "").trim().toLowerCase(),
+            recipient: String(item.recipient || "").trim(),
+            messageStatus: String(item.message_status || "").trim().toLowerCase(),
+            messageStatusLabel: this.communicationMessageStatusLabel(item.message_status),
+            subject: String(item.subject || "").trim(),
+            sentAt: String(item.sent_at || "").trim(),
+            failedAt: String(item.failed_at || "").trim(),
+            lastErrorMessage: String(item.last_error_message || "").trim(),
+            publicUrl: String(item.public_url || "").trim(),
+            downloadUrl: String(item.download_url || "").trim(),
+            firstOpenedAt: String(item.first_opened_at || "").trim(),
+            lastOpenedAt: String(item.last_opened_at || "").trim(),
+            lastDownloadedAt: String(item.last_downloaded_at || "").trim(),
+            openCount: Math.max(0, Number(item.open_count) || 0),
+            downloadCount: Math.max(0, Number(item.download_count) || 0),
+            firstOpenIp: String(item.first_open_ip || "").trim(),
+            lastOpenIp: String(item.last_open_ip || "").trim(),
+            firstOpenUserAgent: String(item.first_open_user_agent || "").trim(),
+            lastOpenUserAgent: String(item.last_open_user_agent || "").trim(),
+            events: Array.isArray(item.events) ? item.events.map((eventItem) => this.mapDealDocumentDeliveryEvent(eventItem)) : [],
+            createdAt: String(item.created_at || "").trim(),
+            updatedAt: String(item.updated_at || "").trim(),
           };
         },
         getActiveCompanyConversation() {
@@ -4959,7 +5007,7 @@
           const documentName = String(this.dealDocumentSendTarget?.originalName || "").trim();
           return {
             subject: documentName || String(conversation?.subject || "").trim() || (this.forms.deals.title ? `По сделке: ${this.forms.deals.title}` : ""),
-            bodyText: documentName ? `Направляю во вложении ${documentName}.` : "",
+            bodyText: documentName ? `Направляю ссылку на ${documentName}.` : "",
             recipient: this.deriveConversationRecipientFromMessages(conversation, this.dealDocumentSendMessages),
           };
         },
@@ -4970,7 +5018,7 @@
             contactId: this.toIntOrNull(this.dealSummaryContact?.id),
             recipient: "",
             subject: documentName || (this.forms.deals.title ? `По сделке: ${this.forms.deals.title}` : ""),
-            bodyText: documentName ? `Направляю во вложении ${documentName}.` : "",
+            bodyText: documentName ? `Направляю ссылку на ${documentName}.` : "",
           };
         },
         syncDealDocumentSendStartRecipient() {
@@ -5007,11 +5055,13 @@
           this.showDealDocumentSendSidebar = false;
           this.isDealDocumentSendSidebarPreparing = false;
           this.isDealDocumentSendLoading = false;
+          this.isDealDocumentDeliveryHistoryLoading = false;
           this.isDealDocumentSendMessagesLoading = false;
           this.isDealDocumentSendSending = false;
           this.isDealDocumentSendStarting = false;
           this.dealDocumentSendTarget = null;
           this.dealDocumentSendConversations = [];
+          this.dealDocumentDeliveryHistory = [];
           this.dealDocumentSendMessages = [];
           this.activeDealDocumentSendConversationId = null;
           this.showDealDocumentSendStartForm = false;
@@ -5021,6 +5071,23 @@
             recipient: "",
           };
           this.dealDocumentSendStartForm = this.getDefaultDealDocumentSendStartForm();
+        },
+        async loadDealDocumentDeliveryHistory(documentId, options = {}) {
+          const normalizedDocumentId = this.toIntOrNull(documentId);
+          if (!normalizedDocumentId) {
+            this.dealDocumentDeliveryHistory = [];
+            return;
+          }
+          if (!options.silent) {
+            this.isDealDocumentDeliveryHistoryLoading = true;
+          }
+          try {
+            const payload = await this.apiRequest(`/api/v1/deal-documents/${normalizedDocumentId}/delivery-history/`);
+            const records = Array.isArray(payload) ? payload : this.normalizePaginatedResponse(payload);
+            this.dealDocumentDeliveryHistory = records.map((item) => this.mapDealDocumentDeliveryShare(item));
+          } finally {
+            this.isDealDocumentDeliveryHistoryLoading = false;
+          }
         },
         async loadDealDocumentSendConversationMessages(conversationId, options = {}) {
           const normalizedConversationId = this.toIntOrNull(conversationId);
@@ -5109,6 +5176,7 @@
             await Promise.all([
               this.loadContactsForSelectedDealCompany(),
               this.loadDealDocumentSendConversations({ preserveSelection: false, forceReloadMessages: true }),
+              this.loadDealDocumentDeliveryHistory(documentId, { silent: true }),
             ]);
             this.dealDocumentSendStartForm = this.getDefaultDealDocumentSendStartForm();
             this.syncDealDocumentSendStartRecipient();
@@ -5531,12 +5599,20 @@
                 touch_summary: `Отправлен документ: ${this.dealDocumentSendTarget.originalName || "Документ"}`,
               }
             });
-            this.ensureOutgoingMessageDelivered(response, "Письмо");
+            let deliveryError = null;
+            try {
+              this.ensureOutgoingMessageDelivered(response, "Письмо");
+            } catch (error) {
+              deliveryError = error;
+            }
             await Promise.all([
               this.loadDealDocumentSendConversations({ preserveSelection: true, forceReloadMessages: true, silent: true }),
+              this.loadDealDocumentDeliveryHistory(documentId, { silent: true }),
               this.refreshAfterDealDocumentSend(),
             ]);
-            this.closeDealDocumentSendSidebar();
+            if (deliveryError) {
+              throw deliveryError;
+            }
           } catch (error) {
             this.setUiError(`Ошибка отправки документа: ${error.message}`, { modal: true });
           } finally {
@@ -5564,12 +5640,25 @@
                 touch_summary: `Отправлен документ: ${this.dealDocumentSendTarget.originalName || "Документ"}`,
               }
             });
-            this.ensureOutgoingMessageDelivered(response, "Письмо");
+            let deliveryError = null;
+            try {
+              this.ensureOutgoingMessageDelivered(response, "Письмо");
+            } catch (error) {
+              deliveryError = error;
+            }
+            const createdConversationId = this.toIntOrNull(response?.conversation?.id);
             await Promise.all([
               this.loadDealDocumentSendConversations({ preserveSelection: false, forceReloadMessages: true, silent: true }),
+              this.loadDealDocumentDeliveryHistory(documentId, { silent: true }),
               this.refreshAfterDealDocumentSend(),
             ]);
-            this.closeDealDocumentSendSidebar();
+            this.showDealDocumentSendStartForm = false;
+            if (createdConversationId) {
+              await this.selectDealDocumentSendConversation(createdConversationId, { silent: true });
+            }
+            if (deliveryError) {
+              throw deliveryError;
+            }
           } catch (error) {
             this.setUiError(`Ошибка создания диалога для отправки документа: ${error.message}`, { modal: true });
           } finally {

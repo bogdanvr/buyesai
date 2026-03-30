@@ -1,8 +1,10 @@
 from pathlib import Path
+import uuid
 
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 from crm.models.common import TimestampedModel
 
@@ -21,6 +23,10 @@ def message_attachment_upload_to(instance, filename: str) -> str:
     message_id = getattr(instance, "message_id", None) or getattr(getattr(instance, "message", None), "id", None) or "new"
     safe_name = truncate_attachment_filename(filename)
     return f"communications/message_{message_id}/{safe_name}"
+
+
+def generate_share_token() -> str:
+    return uuid.uuid4().hex
 
 
 class CommunicationChannelCode(models.TextChoices):
@@ -82,6 +88,13 @@ class DeliveryFailureResolutionStatus(models.TextChoices):
     IN_PROGRESS = "in_progress", "В работе"
     RESOLVED = "resolved", "Решена"
     CLOSED = "closed", "Закрыта"
+
+
+class DealDocumentShareEventType(models.TextChoices):
+    EMAIL_SENT = "email_sent", "Письмо отправлено"
+    EMAIL_FAILED = "email_failed", "Ошибка отправки письма"
+    PAGE_OPENED = "page_opened", "Страница документа открыта"
+    PDF_DOWNLOADED = "pdf_downloaded", "PDF документа скачан"
 
 
 class Conversation(TimestampedModel):
@@ -415,6 +428,93 @@ class MessageAttachment(TimestampedModel):
 
     def __str__(self):
         return self.original_name or self.file.name.rsplit("/", 1)[-1] or f"Вложение #{self.pk}"
+
+
+class DealDocumentShare(TimestampedModel):
+    document = models.ForeignKey(
+        "crm.DealDocument",
+        related_name="shares",
+        on_delete=models.CASCADE,
+        verbose_name="Документ сделки",
+    )
+    message = models.ForeignKey(
+        "crm_communications.Message",
+        related_name="deal_document_shares",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Сообщение",
+    )
+    channel = models.CharField(
+        max_length=32,
+        choices=CommunicationChannelCode.choices,
+        default=CommunicationChannelCode.EMAIL,
+        verbose_name="Канал",
+    )
+    recipient = models.CharField(max_length=255, blank=True, default="", verbose_name="Получатель")
+    token = models.CharField(max_length=32, unique=True, db_index=True, default=generate_share_token, verbose_name="Публичный токен")
+    first_opened_at = models.DateTimeField(blank=True, null=True, verbose_name="Первое открытие страницы")
+    last_opened_at = models.DateTimeField(blank=True, null=True, verbose_name="Последнее открытие страницы")
+    last_downloaded_at = models.DateTimeField(blank=True, null=True, verbose_name="Последнее скачивание PDF")
+    open_count = models.PositiveIntegerField(default=0, verbose_name="Количество открытий страницы")
+    download_count = models.PositiveIntegerField(default=0, verbose_name="Количество скачиваний PDF")
+    first_open_ip = models.GenericIPAddressField(blank=True, null=True, verbose_name="IP первого открытия")
+    last_open_ip = models.GenericIPAddressField(blank=True, null=True, verbose_name="IP последнего открытия")
+    first_open_user_agent = models.TextField(blank=True, default="", verbose_name="User-Agent первого открытия")
+    last_open_user_agent = models.TextField(blank=True, default="", verbose_name="User-Agent последнего открытия")
+
+    class Meta:
+        verbose_name = "Публичная отправка документа сделки"
+        verbose_name_plural = "Публичные отправки документов сделки"
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(fields=["document"]),
+            models.Index(fields=["message"]),
+            models.Index(fields=["channel"]),
+            models.Index(fields=["last_opened_at"]),
+        ]
+
+    def __str__(self):
+        return f"Share #{self.pk} for document #{self.document_id}"
+
+
+class DealDocumentShareEvent(TimestampedModel):
+    share = models.ForeignKey(
+        "crm_communications.DealDocumentShare",
+        related_name="events",
+        on_delete=models.CASCADE,
+        verbose_name="Публичная отправка",
+    )
+    message = models.ForeignKey(
+        "crm_communications.Message",
+        related_name="deal_document_share_events",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Сообщение",
+    )
+    event_type = models.CharField(
+        max_length=32,
+        choices=DealDocumentShareEventType.choices,
+        verbose_name="Тип события",
+    )
+    happened_at = models.DateTimeField(default=timezone.now, db_index=True, verbose_name="Когда произошло")
+    ip_address = models.GenericIPAddressField(blank=True, null=True, verbose_name="IP")
+    user_agent = models.TextField(blank=True, default="", verbose_name="User-Agent")
+    metadata = models.JSONField(default=dict, blank=True, verbose_name="Метаданные")
+
+    class Meta:
+        verbose_name = "Событие публичной отправки документа"
+        verbose_name_plural = "События публичных отправок документов"
+        ordering = ("-happened_at", "-id")
+        indexes = [
+            models.Index(fields=["share"]),
+            models.Index(fields=["event_type"]),
+            models.Index(fields=["message"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_event_type_display()} #{self.pk}"
 
 
 class MessageAttemptLog(TimestampedModel):

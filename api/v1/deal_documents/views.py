@@ -10,7 +10,7 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.viewsets import ModelViewSet
 
-from api.v1.deal_documents.serializers import DealActGenerateSerializer, DealDocumentSerializer
+from api.v1.deal_documents.serializers import DealActGenerateSerializer, DealDocumentSerializer, DealDocumentShareSerializer
 from crm.models import DealDocument
 from crm.services.act_generation import generate_deal_act, generate_deal_invoice
 
@@ -79,3 +79,10 @@ class DealDocumentViewSet(ModelViewSet):
         response = FileResponse(file_handle, as_attachment=False, filename=filename, content_type=content_type or "application/octet-stream")
         response["Content-Disposition"] = content_disposition_header(False, filename)
         return response
+
+    @action(detail=True, methods=["get"], url_path="delivery-history")
+    def delivery_history(self, request, pk=None):
+        instance = self.get_object()
+        queryset = instance.shares.select_related("message").prefetch_related("events").order_by("-created_at", "-id")
+        serializer = DealDocumentShareSerializer(queryset, many=True, context={"request": request})
+        return Response(serializer.data)

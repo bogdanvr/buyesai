@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ document.original_name|default:"Документ" }}</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f7fb;
+      color: #10263d;
+    }
+    .page {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 18px;
+      border: 1px solid #dbe6f3;
+      box-shadow: 0 18px 40px rgba(14, 39, 64, 0.08);
+      padding: 28px;
+    }
+    .eyebrow {
+      margin: 0 0 10px;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #5e7896;
+    }
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.2;
+    }
+    .meta {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .meta-item {
+      border-radius: 14px;
+      background: #f7fafd;
+      border: 1px solid #dbe6f3;
+      padding: 14px 16px;
+    }
+    .meta-item strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #6884a2;
+    }
+    .actions {
+      margin-top: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 18px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 700;
+      transition: 0.2s ease;
+    }
+    .button-primary {
+      background: #153b5e;
+      color: #fff;
+    }
+    .button-secondary {
+      background: #edf4fb;
+      color: #153b5e;
+      border: 1px solid #c9d9ea;
+    }
+    .note {
+      margin-top: 18px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #5e7896;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <p class="eyebrow">Документ сделки</p>
+      <h1>{{ document.original_name|default:"Документ" }}</h1>
+
+      <div class="meta">
+        <div class="meta-item">
+          <strong>Сделка</strong>
+          {{ deal.title|default:"Не указана" }}
+        </div>
+        <div class="meta-item">
+          <strong>Компания</strong>
+          {{ company.name|default:"Не указана" }}
+        </div>
+        <div class="meta-item">
+          <strong>Отправлено</strong>
+          {% if share.message and share.message.sent_at %}{{ share.message.sent_at }}{% else %}Статус уточняется{% endif %}
+        </div>
+      </div>
+
+      <div class="actions">
+        <a class="button button-primary" href="{{ download_url }}">Скачать PDF</a>
+        <a class="button button-secondary" href="{{ public_url }}">Обновить страницу</a>
+      </div>
+
+      <p class="note">
+        Скачивание PDF фиксируется отдельно. Открытие этой страницы также попадает в историю документа.
+      </p>
+    </div>
+  </div>
+</body>
+</html>

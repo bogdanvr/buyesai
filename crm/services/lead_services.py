@@ -264,6 +264,22 @@ def _upsert_contact_from_lead(*, client: Client, lead: Lead) -> None:
         contact.save(update_fields=update_fields)
 
 
+def sync_lead_contact_to_client(*, lead: Lead, client: Client) -> None:
+    if client is None:
+        return
+
+    client_update_fields = []
+    lead_email = _text_or_empty(getattr(lead, "email", ""))
+    if lead_email and not _text_or_empty(client.email):
+        client.email = lead_email
+        client_update_fields.append("email")
+    if client_update_fields:
+        client_update_fields.append("updated_at")
+        client.save(update_fields=client_update_fields)
+
+    _upsert_contact_from_lead(client=client, lead=lead)
+
+
 def _find_duplicate_lead(*, payload: dict, website_session=None) -> Lead | None:
     if website_session is not None:
         existing = (
@@ -552,15 +568,7 @@ def convert_lead_to_deal(
     lead.converted_at = timezone.now()
     lead.save(update_fields=["client", "converted_at", "updated_at"])
     if target_client is not None:
-        client_update_fields = []
-        lead_email = _text_or_empty(lead.email)
-        if lead_email and not _text_or_empty(target_client.email):
-            target_client.email = lead_email
-            client_update_fields.append("email")
-        if client_update_fields:
-            client_update_fields.append("updated_at")
-            target_client.save(update_fields=client_update_fields)
-        _upsert_contact_from_lead(client=target_client, lead=lead)
+        sync_lead_contact_to_client(lead=lead, client=target_client)
     if target_client is not None:
         for lead_document in lead.documents.all().order_by("id"):
             if ClientDocument.objects.filter(

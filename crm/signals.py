@@ -28,7 +28,7 @@ from crm.services.automation import (
     should_write_touch_timeline,
     upsert_touch_follow_up_task,
 )
-from crm.services.lead_services import convert_lead_to_deal
+from crm.services.lead_services import convert_lead_to_deal, sync_lead_contact_to_client
 
 
 logger = logging.getLogger(__name__)
@@ -1069,6 +1069,26 @@ def deal_system_events_signal(sender, instance: Deal, created, **kwargs):
         )
         _append_deal_event(instance.pk, entry)
         _append_client_event(instance.client_id, entry)
+
+
+@receiver(post_save, sender=Deal)
+def deal_sync_lead_contact_on_first_company_bind(sender, instance: Deal, created, **kwargs):
+    if instance.client_id is None or instance.lead_id is None:
+        return
+
+    previous = getattr(instance, "_previous_deal_state", None)
+    if created:
+        previous_client_id = None
+    else:
+        previous_client_id = getattr(previous, "client_id", None) if previous is not None else instance.client_id
+
+    if previous_client_id is not None:
+        return
+
+    if instance.lead is None or instance.client is None:
+        return
+
+    sync_lead_contact_to_client(lead=instance.lead, client=instance.client)
 
 
 @receiver(post_save, sender=Deal)

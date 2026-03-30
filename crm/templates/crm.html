@@ -606,7 +606,7 @@
               <div class="min-w-0">
                 <div class="text-lg font-semibold text-white [overflow-wrap:anywhere]">Отправить документ</div>
                 <div class="mt-1 text-sm text-crm-muted [overflow-wrap:anywhere]">[[ dealDocumentSendTarget?.originalName || 'Документ сделки' ]]</div>
-                <div class="mt-1 text-xs text-crm-muted">Вложение будет отправлено как PDF: [[ dealDocumentSendAttachmentName ]]</div>
+                <div class="mt-1 text-xs text-crm-muted">В письмо будет добавлена ссылка на страницу документа на нашем сайте.</div>
               </div>
               <button
                 type="button"
@@ -626,7 +626,92 @@
                 <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Документ</div>
                 <div class="mt-2 text-sm font-semibold text-white [overflow-wrap:anywhere]">[[ dealDocumentSendTarget?.originalName || 'Документ сделки' ]]</div>
                 <div class="mt-2 inline-flex max-w-full items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 py-2 text-xs font-semibold text-white">
-                  PDF-вложение: [[ dealDocumentSendAttachmentName ]]
+                  Получатель откроет страницу документа и сможет скачать PDF оттуда.
+                </div>
+              </div>
+
+              <div class="mt-4 rounded-2xl border border-crm-border bg-[#102f4a] p-4">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Статус отправок</div>
+                  <div v-if="isDealDocumentDeliveryHistoryLoading" class="text-xs text-crm-muted">Обновляем...</div>
+                </div>
+                <div v-if="!isDealDocumentDeliveryHistoryLoading && dealDocumentDeliveryHistory.length === 0" class="mt-3 text-sm text-crm-muted">
+                  Отправок этого документа пока не было.
+                </div>
+                <div v-else class="mt-3 space-y-3">
+                  <div
+                    v-for="share in dealDocumentDeliveryHistory"
+                    :key="`deal-document-share-${share.id}`"
+                    class="rounded-2xl border border-crm-border bg-[#0f2f4a] p-3"
+                  >
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                      <div class="min-w-0">
+                        <div class="text-sm font-semibold text-white [overflow-wrap:anywhere]">
+                          [[ share.recipient || share.subject || 'Отправка документа' ]]
+                        </div>
+                        <div class="mt-1 text-xs text-crm-muted">
+                          [[ formatEventTimestamp(share.sentAt || share.failedAt || share.createdAt) ]]
+                        </div>
+                      </div>
+                      <span
+                        :class="[
+                          'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold',
+                          communicationMessageStatusClass(share.messageStatus)
+                        ]"
+                      >
+                        [[ share.messageStatusLabel ]]
+                      </span>
+                    </div>
+
+                    <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                      <div class="rounded-xl border border-crm-border/70 bg-[#12324e] px-3 py-2">
+                        <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Открытия страницы</div>
+                        <div class="mt-1 text-sm font-semibold text-white">[[ share.openCount ]]</div>
+                        <div v-if="share.firstOpenedAt" class="mt-1 text-xs text-crm-muted">Первое: [[ formatEventTimestamp(share.firstOpenedAt) ]]</div>
+                        <div v-if="share.lastOpenedAt" class="text-xs text-crm-muted">Последнее: [[ formatEventTimestamp(share.lastOpenedAt) ]]</div>
+                      </div>
+                      <div class="rounded-xl border border-crm-border/70 bg-[#12324e] px-3 py-2">
+                        <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Скачивания PDF</div>
+                        <div class="mt-1 text-sm font-semibold text-white">[[ share.downloadCount ]]</div>
+                        <div v-if="share.lastDownloadedAt" class="mt-1 text-xs text-crm-muted">Последнее: [[ formatEventTimestamp(share.lastDownloadedAt) ]]</div>
+                        <div v-if="share.lastErrorMessage" class="text-xs text-red-200 [overflow-wrap:anywhere]">[[ share.lastErrorMessage ]]</div>
+                      </div>
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <a
+                        :href="share.publicUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex h-8 items-center rounded-lg border border-crm-accent/40 bg-crm-accent/15 px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Открыть страницу
+                      </a>
+                      <a
+                        :href="share.downloadUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        Скачать PDF
+                      </a>
+                    </div>
+
+                    <div v-if="share.events.length" class="mt-3 space-y-2">
+                      <div
+                        v-for="event in share.events.slice(0, 5)"
+                        :key="`deal-document-share-event-${share.id}-${event.id}`"
+                        class="rounded-xl border border-crm-border/60 bg-[#12324e] px-3 py-2"
+                      >
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                          <div class="text-xs font-semibold text-white">[[ event.eventTypeLabel ]]</div>
+                          <div class="text-[11px] text-crm-muted">[[ formatEventTimestamp(event.happenedAt) ]]</div>
+                        </div>
+                        <div v-if="event.ipAddress" class="mt-1 text-[11px] text-crm-muted [overflow-wrap:anywhere]">IP: [[ event.ipAddress ]]</div>
+                        <div v-if="event.userAgent" class="mt-1 text-[11px] text-crm-muted [overflow-wrap:anywhere]">UA: [[ event.userAgent ]]</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -707,7 +792,7 @@
                       <textarea v-model.trim="dealDocumentSendStartForm.bodyText" rows="5" class="mt-1 w-full rounded-2xl border border-crm-border bg-[#0f2f4a] px-3 py-3 outline-none focus:border-crm-accent"></textarea>
                     </label>
                     <div class="rounded-xl border border-crm-accent/30 bg-crm-accent/10 px-3 py-2 text-xs text-white">
-                      Во вложение будет добавлен файл `[[ dealDocumentSendAttachmentName ]]`.
+                      В письмо автоматически будет добавлена публичная ссылка на документ.
                     </div>
                   </div>
                   <div class="mt-3 flex justify-end">
@@ -774,7 +859,7 @@
                       <textarea v-model.trim="dealDocumentSendComposer.bodyText" rows="5" class="mt-1 w-full rounded-2xl border border-crm-border bg-[#0f2f4a] px-3 py-3 outline-none focus:border-crm-accent"></textarea>
                     </label>
                     <div class="mt-3 rounded-xl border border-crm-accent/30 bg-crm-accent/10 px-3 py-2 text-xs text-white">
-                      Во вложение будет добавлен файл `[[ dealDocumentSendAttachmentName ]]`.
+                      В письмо автоматически будет добавлена публичная ссылка на документ.
                     </div>
                     <div class="mt-3 flex justify-end">
                       <button
