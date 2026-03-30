@@ -1,5 +1,8 @@
 # --- Django / Python ---
 db.sqlite3
+settings_test.py
+test_db.sqlite3
+test_media
 *.pyc
 *.pyo
 *.pyd
