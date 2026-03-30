@@ -66,6 +66,7 @@ class SettlementDocumentSerializer(serializers.ModelSerializer):
     contract_name = serializers.SerializerMethodField()
     document_type_label = serializers.CharField(source="get_document_type_display", read_only=True)
     flow_direction_label = serializers.CharField(source="get_flow_direction_display", read_only=True)
+    realization_status_label = serializers.CharField(source="normalized_realization_status_label", read_only=True)
     closed_amount = serializers.SerializerMethodField()
     allocation_history = serializers.SerializerMethodField()
     can_allocate_as_source = serializers.BooleanField(read_only=True)
@@ -131,11 +132,25 @@ class SettlementDocumentSerializer(serializers.ModelSerializer):
         attrs = super().validate(attrs)
         uploaded_file = attrs.get("file")
         original_name = str(attrs.get("original_name") or "").strip()
+        document_type = attrs.get("document_type") or getattr(self.instance, "document_type", "")
+        realization_status = attrs.get("realization_status")
+
+        if document_type == SettlementDocument.DocumentType.REALIZATION and not realization_status:
+            attrs["realization_status"] = SettlementDocument.RealizationStatus.CREATED
+        if document_type != SettlementDocument.DocumentType.REALIZATION:
+            attrs["realization_status"] = ""
+
         if uploaded_file is not None:
             attrs["original_name"] = str(original_name or getattr(uploaded_file, "name", "") or "").strip()[:255]
         else:
             attrs["original_name"] = original_name[:255]
         return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.document_type == SettlementDocument.DocumentType.REALIZATION and not data.get("realization_status"):
+            data["realization_status"] = instance.normalized_realization_status
+        return data
 
     class Meta:
         model = SettlementDocument
@@ -149,6 +164,8 @@ class SettlementDocumentSerializer(serializers.ModelSerializer):
             "document_type_label",
             "flow_direction",
             "flow_direction_label",
+            "realization_status",
+            "realization_status_label",
             "title",
             "number",
             "document_date",

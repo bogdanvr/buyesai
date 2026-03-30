@@ -55,7 +55,7 @@
 
     const SETTLEMENT_DOCUMENT_TYPE_OPTIONS = [
       { value: "invoice", label: "Счет" },
-      { value: "realization", label: "Реализация / акт / накладная" },
+      { value: "realization", label: "Акт / накладная" },
       { value: "supplier_receipt", label: "Поступление от поставщика" },
       { value: "incoming_payment", label: "Оплата входящая" },
       { value: "outgoing_payment", label: "Оплата исходящая" },
@@ -68,6 +68,12 @@
     const SETTLEMENT_DIRECTION_OPTIONS = [
       { value: "incoming", label: "Входящий" },
       { value: "outgoing", label: "Исходящий" },
+    ];
+
+    const SETTLEMENT_REALIZATION_STATUS_OPTIONS = [
+      { value: "created", label: "Создан" },
+      { value: "sent_to_client", label: "Отправлен клиенту" },
+      { value: "signed", label: "Подписан" },
     ];
 
     const SETTLEMENT_DIRECTION_REQUIRED_TYPES = ["debt_adjustment", "refund", "advance", "advance_offset"];
@@ -497,6 +503,7 @@
           companySettlementDocuments: [],
           companySettlementSummary: {
             overview: {
+              expectedReceivable: 0,
               receivable: 0,
               payable: 0,
               advancesReceived: 0,
@@ -526,6 +533,7 @@
             dueDate: "",
             amount: "",
             currency: "RUB",
+            realizationStatus: "",
             note: "",
             file: null,
             fileName: "",
@@ -539,6 +547,7 @@
           },
           settlementDocumentTypeOptions: SETTLEMENT_DOCUMENT_TYPE_OPTIONS.slice(),
           settlementDirectionOptions: SETTLEMENT_DIRECTION_OPTIONS.slice(),
+          settlementRealizationStatusOptions: SETTLEMENT_REALIZATION_STATUS_OPTIONS.slice(),
           companyCommunications: [],
           companyConversationMessages: [],
           activeCompanyConversationId: null,
@@ -4070,9 +4079,22 @@
         settlementDocumentNeedsDirection(documentType) {
           return SETTLEMENT_DIRECTION_REQUIRED_TYPES.includes(String(documentType || "").trim());
         },
+        settlementDocumentIsRealization(documentType) {
+          return String(documentType || "").trim() === "realization";
+        },
+        handleCompanySettlementDocumentTypeChange() {
+          if (this.settlementDocumentIsRealization(this.companySettlementDocumentForm.documentType)) {
+            if (!this.companySettlementDocumentForm.realizationStatus) {
+              this.companySettlementDocumentForm.realizationStatus = "created";
+            }
+            return;
+          }
+          this.companySettlementDocumentForm.realizationStatus = "";
+        },
         defaultCompanySettlementSummary() {
           return {
             overview: {
+              expectedReceivable: 0,
               receivable: 0,
               payable: 0,
               advancesReceived: 0,
@@ -4106,6 +4128,7 @@
             dueDate: "",
             amount: "",
             currency: this.forms.companies.currency || "RUB",
+            realizationStatus: "",
             note: "",
             file: null,
             fileName: "",
@@ -4168,6 +4191,7 @@
           const contracts = Array.isArray(payload.contracts) ? payload.contracts : [];
           return {
             overview: {
+              expectedReceivable: Number(overview.expected_receivable || 0),
               receivable: Number(overview.receivable || 0),
               payable: Number(overview.payable || 0),
               advancesReceived: Number(overview.advances_received || 0),
@@ -4185,6 +4209,7 @@
                 currency: contract.currency || this.forms.companies.currency || "RUB",
                 documentsCount: Number(contract.documents_count || 0),
                 stats: {
+                  expectedReceivable: Number(stats.expected_receivable || 0),
                   receivable: Number(stats.receivable || 0),
                   payable: Number(stats.payable || 0),
                   advancesReceived: Number(stats.advances_received || 0),
@@ -4207,6 +4232,8 @@
             documentTypeLabel: item.document_type_label || "",
             flowDirection: item.flow_direction || "",
             flowDirectionLabel: item.flow_direction_label || "",
+            realizationStatus: item.realization_status || "",
+            realizationStatusLabel: item.realization_status_label || "",
             title: item.title || "",
             number: item.number || "",
             documentDate: item.document_date || "",
@@ -4299,6 +4326,7 @@
                 stats: {
                   receivable: 0,
                   payable: 0,
+                  expectedReceivable: 0,
                   advancesReceived: 0,
                   advancesIssued: 0,
                   overdue: 0,
@@ -4374,6 +4402,9 @@
               flow_direction: this.settlementDocumentNeedsDirection(this.companySettlementDocumentForm.documentType)
                 ? this.companySettlementDocumentForm.flowDirection
                 : "",
+              realization_status: this.settlementDocumentIsRealization(this.companySettlementDocumentForm.documentType)
+                ? (this.companySettlementDocumentForm.realizationStatus || "created")
+                : "",
               title: this.companySettlementDocumentForm.title.trim(),
               number: this.companySettlementDocumentForm.number.trim(),
               document_date: this.companySettlementDocumentForm.documentDate || new Date().toISOString().slice(0, 10),
@@ -4390,6 +4421,7 @@
               }
               formData.append("document_type", payload.document_type);
               formData.append("flow_direction", payload.flow_direction || "");
+              formData.append("realization_status", payload.realization_status || "");
               formData.append("title", payload.title);
               formData.append("number", payload.number);
               formData.append("document_date", payload.document_date);

@@ -49,7 +49,7 @@ class SettlementContract(TimestampedModel):
 class SettlementDocument(TimestampedModel):
     class DocumentType(models.TextChoices):
         INVOICE = "invoice", "Счет"
-        REALIZATION = "realization", "Реализация / акт / накладная"
+        REALIZATION = "realization", "Акт / накладная"
         SUPPLIER_RECEIPT = "supplier_receipt", "Поступление от поставщика"
         INCOMING_PAYMENT = "incoming_payment", "Оплата входящая"
         OUTGOING_PAYMENT = "outgoing_payment", "Оплата исходящая"
@@ -61,6 +61,11 @@ class SettlementDocument(TimestampedModel):
     class FlowDirection(models.TextChoices):
         INCOMING = "incoming", "Входящий"
         OUTGOING = "outgoing", "Исходящий"
+
+    class RealizationStatus(models.TextChoices):
+        CREATED = "created", "Создан"
+        SENT = "sent_to_client", "Отправлен клиенту"
+        SIGNED = "signed", "Подписан"
 
     client = models.ForeignKey(
         "crm.Client",
@@ -83,6 +88,13 @@ class SettlementDocument(TimestampedModel):
         blank=True,
         default="",
         verbose_name="Направление потока",
+    )
+    realization_status = models.CharField(
+        max_length=32,
+        choices=RealizationStatus.choices,
+        blank=True,
+        default="",
+        verbose_name="Статус акта",
     )
     title = models.CharField(max_length=255, blank=True, default="", verbose_name="Название")
     number = models.CharField(max_length=128, blank=True, default="", verbose_name="Номер документа")
@@ -137,8 +149,12 @@ class SettlementDocument(TimestampedModel):
         }
 
     @property
+    def is_expected_receivable(self) -> bool:
+        return self.document_type == self.DocumentType.INVOICE
+
+    @property
     def is_receivable(self) -> bool:
-        return self.document_type in {self.DocumentType.INVOICE, self.DocumentType.REALIZATION}
+        return self.document_type == self.DocumentType.REALIZATION
 
     @property
     def is_payable(self) -> bool:
@@ -159,6 +175,18 @@ class SettlementDocument(TimestampedModel):
         closed = amount - open_amount
         return closed if closed > ZERO_DECIMAL else ZERO_DECIMAL
 
+    @property
+    def normalized_realization_status(self) -> str:
+        if self.document_type != self.DocumentType.REALIZATION:
+            return ""
+        return self.realization_status or self.RealizationStatus.CREATED
+
+    @property
+    def normalized_realization_status_label(self) -> str:
+        if self.document_type != self.DocumentType.REALIZATION:
+            return ""
+        return self.RealizationStatus(self.normalized_realization_status).label
+
     def clean(self):
         amount = Decimal(self.amount or ZERO_DECIMAL)
         if amount <= ZERO_DECIMAL:
@@ -178,6 +206,12 @@ class SettlementDocument(TimestampedModel):
 
         if self.document_type not in direction_required and self.flow_direction:
             raise ValidationError({"flow_direction": "Для этого типа направление не используется."})
+
+        if self.document_type == self.DocumentType.REALIZATION and not self.realization_status:
+            self.realization_status = self.RealizationStatus.CREATED
+
+        if self.document_type != self.DocumentType.REALIZATION and self.realization_status:
+            raise ValidationError({"realization_status": "Статус акта используется только для акта / накладной."})
 
     def save(self, *args, **kwargs):
         self.full_clean()

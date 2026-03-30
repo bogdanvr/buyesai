@@ -79,8 +79,35 @@ class SettlementsApiTests(APITestCase):
 
         summary_response = self.client.get(f"{reverse('settlement-summary')}?client={self.company.pk}")
         self.assertEqual(summary_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Decimal(summary_response.data["overview"]["receivable"]), Decimal("60000.00"))
-        self.assertEqual(Decimal(summary_response.data["overview"]["balance"]), Decimal("60000.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["expected_receivable"]), Decimal("60000.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["receivable"]), Decimal("0.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["balance"]), Decimal("0.00"))
+
+    def test_realization_forms_actual_receivable_and_has_status(self):
+        response = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "document_type": "realization",
+                "number": "ACT-001",
+                "document_date": "2026-03-30",
+                "due_date": "2026-04-05",
+                "currency": "RUB",
+                "amount": "75000.00",
+                "realization_status": "sent_to_client",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content.decode())
+        self.assertEqual(response.data["realization_status"], "sent_to_client")
+        self.assertEqual(response.data["realization_status_label"], "Отправлен клиенту")
+
+        summary_response = self.client.get(f"{reverse('settlement-summary')}?client={self.company.pk}")
+        self.assertEqual(summary_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(summary_response.data["overview"]["expected_receivable"]), Decimal("0.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["receivable"]), Decimal("75000.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["balance"]), Decimal("75000.00"))
 
     @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
     def test_can_upload_file_for_settlement_document(self):

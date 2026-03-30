@@ -4271,6 +4271,10 @@
                 <template v-else>
                   <div class="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                     <div class="rounded-xl border border-crm-border bg-[#0d2942] p-3">
+                      <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Счета к оплате</div>
+                      <div class="mt-2 text-sm font-semibold text-white">[[ formatSettlementAmount(companySettlementSummary.overview.expectedReceivable, forms.companies.currency || 'RUB') ]]</div>
+                    </div>
+                    <div class="rounded-xl border border-crm-border bg-[#0d2942] p-3">
                       <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дебиторская задолженность</div>
                       <div class="mt-2 text-sm font-semibold text-white">[[ formatSettlementAmount(companySettlementSummary.overview.receivable, forms.companies.currency || 'RUB') ]]</div>
                     </div>
@@ -4349,7 +4353,7 @@
                       </label>
                       <label class="block">
                         <span class="text-sm text-crm-muted">Тип документа</span>
-                        <select v-model="companySettlementDocumentForm.documentType" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                        <select v-model="companySettlementDocumentForm.documentType" @change="handleCompanySettlementDocumentTypeChange" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
                           <option v-for="option in settlementDocumentTypeOptions" :key="`settlement-doc-type-${option.value}`" :value="option.value">[[ option.label ]]</option>
                         </select>
                       </label>
@@ -4358,6 +4362,12 @@
                         <select v-model="companySettlementDocumentForm.flowDirection" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
                           <option value="">Выберите направление</option>
                           <option v-for="option in settlementDirectionOptions" :key="`settlement-direction-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                        </select>
+                      </label>
+                      <label v-if="settlementDocumentIsRealization(companySettlementDocumentForm.documentType)" class="block">
+                        <span class="text-sm text-crm-muted">Статус акта</span>
+                        <select v-model="companySettlementDocumentForm.realizationStatus" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                          <option v-for="option in settlementRealizationStatusOptions" :key="`settlement-realization-status-${option.value}`" :value="option.value">[[ option.label ]]</option>
                         </select>
                       </label>
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -4474,7 +4484,11 @@
                           </div>
                           <div class="text-sm font-semibold text-white">[[ formatSettlementAmount(contract.stats.balance, contract.currency) ]]</div>
                         </div>
-                        <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <div class="mt-3 grid grid-cols-2 xl:grid-cols-3 gap-2 text-xs">
+                          <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
+                            <div class="text-crm-muted">Счета к оплате</div>
+                            <div class="mt-1 text-white">[[ formatSettlementAmount(contract.stats.expectedReceivable, contract.currency) ]]</div>
+                          </div>
                           <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
                             <div class="text-crm-muted">Нам должны</div>
                             <div class="mt-1 text-white">[[ formatSettlementAmount(contract.stats.receivable, contract.currency) ]]</div>
@@ -4514,6 +4528,7 @@
                               [[ document.contractName || 'Без договора' ]] • от [[ formatSettlementDate(document.documentDate) ]]
                               <span v-if="document.dueDate"> • оплатить до [[ formatSettlementDate(document.dueDate) ]]</span>
                               <span v-if="document.flowDirectionLabel"> • [[ document.flowDirectionLabel ]]</span>
+                              <span v-if="document.realizationStatusLabel"> • [[ document.realizationStatusLabel ]]</span>
                             </div>
                           </div>
                           <div class="flex items-center gap-2">

@@ -23,6 +23,7 @@ ZERO = Decimal("0.00")
 
 def build_settlement_stats(documents):
     today = timezone.localdate()
+    expected_receivable = ZERO
     receivable = ZERO
     payable = ZERO
     advances_received = ZERO
@@ -34,6 +35,8 @@ def build_settlement_stats(documents):
         open_amount = Decimal(document.open_amount or 0)
         if open_amount <= ZERO:
             continue
+        if document.is_expected_receivable:
+            expected_receivable += open_amount
         if document.is_receivable:
             receivable += open_amount
         if document.is_payable:
@@ -50,6 +53,7 @@ def build_settlement_stats(documents):
 
     balance = receivable + advances_issued - payable - advances_received
     return {
+        "expected_receivable": expected_receivable,
         "receivable": receivable,
         "payable": payable,
         "advances_received": advances_received,
