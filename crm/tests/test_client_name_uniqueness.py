@@ -51,6 +51,23 @@ class ClientNameUniquenessTests(APITestCase):
         company = Client.objects.get(pk=response.data["id"])
         self.assertEqual(company.phone, "+7 900 000-00-00")
         self.assertEqual(company.email, "gamma@example.com")
+        self.assertEqual(company.company_type, Client.CompanyType.CLIENT)
+
+    def test_can_save_company_type(self):
+        response = self.client.post(
+            reverse("clients-list"),
+            {"name": "Own Company", "company_type": "own"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        company = Client.objects.get(pk=response.data["id"])
+        self.assertEqual(company.company_type, Client.CompanyType.OWN)
+
+        detail_response = self.client.get(reverse("clients-detail", kwargs={"pk": company.pk}))
+
+        self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail_response.data["company_type"], "own")
 
     def test_can_save_company_registry_and_bank_account_fields(self):
         response = self.client.post(

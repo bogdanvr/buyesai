@@ -73,6 +73,11 @@
       { value: "sent_to_client", label: "Отправлен клиенту" },
       { value: "signed", label: "Подписан" },
     ];
+    const COMPANY_TYPE_OPTIONS = [
+      { value: "own", label: "Собственные организации" },
+      { value: "client", label: "Клиент" },
+      { value: "supplier", label: "Поставщик" },
+    ];
 
     const SETTLEMENT_DIRECTION_REQUIRED_TYPES = ["debt_adjustment", "refund"];
 
@@ -339,6 +344,7 @@
               name: "",
               legalName: "",
               inn: "",
+              companyType: "client",
               address: "",
               actualAddress: "",
               ogrn: "",
@@ -439,6 +445,7 @@
           dealCompanyForm: {
             name: "",
             inn: "",
+            companyType: "client",
             address: "",
             actualAddress: "",
             bankDetails: "",
@@ -549,6 +556,7 @@
           settlementDocumentTypeOptions: SETTLEMENT_DOCUMENT_TYPE_OPTIONS.slice(),
           settlementDirectionOptions: SETTLEMENT_DIRECTION_OPTIONS.slice(),
           settlementRealizationStatusOptions: SETTLEMENT_REALIZATION_STATUS_OPTIONS.slice(),
+          companyTypeOptions: COMPANY_TYPE_OPTIONS.slice(),
           companyCommunications: [],
           companyConversationMessages: [],
           activeCompanyConversationId: null,
@@ -2418,6 +2426,10 @@
         },
         companyUsesRussianBankFields(currency) {
           return this.resolveBankFieldsMode(currency) === "ru";
+        },
+        companyTypeLabel(value) {
+          const normalized = String(value || "client").trim() || "client";
+          return (this.companyTypeOptions || []).find((item) => String(item.value || "") === normalized)?.label || "Клиент";
         },
         companyPrimaryBankAccountLabel(currency) {
           const mode = this.resolveBankFieldsMode(currency);
@@ -8038,6 +8050,7 @@
             name: item.name || "",
             legalName: item.legalName || "",
             inn: item.inn || "",
+            companyType: item.companyType || "client",
             address: item.address || "",
             actualAddress: item.actualAddress || "",
             ogrn: item.ogrn || "",
@@ -8592,6 +8605,7 @@
           this.dealCompanyForm = {
             name: "",
             inn: "",
+            companyType: "client",
             address: "",
             industry: "",
             okved: "",
@@ -10042,6 +10056,7 @@
             statusLabel: normalized.label,
             legalName: item.legal_name || "",
             inn: item.inn || "",
+            companyType: item.company_type || "client",
             address: item.address || "",
             actualAddress: item.actual_address || "",
             ogrn: item.ogrn || "",
@@ -10747,6 +10762,7 @@
               name: "",
               legalName: "",
               inn: "",
+              companyType: "client",
               address: "",
               actualAddress: "",
               ogrn: "",
@@ -11058,6 +11074,7 @@
               body: {
                 name: companyName,
                 inn: this.dealCompanyForm.inn.trim() || null,
+                company_type: this.dealCompanyForm.companyType || "client",
                 address: this.dealCompanyForm.address.trim(),
                 industry: this.dealCompanyForm.industry.trim(),
                 okved: this.dealCompanyForm.okved.trim(),
@@ -11192,6 +11209,7 @@
               name: form.name.trim(),
               legal_name: form.legalName.trim(),
               inn: form.inn.trim() || null,
+              company_type: form.companyType || "client",
               address: form.address.trim(),
               actual_address: form.actualAddress.trim(),
               ogrn: form.ogrn.trim(),
@@ -11229,6 +11247,7 @@
               name: form.name.trim(),
               legal_name: form.legalName.trim(),
               inn: form.inn.trim() || null,
+              company_type: form.companyType || "client",
               address: form.address.trim(),
               actual_address: form.actualAddress.trim(),
               ogrn: form.ogrn.trim(),

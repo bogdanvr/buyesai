@@ -7,6 +7,7 @@ from crm.models import Client, CommunicationChannel, Contact
 class ClientSerializer(serializers.ModelSerializer):
     leads_count = serializers.IntegerField(read_only=True)
     deals_count = serializers.IntegerField(read_only=True)
+    company_type_label = serializers.CharField(source="get_company_type_display", read_only=True)
     note_draft = serializers.CharField(write_only=True, required=False, allow_blank=True, default="")
 
     def _actor_name(self) -> str:
@@ -119,6 +120,8 @@ class ClientSerializer(serializers.ModelSerializer):
             "inn",
             "phone",
             "email",
+            "company_type",
+            "company_type_label",
             "currency",
             "website",
             "address",

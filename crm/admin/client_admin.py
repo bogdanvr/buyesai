@@ -15,6 +15,7 @@ class ClientAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
+        "company_type",
         "phone",
         "email",
         "currency",
@@ -27,7 +28,7 @@ class ClientAdmin(admin.ModelAdmin):
         "is_active",
         "created_at",
     )
-    list_filter = ("is_active", "source", "currency")
+    list_filter = ("company_type", "is_active", "source", "currency")
     search_fields = (
         "name",
         "legal_name",

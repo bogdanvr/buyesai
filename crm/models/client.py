@@ -22,6 +22,11 @@ def client_document_upload_to(instance, filename: str) -> str:
 
 
 class Client(TimestampedModel):
+    class CompanyType(models.TextChoices):
+        OWN = "own", "Собственные организации"
+        CLIENT = "client", "Клиент"
+        SUPPLIER = "supplier", "Поставщик"
+
     CURRENCY_CHOICES = (
         ("RUB", "RUB"),
         ("KZT", "KZT"),
@@ -45,6 +50,12 @@ class Client(TimestampedModel):
     )
     phone = models.CharField(max_length=64, blank=True, default="", verbose_name="Телефон")
     email = models.EmailField(blank=True, default="", verbose_name="Email")
+    company_type = models.CharField(
+        max_length=16,
+        choices=CompanyType.choices,
+        default=CompanyType.CLIENT,
+        verbose_name="Тип компании",
+    )
     currency = models.CharField(
         max_length=3,
         choices=CURRENCY_CHOICES,

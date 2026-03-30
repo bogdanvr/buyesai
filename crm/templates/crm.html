@@ -3252,6 +3252,12 @@
                     <input v-model="dealCompanyForm.inn" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                   </label>
                   <label class="block">
+                    <span class="text-sm text-crm-muted">Тип компании</span>
+                    <select v-model="dealCompanyForm.companyType" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                      <option v-for="option in companyTypeOptions" :key="`deal-company-type-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                    </select>
+                  </label>
+                  <label class="block">
                     <span class="text-sm text-crm-muted">ОКВЭД</span>
                     <input v-model="dealCompanyForm.okved" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                   </label>
@@ -3992,6 +3998,21 @@
                     class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
                     autofocus
                   />
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Тип компании</div>
+                  <select
+                    v-if="isCompanySummaryEditing('companyType')"
+                    v-model="forms.companies.companyType"
+                    @change="stopCompanySummaryEdit('companyType')"
+                    @blur="stopCompanySummaryEdit('companyType')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  >
+                    <option v-for="option in companyTypeOptions" :key="`company-type-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                  </select>
+                  <button v-else type="button" @click="openCompanySummaryField('companyType')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ companyTypeLabel(forms.companies.companyType) ]]
+                  </button>
                 </div>
                 <div class="py-1">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Сайт</div>
