@@ -130,10 +130,12 @@ class DealDocumentsApiTests(APITestCase):
         self.assertEqual(str(realization.amount), "52000.00")
         self.assertEqual(realization.number, "1235")
         self.assertEqual(realization.currency, "KZT")
+        self.assertTrue(bool(realization.file))
 
         generated_document = DealDocument.objects.get(pk=response.data["id"])
         self.assertEqual(generated_document.uploaded_by, self.user)
         self.assertIn(f"company_{self.company.pk}/deal_{self.deal.pk}/", generated_document.file.name)
+        self.assertEqual(realization.original_name, generated_document.original_name)
 
         with generated_document.file.open("rb") as file_handle:
             archive = ZipFile(file_handle)

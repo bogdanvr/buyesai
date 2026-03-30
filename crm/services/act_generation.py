@@ -416,15 +416,17 @@ def generate_deal_act(*, deal: Deal, executor_company: Client, items: list[ActLi
 
         file_name = f"act-{settlement_document.number or settlement_document.pk}.docx"
         original_name = f"Акт № {settlement_document.number} от {_format_date_short(settlement_document.document_date)}.docx"
-        content = ContentFile(
-            build_act_docx_bytes(
-                settlement_document=settlement_document,
-                deal=deal,
-                executor_company=executor_company,
-                items=line_items,
-            ),
-            name=file_name,
+        document_bytes = build_act_docx_bytes(
+            settlement_document=settlement_document,
+            deal=deal,
+            executor_company=executor_company,
+            items=line_items,
         )
+        settlement_document.original_name = original_name
+        settlement_document.file.save(file_name, ContentFile(document_bytes, name=file_name), save=False)
+        settlement_document.save(update_fields=["file", "original_name", "updated_at"])
+
+        content = ContentFile(document_bytes, name=file_name)
         deal_document = DealDocument(deal=deal, original_name=original_name, uploaded_by=uploaded_by)
         deal_document.file.save(file_name, content, save=False)
         deal_document.save()
