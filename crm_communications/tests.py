@@ -4,6 +4,7 @@ from io import StringIO
 import tempfile
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management.base import CommandError
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -11,7 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 from unittest.mock import patch
 
-from crm.models import Client, Contact, Deal, DealStage, Lead, LeadSource, LeadStatus, Touch
+from crm.models import Client, Contact, Deal, DealDocument, DealStage, Lead, LeadSource, LeadStatus, Touch, TouchResult
 from crm_communications.email_outbound import EmailOutboundMessageService
 from crm_communications.models import (
     AttemptStatus,
@@ -1405,6 +1406,47 @@ class CommunicationsApiTests(TestCase):
         self.assertEqual(message.status, MessageStatus.SENT)
         email_cls_mock.assert_called_once()
 
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    @patch("crm_communications.document_delivery.build_deal_document_pdf_bytes")
+    def test_send_message_from_conversation_attaches_deal_document_pdf_and_sets_touch_result(self, build_pdf_mock):
+        build_pdf_mock.return_value = (b"%PDF-1.4 sent document", "act-1235.pdf")
+        TouchResult.objects.get_or_create(
+            code="proposal_sent",
+            defaults={"name": "КП Отправлено", "is_active": True},
+        )
+        deal_document = DealDocument.objects.create(
+            deal=self.deal,
+            file=SimpleUploadedFile(
+                "act-1235.docx",
+                b"docx-content",
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ),
+            original_name="Акт № 1235.docx",
+            uploaded_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("communications-conversations-send", kwargs={"pk": self.conversation.pk}),
+            data={
+                "subject": "Направляю акт",
+                "body_text": "Во вложении акт.",
+                "deal_document": deal_document.pk,
+                "touch_result_code": "proposal_sent",
+                "touch_summary": "Отправлен документ: Акт № 1235.docx",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        message = Message.objects.get(pk=response.json()["id"])
+        self.assertEqual(message.status, MessageStatus.SENT)
+        self.assertEqual(message.attachments.count(), 1)
+        attachment = message.attachments.get()
+        self.assertEqual(attachment.original_name, "act-1235.pdf")
+        self.assertEqual(attachment.mime_type, "application/pdf")
+        self.assertEqual(message.touch.result_option.code, "proposal_sent")
+        self.assertEqual(message.touch.summary, "Отправлен документ: Акт № 1235.docx")
+
     @patch("crm_communications.email_outbound.EmailMultiAlternatives")
     def test_start_conversation_from_deal(self, email_cls_mock):
         email_instance = email_cls_mock.return_value
@@ -1436,6 +1478,51 @@ class CommunicationsApiTests(TestCase):
         self.assertEqual(message.conversation, conversation)
         self.assertEqual(message.external_recipient_key, "email:sveta@example.com")
         email_cls_mock.assert_called_once()
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    @patch("crm_communications.document_delivery.build_deal_document_pdf_bytes")
+    def test_start_conversation_from_deal_attaches_deal_document_pdf_and_sets_touch_result(self, build_pdf_mock):
+        build_pdf_mock.return_value = (b"%PDF-1.4 invoice document", "invoice-1235.pdf")
+        TouchResult.objects.get_or_create(
+            code="proposal_sent",
+            defaults={"name": "КП Отправлено", "is_active": True},
+        )
+        deal_document = DealDocument.objects.create(
+            deal=self.deal,
+            file=SimpleUploadedFile(
+                "invoice-1235.docx",
+                b"docx-content",
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ),
+            original_name="Счет № 1235.docx",
+            uploaded_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("communications-conversations-start"),
+            data={
+                "channel": "email",
+                "deal": self.deal.pk,
+                "client": self.client_company.pk,
+                "contact": self.contact.pk,
+                "recipient": "email:sveta@example.com",
+                "subject": "Направляю счет",
+                "body_text": "Во вложении счет.",
+                "deal_document": deal_document.pk,
+                "touch_result_code": "proposal_sent",
+                "touch_summary": "Отправлен документ: Счет № 1235.docx",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        message = Message.objects.get(pk=response.json()["message"]["id"])
+        self.assertEqual(message.status, MessageStatus.SENT)
+        self.assertEqual(message.attachments.count(), 1)
+        attachment = message.attachments.get()
+        self.assertEqual(attachment.original_name, "invoice-1235.pdf")
+        self.assertEqual(message.touch.result_option.code, "proposal_sent")
+        self.assertEqual(message.touch.summary, "Отправлен документ: Счет № 1235.docx")
 
     def test_manual_bind_updates_conversation(self):
         second_deal = Deal.objects.create(

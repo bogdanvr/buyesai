@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
@@ -16,7 +17,8 @@ from api.v1.communications.serializers import (
     MessageAttemptLogSerializer,
     MessageSerializer,
 )
-from crm.models import Client, Contact, Deal
+from crm.models import Client, Contact, Deal, DealDocument, TouchResult
+from crm_communications.document_delivery import attach_deal_document_pdf_to_message
 from crm_communications.email_outbound import EmailOutboundMessageService
 from crm_communications.models import Conversation, ConversationRoute, DeliveryFailureQueue, Message, MessageAttemptLog
 from crm_communications.services import ConversationBindingService, MessageQueueService, TelegramOutboundMessageService, normalize_telegram_key
@@ -49,6 +51,38 @@ def sync_message_context_from_conversation(*, message: Message) -> Message:
 def sync_conversation_message_contexts_from_conversation(*, conversation: Conversation) -> None:
     for message in conversation.messages.select_related("touch", "deal").all():
         sync_message_context_from_conversation(message=message)
+
+
+def _resolve_deal_document_for_outbound(*, deal_document_id: int | None, deal_id: int | None):
+    if not deal_document_id:
+        return None
+    document = DealDocument.objects.select_related("deal").filter(pk=deal_document_id).first()
+    if document is None:
+        raise ValueError("Документ сделки не найден.")
+    if deal_id and document.deal_id != deal_id:
+        raise ValueError("Документ сделки не принадлежит выбранной сделке.")
+    return document
+
+
+def _apply_outbound_touch_metadata(*, message: Message, touch_result_code: str = "", touch_summary: str = "") -> None:
+    normalized_result_code = str(touch_result_code or "").strip().lower()
+    normalized_summary = str(touch_summary or "").strip()
+    refreshed_message = Message.objects.select_related("touch").get(pk=message.pk)
+    if not refreshed_message.touch_id:
+        return
+
+    touch = refreshed_message.touch
+    updates: list[str] = []
+    if normalized_result_code:
+        result_option = TouchResult.objects.filter(code=normalized_result_code).first()
+        if result_option is not None and touch.result_option_id != result_option.pk:
+            touch.result_option = result_option
+            updates.append("result_option")
+    if normalized_summary and touch.summary != normalized_summary:
+        touch.summary = normalized_summary
+        updates.append("summary")
+    if updates:
+        touch.save(update_fields=[*updates, "updated_at"])
 
 
 class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -120,6 +154,15 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = ConversationSendSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payload = serializer.validated_data
+        try:
+            deal_document = _resolve_deal_document_for_outbound(
+                deal_document_id=payload.get("deal_document"),
+                deal_id=conversation.deal_id,
+            )
+        except ValueError as exc:
+            return Response({"deal_document": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if deal_document is not None and conversation.channel != "email":
+            return Response({"deal_document": "Отправка документа с PDF-вложением сейчас поддерживается только для email-диалогов."}, status=status.HTTP_400_BAD_REQUEST)
         message = Message.objects.create(
             conversation=conversation,
             channel=conversation.channel,
@@ -135,12 +178,24 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
             body_preview=str(payload.get("body_text") or payload.get("subject") or "").strip()[:500],
             external_recipient_key=str(payload.get("recipient") or "").strip(),
         )
+        if deal_document is not None:
+            try:
+                attach_deal_document_pdf_to_message(message=message, document=deal_document)
+            except DjangoValidationError as exc:
+                message.delete()
+                return Response(getattr(exc, "message_dict", None) or {"deal_document": getattr(exc, "messages", [str(exc)])}, status=status.HTTP_400_BAD_REQUEST)
         MessageQueueService.enqueue_message(message=message)
         try:
             message = dispatch_outgoing_message(message=message)
         except ValueError as exc:
             return Response({"detail": f"Канал {conversation.channel} не поддерживается."}, status=status.HTTP_400_BAD_REQUEST)
 
+        message.refresh_from_db()
+        _apply_outbound_touch_metadata(
+            message=message,
+            touch_result_code=str(payload.get("touch_result_code") or "").strip(),
+            touch_summary=str(payload.get("touch_summary") or "").strip(),
+        )
         message.refresh_from_db()
         return Response(MessageSerializer(message, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
@@ -158,6 +213,15 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
         subject = str(payload.get("subject") or "").strip()
         body_text = str(payload.get("body_text") or "").strip()
         body_html = str(payload.get("body_html") or "").strip()
+        try:
+            deal_document = _resolve_deal_document_for_outbound(
+                deal_document_id=payload.get("deal_document"),
+                deal_id=getattr(deal, "pk", None),
+            )
+        except ValueError as exc:
+            return Response({"deal_document": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if deal_document is not None and channel != "email":
+            return Response({"deal_document": "Отправка документа с PDF-вложением сейчас поддерживается только для email-диалогов."}, status=status.HTTP_400_BAD_REQUEST)
 
         conversation = Conversation.objects.create(
             channel=channel,
@@ -206,6 +270,12 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
             body_preview=str(body_text or subject or "").strip()[:500],
             external_recipient_key=recipient,
         )
+        if deal_document is not None:
+            try:
+                attach_deal_document_pdf_to_message(message=message, document=deal_document)
+            except DjangoValidationError as exc:
+                message.delete()
+                return Response(getattr(exc, "message_dict", None) or {"deal_document": getattr(exc, "messages", [str(exc)])}, status=status.HTTP_400_BAD_REQUEST)
         MessageQueueService.enqueue_message(message=message)
         try:
             message = dispatch_outgoing_message(message=message)
@@ -213,6 +283,12 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({"detail": f"Канал {channel} не поддерживается."}, status=status.HTTP_400_BAD_REQUEST)
 
         conversation.refresh_from_db()
+        message.refresh_from_db()
+        _apply_outbound_touch_metadata(
+            message=message,
+            touch_result_code=str(payload.get("touch_result_code") or "").strip(),
+            touch_summary=str(payload.get("touch_summary") or "").strip(),
+        )
         message.refresh_from_db()
         return Response(
             {

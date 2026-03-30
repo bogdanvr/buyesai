@@ -211,10 +211,18 @@ class ConversationSendSerializer(serializers.Serializer):
     body_text = serializers.CharField(required=False, allow_blank=True, default="")
     body_html = serializers.CharField(required=False, allow_blank=True, default="")
     recipient = serializers.CharField(required=False, allow_blank=True, default="")
+    deal_document = serializers.IntegerField(required=False, allow_null=True)
+    touch_result_code = serializers.CharField(required=False, allow_blank=True, default="")
+    touch_summary = serializers.CharField(required=False, allow_blank=True, default="")
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        if not str(attrs.get("subject") or "").strip() and not str(attrs.get("body_text") or attrs.get("body_html") or "").strip():
+        has_text_payload = bool(
+            str(attrs.get("subject") or "").strip()
+            or str(attrs.get("body_text") or attrs.get("body_html") or "").strip()
+        )
+        has_document_attachment = bool(attrs.get("deal_document"))
+        if not has_text_payload and not has_document_attachment:
             raise serializers.ValidationError("Укажите тему или текст сообщения.")
         return attrs
 
