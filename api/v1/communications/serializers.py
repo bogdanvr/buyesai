@@ -217,11 +217,15 @@ class ConversationSendSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        normalized_recipient = str(attrs.get("recipient") or "").strip()
+        attrs["recipient"] = normalized_recipient
         has_text_payload = bool(
             str(attrs.get("subject") or "").strip()
             or str(attrs.get("body_text") or attrs.get("body_html") or "").strip()
         )
         has_document_attachment = bool(attrs.get("deal_document"))
+        if has_document_attachment and not normalized_recipient:
+            raise serializers.ValidationError({"recipient": "Укажите получателя письма."})
         if not has_text_payload and not has_document_attachment:
             raise serializers.ValidationError("Укажите тему или текст сообщения.")
         return attrs

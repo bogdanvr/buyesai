@@ -405,6 +405,57 @@ class MessageQueueService:
 
     @staticmethod
     @transaction.atomic
+    def mark_message_bounced(
+        *,
+        message: Message,
+        error_message: str,
+        happened_at=None,
+    ) -> Message:
+        now = happened_at or timezone.now()
+        normalized_error = str(error_message or "").strip() or "Email провайдера сообщил о невозможности доставки."
+        message = Message.objects.select_for_update().get(pk=message.pk)
+        message.status = MessageStatus.FAILED
+        message.failed_at = now
+        message.next_attempt_at = None
+        message.requires_manual_retry = False
+        message.last_error_code = "email_bounced"
+        message.last_error_message = normalized_error
+        message.save(
+            update_fields=[
+                "status",
+                "failed_at",
+                "next_attempt_at",
+                "requires_manual_retry",
+                "last_error_code",
+                "last_error_message",
+                "updated_at",
+            ]
+        )
+        DeliveryFailureQueue.objects.update_or_create(
+            message=message,
+            defaults={
+                "failure_type": "email_bounced",
+                "opened_at": now,
+                "last_attempt_log": message.attempt_logs.order_by("-attempt_number", "-id").first(),
+                "resolution_status": DeliveryFailureResolutionStatus.OPEN,
+                "resolved_at": None,
+                "resolution_comment": "",
+            },
+        )
+
+        try:
+            from crm_communications.deal_document_shares import record_share_message_status
+        except Exception:
+            record_share_message_status = None
+
+        if record_share_message_status is not None:
+            for share in message.deal_document_shares.select_related("document", "document__deal").all():
+                record_share_message_status(share=share, message=message)
+
+        return message
+
+    @staticmethod
+    @transaction.atomic
     def begin_send_attempt(*, message: Message) -> MessageAttemptLog:
         message = Message.objects.select_for_update().get(pk=message.pk)
         latest_attempt = message.attempt_logs.order_by("-attempt_number", "-id").first()

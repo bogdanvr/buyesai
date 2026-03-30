@@ -5289,6 +5289,9 @@
               forceReloadMessages: true,
             }));
           }
+          if (this.showDealDocumentSendSidebar && this.toIntOrNull(this.dealDocumentSendTarget?.id)) {
+            tasks.push(this.loadDealDocumentDeliveryHistory(this.toIntOrNull(this.dealDocumentSendTarget?.id), { silent: true }));
+          }
           if (!tasks.length) {
             this.stopCommunicationsPollingIfIdle();
             return;
@@ -5518,6 +5521,13 @@
           }
           throw new Error(`${contextLabel} не отправлено. Текущий статус: ${status || "неизвестен"}.`);
         },
+        ensureDocumentRecipientFilled(rawRecipient) {
+          const recipient = String(rawRecipient || "").trim();
+          if (!recipient) {
+            throw new Error("Укажите получателя письма.");
+          }
+          return recipient;
+        },
         async sendCompanyCommunicationMessage() {
           const conversation = this.getActiveCompanyConversation();
           if (!conversation?.id || this.isCompanyCommunicationSending) return;
@@ -5588,12 +5598,13 @@
           this.clearUiErrors({ modalOnly: true });
           this.isDealDocumentSendSending = true;
           try {
+            const recipient = this.ensureDocumentRecipientFilled(this.dealDocumentSendComposer.recipient);
             const response = await this.apiRequest(`/api/v1/communications/conversations/${conversation.id}/send/`, {
               method: "POST",
               body: {
                 subject: this.dealDocumentSendComposer.subject,
                 body_text: this.dealDocumentSendComposer.bodyText,
-                recipient: this.dealDocumentSendComposer.recipient,
+                recipient,
                 deal_document: documentId,
                 touch_result_code: "proposal_sent",
                 touch_summary: `Отправлен документ: ${this.dealDocumentSendTarget.originalName || "Документ"}`,
@@ -5625,6 +5636,7 @@
           this.clearUiErrors({ modalOnly: true });
           this.isDealDocumentSendStarting = true;
           try {
+            const recipient = this.ensureDocumentRecipientFilled(this.dealDocumentSendStartForm.recipient);
             const response = await this.apiRequest("/api/v1/communications/conversations/start/", {
               method: "POST",
               body: {
@@ -5632,7 +5644,7 @@
                 deal: this.toIntOrNull(this.editingDealId),
                 client: this.toIntOrNull(this.forms.deals.companyId),
                 contact: this.toIntOrNull(this.dealDocumentSendStartForm.contactId),
-                recipient: this.dealDocumentSendStartForm.recipient,
+                recipient,
                 subject: this.dealDocumentSendStartForm.subject,
                 body_text: this.dealDocumentSendStartForm.bodyText,
                 deal_document: documentId,

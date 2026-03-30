@@ -31,6 +31,7 @@ from crm_communications.services import (
     ConversationBindingService,
     ConversationResolverService,
     InboundLeadService,
+    MessageQueueService,
     build_message_preview,
     normalize_email,
 )
@@ -177,6 +178,82 @@ def parse_inbound_email(raw_message: bytes) -> ParsedInboundEmail:
     )
 
 
+def _message_reference_ids(parsed: ParsedInboundEmail) -> list[str]:
+    references = [item for item in str(parsed.references or "").split() if item]
+    ordered = []
+    for candidate in [parsed.in_reply_to, *references, parsed.thread_key]:
+        normalized = _normalize_message_id(candidate)
+        if normalized and normalized not in ordered:
+            ordered.append(normalized)
+    return ordered
+
+
+def _looks_like_bounce_email(parsed: ParsedInboundEmail) -> bool:
+    sender = str(parsed.from_email or "").strip().lower()
+    sender_local = sender.split("@", 1)[0] if sender else ""
+    subject = str(parsed.subject or "").strip().lower()
+    body_text = str(parsed.body_text or parsed.body_html or "").strip().lower()
+    if sender_local in {"mailer-daemon", "postmaster", "maildelivery", "mail-delivery"}:
+        return True
+    bounce_markers = (
+        "delivery status notification",
+        "mail delivery failed",
+        "undelivered mail",
+        "returned mail",
+        "delivery has failed",
+        "delivery failure",
+    )
+    body_markers = (
+        "could not be delivered",
+        "this is a permanent error",
+        "the following address(es) failed",
+        "message was not accepted",
+        "invalid mailbox",
+        "user is terminated",
+        "mailbox is unavailable",
+    )
+    return any(marker in subject for marker in bounce_markers) or any(marker in body_text for marker in body_markers)
+
+
+def _extract_bounce_error_text(parsed: ParsedInboundEmail) -> str:
+    lines = [str(line or "").strip() for line in str(parsed.body_text or "").splitlines()]
+    interesting = []
+    for line in lines:
+        normalized = line.lower()
+        if not normalized:
+            continue
+        if (
+            "address(es) failed" in normalized
+            or "smtp error" in normalized
+            or "invalid mailbox" in normalized
+            or "mailbox" in normalized
+            or "user is terminated" in normalized
+            or normalized.startswith("550 ")
+            or "could not be delivered" in normalized
+        ):
+            interesting.append(line)
+    if interesting:
+        return "\n".join(interesting[:6])
+    compact_lines = [line for line in lines if line][:6]
+    return "\n".join(compact_lines)[:1000]
+
+
+def _resolve_bounced_outgoing_message(parsed: ParsedInboundEmail) -> Message | None:
+    reference_ids = _message_reference_ids(parsed)
+    if not reference_ids:
+        return None
+    return (
+        Message.objects.select_related("conversation", "client", "contact", "deal")
+        .filter(
+            channel=CommunicationChannelCode.EMAIL,
+            direction=MessageDirection.OUTGOING,
+            external_message_id__in=reference_ids,
+        )
+        .order_by("-sent_at", "-created_at", "-id")
+        .first()
+    )
+
+
 class EmailInboundService:
     @staticmethod
     @transaction.atomic
@@ -196,11 +273,26 @@ class EmailInboundService:
                 "external_message_id": parsed.message_id,
             }
 
-        resolution = ConversationResolverService.resolve_for_email(
-            email=parsed.from_email,
-            route_type=EMAIL_THREAD_ROUTE_TYPE,
-            route_key=parsed.thread_key,
-        )
+        bounced_message = _resolve_bounced_outgoing_message(parsed) if _looks_like_bounce_email(parsed) else None
+
+        if bounced_message is not None:
+            resolution = ConversationResolverService.resolve_for_email(
+                email=parsed.from_email,
+                route_type=EMAIL_THREAD_ROUTE_TYPE,
+                route_key=parsed.thread_key,
+            )
+            resolution.client = bounced_message.client
+            resolution.contact = bounced_message.contact
+            resolution.deal = bounced_message.deal
+            resolution.lead = getattr(getattr(bounced_message, "touch", None), "lead", None) or getattr(getattr(bounced_message, "deal", None), "lead", None)
+            conversation = bounced_message.conversation
+        else:
+            resolution = ConversationResolverService.resolve_for_email(
+                email=parsed.from_email,
+                route_type=EMAIL_THREAD_ROUTE_TYPE,
+                route_key=parsed.thread_key,
+            )
+            conversation = getattr(getattr(resolution, "matched_route", None), "conversation", None)
         if resolution.deal is None and resolution.lead is None and not resolution.requires_manual_binding:
             resolution.lead = InboundLeadService.create_email_lead(
                 from_email=parsed.from_email,
@@ -211,7 +303,6 @@ class EmailInboundService:
             )
             resolution.client = resolution.lead.client
             resolution.resolution_notes.append("created_new_lead")
-        conversation = getattr(getattr(resolution, "matched_route", None), "conversation", None)
         if conversation is None:
             conversation = Conversation.objects.create(
                 channel=CommunicationChannelCode.EMAIL,
@@ -282,6 +373,12 @@ class EmailInboundService:
             happened_at=parsed.received_at,
         )
         CommunicationTouchService.ensure_lead_for_message_touch(message=message, lead=resolution.lead)
+        if bounced_message is not None:
+            MessageQueueService.mark_message_bounced(
+                message=bounced_message,
+                error_message=_extract_bounce_error_text(parsed),
+                happened_at=parsed.received_at,
+            )
         EmailInboundService._refresh_conversation_snapshot(conversation=conversation, message=message)
         return {
             "ok": True,

@@ -786,14 +786,16 @@ class EmailInboundServiceTests(TestCase):
         message_id: str,
         subject: str,
         body: str,
+        from_header: str = "Maria <maria@example.com>",
+        to_header: str = "sales@buyes.pro",
         references: str = "",
         in_reply_to: str = "",
         attachment_name: str = "",
         attachment_content: bytes | None = None,
     ) -> bytes:
         message = EmailMessage()
-        message["From"] = "Maria <maria@example.com>"
-        message["To"] = "sales@buyes.pro"
+        message["From"] = from_header
+        message["To"] = to_header
         message["Subject"] = subject
         message["Message-ID"] = f"<{message_id}>"
         message["Date"] = "Fri, 22 Mar 2026 12:00:00 +0600"
@@ -1025,6 +1027,73 @@ class EmailInboundServiceTests(TestCase):
         lead.refresh_from_db()
         events_text = str(lead.events or "")
         self.assertEqual(events_text.count(f"touch_id: {touch.id}"), 1)
+
+    def test_process_raw_bounce_marks_original_outgoing_message_as_failed(self):
+        outgoing = Message.objects.create(
+            conversation=Conversation.objects.create(
+                channel=CommunicationChannelCode.EMAIL,
+                client=self.client_company,
+                contact=self.contact,
+                deal=self.deal,
+                status="active",
+            ),
+            channel=CommunicationChannelCode.EMAIL,
+            direction=MessageDirection.OUTGOING,
+            status=MessageStatus.SENT,
+            client=self.client_company,
+            contact=self.contact,
+            deal=self.deal,
+            subject="Счет",
+            body_text="Отправляю счет",
+            body_preview="Отправляю счет",
+            external_message_id="outgoing-1@example.com",
+            external_recipient_key="email:vbogdanv@mail.ru",
+            sent_at=timezone.now() - timedelta(minutes=10),
+        )
+        document = DealDocument.objects.create(
+            deal=self.deal,
+            file=SimpleUploadedFile(
+                "invoice-1235.docx",
+                b"docx-content",
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ),
+            original_name="Счет № 1235.docx",
+        )
+        share = DealDocumentShare.objects.create(document=document, message=outgoing, recipient="email:vbogdanv@mail.ru")
+
+        result = EmailInboundService.process_raw_email(
+            raw_message=self.build_email(
+                message_id="bounce-1@example.com",
+                subject="Delivery Status Notification (Failure)",
+                body=(
+                    "This message was created automatically by mail delivery software.\n\n"
+                    "A message that you sent could not be delivered.\n"
+                    "The following address(es) failed:\n"
+                    "vbogdanv@mail.ru\n"
+                    "SMTP error from remote mail server after end of data:\n"
+                    "550 Message was not accepted -- invalid mailbox. Local mailbox vbogdanv@mail.ru is unavailable:\n"
+                    "user is terminated\n"
+                ),
+                from_header="Mail Delivery System <mailer-daemon@smtp.beget.com>",
+                to_header="sales@buyes.pro",
+                references="<outgoing-1@example.com>",
+                in_reply_to="<outgoing-1@example.com>",
+            )
+        )
+
+        self.assertTrue(result["ok"])
+        outgoing.refresh_from_db()
+        share.refresh_from_db()
+        self.deal.refresh_from_db()
+        self.assertEqual(outgoing.status, MessageStatus.FAILED)
+        self.assertEqual(outgoing.last_error_code, "email_bounced")
+        self.assertIn("invalid mailbox", outgoing.last_error_message.lower())
+        self.assertEqual(outgoing.delivery_failure_queue_item.failure_type, "email_bounced")
+        self.assertEqual(
+            DealDocumentShareEvent.objects.filter(share=share, event_type=DealDocumentShareEventType.EMAIL_FAILED).count(),
+            1,
+        )
+        self.assertIn("Ошибка отправки письма со ссылкой на документ", self.deal.events)
 
 
 class EmailOutboundMessageServiceTests(TestCase):
@@ -1433,6 +1502,7 @@ class CommunicationsApiTests(TestCase):
             data={
                 "subject": "Направляю акт",
                 "body_text": "Во вложении акт.",
+                "recipient": "email:elena@example.com",
                 "deal_document": deal_document.pk,
                 "touch_result_code": "proposal_sent",
                 "touch_summary": "Отправлен документ: Акт № 1235.docx",
@@ -1532,6 +1602,31 @@ class CommunicationsApiTests(TestCase):
         self.assertIn(f"https://crm.example.com/documents/share/{share.token}/", message.body_text)
         self.assertEqual(message.touch.result_option.code, "proposal_sent")
         self.assertEqual(message.touch.summary, "Отправлен документ: Счет № 1235.docx")
+
+    def test_send_message_with_deal_document_requires_explicit_recipient(self):
+        deal_document = DealDocument.objects.create(
+            deal=self.deal,
+            file=SimpleUploadedFile(
+                "act-1235.docx",
+                b"docx-content",
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ),
+            original_name="Акт № 1235.docx",
+            uploaded_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("communications-conversations-send", kwargs={"pk": self.conversation.pk}),
+            data={
+                "subject": "Направляю акт",
+                "body_text": "Смотрите документ.",
+                "deal_document": deal_document.pk,
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("recipient", response.json())
 
     def test_manual_bind_updates_conversation(self):
         second_deal = Deal.objects.create(
