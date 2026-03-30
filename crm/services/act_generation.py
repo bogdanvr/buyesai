@@ -343,6 +343,12 @@ def generate_deal_act(*, deal: Deal, uploaded_by=None) -> tuple[DealDocument, Se
 
     with transaction.atomic():
         contract = SettlementContract.objects.filter(client_id=client.pk, is_active=True).order_by("-created_at", "-id").first()
+        resolved_currency = (
+            _normalize_text(getattr(contract, "currency", ""))
+            or _normalize_text(getattr(client, "currency", ""))
+            or _normalize_text(getattr(deal, "currency", ""))
+            or "RUB"
+        )
         settlement_document = SettlementDocument.objects.create(
             client=client,
             contract=contract,
@@ -350,7 +356,7 @@ def generate_deal_act(*, deal: Deal, uploaded_by=None) -> tuple[DealDocument, Se
             document_type=SettlementDocument.DocumentType.REALIZATION,
             title="Акт об оказании услуг",
             document_date=timezone.localdate(),
-            currency=_normalize_text(getattr(deal, "currency", "")) or _normalize_text(getattr(client, "currency", "")) or "RUB",
+            currency=resolved_currency,
             amount=amount,
             realization_status=SettlementDocument.RealizationStatus.CREATED,
         )

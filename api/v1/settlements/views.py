@@ -4,6 +4,7 @@ import mimetypes
 from django.http import FileResponse, Http404
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.http import content_disposition_header
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
@@ -112,7 +113,7 @@ class SettlementDocumentViewSet(ModelViewSet):
         filename = instance.original_name or file_field.name.rsplit("/", 1)[-1]
         content_type, _ = mimetypes.guess_type(filename)
         response = FileResponse(file_handle, as_attachment=False, filename=filename, content_type=content_type or "application/octet-stream")
-        response["Content-Disposition"] = f'inline; filename="{filename}"'
+        response["Content-Disposition"] = content_disposition_header(False, filename)
         return response
 
 

@@ -27,7 +27,7 @@ class DealDocumentsApiTests(APITestCase):
             bik="044525593",
             settlement_account="40702810000000000001",
             correspondent_account="30101810200000000593",
-            currency="RUB",
+            currency="KZT",
         )
         self.deal = Deal.objects.create(title="Сделка для документов", client=self.company, amount="77000.00", currency="RUB")
 
@@ -104,6 +104,7 @@ class DealDocumentsApiTests(APITestCase):
         realization = SettlementDocument.objects.get(deal=self.deal, document_type=SettlementDocument.DocumentType.REALIZATION)
         self.assertEqual(str(realization.amount), "77000.00")
         self.assertEqual(realization.number, "1235")
+        self.assertEqual(realization.currency, "KZT")
 
         generated_document = DealDocument.objects.get(pk=response.data["id"])
         self.assertEqual(generated_document.uploaded_by, self.user)
@@ -117,3 +118,8 @@ class DealDocumentsApiTests(APITestCase):
         self.assertIn("Акт об оказании услуг", document_xml)
         self.assertIn("Сделка для документов", document_xml)
         self.assertIn("77000,00", document_xml.replace(" ", ""))
+        self.assertIn("KZT", document_xml)
+
+        download_response = self.client.get(reverse("deal-documents-download", kwargs={"pk": generated_document.pk}))
+        self.assertEqual(download_response.status_code, status.HTTP_200_OK)
+        self.assertIn("filename*=utf-8''", download_response["Content-Disposition"])
