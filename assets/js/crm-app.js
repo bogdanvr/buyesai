@@ -4395,6 +4395,7 @@
           try {
             const file = this.companySettlementDocumentForm.file || null;
             const contractId = this.toIntOrNull(this.companySettlementDocumentForm.contractId);
+            let createdDocument = null;
             const payload = {
               client: this.editingCompanyId,
               contract: contractId,
@@ -4433,12 +4434,12 @@
               formData.append("note", payload.note);
               formData.append("file", file);
               formData.append("original_name", this.companySettlementDocumentForm.fileName || file.name || "");
-              await this.apiRequest("/api/v1/settlements/documents/", {
+              createdDocument = await this.apiRequest("/api/v1/settlements/documents/", {
                 method: "POST",
                 body: formData,
               });
             } else {
-              await this.apiRequest("/api/v1/settlements/documents/", {
+              createdDocument = await this.apiRequest("/api/v1/settlements/documents/", {
                 method: "POST",
                 body: payload,
               });
@@ -4446,6 +4447,12 @@
             this.resetCompanySettlementDocumentForm();
             this.showCompanySettlementDocumentForm = false;
             await this.loadCompanySettlements();
+            if (createdDocument) {
+              const normalizedCreatedDocument = this.normalizeCompanySettlementDocument(createdDocument);
+              if (!this.companySettlementDocuments.some((item) => this.toIntOrNull(item.id) === this.toIntOrNull(normalizedCreatedDocument.id))) {
+                this.companySettlementDocuments = [normalizedCreatedDocument, ...this.companySettlementDocuments];
+              }
+            }
           } catch (error) {
             this.setUiError(`Ошибка создания документа: ${error.message}`, { modal: true });
           } finally {
