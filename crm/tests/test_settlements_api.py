@@ -9,7 +9,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from crm.models import Client, SettlementDocument
+from crm.models import Client, Deal, SettlementDocument
 
 
 class SettlementsApiTests(APITestCase):
@@ -21,6 +21,7 @@ class SettlementsApiTests(APITestCase):
         )
         self.client.force_authenticate(user=user)
         self.company = Client.objects.create(name="Acme", currency="RUB")
+        self.deal = Deal.objects.create(title="Сделка Acme", client=self.company)
         self.media_root = tempfile.mkdtemp()
         self.addCleanup(lambda: shutil.rmtree(self.media_root, ignore_errors=True))
 
@@ -55,6 +56,7 @@ class SettlementsApiTests(APITestCase):
                 "due_date": "2026-04-10",
                 "currency": "RUB",
                 "amount": "120000.00",
+                "deal": self.deal.pk,
                 "realization_status": "created",
             },
             format="json",
@@ -89,6 +91,7 @@ class SettlementsApiTests(APITestCase):
                 "due_date": "2026-04-05",
                 "currency": "RUB",
                 "amount": "120000.00",
+                "deal": self.deal.pk,
                 "realization_status": "sent_to_client",
             },
             format="json",
@@ -125,6 +128,86 @@ class SettlementsApiTests(APITestCase):
         self.assertEqual(Decimal(summary_response.data["overview"]["receivable"]), Decimal("70000.00"))
         self.assertEqual(Decimal(summary_response.data["overview"]["advances_received"]), Decimal("0.00"))
         self.assertEqual(Decimal(summary_response.data["overview"]["balance"]), Decimal("70000.00"))
+
+    def test_realization_requires_deal(self):
+        response = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "document_type": "realization",
+                "document_date": "2026-03-30",
+                "currency": "RUB",
+                "amount": "1000.00",
+                "realization_status": "created",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("deal", response.data)
+
+    def test_invoice_and_realization_get_separate_auto_numbers(self):
+        first_invoice = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "document_type": "invoice",
+                "document_date": "2026-03-30",
+                "currency": "RUB",
+                "amount": "1000.00",
+                "number": "",
+            },
+            format="json",
+        )
+        second_invoice = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "document_type": "invoice",
+                "document_date": "2026-03-31",
+                "currency": "RUB",
+                "amount": "2000.00",
+                "number": "",
+            },
+            format="json",
+        )
+        first_realization = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "deal": self.deal.pk,
+                "document_type": "realization",
+                "document_date": "2026-04-01",
+                "currency": "RUB",
+                "amount": "3000.00",
+                "number": "",
+                "realization_status": "created",
+            },
+            format="json",
+        )
+        second_realization = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "deal": self.deal.pk,
+                "document_type": "realization",
+                "document_date": "2026-04-02",
+                "currency": "RUB",
+                "amount": "4000.00",
+                "number": "",
+                "realization_status": "created",
+            },
+            format="json",
+        )
+
+        self.assertEqual(first_invoice.status_code, status.HTTP_201_CREATED, first_invoice.content.decode())
+        self.assertEqual(second_invoice.status_code, status.HTTP_201_CREATED, second_invoice.content.decode())
+        self.assertEqual(first_realization.status_code, status.HTTP_201_CREATED, first_realization.content.decode())
+        self.assertEqual(second_realization.status_code, status.HTTP_201_CREATED, second_realization.content.decode())
+        self.assertEqual(first_invoice.data["number"], "1235")
+        self.assertEqual(second_invoice.data["number"], "1242")
+        self.assertEqual(first_realization.data["number"], "1235")
+        self.assertEqual(second_realization.data["number"], "1242")
 
     @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
     def test_can_upload_file_for_settlement_document(self):

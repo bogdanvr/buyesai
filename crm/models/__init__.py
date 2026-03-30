@@ -20,7 +20,7 @@ from crm.models.deal import Deal, DealDocument
 from crm.models.lead import Lead, LeadDocument
 from crm.models.source import LeadSource
 from crm.models.status import DealStage, LeadStatus
-from crm.models.settlement import SettlementAllocation, SettlementContract, SettlementDocument
+from crm.models.settlement import SettlementAllocation, SettlementContract, SettlementDocument, SettlementDocumentSequence
 from crm.models.touch import Touch, TouchResult
 
 __all__ = [
@@ -51,6 +51,7 @@ __all__ = [
     "SettlementAllocation",
     "SettlementContract",
     "SettlementDocument",
+    "SettlementDocumentSequence",
     "OutcomeCatalog",
     "Touch",
     "TouchResult",

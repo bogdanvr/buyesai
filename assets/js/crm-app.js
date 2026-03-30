@@ -526,6 +526,7 @@
           },
           companySettlementDocumentForm: {
             contractId: null,
+            dealId: null,
             documentType: "invoice",
             flowDirection: "",
             title: "",
@@ -4083,6 +4084,12 @@
         settlementDocumentIsRealization(documentType) {
           return String(documentType || "").trim() === "realization";
         },
+        companySettlementDealOptions() {
+          const companyId = this.toIntOrNull(this.editingCompanyId);
+          return (this.datasets.deals || [])
+            .filter((deal) => String(deal.clientId || "") === String(companyId))
+            .sort((left, right) => String(left.title || "").localeCompare(String(right.title || ""), "ru"));
+        },
         handleCompanySettlementDocumentTypeChange() {
           if (this.settlementDocumentIsRealization(this.companySettlementDocumentForm.documentType)) {
             if (!this.companySettlementDocumentForm.realizationStatus) {
@@ -4121,6 +4128,7 @@
         resetCompanySettlementDocumentForm() {
           this.companySettlementDocumentForm = {
             contractId: null,
+            dealId: null,
             documentType: "invoice",
             flowDirection: "",
             title: "",
@@ -4230,6 +4238,8 @@
             clientId: this.toIntOrNull(item.client),
             contractId: this.toIntOrNull(item.contract),
             contractName: item.contract_name || "Без договора",
+            dealId: this.toIntOrNull(item.deal),
+            dealTitle: item.deal_title || "",
             documentType: item.document_type || "",
             documentTypeLabel: item.document_type_label || "",
             flowDirection: item.flow_direction || "",
@@ -4422,8 +4432,12 @@
             throw new Error("Сначала откройте компанию");
           }
           const amount = Number(this.companySettlementDocumentForm.amount || 0);
+          const dealId = this.toIntOrNull(this.companySettlementDocumentForm.dealId);
           if (!Number.isFinite(amount) || amount <= 0) {
             throw new Error("Укажите сумму документа больше нуля");
+          }
+          if (this.settlementDocumentIsRealization(this.companySettlementDocumentForm.documentType) && !dealId) {
+            throw new Error("Для акта нужно выбрать сделку");
           }
           if (this.settlementDocumentNeedsDirection(this.companySettlementDocumentForm.documentType) && !this.companySettlementDocumentForm.flowDirection) {
             throw new Error("Укажите направление документа");
@@ -4437,6 +4451,7 @@
             const payload = {
               client: this.editingCompanyId,
               contract: contractId,
+              deal: dealId,
               document_type: this.companySettlementDocumentForm.documentType,
               flow_direction: this.settlementDocumentNeedsDirection(this.companySettlementDocumentForm.documentType)
                 ? this.companySettlementDocumentForm.flowDirection
@@ -4457,6 +4472,9 @@
               formData.append("client", String(this.editingCompanyId));
               if (contractId) {
                 formData.append("contract", String(contractId));
+              }
+              if (dealId) {
+                formData.append("deal", String(dealId));
               }
               formData.append("document_type", payload.document_type);
               formData.append("flow_direction", payload.flow_direction || "");

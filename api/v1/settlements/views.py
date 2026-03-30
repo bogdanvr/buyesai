@@ -80,17 +80,20 @@ class SettlementDocumentViewSet(ModelViewSet):
     parser_classes = (JSONParser, MultiPartParser, FormParser)
 
     def get_queryset(self):
-        queryset = SettlementDocument.objects.select_related("client", "contract").prefetch_related(
+        queryset = SettlementDocument.objects.select_related("client", "contract", "deal").prefetch_related(
             "incoming_allocations__source_document",
             "outgoing_allocations__target_document",
         ).order_by("-document_date", "-id")
         client_id = self.request.query_params.get("client")
         contract_id = self.request.query_params.get("contract")
+        deal_id = self.request.query_params.get("deal")
         document_type = self.request.query_params.get("document_type")
         if client_id:
             queryset = queryset.filter(client_id=client_id)
         if contract_id:
             queryset = queryset.filter(contract_id=contract_id)
+        if deal_id:
+            queryset = queryset.filter(deal_id=deal_id)
         if document_type:
             queryset = queryset.filter(document_type=document_type)
         return queryset

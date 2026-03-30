@@ -64,6 +64,7 @@ class SettlementContractSerializer(serializers.ModelSerializer):
 class SettlementDocumentSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source="client.name", read_only=True)
     contract_name = serializers.SerializerMethodField()
+    deal_title = serializers.CharField(source="deal.title", read_only=True)
     document_type_label = serializers.CharField(source="get_document_type_display", read_only=True)
     flow_direction_label = serializers.CharField(source="get_flow_direction_display", read_only=True)
     realization_status_label = serializers.CharField(source="normalized_realization_status_label", read_only=True)
@@ -134,6 +135,16 @@ class SettlementDocumentSerializer(serializers.ModelSerializer):
         original_name = str(attrs.get("original_name") or "").strip()
         document_type = attrs.get("document_type") or getattr(self.instance, "document_type", "")
         realization_status = attrs.get("realization_status")
+        client = attrs.get("client") or getattr(self.instance, "client", None)
+        contract = attrs.get("contract") if "contract" in attrs else getattr(self.instance, "contract", None)
+        deal = attrs.get("deal") if "deal" in attrs else getattr(self.instance, "deal", None)
+
+        if document_type == SettlementDocument.DocumentType.REALIZATION and deal is None:
+            raise serializers.ValidationError({"deal": "Для акта сделка обязательна."})
+        if contract is not None and client is not None and contract.client_id != client.id:
+            raise serializers.ValidationError({"contract": "Договор должен принадлежать той же компании."})
+        if deal is not None and client is not None and deal.client_id != client.id:
+            raise serializers.ValidationError({"deal": "Сделка должна принадлежать той же компании."})
 
         if document_type == SettlementDocument.DocumentType.REALIZATION and not realization_status:
             attrs["realization_status"] = SettlementDocument.RealizationStatus.CREATED
@@ -160,6 +171,8 @@ class SettlementDocumentSerializer(serializers.ModelSerializer):
             "client_name",
             "contract",
             "contract_name",
+            "deal",
+            "deal_title",
             "document_type",
             "document_type_label",
             "flow_direction",

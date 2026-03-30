@@ -11,6 +11,8 @@ from crm.models.common import TimestampedModel
 
 
 ZERO_DECIMAL = Decimal("0.00")
+SETTLEMENT_DOCUMENT_NUMBER_START = 1235
+SETTLEMENT_DOCUMENT_NUMBER_STEP = 7
 
 
 def settlement_document_upload_to(instance, filename: str) -> str:
@@ -47,6 +49,19 @@ class SettlementContract(TimestampedModel):
         return str(base).strip()
 
 
+class SettlementDocumentSequence(TimestampedModel):
+    document_type = models.CharField(max_length=32, unique=True, verbose_name="Тип документа")
+    next_number = models.PositiveIntegerField(default=SETTLEMENT_DOCUMENT_NUMBER_START, verbose_name="Следующий номер")
+
+    class Meta:
+        verbose_name = "Счетчик документов взаиморасчетов"
+        verbose_name_plural = "Счетчики документов взаиморасчетов"
+        ordering = ("document_type",)
+
+    def __str__(self):
+        return f"{self.document_type}: {self.next_number}"
+
+
 class SettlementDocument(TimestampedModel):
     class DocumentType(models.TextChoices):
         INVOICE = "invoice", "Счет"
@@ -81,6 +96,14 @@ class SettlementDocument(TimestampedModel):
         null=True,
         on_delete=models.SET_NULL,
         verbose_name="Договор",
+    )
+    deal = models.ForeignKey(
+        "crm.Deal",
+        related_name="settlement_documents",
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+        verbose_name="Сделка",
     )
     document_type = models.CharField(max_length=32, choices=DocumentType.choices, verbose_name="Тип документа")
     flow_direction = models.CharField(
@@ -197,6 +220,10 @@ class SettlementDocument(TimestampedModel):
 
         if self.contract_id and self.contract and self.contract.client_id != self.client_id:
             raise ValidationError({"contract": "Договор должен принадлежать той же компании."})
+        if self.deal_id and self.deal and self.deal.client_id != self.client_id:
+            raise ValidationError({"deal": "Сделка должна принадлежать той же компании."})
+        if self.document_type == self.DocumentType.REALIZATION and not self.deal_id:
+            raise ValidationError({"deal": "Для акта сделка обязательна."})
 
         direction_required = {
             self.DocumentType.DEBT_ADJUSTMENT,
@@ -225,13 +252,27 @@ class SettlementDocument(TimestampedModel):
                 or "RUB"
             )
         creating = self.pk is None
-        if creating and (self.open_amount in (None, "", ZERO_DECIMAL) or Decimal(self.open_amount or ZERO_DECIMAL) <= ZERO_DECIMAL):
-            self.open_amount = self.amount
         with transaction.atomic():
+            if creating and not str(self.number or "").strip():
+                self.number = self.generate_next_number()
+            if creating and (self.open_amount in (None, "", ZERO_DECIMAL) or Decimal(self.open_amount or ZERO_DECIMAL) <= ZERO_DECIMAL):
+                self.open_amount = self.amount
             super().save(*args, **kwargs)
             if creating:
                 self.auto_allocate_on_create()
             self.recalculate_open_amount(save=True)
+
+    def generate_next_number(self) -> str:
+        if self.document_type not in {self.DocumentType.INVOICE, self.DocumentType.REALIZATION}:
+            return str(self.number or "").strip()
+        sequence, _ = SettlementDocumentSequence.objects.select_for_update().get_or_create(
+            document_type=self.document_type,
+            defaults={"next_number": SETTLEMENT_DOCUMENT_NUMBER_START},
+        )
+        next_number = int(sequence.next_number or SETTLEMENT_DOCUMENT_NUMBER_START)
+        sequence.next_number = next_number + SETTLEMENT_DOCUMENT_NUMBER_STEP
+        sequence.save(update_fields=["next_number", "updated_at"])
+        return str(next_number)
 
     def auto_allocate_on_create(self):
         if self.document_type == self.DocumentType.INCOMING_PAYMENT:
