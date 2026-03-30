@@ -3,7 +3,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from crm.models import Client, Deal
+from crm.models import Client, Deal, DealStage, LeadSource
 
 
 class DealOptionalCompanyTests(APITestCase):
@@ -14,11 +14,19 @@ class DealOptionalCompanyTests(APITestCase):
             is_staff=True,
         )
         self.client.force_authenticate(user=user)
+        self.source = LeadSource.objects.create(name="Сайт", code="site")
+        self.stage = DealStage.objects.create(
+            name="В работе",
+            code="in_progress",
+            order=10,
+            is_active=True,
+            is_final=False,
+        )
 
     def test_can_create_deal_without_company(self):
         response = self.client.post(
             reverse("deals-list"),
-            {"title": "Deal without company", "client": None},
+            {"title": "Deal without company", "client": None, "source": self.source.pk, "stage": self.stage.pk, "has_pending_task": True},
             format="json",
         )
 
@@ -28,14 +36,26 @@ class DealOptionalCompanyTests(APITestCase):
 
     def test_can_clear_company_on_deal_update(self):
         company = Client.objects.create(name="Acme")
-        deal = Deal.objects.create(title="Deal with company", client=company)
+        deal = Deal.objects.create(title="Deal with company", client=company, source=self.source, stage=self.stage)
 
         response = self.client.patch(
             reverse("deals-detail", kwargs={"pk": deal.pk}),
-            {"client": None},
+            {"client": None, "has_pending_task": True},
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         deal.refresh_from_db()
         self.assertIsNone(deal.client)
+
+    def test_can_filter_deals_by_company(self):
+        company = Client.objects.create(name="Acme")
+        other_company = Client.objects.create(name="Beta")
+        target_deal = Deal.objects.create(title="Deal for Acme", client=company)
+        Deal.objects.create(title="Deal for Beta", client=other_company)
+
+        response = self.client.get(reverse("deals-list"), {"client": company.pk})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result_ids = {item["id"] for item in response.data["results"]}
+        self.assertEqual(result_ids, {target_deal.pk})

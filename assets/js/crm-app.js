@@ -4088,6 +4088,15 @@
             .filter((deal) => String(deal.clientId || "") === String(companyId))
             .sort((left, right) => String(left.title || "").localeCompare(String(right.title || ""), "ru"));
         },
+        async ensureCompanySettlementDealsLoaded() {
+          const companyId = this.toIntOrNull(this.editingCompanyId);
+          if (!companyId) {
+            return;
+          }
+          const payload = await this.apiRequest(`/api/v1/deals/?client=${companyId}&page_size=200`);
+          const records = this.normalizePaginatedResponse(payload).map((item) => this.mapDeal(item));
+          this.datasets.deals = this.mergeSectionRecords(this.datasets.deals, records);
+        },
         defaultCompanySettlementDocumentTitle(documentType) {
           return this.settlementDocumentIsRealization(documentType) ? "Акт об оказании услуг" : "";
         },
@@ -4362,6 +4371,7 @@
           }
           this.isCompanySettlementsLoading = true;
           try {
+            await this.ensureCompanySettlementDealsLoaded();
             const [summaryPayload, contractsPayload, documentsPayload] = await Promise.all([
               this.apiRequest(`/api/v1/settlements/summary/?client=${this.editingCompanyId}`),
               this.apiRequest(`/api/v1/settlements/contracts/?client=${this.editingCompanyId}&page_size=100`),

@@ -10,10 +10,13 @@ class DealViewSet(ModelViewSet):
 
     def get_queryset(self):
         queryset = list_deals()
+        client_id = self.request.query_params.get("client")
         stage_code = self.request.query_params.get("stage")
         is_won = self.request.query_params.get("is_won")
         search_query = self.request.query_params.get("q")
 
+        if client_id:
+            queryset = queryset.filter(client_id=client_id)
         if stage_code:
             queryset = queryset.filter(stage__code=stage_code)
         if is_won in {"true", "false"}:
