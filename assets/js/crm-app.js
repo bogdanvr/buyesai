@@ -2452,6 +2452,16 @@
           element.style.height = "0px";
           element.style.height = `${Math.max(element.scrollHeight, 44)}px`;
         },
+        scrollPanelIntoView(panelId) {
+          const normalizedId = String(panelId || "").trim();
+          if (!normalizedId) return;
+          this.$nextTick(() => {
+            const panel = document.getElementById(normalizedId);
+            if (panel && typeof panel.scrollIntoView === "function") {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        },
         autoResizeTextarea(event) {
           const element = event?.target;
           if (!element) return;
@@ -4107,22 +4117,30 @@
         },
         toggleCompanyRequisites() {
           this.toggleExclusiveCompanyPanel("requisites");
+          if (this.showCompanyRequisites) {
+            this.scrollPanelIntoView("company-requisites-panel");
+          }
         },
         async toggleCompanySettlementsPanel() {
           const wasOpen = this.showCompanySettlementsPanel;
           this.toggleExclusiveCompanyPanel("settlements");
           if (!wasOpen && this.showCompanySettlementsPanel) {
             await this.loadCompanySettlements();
+            this.scrollPanelIntoView("company-settlements-panel");
           }
         },
         toggleCompanyWorkRules() {
           this.toggleExclusiveCompanyPanel("workRules");
+          if (this.showCompanyWorkRules) {
+            this.scrollPanelIntoView("company-workrules-panel");
+          }
         },
         async toggleCompanyDocumentsPanel() {
           const wasOpen = this.showCompanyDocumentsPanel;
           this.toggleExclusiveCompanyPanel("documents");
           if (!wasOpen && this.showCompanyDocumentsPanel) {
             await this.loadCompanyDocuments();
+            this.scrollPanelIntoView("company-documents-panel");
           }
         },
         async toggleCompanyPhoneCallHistoryPanel() {
@@ -4130,6 +4148,7 @@
           this.toggleExclusiveCompanyPanel("phoneCallHistory");
           if (!wasOpen && this.showCompanyPhoneCallHistory) {
             await this.ensurePhoneCallHistoryLoaded("company", this.editingCompanyId);
+            this.scrollPanelIntoView("company-phone-history-panel");
           }
         },
         async toggleCompanyCommunicationsPanel() {
@@ -4137,6 +4156,7 @@
           this.toggleExclusiveCompanyPanel("communications");
           if (!wasOpen && this.showCompanyCommunicationsPanel) {
             await this.loadCompanyCommunications({ preserveSelection: false });
+            this.scrollPanelIntoView("company-communications-panel");
             return;
           }
           if (!this.showCompanyCommunicationsPanel) {
@@ -4145,9 +4165,15 @@
         },
         toggleCompanyDealsPanel() {
           this.toggleExclusiveCompanyPanel("deals");
+          if (this.showCompanyDealsPanel) {
+            this.scrollPanelIntoView("company-deals-panel");
+          }
         },
         toggleCompanyLeadsPanel() {
           this.toggleExclusiveCompanyPanel("leads");
+          if (this.showCompanyLeadsPanel) {
+            this.scrollPanelIntoView("company-leads-panel");
+          }
         },
         settlementDocumentNeedsDirection(documentType) {
           return SETTLEMENT_DIRECTION_REQUIRED_TYPES.includes(String(documentType || "").trim());
@@ -8409,6 +8435,7 @@
             this.showDealPhoneCallHistory = false;
             this.stopCommunicationsPollingIfIdle();
             await this.loadContactsForSelectedDealCompany();
+            this.scrollPanelIntoView("deal-contacts-panel");
             return;
           }
           this.showDealContactForm = false;
@@ -8422,6 +8449,7 @@
             this.showDealTaskForm = false;
             this.showDealPhoneCallHistory = false;
             await this.loadDealCommunications({ preserveSelection: false });
+            this.scrollPanelIntoView("deal-communications-panel");
             return;
           }
           this.stopCommunicationsPollingIfIdle();
@@ -9181,6 +9209,7 @@
             this.showDealPhoneCallHistory = false;
             this.stopCommunicationsPollingIfIdle();
             await this.loadDealDocuments();
+            this.scrollPanelIntoView("deal-documents-panel");
           }
         },
         async toggleDealPhoneCallHistoryPanel() {
@@ -9195,6 +9224,7 @@
             this.showDealDocumentsPanel = false;
             this.stopCommunicationsPollingIfIdle();
             await this.ensurePhoneCallHistoryLoaded("deal", this.editingDealId);
+            this.scrollPanelIntoView("deal-phone-history-panel");
           }
         },
         openDealDocumentPicker() {
@@ -10058,6 +10088,9 @@
         },
         toggleCompanyContactsPanel() {
           this.toggleExclusiveCompanyPanel("contacts");
+          if (this.showCompanyContactsPanel) {
+            this.scrollPanelIntoView("company-contacts-panel");
+          }
         },
         toggleCompanyContactForm() {
           this.showCompanyContactForm = !this.showCompanyContactForm;

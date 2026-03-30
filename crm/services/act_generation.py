@@ -325,7 +325,7 @@ def _invoice_payment_table(executor_company: Client) -> str:
     bik = _normalize_text(executor_company.bik) or "-"
     correspondent_account = _normalize_text(executor_company.correspondent_account) or "-"
     settlement_account = _normalize_text(executor_company.settlement_account or executor_company.iban) or "-"
-    settlement_label = "Сч. №" if _normalize_text(executor_company.currency).upper() == "RUB" else "IBAN"
+    settlement_label = "р/с №"
     inn = _normalize_text(executor_company.inn) or "-"
     kpp = _normalize_text(executor_company.kpp) or "-"
     recipient_name = _company_name(executor_company, "Получатель")
@@ -337,7 +337,7 @@ def _invoice_payment_table(executor_company: Client) -> str:
         "</w:tr>",
         "<w:tr>"
         f"{_table_cell_custom('Банк получателя', width=widths[0] + widths[1], size=18, grid_span=2)}"
-        f"{_table_cell_custom('Сч. №', width=widths[2], bold=True, size=20)}"
+        f"{_table_cell_custom('к/с №', width=widths[2], bold=True, size=20)}"
         f"{_table_cell_custom(correspondent_account, width=widths[3], size=22)}"
         "</w:tr>",
         "<w:tr>"

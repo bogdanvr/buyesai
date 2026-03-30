@@ -2601,7 +2601,7 @@
                 <span>Переписка</span>
               </button>
             </div>
-            <div v-if="showDealPhoneCallHistory && editingDealId" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+            <div id="deal-phone-history-panel" v-if="showDealPhoneCallHistory && editingDealId" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div class="text-sm font-semibold text-white">История звонков</div>
@@ -2690,7 +2690,7 @@
                 </div>
               </div>
             </div>
-            <div v-if="editingDealId && showDealCommunicationsPanel" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+            <div id="deal-communications-panel" v-if="editingDealId && showDealCommunicationsPanel" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div class="text-sm font-semibold text-white">Переписка сделки</div>
@@ -3036,7 +3036,7 @@
                 </div>
               </div>
             </div>
-            <div v-if="editingDealId && showDealDocumentsPanel" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+            <div id="deal-documents-panel" v-if="editingDealId && showDealDocumentsPanel" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div class="text-sm font-semibold text-white">Документы сделки</div>
@@ -3101,7 +3101,7 @@
                 </a>
               </div>
             </div>
-            <div v-if="dealHasSelectedCompany && showDealContactsPanel" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+            <div id="deal-contacts-panel" v-if="dealHasSelectedCompany && showDealContactsPanel" class="md:col-span-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="min-w-0">
                   <div class="text-sm font-semibold text-white truncate">Контакты компании</div>
@@ -4274,7 +4274,7 @@
                   <span class="text-crm-accent text-xs">[[ showCompanyLeadsPanel ? '−' : '+' ]]</span>
                 </button>
               </div>
-              <div v-if="showCompanySettlementsPanel && editingCompanyId" class="mt-4 rounded-2xl border border-crm-border/80 bg-[#102f4a] p-4">
+              <div id="company-settlements-panel" v-if="showCompanySettlementsPanel && editingCompanyId" class="mt-4 rounded-2xl border border-crm-border/80 bg-[#102f4a] p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div class="text-sm font-semibold text-white">Взаиморасчёты</div>
@@ -4586,7 +4586,7 @@
                                 <path d="M11 2.75V7.5h4.25" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
                               </svg>
                             </a>
-                            <span :class="settlementDocumentStatusClass(document)" class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold">
+                            <span v-if="document.documentType !== 'invoice'" :class="settlementDocumentStatusClass(document)" class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold">
                               [[ settlementDocumentStatusLabel(document) ]]
                             </span>
                             <button
@@ -4602,16 +4602,16 @@
                             </button>
                           </div>
                         </div>
-                        <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                        <div :class="document.documentType === 'invoice' ? 'mt-3 grid grid-cols-1 gap-3 text-sm' : 'mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm'">
                           <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
                             <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Сумма документа</div>
                             <div class="mt-1 text-white">[[ formatSettlementAmount(document.amount, document.currency) ]]</div>
                           </div>
-                          <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
+                          <div v-if="document.documentType !== 'invoice'" class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
                             <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Закрыто</div>
                             <div class="mt-1 text-white">[[ formatSettlementAmount(document.closedAmount, document.currency) ]]</div>
                           </div>
-                          <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
+                          <div v-if="document.documentType !== 'invoice'" class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
                             <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Остаток</div>
                             <div class="mt-1 text-white">[[ formatSettlementAmount(document.openAmount, document.currency) ]]</div>
                           </div>
@@ -4621,7 +4621,7 @@
                           <span v-if="document.fileSize"> • [[ formatFileSize(document.fileSize) ]]</span>
                         </div>
                         <div v-if="document.note" class="mt-3 text-sm text-crm-muted whitespace-pre-line break-words">[[ document.note ]]</div>
-                        <div class="mt-3">
+                        <div v-if="document.documentType !== 'invoice'" class="mt-3">
                           <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">История оплат и закрытий</div>
                           <div v-if="!document.allocationHistory.length" class="mt-2 text-sm text-crm-muted">
                             История закрытий пока пустая.
@@ -4646,7 +4646,7 @@
                   </div>
                 </template>
               </div>
-              <div v-if="showCompanyPhoneCallHistory && editingCompanyId" class="mt-4 rounded-2xl border border-crm-border/80 bg-[#102f4a] p-4">
+              <div id="company-phone-history-panel" v-if="showCompanyPhoneCallHistory && editingCompanyId" class="mt-4 rounded-2xl border border-crm-border/80 bg-[#102f4a] p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div class="text-sm font-semibold text-white">История звонков</div>
@@ -4735,7 +4735,7 @@
                   </div>
                 </div>
               </div>
-              <div v-if="showCompanyRequisites" class="mt-4 space-y-4">
+              <div id="company-requisites-panel" v-if="showCompanyRequisites" class="mt-4 space-y-4">
                 <div class="rounded-2xl border border-crm-border bg-[#102f4a] p-4">
                   <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">Общие реквизиты</div>
                   <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -4952,7 +4952,7 @@
                   </div>
                 </div>
               </div>
-              <div v-if="showCompanyDocumentsPanel && editingCompanyId" class="mt-4 rounded-2xl border border-crm-border bg-[#102f4a] p-4">
+              <div id="company-documents-panel" v-if="showCompanyDocumentsPanel && editingCompanyId" class="mt-4 rounded-2xl border border-crm-border bg-[#102f4a] p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div class="text-sm font-semibold text-white">Документы компании</div>
@@ -5050,7 +5050,7 @@
                   </div>
                 </template>
               </div>
-              <div v-if="showCompanyCommunicationsPanel && editingCompanyId" class="mt-4 rounded-2xl border border-crm-border bg-[#102f4a] p-4">
+              <div id="company-communications-panel" v-if="showCompanyCommunicationsPanel && editingCompanyId" class="mt-4 rounded-2xl border border-crm-border bg-[#102f4a] p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div class="text-sm font-semibold text-white">Переписка компании</div>
@@ -5225,7 +5225,7 @@
                   </div>
                 </div>
               </div>
-              <div v-if="showCompanyWorkRules" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+              <div id="company-workrules-panel" v-if="showCompanyWorkRules" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                 <div class="py-1">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">ЛПР</div>
                   <select
@@ -5334,7 +5334,7 @@
                   </button>
                 </div>
               </div>
-              <div v-if="showCompanyContactsPanel && editingCompanyId" class="mt-4 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-4">
+              <div id="company-contacts-panel" v-if="showCompanyContactsPanel && editingCompanyId" class="mt-4 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-4">
                 <button
                   type="button"
                   @click="toggleCompanyContactForm"
@@ -5428,7 +5428,7 @@
                   </div>
                 </div>
               </div>
-              <div v-if="showCompanyDealsPanel && editingCompanyId" class="mt-4 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-4 space-y-5">
+              <div id="company-deals-panel" v-if="showCompanyDealsPanel && editingCompanyId" class="mt-4 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-4 space-y-5">
                 <div>
                   <div class="text-sm font-semibold text-white">Открытые сделки</div>
                   <div v-if="!companySummaryActiveDeals.length" class="mt-2 text-sm text-crm-muted">Открытых сделок нет.</div>
@@ -5496,7 +5496,7 @@
                   </div>
                 </div>
               </div>
-              <div v-if="showCompanyLeadsPanel && editingCompanyId" class="mt-4 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-4 space-y-5">
+              <div id="company-leads-panel" v-if="showCompanyLeadsPanel && editingCompanyId" class="mt-4 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-4 space-y-5">
                 <div>
                   <div class="text-sm font-semibold text-white">Активные лиды</div>
                   <div v-if="!companySummaryActiveLeads.length" class="mt-2 text-sm text-crm-muted">Активных лидов нет.</div>
