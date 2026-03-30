@@ -4,8 +4,9 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from zipfile import ZipFile
 
-from crm.models import Client, ClientDocument, Deal, DealDocument
+from crm.models import Client, ClientDocument, Deal, DealDocument, SettlementDocument
 
 
 class DealDocumentsApiTests(APITestCase):
@@ -16,8 +17,19 @@ class DealDocumentsApiTests(APITestCase):
             is_staff=True,
         )
         self.client.force_authenticate(user=self.user)
-        self.company = Client.objects.create(name="Acme")
-        self.deal = Deal.objects.create(title="Сделка для документов", client=self.company)
+        self.company = Client.objects.create(
+            name="Acme",
+            legal_name='ООО "Акме"',
+            inn="5501000000",
+            kpp="550101001",
+            address="г. Омск, ул. Ленина, д. 1",
+            bank_name="АО Альфа-Банк",
+            bik="044525593",
+            settlement_account="40702810000000000001",
+            correspondent_account="30101810200000000593",
+            currency="RUB",
+        )
+        self.deal = Deal.objects.create(title="Сделка для документов", client=self.company, amount="77000.00", currency="RUB")
 
     @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
     def test_can_upload_document_with_long_filename_after_company_deal_prefix(self):
@@ -70,3 +82,38 @@ class DealDocumentsApiTests(APITestCase):
         self.assertIn("event_type: document", self.company.events)
         self.assertIn("document_name: brief.docx", self.company.events)
         self.assertIn(f"document_url: {expected_url}", self.company.events)
+
+    @override_settings(
+        ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"],
+        CRM_ACT_EXECUTOR_NAME='ООО "Buseys"',
+        CRM_ACT_EXECUTOR_REQUISITES="ИНН 5501999999, КПП 550101001, г. Омск, р/с 40702810000000000009, АО Альфа-Банк, БИК 044525593",
+    )
+    def test_can_generate_act_document_for_deal(self):
+        response = self.client.post(
+            reverse("deal-documents-generate-act"),
+            {
+                "deal": self.deal.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content.decode())
+        self.assertEqual(response.data["deal"], self.deal.pk)
+        self.assertTrue(response.data["original_name"].endswith(".docx"))
+
+        realization = SettlementDocument.objects.get(deal=self.deal, document_type=SettlementDocument.DocumentType.REALIZATION)
+        self.assertEqual(str(realization.amount), "77000.00")
+        self.assertEqual(realization.number, "1235")
+
+        generated_document = DealDocument.objects.get(pk=response.data["id"])
+        self.assertEqual(generated_document.uploaded_by, self.user)
+        self.assertIn(f"company_{self.company.pk}/deal_{self.deal.pk}/", generated_document.file.name)
+
+        with generated_document.file.open("rb") as file_handle:
+            archive = ZipFile(file_handle)
+            self.assertIn("word/document.xml", archive.namelist())
+            document_xml = archive.read("word/document.xml").decode("utf-8")
+
+        self.assertIn("Акт об оказании услуг", document_xml)
+        self.assertIn("Сделка для документов", document_xml)
+        self.assertIn("77000,00", document_xml.replace(" ", ""))

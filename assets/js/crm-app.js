@@ -157,6 +157,7 @@
           isDealCommunicationSending: false,
           isDealCommunicationStarting: false,
           isDealDocumentUploading: false,
+          isDealActGenerating: false,
           isTouchDocumentsLoading: false,
           isTouchDocumentUploading: false,
           touchResultPromptVisible: false,
@@ -4088,6 +4089,13 @@
             .filter((deal) => String(deal.clientId || "") === String(companyId))
             .sort((left, right) => String(left.title || "").localeCompare(String(right.title || ""), "ru"));
         },
+        selectedCompanySettlementDeal() {
+          const dealId = this.toIntOrNull(this.companySettlementDocumentForm.dealId);
+          if (!dealId) {
+            return null;
+          }
+          return (this.datasets.deals || []).find((deal) => String(deal.id) === String(dealId)) || null;
+        },
         async ensureCompanySettlementDealsLoaded() {
           const companyId = this.toIntOrNull(this.editingCompanyId);
           if (!companyId) {
@@ -4114,6 +4122,20 @@
           }
           this.resetCompanySettlementDocumentForm();
         },
+        syncCompanySettlementAmountFromDeal() {
+          if (!this.settlementDocumentIsRealization(this.companySettlementDocumentForm.documentType)) {
+            return;
+          }
+          const deal = this.selectedCompanySettlementDeal();
+          if (!deal) {
+            return;
+          }
+          const amount = Number(deal.amount || 0);
+          if (!Number.isFinite(amount) || amount <= 0) {
+            return;
+          }
+          this.companySettlementDocumentForm.amount = amount.toFixed(2);
+        },
         handleCompanySettlementDocumentTypeChange() {
           if (this.settlementDocumentIsRealization(this.companySettlementDocumentForm.documentType)) {
             if (!this.companySettlementDocumentForm.realizationStatus) {
@@ -4122,6 +4144,7 @@
             if (!String(this.companySettlementDocumentForm.title || "").trim()) {
               this.companySettlementDocumentForm.title = this.defaultCompanySettlementDocumentTitle(this.companySettlementDocumentForm.documentType);
             }
+            this.syncCompanySettlementAmountFromDeal();
             return;
           }
           if (String(this.companySettlementDocumentForm.title || "").trim() === this.defaultCompanySettlementDocumentTitle("realization")) {
@@ -8959,12 +8982,36 @@
           }
         },
         openDealDocumentPicker() {
-          if (!this.editingDealId || this.isDealDocumentUploading) {
+          if (!this.editingDealId || this.isDealDocumentUploading || this.isDealActGenerating) {
             return;
           }
           const input = this.$refs.dealDocumentInput;
           if (input) {
             input.click();
+          }
+        },
+        async generateDealAct() {
+          if (!this.editingDealId) {
+            return;
+          }
+          this.isDealActGenerating = true;
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            const created = await this.apiRequest("/api/v1/deal-documents/generate-act/", {
+              method: "POST",
+              body: {
+                deal: this.editingDealId,
+              },
+            });
+            this.dealDocumentsForActiveDeal = [
+              this.mapDealDocument(created),
+              ...this.dealDocumentsForActiveDeal,
+            ];
+            this.showDealDocumentsPanel = true;
+          } catch (error) {
+            this.setUiError(`Ошибка генерации акта: ${error.message}`, { modal: true });
+          } finally {
+            this.isDealActGenerating = false;
           }
         },
         async handleDealDocumentInput(event) {

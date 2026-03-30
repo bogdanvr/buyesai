@@ -1,17 +1,22 @@
 import mimetypes
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import FileResponse, Http404
 from rest_framework.decorators import action
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.viewsets import ModelViewSet
 
 from api.v1.deal_documents.serializers import DealDocumentSerializer
-from crm.models import DealDocument
+from crm.models import Deal, DealDocument
+from crm.services.act_generation import generate_deal_act
 
 
 class DealDocumentViewSet(ModelViewSet):
     serializer_class = DealDocumentSerializer
-    parser_classes = (MultiPartParser, FormParser)
+    parser_classes = (JSONParser, MultiPartParser, FormParser)
 
     def get_queryset(self):
         queryset = DealDocument.objects.select_related("deal", "deal__client", "uploaded_by").order_by("-created_at", "-id")
@@ -22,6 +27,22 @@ class DealDocumentViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(uploaded_by=self.request.user)
+
+    @action(detail=False, methods=["post"], url_path="generate-act")
+    def generate_act(self, request):
+        deal_id = request.data.get("deal")
+        if not deal_id:
+            raise ValidationError({"deal": "Укажите сделку."})
+        deal = Deal.objects.select_related("client").filter(pk=deal_id).first()
+        if deal is None:
+            raise ValidationError({"deal": "Сделка не найдена."})
+        try:
+            deal_document, _ = generate_deal_act(deal=deal, uploaded_by=request.user)
+        except DjangoValidationError as exc:
+            raise ValidationError(getattr(exc, "message_dict", None) or getattr(exc, "messages", None) or {"detail": str(exc)})
+
+        serializer = self.get_serializer(deal_document)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["get"], url_path="download")
     def download(self, request, pk=None):

@@ -3043,6 +3043,14 @@
                   <div class="text-xs text-crm-muted">[[ forms.deals.title || `Сделка #${editingDealId}` ]]</div>
                 </div>
                 <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    @click="generateDealAct"
+                    :disabled="isDealActGenerating || isDealDocumentUploading"
+                    class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span>[[ isDealActGenerating ? 'Генерируем...' : 'Сгенерировать акт' ]]</span>
+                  </button>
                   <input
                     ref="dealDocumentInput"
                     type="file"
@@ -3052,7 +3060,7 @@
                   <button
                     type="button"
                     @click="openDealDocumentPicker"
-                    :disabled="isDealDocumentUploading"
+                    :disabled="isDealDocumentUploading || isDealActGenerating"
                     class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <span class="text-crm-accent">+</span>
@@ -4353,7 +4361,7 @@
                       </label>
                       <label class="block">
                         <span class="text-sm text-crm-muted">Сделка <span v-if="settlementDocumentIsRealization(companySettlementDocumentForm.documentType)" class="text-red-300">*</span></span>
-                        <select v-model="companySettlementDocumentForm.dealId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                        <select v-model="companySettlementDocumentForm.dealId" @change="syncCompanySettlementAmountFromDeal" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
                           <option :value="null">Не выбрана</option>
                           <option v-for="deal in companySettlementDealOptions()" :key="`settlement-deal-option-${deal.id}`" :value="deal.id">
                             [[ deal.title || `Сделка #${deal.id}` ]]
