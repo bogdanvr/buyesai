@@ -4253,7 +4253,7 @@
                     </button>
                     <button
                       type="button"
-                      @click="showCompanySettlementDocumentForm = !showCompanySettlementDocumentForm"
+                      @click="toggleCompanySettlementDocumentForm"
                       class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-medium text-white transition hover:border-crm-accent"
                     >
                       [[ showCompanySettlementDocumentForm ? 'Скрыть документ' : 'Добавить документ' ]]
@@ -4365,6 +4365,7 @@
                         <select v-model="companySettlementDocumentForm.documentType" @change="handleCompanySettlementDocumentTypeChange" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
                           <option v-for="option in settlementDocumentTypeOptions" :key="`settlement-doc-type-${option.value}`" :value="option.value">[[ option.label ]]</option>
                         </select>
+                        <div class="mt-1 text-xs text-crm-muted">Авансы считаются автоматически по незачтённым оплатам, отдельный документ для этого не нужен.</div>
                       </label>
                       <label v-if="settlementDocumentNeedsDirection(companySettlementDocumentForm.documentType)" class="block">
                         <span class="text-sm text-crm-muted">Направление</span>
@@ -4379,17 +4380,10 @@
                           <option v-for="option in settlementRealizationStatusOptions" :key="`settlement-realization-status-${option.value}`" :value="option.value">[[ option.label ]]</option>
                         </select>
                       </label>
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <label class="block">
-                          <span class="text-sm text-crm-muted">Номер</span>
-                          <input v-model="companySettlementDocumentForm.number" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                          <div class="mt-1 text-xs text-crm-muted">Если оставить пустым, номер присвоится автоматически.</div>
-                        </label>
-                        <label class="block">
-                          <span class="text-sm text-crm-muted">Название</span>
-                          <input v-model="companySettlementDocumentForm.title" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
-                        </label>
-                      </div>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Название</span>
+                        <input v-model="companySettlementDocumentForm.title" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                      </label>
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <label class="block">
                           <span class="text-sm text-crm-muted">Дата документа</span>

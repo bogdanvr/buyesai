@@ -139,6 +139,11 @@ class SettlementDocumentSerializer(serializers.ModelSerializer):
         contract = attrs.get("contract") if "contract" in attrs else getattr(self.instance, "contract", None)
         deal = attrs.get("deal") if "deal" in attrs else getattr(self.instance, "deal", None)
 
+        if document_type in {"advance", "advance_offset"}:
+            raise serializers.ValidationError(
+                {"document_type": "Документы 'Аванс' и 'Зачет аванса' больше не создаются отдельно. Используйте оплату и закрытие."}
+            )
+
         if document_type == SettlementDocument.DocumentType.REALIZATION and deal is None:
             raise serializers.ValidationError({"deal": "Для акта сделка обязательна."})
         if contract is not None and client is not None and contract.client_id != client.id:

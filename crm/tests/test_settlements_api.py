@@ -209,6 +209,24 @@ class SettlementsApiTests(APITestCase):
         self.assertEqual(first_realization.data["number"], "1235")
         self.assertEqual(second_realization.data["number"], "1242")
 
+    def test_legacy_advance_document_types_cannot_be_created(self):
+        for document_type in ("advance", "advance_offset"):
+            response = self.client.post(
+                reverse("settlement-documents-list"),
+                {
+                    "client": self.company.pk,
+                    "document_type": document_type,
+                    "document_date": "2026-03-30",
+                    "currency": "RUB",
+                    "amount": "1000.00",
+                    "flow_direction": "incoming",
+                },
+                format="json",
+            )
+
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertIn("document_type", response.data)
+
     @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
     def test_can_upload_file_for_settlement_document(self):
         uploaded_file = SimpleUploadedFile("invoice-100000.pdf", b"%PDF-1.4", content_type="application/pdf")

@@ -61,8 +61,6 @@
       { value: "outgoing_payment", label: "Оплата исходящая" },
       { value: "debt_adjustment", label: "Корректировка долга" },
       { value: "refund", label: "Возврат" },
-      { value: "advance", label: "Аванс" },
-      { value: "advance_offset", label: "Зачет аванса" },
     ];
 
     const SETTLEMENT_DIRECTION_OPTIONS = [
@@ -76,7 +74,7 @@
       { value: "signed", label: "Подписан" },
     ];
 
-    const SETTLEMENT_DIRECTION_REQUIRED_TYPES = ["debt_adjustment", "refund", "advance", "advance_offset"];
+    const SETTLEMENT_DIRECTION_REQUIRED_TYPES = ["debt_adjustment", "refund"];
 
     const app = createApp({
       compilerOptions: {
@@ -4090,12 +4088,35 @@
             .filter((deal) => String(deal.clientId || "") === String(companyId))
             .sort((left, right) => String(left.title || "").localeCompare(String(right.title || ""), "ru"));
         },
+        defaultCompanySettlementDocumentTitle(documentType) {
+          return this.settlementDocumentIsRealization(documentType) ? "Акт об оказании услуг" : "";
+        },
+        preferredCompanySettlementContractId() {
+          const latestContract = Array.isArray(this.companySettlementContracts) && this.companySettlementContracts.length
+            ? this.companySettlementContracts[0]
+            : null;
+          return this.toIntOrNull(latestContract?.id);
+        },
+        toggleCompanySettlementDocumentForm() {
+          const shouldOpen = !this.showCompanySettlementDocumentForm;
+          this.showCompanySettlementDocumentForm = shouldOpen;
+          if (!shouldOpen) {
+            return;
+          }
+          this.resetCompanySettlementDocumentForm();
+        },
         handleCompanySettlementDocumentTypeChange() {
           if (this.settlementDocumentIsRealization(this.companySettlementDocumentForm.documentType)) {
             if (!this.companySettlementDocumentForm.realizationStatus) {
               this.companySettlementDocumentForm.realizationStatus = "created";
             }
+            if (!String(this.companySettlementDocumentForm.title || "").trim()) {
+              this.companySettlementDocumentForm.title = this.defaultCompanySettlementDocumentTitle(this.companySettlementDocumentForm.documentType);
+            }
             return;
+          }
+          if (String(this.companySettlementDocumentForm.title || "").trim() === this.defaultCompanySettlementDocumentTitle("realization")) {
+            this.companySettlementDocumentForm.title = "";
           }
           this.companySettlementDocumentForm.realizationStatus = "";
         },
@@ -4127,12 +4148,11 @@
         },
         resetCompanySettlementDocumentForm() {
           this.companySettlementDocumentForm = {
-            contractId: null,
+            contractId: this.preferredCompanySettlementContractId(),
             dealId: null,
             documentType: "invoice",
             flowDirection: "",
-            title: "",
-            number: "",
+            title: this.defaultCompanySettlementDocumentTitle("invoice"),
             documentDate: new Date().toISOString().slice(0, 10),
             dueDate: "",
             amount: "",
@@ -4460,7 +4480,7 @@
                 ? (this.companySettlementDocumentForm.realizationStatus || "created")
                 : "",
               title: this.companySettlementDocumentForm.title.trim(),
-              number: this.companySettlementDocumentForm.number.trim(),
+              number: "",
               document_date: this.companySettlementDocumentForm.documentDate || new Date().toISOString().slice(0, 10),
               due_date: this.companySettlementDocumentForm.dueDate || null,
               currency: this.companySettlementDocumentForm.currency || this.forms.companies.currency || "RUB",

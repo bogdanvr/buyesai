@@ -71,8 +71,6 @@ class SettlementDocument(TimestampedModel):
         OUTGOING_PAYMENT = "outgoing_payment", "Оплата исходящая"
         DEBT_ADJUSTMENT = "debt_adjustment", "Корректировка долга"
         REFUND = "refund", "Возврат"
-        ADVANCE = "advance", "Аванс"
-        ADVANCE_OFFSET = "advance_offset", "Зачет аванса"
 
     class FlowDirection(models.TextChoices):
         INCOMING = "incoming", "Входящий"
@@ -159,8 +157,6 @@ class SettlementDocument(TimestampedModel):
             self.DocumentType.OUTGOING_PAYMENT,
             self.DocumentType.DEBT_ADJUSTMENT,
             self.DocumentType.REFUND,
-            self.DocumentType.ADVANCE,
-            self.DocumentType.ADVANCE_OFFSET,
         }
 
     @property
@@ -168,7 +164,6 @@ class SettlementDocument(TimestampedModel):
         return self.document_type in {
             self.DocumentType.REALIZATION,
             self.DocumentType.SUPPLIER_RECEIPT,
-            self.DocumentType.ADVANCE,
         }
 
     @property
@@ -185,14 +180,11 @@ class SettlementDocument(TimestampedModel):
 
     @property
     def is_advance_received(self) -> bool:
-        return (
-            self.document_type == self.DocumentType.INCOMING_PAYMENT
-            or (self.document_type == self.DocumentType.ADVANCE and self.flow_direction == self.FlowDirection.INCOMING)
-        )
+        return self.document_type == self.DocumentType.INCOMING_PAYMENT
 
     @property
     def is_advance_issued(self) -> bool:
-        return self.document_type == self.DocumentType.ADVANCE and self.flow_direction == self.FlowDirection.OUTGOING
+        return self.document_type == self.DocumentType.OUTGOING_PAYMENT
 
     @property
     def closed_amount(self) -> Decimal:
@@ -228,8 +220,6 @@ class SettlementDocument(TimestampedModel):
         direction_required = {
             self.DocumentType.DEBT_ADJUSTMENT,
             self.DocumentType.REFUND,
-            self.DocumentType.ADVANCE,
-            self.DocumentType.ADVANCE_OFFSET,
         }
         if self.document_type in direction_required and not self.flow_direction:
             raise ValidationError({"flow_direction": "Укажите направление документа."})
@@ -329,13 +319,8 @@ class SettlementDocument(TimestampedModel):
         queryset = SettlementDocument.objects.select_for_update().filter(
             client_id=self.client_id,
             open_amount__gt=ZERO_DECIMAL,
-        ).exclude(pk=self.pk).filter(
-            models.Q(document_type=self.DocumentType.INCOMING_PAYMENT)
-            | models.Q(
-                document_type=self.DocumentType.ADVANCE,
-                flow_direction=self.FlowDirection.INCOMING,
-            )
-        )
+            document_type=self.DocumentType.INCOMING_PAYMENT,
+        ).exclude(pk=self.pk)
         if self.contract_id:
             queryset = queryset.filter(
                 models.Q(contract_id=self.contract_id) | models.Q(contract_id__isnull=True)
