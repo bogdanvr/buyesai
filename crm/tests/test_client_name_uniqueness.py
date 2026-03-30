@@ -51,3 +51,34 @@ class ClientNameUniquenessTests(APITestCase):
         company = Client.objects.get(pk=response.data["id"])
         self.assertEqual(company.phone, "+7 900 000-00-00")
         self.assertEqual(company.email, "gamma@example.com")
+
+    def test_can_save_company_registry_and_bank_account_fields(self):
+        response = self.client.post(
+            reverse("clients-list"),
+            {
+                "name": "Delta",
+                "currency": "RUB",
+                "ogrn": "1205500003763",
+                "kpp": "550301001",
+                "settlement_account": "40702810900000000001",
+                "correspondent_account": "30101810400000000225",
+                "bik": "045004225",
+                "bank_name": "АО Банк",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        company = Client.objects.get(pk=response.data["id"])
+        self.assertEqual(company.ogrn, "1205500003763")
+        self.assertEqual(company.kpp, "550301001")
+        self.assertEqual(company.settlement_account, "40702810900000000001")
+        self.assertEqual(company.correspondent_account, "30101810400000000225")
+
+        detail_response = self.client.get(reverse("clients-detail", kwargs={"pk": company.pk}))
+
+        self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail_response.data["ogrn"], "1205500003763")
+        self.assertEqual(detail_response.data["kpp"], "550301001")
+        self.assertEqual(detail_response.data["settlement_account"], "40702810900000000001")
+        self.assertEqual(detail_response.data["correspondent_account"], "30101810400000000225")

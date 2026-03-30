@@ -311,7 +311,11 @@
               inn: "",
               address: "",
               actualAddress: "",
+              ogrn: "",
+              kpp: "",
               bankDetails: "",
+              settlementAccount: "",
+              correspondentAccount: "",
               iban: "",
               bik: "",
               bankName: "",
@@ -2324,6 +2328,24 @@
         phoneHref(value) {
           const normalized = String(value || "").trim().replace(/[^\d+]/g, "");
           return normalized ? `tel:${normalized}` : "";
+        },
+        resolveBankFieldsMode(currency) {
+          const normalizedCurrency = String(currency || "").trim().toUpperCase();
+          if (normalizedCurrency === "RUB") return "ru";
+          if (normalizedCurrency === "KZT") return "kz";
+          return "intl";
+        },
+        companyUsesRussianBankFields(currency) {
+          return this.resolveBankFieldsMode(currency) === "ru";
+        },
+        companyPrimaryBankAccountLabel(currency) {
+          const mode = this.resolveBankFieldsMode(currency);
+          if (mode === "ru") return "Расчетный счет";
+          if (mode === "kz") return "ИИК / IBAN";
+          return "IBAN";
+        },
+        companyBankCodeLabel(currency) {
+          return this.resolveBankFieldsMode(currency) === "intl" ? "SWIFT / BIC" : "БИК";
         },
         novofonCallTargetKey(entityType, entityId, phone) {
           const normalizedEntityType = String(entityType || "").trim();
@@ -7363,7 +7385,11 @@
             inn: item.inn || "",
             address: item.address || "",
             actualAddress: item.actualAddress || "",
+            ogrn: item.ogrn || "",
+            kpp: item.kpp || "",
             bankDetails: item.bankDetails || "",
+            settlementAccount: item.settlementAccount || "",
+            correspondentAccount: item.correspondentAccount || "",
             iban: item.iban || "",
             bik: item.bik || "",
             bankName: item.bankName || "",
@@ -8995,6 +9021,12 @@
             if (profile.okved) {
               this.forms.companies.okved = profile.okved;
             }
+            if (profile.ogrn) {
+              this.forms.companies.ogrn = profile.ogrn;
+            }
+            if (profile.kpp) {
+              this.forms.companies.kpp = profile.kpp;
+            }
             if (resolvedIndustry) {
               this.forms.companies.industry = resolvedIndustry;
             }
@@ -9329,7 +9361,11 @@
             inn: item.inn || "",
             address: item.address || "",
             actualAddress: item.actual_address || "",
+            ogrn: item.ogrn || "",
+            kpp: item.kpp || "",
             bankDetails: item.bank_details || "",
+            settlementAccount: item.settlement_account || "",
+            correspondentAccount: item.correspondent_account || "",
             iban: item.iban || "",
             bik: item.bik || "",
             bankName: item.bank_name || "",
@@ -10021,7 +10057,11 @@
               inn: "",
               address: "",
               actualAddress: "",
+              ogrn: "",
+              kpp: "",
               bankDetails: "",
+              settlementAccount: "",
+              correspondentAccount: "",
               iban: "",
               bik: "",
               bankName: "",
@@ -10462,7 +10502,11 @@
               inn: form.inn.trim() || null,
               address: form.address.trim(),
               actual_address: form.actualAddress.trim(),
+              ogrn: form.ogrn.trim(),
+              kpp: form.kpp.trim(),
               bank_details: form.bankDetails.trim(),
+              settlement_account: form.settlementAccount.trim(),
+              correspondent_account: form.correspondentAccount.trim(),
               iban: form.iban.trim(),
               bik: form.bik.trim(),
               bank_name: form.bankName.trim(),
@@ -10495,7 +10539,11 @@
               inn: form.inn.trim() || null,
               address: form.address.trim(),
               actual_address: form.actualAddress.trim(),
+              ogrn: form.ogrn.trim(),
+              kpp: form.kpp.trim(),
               bank_details: form.bankDetails.trim(),
+              settlement_account: form.settlementAccount.trim(),
+              correspondent_account: form.correspondentAccount.trim(),
               iban: form.iban.trim(),
               bik: form.bik.trim(),
               bank_name: form.bankName.trim(),

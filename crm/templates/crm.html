@@ -4352,6 +4352,36 @@
                     [[ forms.companies.inn || 'Не указан' ]]
                   </button>
                 </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">ОГРН</div>
+                  <input
+                    v-if="isCompanySummaryEditing('ogrn')"
+                    v-model="forms.companies.ogrn"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('ogrn')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('ogrn')"
+                    @blur="stopCompanySummaryEdit('ogrn')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                  <button v-else type="button" @click="openCompanySummaryField('ogrn')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.ogrn || 'Не указан' ]]
+                  </button>
+                </div>
+                <div class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">КПП</div>
+                  <input
+                    v-if="isCompanySummaryEditing('kpp')"
+                    v-model="forms.companies.kpp"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('kpp')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('kpp')"
+                    @blur="stopCompanySummaryEdit('kpp')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                  <button v-else type="button" @click="openCompanySummaryField('kpp')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.kpp || 'Не указан' ]]
+                  </button>
+                </div>
                 <div class="py-1 md:col-span-2">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Юридический адрес</div>
                   <input
@@ -4382,22 +4412,23 @@
                     [[ forms.companies.actualAddress || 'Не указан' ]]
                   </button>
                 </div>
-                <div class="py-1 md:col-span-2">
-                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Банковские реквизиты</div>
-                  <textarea
-                    v-if="isCompanySummaryEditing('bankDetails')"
-                    v-model="forms.companies.bankDetails"
-                    rows="2"
-                    @keydown.esc.prevent="stopCompanySummaryEdit('bankDetails')"
-                    @blur="stopCompanySummaryEdit('bankDetails')"
-                    class="mt-1 w-full rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"
-                  ></textarea>
-                  <button v-else type="button" @click="openCompanySummaryField('bankDetails')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition whitespace-pre-line break-words">
-                    [[ forms.companies.bankDetails || 'Не указаны' ]]
+                <div v-if="companyUsesRussianBankFields(forms.companies.currency)" class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Расчетный счет</div>
+                  <input
+                    v-if="isCompanySummaryEditing('settlementAccount')"
+                    v-model="forms.companies.settlementAccount"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('settlementAccount')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('settlementAccount')"
+                    @blur="stopCompanySummaryEdit('settlementAccount')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                  <button v-else type="button" @click="openCompanySummaryField('settlementAccount')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.settlementAccount || 'Не указан' ]]
                   </button>
                 </div>
-                <div class="py-1">
-                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">ИИК / IBAN</div>
+                <div v-else class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">[[ companyPrimaryBankAccountLabel(forms.companies.currency) ]]</div>
                   <input
                     v-if="isCompanySummaryEditing('iban')"
                     v-model="forms.companies.iban"
@@ -4412,7 +4443,7 @@
                   </button>
                 </div>
                 <div class="py-1">
-                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">БИК</div>
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">[[ companyBankCodeLabel(forms.companies.currency) ]]</div>
                   <input
                     v-if="isCompanySummaryEditing('bik')"
                     v-model="forms.companies.bik"
@@ -4424,6 +4455,21 @@
                   />
                   <button v-else type="button" @click="openCompanySummaryField('bik')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
                     [[ forms.companies.bik || 'Не указан' ]]
+                  </button>
+                </div>
+                <div v-if="companyUsesRussianBankFields(forms.companies.currency)" class="py-1">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Корреспондентский счет</div>
+                  <input
+                    v-if="isCompanySummaryEditing('correspondentAccount')"
+                    v-model="forms.companies.correspondentAccount"
+                    type="text"
+                    @keydown.enter.prevent="stopCompanySummaryEdit('correspondentAccount')"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('correspondentAccount')"
+                    @blur="stopCompanySummaryEdit('correspondentAccount')"
+                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                  />
+                  <button v-else type="button" @click="openCompanySummaryField('correspondentAccount')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
+                    [[ forms.companies.correspondentAccount || 'Не указан' ]]
                   </button>
                 </div>
                 <div class="py-1">
@@ -4439,6 +4485,20 @@
                   />
                   <button v-else type="button" @click="openCompanySummaryField('bankName')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
                     [[ forms.companies.bankName || 'Не указан' ]]
+                  </button>
+                </div>
+                <div class="py-1 md:col-span-2">
+                  <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дополнительные банковские реквизиты</div>
+                  <textarea
+                    v-if="isCompanySummaryEditing('bankDetails')"
+                    v-model="forms.companies.bankDetails"
+                    rows="2"
+                    @keydown.esc.prevent="stopCompanySummaryEdit('bankDetails')"
+                    @blur="stopCompanySummaryEdit('bankDetails')"
+                    class="mt-1 w-full rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2 text-sm outline-none focus:border-crm-accent"
+                  ></textarea>
+                  <button v-else type="button" @click="openCompanySummaryField('bankDetails')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition whitespace-pre-line break-words">
+                    [[ forms.companies.bankDetails || 'Не указаны' ]]
                   </button>
                 </div>
                 <div class="py-1">

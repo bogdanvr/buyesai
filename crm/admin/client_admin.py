@@ -19,6 +19,8 @@ class ClientAdmin(admin.ModelAdmin):
         "email",
         "currency",
         "inn",
+        "ogrn",
+        "kpp",
         "okved",
         "bank_name",
         "source",
@@ -26,7 +28,24 @@ class ClientAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("is_active", "source", "currency")
-    search_fields = ("name", "legal_name", "inn", "phone", "email", "address", "actual_address", "industry", "okved", "bank_name", "iban", "bik")
+    search_fields = (
+        "name",
+        "legal_name",
+        "inn",
+        "ogrn",
+        "kpp",
+        "phone",
+        "email",
+        "address",
+        "actual_address",
+        "industry",
+        "okved",
+        "bank_name",
+        "iban",
+        "bik",
+        "settlement_account",
+        "correspondent_account",
+    )
     inlines = (ContactInline,)
 
 
