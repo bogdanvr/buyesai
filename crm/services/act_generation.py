@@ -285,7 +285,8 @@ def _table_cell_custom(
 
 
 def _service_table(items: list[ActLineItem]) -> str:
-    widths = [700, 4800, 1200, 900, 1600, 1700]
+    widths = [500, 4500, 900, 700, 1300, 1500]
+    table_width = sum(widths)
     headers = ["№", "Наименование работ, услуг", "Кол-во", "Ед.", "Цена", "Сумма"]
     header_xml = "".join(
         _table_cell(text, width=width, bold=True, align="center", shaded=True)
@@ -317,7 +318,7 @@ def _service_table(items: list[ActLineItem]) -> str:
     )
     return (
         "<w:tbl>"
-        f"<w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/>{borders_xml}</w:tblPr>"
+        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/>{borders_xml}</w:tblPr>"
         f"<w:tblGrid>{grid_xml}</w:tblGrid>"
         f"<w:tr>{header_xml}</w:tr>"
         f"{rows_xml}"
@@ -384,7 +385,8 @@ def _invoice_payment_table(executor_company: Client) -> str:
 
 
 def _invoice_items_table(items: list[ActLineItem]) -> str:
-    widths = [600, 5600, 1100, 800, 1300, 1600]
+    widths = [500, 4600, 900, 700, 1200, 1500]
+    table_width = sum(widths)
     headers = ["№", "Товары (работы, услуги)", "Кол-во", "Ед.", "Цена", "Сумма"]
     header_xml = "".join(
         _table_cell_custom(text, width=width, bold=True, align="center", size=22, shaded=True)
@@ -416,7 +418,7 @@ def _invoice_items_table(items: list[ActLineItem]) -> str:
     )
     return (
         "<w:tbl>"
-        f"<w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/>{borders_xml}</w:tblPr>"
+        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/>{borders_xml}</w:tblPr>"
         f"<w:tblGrid>{grid_xml}</w:tblGrid>"
         f"<w:tr>{header_xml}</w:tr>"
         f"{rows_xml}"
