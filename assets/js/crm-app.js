@@ -9252,6 +9252,17 @@
               this.mapDealDocument(created),
               ...this.dealDocumentsForActiveDeal,
             ];
+            const activeDeal = this.editingDealItem;
+            const generatedDealClientId = this.toIntOrNull(activeDeal?.clientId);
+            const openedCompanyId = this.toIntOrNull(this.editingCompanyId);
+            if (generatedDealClientId && openedCompanyId && generatedDealClientId === openedCompanyId) {
+              if (this.showCompanySettlementsPanel) {
+                await this.loadCompanySettlements();
+              }
+              if (this.showCompanyDocumentsPanel) {
+                await this.loadCompanyDocuments();
+              }
+            }
             this.showDealDocumentsPanel = true;
             this.showDealActGenerator = false;
             this.dealDocumentGeneratorType = "";
