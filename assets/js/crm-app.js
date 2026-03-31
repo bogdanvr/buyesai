@@ -11496,6 +11496,77 @@
             isPrimary: false
           };
         },
+        hasCompanyContactDraft() {
+          const form = this.companyContactForm || {};
+          return !!(
+            String(form.fullName || "").trim()
+            || String(form.position || "").trim()
+            || String(form.phone || "").trim()
+            || String(form.email || "").trim()
+            || String(form.telegram || "").trim()
+            || String(form.whatsapp || "").trim()
+            || String(form.maxContact || "").trim()
+            || String(form.personNote || "").trim()
+            || this.toIntOrNull(form.roleId)
+            || !!form.isPrimary
+          );
+        },
+        buildCompanyContactPayload(clientId, options = {}) {
+          const normalizedClientId = this.toIntOrNull(clientId);
+          if (!normalizedClientId) {
+            throw new Error("Не удалось определить компанию для сохранения контакта.");
+          }
+          if (!this.hasCompanyContactDraft()) {
+            return null;
+          }
+          const fullName = String(this.companyContactForm.fullName || "").trim();
+          if (!fullName) {
+            if (options.allowEmpty !== true) {
+              throw new Error("Укажите ФИО нового контакта компании или очистите форму контакта.");
+            }
+            return null;
+          }
+          const parts = fullName.split(/\s+/).filter(Boolean);
+          const firstName = parts[0] || fullName;
+          const lastName = parts.slice(1).join(" ");
+          return {
+            client: normalizedClientId,
+            first_name: firstName,
+            last_name: lastName,
+            position: String(this.companyContactForm.position || "").trim(),
+            phone: String(this.companyContactForm.phone || "").trim(),
+            email: String(this.companyContactForm.email || "").trim(),
+            telegram: String(this.companyContactForm.telegram || "").trim(),
+            whatsapp: String(this.companyContactForm.whatsapp || "").trim(),
+            max_contact: String(this.companyContactForm.maxContact || "").trim(),
+            role: this.toIntOrNull(this.companyContactForm.roleId),
+            person_note: String(this.companyContactForm.personNote || "").trim(),
+            is_primary: !!this.companyContactForm.isPrimary,
+          };
+        },
+        async persistCompanyContactDraft(clientId, options = {}) {
+          const payload = this.buildCompanyContactPayload(clientId, options);
+          if (!payload) {
+            return null;
+          }
+          const createdContact = await this.apiRequest("/api/v1/contacts/", {
+            method: "POST",
+            body: payload,
+          });
+          if (options.resetForm !== false) {
+            this.resetCompanyContactForm();
+          }
+          if (options.closeForm !== false) {
+            this.showCompanyContactForm = false;
+          }
+          if (options.reloadCompanyContacts) {
+            await this.loadContactsForCompany();
+          }
+          if (options.reloadContactsSection) {
+            await this.loadSection("contacts");
+          }
+          return createdContact;
+        },
         async loadContactsForCompany() {
           if (!this.editingCompanyId) {
             this.companyContactsForActiveCompany = [];
@@ -12858,7 +12929,7 @@
           if (!form.name.trim()) {
             throw new Error("Укажите название компании");
           }
-          await this.apiRequest("/api/v1/clients/", {
+          return await this.apiRequest("/api/v1/clients/", {
             method: "POST",
             body: {
               name: form.name.trim(),
@@ -12896,7 +12967,7 @@
           if (!form.name.trim()) {
             throw new Error("Укажите название компании");
           }
-          await this.apiRequest(`/api/v1/clients/${this.editingCompanyId}/`, {
+          return await this.apiRequest(`/api/v1/clients/${this.editingCompanyId}/`, {
             method: "PATCH",
             body: {
               name: form.name.trim(),
@@ -12930,37 +13001,13 @@
           if (!this.editingCompanyId) {
             throw new Error("Сначала откройте компанию");
           }
-          const fullName = this.companyContactForm.fullName.trim();
-          if (!fullName) {
-            throw new Error("Укажите ФИО контакта");
-          }
-          const parts = fullName.split(/\s+/).filter(Boolean);
-          const firstName = parts[0] || fullName;
-          const lastName = parts.slice(1).join(" ");
           this.isCompanyContactSaving = true;
           this.clearUiErrors({ modalOnly: true });
           try {
-            await this.apiRequest("/api/v1/contacts/", {
-              method: "POST",
-              body: {
-                client: this.editingCompanyId,
-                first_name: firstName,
-                last_name: lastName,
-                position: this.companyContactForm.position.trim(),
-                phone: this.companyContactForm.phone.trim(),
-                email: this.companyContactForm.email.trim(),
-                telegram: this.companyContactForm.telegram.trim(),
-                whatsapp: this.companyContactForm.whatsapp.trim(),
-                max_contact: this.companyContactForm.maxContact.trim(),
-                role: this.toIntOrNull(this.companyContactForm.roleId),
-                person_note: this.companyContactForm.personNote.trim(),
-                is_primary: !!this.companyContactForm.isPrimary
-              }
+            await this.persistCompanyContactDraft(this.editingCompanyId, {
+              reloadCompanyContacts: true,
+              reloadContactsSection: true,
             });
-            this.resetCompanyContactForm();
-            this.showCompanyContactForm = false;
-            await this.loadContactsForCompany();
-            await this.loadSection("contacts");
           } catch (error) {
             this.setUiError(`Ошибка создания контакта: ${error.message}`, { modal: true });
           } finally {
@@ -13246,6 +13293,7 @@
           try {
             const returnToParentAfterChildModal = (this.activeSection === "touches" || this.activeSection === "tasks") && !!this.modalParentContext;
             let savedDeal = null;
+            let savedCompany = null;
             const currentTouchId = this.editingTouchId;
             if (this.activeSection === "leads" && this.editingLeadId) await this.updateLead();
             if (this.activeSection === "leads" && !this.editingLeadId) await this.createLead();
@@ -13262,8 +13310,18 @@
             }
             if (this.activeSection === "contacts" && this.editingContactId) await this.updateContact();
             if (this.activeSection === "contacts" && !this.editingContactId) await this.createContact();
-            if (this.activeSection === "companies" && this.editingCompanyId) await this.updateCompany();
-            if (this.activeSection === "companies" && !this.editingCompanyId) await this.createCompany();
+            if (this.activeSection === "companies" && this.editingCompanyId) savedCompany = await this.updateCompany();
+            if (this.activeSection === "companies" && !this.editingCompanyId) {
+              savedCompany = await this.createCompany();
+              this.editingCompanyId = this.toIntOrNull(savedCompany?.id);
+            }
+            if (this.activeSection === "companies" && this.hasCompanyContactDraft()) {
+              const companyIdForContact = this.toIntOrNull(savedCompany?.id || this.editingCompanyId);
+              await this.persistCompanyContactDraft(companyIdForContact, {
+                reloadCompanyContacts: false,
+                reloadContactsSection: false,
+              });
+            }
             if (this.activeSection === "tasks" && this.editingTaskId) await this.updateTask();
             if (this.activeSection === "tasks" && this.editingTaskId && this.showTaskFollowUpSuggestion && this.hasPreparedTaskFollowUp()) {
               await this.createFollowUpTaskFromCurrentDeal();
