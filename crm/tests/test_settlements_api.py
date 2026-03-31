@@ -384,6 +384,9 @@ class SettlementsApiTests(APITestCase):
             self.assertIn("составляет 45 календарных дней", xml)
             self.assertIn("составляет 7 календарных дней с даты ее получения.", xml)
             self.assertIn("не менее чем за 10 календарных дней.", xml)
+            self.assertIn("и 3 лет после его прекращения.", xml)
+            self.assertIn("электронная почта director@acme.example, а также иные письменно согласованные каналы связи.", xml)
+            self.assertNotIn("система управления проектом [указать]", xml)
 
     @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
     def test_updating_generated_contract_regenerates_docx_and_keeps_number(self):

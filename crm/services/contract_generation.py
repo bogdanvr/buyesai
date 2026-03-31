@@ -162,6 +162,14 @@ def _company_email(company: Client) -> str:
     return _normalize_text(company.email) or "-"
 
 
+def _company_official_email(company: Client) -> str:
+    contact = _resolve_contact_for_company(company)
+    contact_email = _normalize_text(getattr(contact, "email", ""))
+    if contact_email:
+        return contact_email
+    return _company_email(company)
+
+
 def _company_phone(company: Client) -> str:
     return _normalize_text(company.phone) or "-"
 
@@ -229,6 +237,13 @@ def _build_contract_docx(contract: SettlementContract, executor_company: Client)
         xml = _replace_text(xml, "составляет [___] календарных дней", f"составляет {int(contract.warranty_days or DEFAULT_WARRANTY_DAYS)} календарных дней", count=1)
         xml = _replace_text(xml, "не менее чем за [___] календарных дней.", f"не менее чем за {int(contract.termination_notice_days or DEFAULT_TERMINATION_NOTICE_DAYS)} календарных дней.", count=1)
         xml = _replace_text(xml, "составляет [___] календарных дней с даты ее получения.", f"составляет {int(contract.claim_response_days or DEFAULT_CLAIM_RESPONSE_DAYS)} календарных дней с даты ее получения.", count=1)
+        xml = _replace_text(xml, "и [___] лет после его прекращения.", "и 3 лет после его прекращения.", count=1)
+        xml = _replace_text(
+            xml,
+            "электронная почта [указать], система управления проектом [указать], а также иные письменно согласованные каналы связи.",
+            f"электронная почта {_company_official_email(customer_company)}, а также иные письменно согласованные каналы связи.",
+            count=1,
+        )
 
         customer_requisites = [
             ("Полное наименование: [___]", f"Полное наименование: {_company_name(customer_company)}"),
