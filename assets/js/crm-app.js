@@ -5432,6 +5432,9 @@
             this.setUiError("Не удалось определить счет или компанию для отправки.", { modal: true });
             return;
           }
+          if (this.showModal) {
+            this.closeModal();
+          }
           await this.openCommunicationsSection({
             companyId,
             dealId,
