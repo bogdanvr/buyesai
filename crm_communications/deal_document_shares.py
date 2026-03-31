@@ -49,10 +49,53 @@ def build_share_download_url(*, share: DealDocumentShare, request=None) -> str:
     return relative_url
 
 
+def build_share_preview_url(*, share: DealDocumentShare, request=None) -> str:
+    relative_url = reverse("deal-document-share-preview", kwargs={"token": share.token})
+    public_base_url = str(getattr(settings, "CRM_PUBLIC_BASE_URL", "") or "").strip()
+    if public_base_url:
+        return urljoin(f"{public_base_url.rstrip('/')}/", relative_url.lstrip("/"))
+    if request is not None:
+        return request.build_absolute_uri(relative_url)
+    return relative_url
+
+
 def _message_status_event_type(message: Message) -> str:
     if str(getattr(message, "status", "") or "").strip().lower() == MessageStatus.SENT:
         return DealDocumentShareEventType.EMAIL_SENT
     return DealDocumentShareEventType.EMAIL_FAILED
+
+
+def _document_name(document: DealDocument | None) -> str:
+    if document is None:
+        return "Документ"
+    return str(
+        getattr(document, "original_name", "")
+        or getattr(getattr(document, "file", None), "name", "")
+        or f"Документ #{getattr(document, 'pk', '')}"
+    ).strip() or f"Документ #{getattr(document, 'pk', '')}"
+
+
+def _document_kind_code(document: DealDocument | None) -> str:
+    normalized_name = _document_name(document).lower().replace("ё", "е")
+    if "счет" in normalized_name or "invoice" in normalized_name:
+        return "invoice"
+    return "document"
+
+
+def _document_kind_label(document: DealDocument | None) -> str:
+    if _document_kind_code(document) == "invoice":
+        return "Счет"
+    return "Документ"
+
+
+def _result_text(*, document: DealDocument | None, action: str) -> str:
+    action_map = {
+        "sent": "отправлен",
+        "failed": "не отправлен",
+        "opened": "открыт",
+        "downloaded": "скачан",
+    }
+    return f"{_document_kind_label(document)} {action_map[action]}: {_document_name(document)}"
 
 
 def _timeline_entry(*, deal_id: int | None, result_text: str, happened_at, event_type: str, document_name: str, share: DealDocumentShare, extra_lines: list[str] | None = None) -> str:
@@ -62,10 +105,12 @@ def _timeline_entry(*, deal_id: int | None, result_text: str, happened_at, event
         f"Результат: {str(result_text or '').strip()}",
         f"event_type: {event_type}",
         "priority: medium",
-        "title: Документ сделки",
+        f"title: {_document_kind_label(getattr(share, 'document', None))} сделки",
         f"document_name: {document_name}",
+        f"document_kind: {_document_kind_code(getattr(share, 'document', None))}",
         f"document_share_token: {share.token}",
         f"document_share_url: {build_share_public_url(share=share)}",
+        f"document_share_preview_url: {build_share_preview_url(share=share)}",
         f"document_share_download_url: {build_share_download_url(share=share)}",
     ]
     if deal_id:
@@ -135,13 +180,13 @@ def record_share_message_status(*, share: DealDocumentShare, message: Message) -
 
     document = share.document
     deal = getattr(document, "deal", None)
-    document_name = str(getattr(document, "original_name", "") or getattr(getattr(document, "file", None), "name", "") or "").strip() or f"Документ #{document.pk}"
+    document_name = _document_name(document)
     message_status = str(getattr(message, "status", "") or "").strip()
     event_type = _message_status_event_type(message)
     if event_type == DealDocumentShareEventType.EMAIL_SENT:
-        result_text = f"Письмо со ссылкой на документ отправлено: {document_name}"
+        result_text = _result_text(document=document, action="sent")
     else:
-        result_text = f"Ошибка отправки письма со ссылкой на документ: {document_name}"
+        result_text = _result_text(document=document, action="failed")
 
     event = DealDocumentShareEvent.objects.create(
         share=share,
@@ -207,10 +252,11 @@ def record_share_page_open(*, share: DealDocumentShare, request) -> DealDocument
         user_agent=user_agent,
         metadata={"open_count": share.open_count},
     )
-    document_name = str(getattr(share.document, "original_name", "") or getattr(getattr(share.document, "file", None), "name", "") or "").strip() or f"Документ #{share.document_id}"
+    document = getattr(share, "document", None)
+    document_name = _document_name(document)
     entry = _timeline_entry(
-        deal_id=getattr(getattr(share.document, "deal", None), "pk", None),
-        result_text=f"Открыта страница документа: {document_name}",
+        deal_id=getattr(getattr(document, "deal", None), "pk", None),
+        result_text=_result_text(document=document, action="opened"),
         happened_at=happened_at,
         event_type="document_share_page_opened",
         document_name=document_name,
@@ -221,7 +267,7 @@ def record_share_page_open(*, share: DealDocumentShare, request) -> DealDocument
             f"user_agent: {user_agent}",
         ],
     )
-    _append_deal_event(deal=getattr(share.document, "deal", None), entry=entry)
+    _append_deal_event(deal=getattr(document, "deal", None), entry=entry)
     return event
 
 
@@ -243,10 +289,11 @@ def record_share_pdf_download(*, share: DealDocumentShare, request) -> DealDocum
         user_agent=user_agent,
         metadata={"download_count": share.download_count},
     )
-    document_name = str(getattr(share.document, "original_name", "") or getattr(getattr(share.document, "file", None), "name", "") or "").strip() or f"Документ #{share.document_id}"
+    document = getattr(share, "document", None)
+    document_name = _document_name(document)
     entry = _timeline_entry(
-        deal_id=getattr(getattr(share.document, "deal", None), "pk", None),
-        result_text=f"Скачан PDF документа: {document_name}",
+        deal_id=getattr(getattr(document, "deal", None), "pk", None),
+        result_text=_result_text(document=document, action="downloaded"),
         happened_at=happened_at,
         event_type="document_share_pdf_downloaded",
         document_name=document_name,
@@ -257,5 +304,5 @@ def record_share_pdf_download(*, share: DealDocumentShare, request) -> DealDocum
             f"user_agent: {user_agent}",
         ],
     )
-    _append_deal_event(deal=getattr(share.document, "deal", None), entry=entry)
+    _append_deal_event(deal=getattr(document, "deal", None), entry=entry)
     return event

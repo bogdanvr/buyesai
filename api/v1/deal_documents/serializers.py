@@ -2,7 +2,7 @@ from django.urls import reverse
 from rest_framework import serializers
 
 from crm.models import Client, Deal, DealDocument
-from crm_communications.deal_document_shares import build_share_download_url, build_share_public_url
+from crm_communications.deal_document_shares import build_share_download_url, build_share_preview_url, build_share_public_url
 from crm_communications.models import DealDocumentShare, DealDocumentShareEvent
 
 
@@ -129,6 +129,7 @@ class DealDocumentShareEventSerializer(serializers.ModelSerializer):
 
 class DealDocumentShareSerializer(serializers.ModelSerializer):
     public_url = serializers.SerializerMethodField()
+    preview_url = serializers.SerializerMethodField()
     download_url = serializers.SerializerMethodField()
     message_status = serializers.CharField(source="message.status", read_only=True)
     sent_at = serializers.DateTimeField(source="message.sent_at", read_only=True)
@@ -143,6 +144,9 @@ class DealDocumentShareSerializer(serializers.ModelSerializer):
 
     def get_download_url(self, obj):
         return build_share_download_url(share=obj, request=self.context.get("request"))
+
+    def get_preview_url(self, obj):
+        return build_share_preview_url(share=obj, request=self.context.get("request"))
 
     def get_recipient(self, obj):
         return str(getattr(obj, "recipient", "") or getattr(getattr(obj, "message", None), "external_recipient_key", "") or "").strip()
@@ -159,6 +163,7 @@ class DealDocumentShareSerializer(serializers.ModelSerializer):
             "last_error_message",
             "subject",
             "public_url",
+            "preview_url",
             "download_url",
             "first_opened_at",
             "last_opened_at",

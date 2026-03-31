@@ -87,6 +87,33 @@
       line-height: 1.5;
       color: #5e7896;
     }
+    .preview-shell {
+      margin-top: 28px;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid #dbe6f3;
+      background: #dfe9f5;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+    .preview-frame {
+      display: block;
+      width: 100%;
+      min-height: 840px;
+      border: 0;
+      background: #fff;
+    }
+    .preview-caption {
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #5e7896;
+      background: rgba(255, 255, 255, 0.8);
+      border-top: 1px solid #dbe6f3;
+    }
+    @media (max-width: 720px) {
+      .preview-frame {
+        min-height: 68vh;
+      }
+    }
   </style>
 </head>
 <body>
@@ -112,12 +139,24 @@
 
       <div class="actions">
         <a class="button button-primary" href="{{ download_url }}">Скачать PDF</a>
+        <a class="button button-secondary" href="{{ preview_url }}" target="_blank" rel="noopener noreferrer">Открыть PDF</a>
         <a class="button button-secondary" href="{{ public_url }}">Обновить страницу</a>
       </div>
 
       <p class="note">
-        Скачивание PDF фиксируется отдельно. Открытие этой страницы также попадает в историю документа.
+        По ссылке счет открывается сразу в PDF-просмотре. Скачивание PDF фиксируется отдельно, как и открытие страницы.
       </p>
+
+      <div class="preview-shell">
+        <iframe
+          class="preview-frame"
+          src="{{ preview_url }}#toolbar=1&navpanes=0&view=FitH"
+          title="Предпросмотр PDF документа"
+        ></iframe>
+        <div class="preview-caption">
+          Если встроенный просмотр PDF не открылся, используйте кнопку «Открыть PDF» или скачайте файл.
+        </div>
+      </div>
     </div>
   </div>
 </body>

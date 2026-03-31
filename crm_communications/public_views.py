@@ -8,6 +8,7 @@ from django.views import View
 
 from crm_communications.deal_document_shares import (
     build_share_download_url,
+    build_share_preview_url,
     build_share_public_url,
     record_share_page_open,
     record_share_pdf_download,
@@ -40,9 +41,32 @@ class DealDocumentSharePageView(View):
             "deal": deal,
             "company": company,
             "public_url": build_share_public_url(share=share, request=request),
+            "preview_url": build_share_preview_url(share=share, request=request),
             "download_url": build_share_download_url(share=share, request=request),
         }
         return render(request, self.template_name, context=context)
+
+
+class DealDocumentSharePreviewView(View):
+    def get(self, request, token: str):
+        share = get_object_or_404(
+            DealDocumentShare.objects.select_related("document", "document__deal"),
+            token=token,
+        )
+        try:
+            pdf_bytes, pdf_name = build_deal_document_pdf_bytes(share.document)
+        except FileNotFoundError as exc:
+            raise Http404("Файл документа не найден.") from exc
+
+        content_type, _ = mimetypes.guess_type(pdf_name)
+        response = FileResponse(
+            BytesIO(pdf_bytes),
+            as_attachment=False,
+            filename=pdf_name,
+            content_type=content_type or "application/pdf",
+        )
+        response["Content-Disposition"] = content_disposition_header(False, pdf_name)
+        return response
 
 
 class DealDocumentShareDownloadView(View):

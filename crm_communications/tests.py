@@ -1523,7 +1523,7 @@ class CommunicationsApiTests(TestCase):
         self.assertEqual(message.touch.result_option.code, "proposal_sent")
         self.assertEqual(message.touch.summary, "Отправлен документ: Акт № 1235.docx")
         self.deal.refresh_from_db()
-        self.assertIn("Письмо со ссылкой на документ отправлено", self.deal.events)
+        self.assertIn("Документ отправлен", self.deal.events)
         history_response = self.client.get(reverse("deal-documents-delivery-history", kwargs={"pk": deal_document.pk}))
         self.assertEqual(history_response.status_code, 200)
         self.assertEqual(history_response.json()[0]["message_status"], "sent")
@@ -1602,6 +1602,8 @@ class CommunicationsApiTests(TestCase):
         self.assertIn(f"https://crm.example.com/documents/share/{share.token}/", message.body_text)
         self.assertEqual(message.touch.result_option.code, "proposal_sent")
         self.assertEqual(message.touch.summary, "Отправлен документ: Счет № 1235.docx")
+        self.deal.refresh_from_db()
+        self.assertIn("Счет отправлен", self.deal.events)
 
     def test_send_message_with_deal_document_requires_explicit_recipient(self):
         deal_document = DealDocument.objects.create(
@@ -2023,6 +2025,16 @@ class DealDocumentDeliveryTests(TestCase):
             REMOTE_ADDR="203.0.113.10",
         )
         self.assertEqual(open_response.status_code, 200)
+        self.assertContains(open_response, reverse("deal-document-share-preview", kwargs={"token": share.token}))
+        self.assertContains(open_response, "<iframe", html=False)
+
+        preview_response = self.client.get(
+            reverse("deal-document-share-preview", kwargs={"token": share.token}),
+            HTTP_USER_AGENT="TrackedBrowser/1.0",
+            REMOTE_ADDR="203.0.113.10",
+        )
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertEqual(preview_response["Content-Disposition"], 'inline; filename="invoice-1235.pdf"')
 
         download_response = self.client.get(
             reverse("deal-document-share-download", kwargs={"token": share.token}),
@@ -2048,5 +2060,5 @@ class DealDocumentDeliveryTests(TestCase):
             1,
         )
         self.deal.refresh_from_db()
-        self.assertIn("Открыта страница документа", self.deal.events)
-        self.assertIn("Скачан PDF документа", self.deal.events)
+        self.assertIn("Счет открыт", self.deal.events)
+        self.assertIn("Счет скачан", self.deal.events)
