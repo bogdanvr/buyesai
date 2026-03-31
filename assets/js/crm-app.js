@@ -10005,6 +10005,12 @@
           this.editingTouchId = null;
           this.editingTouchId = item.id;
           await this.ensureCompanyLoadedForTouchEditor(item.clientId);
+          const resolvedOwnerId = this.toIntOrNull(item.ownerId) || this.resolveTouchOwnerIdFromContext({
+            dealId: this.toIntOrNull(item.dealId),
+            leadId: this.toIntOrNull(item.leadId),
+            taskId: this.toIntOrNull(item.taskId),
+            companyId: this.toIntOrNull(item.clientId),
+          });
           this.forms.touches = {
             happenedAt: this.toDateTimeLocal(item.happenedAtRaw),
             channelId: this.toIntOrNull(item.channelId),
@@ -10024,12 +10030,6 @@
             documentUploadTarget: this.toIntOrNull(item.dealId) ? "deal" : (this.toIntOrNull(item.clientId) ? "company" : ""),
           };
           await this.loadTouchTaskOptions();
-          const resolvedOwnerId = this.toIntOrNull(item.ownerId) || this.resolveTouchOwnerIdFromContext({
-            dealId: this.toIntOrNull(item.dealId),
-            leadId: this.toIntOrNull(item.leadId),
-            taskId: this.toIntOrNull(item.taskId),
-            companyId: this.toIntOrNull(item.clientId),
-          });
           this.forms.touches.ownerId = resolvedOwnerId;
           this.resetTouchFollowUpForm();
           this.loadTouchDocuments();
