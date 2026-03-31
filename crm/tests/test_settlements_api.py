@@ -389,6 +389,43 @@ class SettlementsApiTests(APITestCase):
             self.assertNotIn("система управления проектом [указать]", xml)
 
     @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
+    def test_generated_contract_uses_selected_representative_contact(self):
+        alternate_contact = Contact.objects.create(
+            client=self.company,
+            first_name="Сидор",
+            last_name="Сидоров",
+            position="генеральный директор",
+            phone="+79994445566",
+            email="ceo@acme.example",
+            is_primary=False,
+        )
+
+        with override_settings(MEDIA_ROOT=self.media_root):
+            response = self.client.post(
+                reverse("settlement-contracts-generate"),
+                {
+                    "client": self.company.pk,
+                    "representative_contact": alternate_contact.pk,
+                    "advance_percent": "50.00",
+                    "hourly_rate": "2500.00",
+                    "warranty_days": 45,
+                    "claim_response_days": 7,
+                    "termination_notice_days": 10,
+                },
+                format="json",
+            )
+
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content.decode())
+            contract = SettlementContract.objects.get(pk=response.data["id"])
+            self.assertEqual(contract.generator_payload.get("customer_contact_id"), alternate_contact.pk)
+
+            xml = self._contract_document_xml(contract)
+            self.assertIn("Сидор Сидоров", xml)
+            self.assertIn("генеральный директор", xml)
+            self.assertIn("электронная почта ceo@acme.example, а также иные письменно согласованные каналы связи.", xml)
+            self.assertNotIn("электронная почта director@acme.example, а также иные письменно согласованные каналы связи.", xml)
+
+    @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
     def test_updating_generated_contract_regenerates_docx_and_keeps_number(self):
         with override_settings(MEDIA_ROOT=self.media_root):
             create_response = self.client.post(
@@ -425,3 +462,27 @@ class SettlementsApiTests(APITestCase):
             self.assertIn("аванс в размере 35 % стоимости этапа", xml)
             self.assertIn("составляет 3000 рублей.", xml)
             self.assertIn("составляет 60 календарных дней", xml)
+
+    @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
+    def test_contract_uses_strict_city_from_legal_address(self):
+        self.executor_company.address = "644024, Омская область, г. Омск, ул. Ленина, д. 7"
+        self.executor_company.save(update_fields=["address"])
+
+        with override_settings(MEDIA_ROOT=self.media_root):
+            response = self.client.post(
+                reverse("settlement-contracts-generate"),
+                {
+                    "client": self.company.pk,
+                    "advance_percent": "10.00",
+                    "hourly_rate": "1500.00",
+                    "warranty_days": 31,
+                    "claim_response_days": 5,
+                    "termination_notice_days": 5,
+                },
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content.decode())
+            contract = SettlementContract.objects.get(pk=response.data["id"])
+            xml = self._contract_document_xml(contract)
+            self.assertIn("г. Омск", xml)
+            self.assertNotIn("г. Омская область", xml)

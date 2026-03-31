@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.urls import reverse
 from rest_framework import serializers
 
-from crm.models import Client, SettlementAllocation, SettlementContract, SettlementDocument
+from crm.models import Client, Contact, SettlementAllocation, SettlementContract, SettlementDocument
 
 
 class SettlementAllocationHistorySerializer(serializers.ModelSerializer):
@@ -102,11 +102,20 @@ class SettlementContractSerializer(serializers.ModelSerializer):
 
 class SettlementContractGenerateSerializer(serializers.Serializer):
     client = serializers.PrimaryKeyRelatedField(queryset=Client.objects.all())
+    representative_contact = serializers.PrimaryKeyRelatedField(queryset=Contact.objects.all(), allow_null=True, required=False)
     advance_percent = serializers.DecimalField(max_digits=6, decimal_places=2, min_value=Decimal("0.00"))
     hourly_rate = serializers.DecimalField(max_digits=14, decimal_places=2, min_value=Decimal("0.00"))
     warranty_days = serializers.IntegerField(min_value=1, default=31)
     claim_response_days = serializers.IntegerField(min_value=1, default=5)
     termination_notice_days = serializers.IntegerField(min_value=1, default=5)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        client = attrs.get("client")
+        representative_contact = attrs.get("representative_contact")
+        if representative_contact is not None and client is not None and representative_contact.client_id != client.pk:
+            raise serializers.ValidationError({"representative_contact": "Контакт должен принадлежать выбранной компании."})
+        return attrs
 
 
 class SettlementDocumentSerializer(serializers.ModelSerializer):

@@ -603,6 +603,7 @@
             isActive: true,
           },
           companySettlementContractGeneratorForm: {
+            contactId: null,
             advancePercent: "",
             hourlyRate: "",
             warrantyDays: 31,
@@ -4452,11 +4453,29 @@
             : null;
           return this.toIntOrNull(latestContract?.id);
         },
+        preferredCompanySettlementContractContactId() {
+          const contacts = Array.isArray(this.companyContactsForActiveCompany) ? this.companyContactsForActiveCompany : [];
+          if (!contacts.length) {
+            return null;
+          }
+          const decisionMakerId = this.toIntOrNull(this.forms.companies.workRules?.decisionMakerId);
+          if (decisionMakerId && contacts.some((item) => this.toIntOrNull(item.id) === decisionMakerId)) {
+            return decisionMakerId;
+          }
+          const primaryContact = contacts.find((item) => item.isPrimary);
+          if (primaryContact) {
+            return this.toIntOrNull(primaryContact.id);
+          }
+          return this.toIntOrNull(contacts[0]?.id);
+        },
         openNewCompanySettlementContractForm() {
           this.resetCompanySettlementContractForm();
           this.showCompanySettlementContractForm = true;
         },
-        openNewGeneratedCompanySettlementContractForm() {
+        async openNewGeneratedCompanySettlementContractForm() {
+          if (this.editingCompanyId && !this.companyContactsForActiveCompany.length && !this.isCompanyContactsLoading) {
+            await this.loadContactsForCompany();
+          }
           this.resetCompanySettlementContractGeneratorForm();
           this.showCompanySettlementContractGeneratorForm = true;
         },
@@ -4602,6 +4621,7 @@
         resetCompanySettlementContractGeneratorForm() {
           const preferredHourlyRate = Number(this.companySettlementContracts[0]?.hourlyRate || 0) || 0;
           this.companySettlementContractGeneratorForm = {
+            contactId: this.preferredCompanySettlementContractContactId(),
             advancePercent: "",
             hourlyRate: preferredHourlyRate > 0 ? preferredHourlyRate.toFixed(2) : "",
             warrantyDays: 31,
@@ -4985,6 +5005,7 @@
               method: "POST",
               body: {
                 client: this.editingCompanyId,
+                representative_contact: this.toIntOrNull(this.companySettlementContractGeneratorForm.contactId),
                 advance_percent: advancePercent > 0 ? advancePercent.toFixed(2) : "0.00",
                 hourly_rate: hourlyRate.toFixed(2),
                 warranty_days: Number.parseInt(this.companySettlementContractGeneratorForm.warrantyDays || 31, 10) || 31,
@@ -9830,7 +9851,7 @@
           throw new Error("Сделка без активных задач допустима только в статусах «Успешно» и «Провален»");
         },
         validateDealFailureReason() {
-          if (!this.isDealFailedStageSelected) {
+          if (!this.isDealFailedStageSelected()) {
             return;
           }
           if (!String(this.forms.deals.failureReason || "").trim()) {
@@ -10786,14 +10807,25 @@
           }
         },
         resolveCompanyRegionLabel(address) {
-          const chunks = String(address || "")
+          const rawChunks = String(address || "")
             .split(",")
             .map((chunk) => chunk.trim())
             .filter(Boolean);
-          if (!chunks.length) {
+          if (!rawChunks.length) {
             return "Не указан";
           }
-          return chunks.slice(0, 2).join(", ");
+          const normalizedChunks = rawChunks
+            .map((chunk) => chunk.replace(/^\d{5,6}\s*/, "").trim())
+            .filter(Boolean);
+          for (const chunk of normalizedChunks) {
+            const cityMatch = chunk.match(/^(?:г\.?|гор\.?|город)\s*(.+)$/i);
+            if (cityMatch && String(cityMatch[1] || "").trim()) {
+              return String(cityMatch[1] || "").trim();
+            }
+          }
+          const skipPattern = /(россия|рф|область|обл\.|край|республика|респ\.|район|р-н|автоном|округ|ул\.|улица|проспект|пр-т|переулок|пер\.|шоссе|наб\.|набережная|бульвар|бул\.|площадь|пл\.|дом|д\.|строение|стр\.|корпус|корп\.|кв\.|офис|оф\.|пом\.|эт\.|мкр\.|микрорайон)/i;
+          const cityChunk = normalizedChunks.find((chunk) => !skipPattern.test(chunk) && chunk.length <= 80);
+          return cityChunk || "Не указан";
         },
         isCompanySummaryEditing(fieldKey) {
           return String(this.companySummaryEditingField || "") === String(fieldKey || "");
@@ -11750,6 +11782,7 @@
             legalName: item.legal_name || "",
             inn: item.inn || "",
             companyType: item.company_type || "client",
+            companyTypeLabel: item.company_type_label || this.companyTypeLabel(item.company_type || "client"),
             address: item.address || "",
             actualAddress: item.actual_address || "",
             ogrn: item.ogrn || "",

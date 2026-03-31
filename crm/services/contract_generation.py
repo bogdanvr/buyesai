@@ -92,8 +92,16 @@ def _resolve_contact_for_company(company: Client) -> Contact | None:
     return Contact.objects.filter(client_id=company.pk).order_by("-is_primary", "last_name", "first_name", "id").first()
 
 
-def _company_representative(company: Client, *, default_position: str, default_name: str) -> tuple[str, str]:
-    contact = _resolve_contact_for_company(company)
+def _resolve_contract_contact(company: Client, explicit_contact_id: int | None = None) -> Contact | None:
+    if explicit_contact_id:
+        contact = Contact.objects.filter(pk=explicit_contact_id, client_id=company.pk).first()
+        if contact is not None:
+            return contact
+    return _resolve_contact_for_company(company)
+
+
+def _company_representative(company: Client, *, default_position: str, default_name: str, contact: Contact | None = None) -> tuple[str, str]:
+    contact = contact or _resolve_contact_for_company(company)
     if contact is None:
         return default_position, default_name
     full_name = _normalize_text(f"{contact.first_name} {contact.last_name}")
@@ -115,18 +123,26 @@ def _company_city(company: Client) -> str:
     raw_address = _company_address(company)
     if not raw_address or raw_address == "Не указан":
         return "__________"
-    for pattern in (
-        r"(?:^|,\s*)г\.?\s*([^,;]+)",
-        r"(?:^|,\s*)город\s+([^,;]+)",
-    ):
-        match = re.search(pattern, raw_address, flags=re.IGNORECASE)
+    chunks = [
+        re.sub(r"^\d{5,6}\s*", "", _normalize_text(chunk))
+        for chunk in raw_address.split(",")
+    ]
+    chunks = [chunk for chunk in chunks if chunk]
+    for chunk in chunks:
+        match = re.match(r"^(?:г\.?|гор\.?|город)\s*(.+)$", chunk, flags=re.IGNORECASE)
         if match:
             city = _normalize_text(match.group(1))
             if city:
                 return city
-    first_chunk = _normalize_text(raw_address.split(",")[0])
-    if first_chunk and len(first_chunk) <= 60:
-        return re.sub(r"^(адрес:?)\s*", "", first_chunk, flags=re.IGNORECASE).strip() or "__________"
+    skip_pattern = re.compile(
+        r"(россия|рф|область|обл\.|край|республика|респ\.|район|р-н|автоном|округ|ул\.|улица|проспект|пр-т|переулок|пер\.|шоссе|наб\.|набережная|бульвар|бул\.|площадь|пл\.|дом|д\.|строение|стр\.|корпус|корп\.|кв\.|офис|оф\.|пом\.|эт\.|мкр\.|микрорайон)",
+        flags=re.IGNORECASE,
+    )
+    for chunk in chunks:
+        if skip_pattern.search(chunk):
+            continue
+        if len(chunk) <= 80:
+            return chunk
     return "__________"
 
 
@@ -162,8 +178,8 @@ def _company_email(company: Client) -> str:
     return _normalize_text(company.email) or "-"
 
 
-def _company_official_email(company: Client) -> str:
-    contact = _resolve_contact_for_company(company)
+def _company_official_email(company: Client, contact: Contact | None = None) -> str:
+    contact = contact or _resolve_contact_for_company(company)
     contact_email = _normalize_text(getattr(contact, "email", ""))
     if contact_email:
         return contact_email
@@ -206,10 +222,13 @@ def _build_contract_docx(contract: SettlementContract, executor_company: Client)
 
     customer_company = contract.client
     contract_date = contract.start_date or timezone.localdate()
+    payload = contract.generator_payload if isinstance(contract.generator_payload, dict) else {}
+    customer_contact = _resolve_contract_contact(customer_company, payload.get("customer_contact_id"))
     customer_position, customer_name = _company_representative(
         customer_company,
         default_position="уполномоченного представителя",
         default_name="_____________",
+        contact=customer_contact,
     )
     executor_position, executor_name = _company_representative(
         executor_company,
@@ -241,7 +260,7 @@ def _build_contract_docx(contract: SettlementContract, executor_company: Client)
         xml = _replace_text(
             xml,
             "электронная почта [указать], система управления проектом [указать], а также иные письменно согласованные каналы связи.",
-            f"электронная почта {_company_official_email(customer_company)}, а также иные письменно согласованные каналы связи.",
+            f"электронная почта {_company_official_email(customer_company, customer_contact)}, а также иные письменно согласованные каналы связи.",
             count=1,
         )
 
@@ -292,12 +311,15 @@ def _build_contract_docx(contract: SettlementContract, executor_company: Client)
 def generate_service_agreement_contract(
     *,
     client: Client,
+    representative_contact: Contact | None = None,
     advance_percent: Decimal | int | float | str,
     hourly_rate: Decimal | int | float | str,
     warranty_days: int = DEFAULT_WARRANTY_DAYS,
     claim_response_days: int = DEFAULT_CLAIM_RESPONSE_DAYS,
     termination_notice_days: int = DEFAULT_TERMINATION_NOTICE_DAYS,
 ) -> SettlementContract:
+    if representative_contact is not None and representative_contact.client_id != client.pk:
+        raise ValidationError({"representative_contact": "Контакт должен принадлежать выбранной компании."})
     executor_company = _select_executor_company()
     contract = SettlementContract.objects.create(
         client=client,
@@ -313,6 +335,7 @@ def generate_service_agreement_contract(
         generator_payload={
             "template_code": SERVICE_AGREEMENT_TEMPLATE_CODE,
             "executor_company_id": executor_company.pk,
+            "customer_contact_id": representative_contact.pk if representative_contact is not None else None,
         },
     )
     refresh_generated_service_agreement(contract)

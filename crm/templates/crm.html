@@ -1474,6 +1474,9 @@
                   : 'border-crm-border bg-[#102f4a] hover:border-crm-accent/70'"
               >
                 <div class="text-sm font-semibold text-white [overflow-wrap:anywhere]">[[ company.name ]]</div>
+                <div class="mt-1 text-xs text-crm-muted">
+                  [[ company.companyTypeLabel || companyTypeLabel(company.companyType) ]]
+                </div>
                 <div class="mt-1 text-xs text-crm-muted [overflow-wrap:anywhere]">
                   [[ company.phone || company.email || company.inn || 'Без контактных данных' ]]
                 </div>
@@ -3980,7 +3983,7 @@
               </div>
 
             </div>
-            <label v-if="isDealFailedStageSelected" class="block md:col-span-2">
+            <label v-if="isDealFailedStageSelected()" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Причина провала</span>
               <textarea v-model="forms.deals.failureReason" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
@@ -5687,6 +5690,19 @@
                     </div>
                     <div v-if="showCompanySettlementContractGeneratorForm" class="mt-3 rounded-xl border border-crm-border bg-[#0f2f4a] p-4 space-y-3">
                       <div class="text-sm font-semibold text-white">Новый договор</div>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Контакт для подстановки как директор</span>
+                        <select v-model="companySettlementContractGeneratorForm.contactId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                          <option :value="null">Автовыбор по ЛПР или основному контакту</option>
+                          <option
+                            v-for="contact in companyContactsForActiveCompany"
+                            :key="`generated-contract-contact-${contact.id}`"
+                            :value="contact.id"
+                          >
+                            [[ contact.fullName ]][[ contact.position ? `, ${contact.position}` : '' ]]
+                          </option>
+                        </select>
+                      </label>
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <label class="block">
                           <span class="text-sm text-crm-muted">Размер аванса, %</span>
