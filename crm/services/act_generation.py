@@ -255,10 +255,18 @@ def _paragraph(text: str = "", *, bold: bool = False, align: str = "left", size:
 
 def _table_cell(text: str, *, width: int, bold: bool = False, align: str = "left", shaded: bool = False) -> str:
     shading_xml = '<w:shd w:val="clear" w:color="auto" w:fill="D9E7F5"/>' if shaded else ""
+    margins_xml = (
+        "<w:tcMar>"
+        '<w:top w:w="40" w:type="dxa"/>'
+        '<w:bottom w:w="40" w:type="dxa"/>'
+        '<w:left w:w="40" w:type="dxa"/>'
+        '<w:right w:w="40" w:type="dxa"/>'
+        "</w:tcMar>"
+    )
     return (
         "<w:tc>"
-        f'<w:tcPr><w:tcW w:w="{width}" w:type="dxa"/>{shading_xml}</w:tcPr>'
-        f"{_paragraph(text, bold=bold, align=align, size=22, spacing_after=60)}"
+        f'<w:tcPr><w:tcW w:w="{width}" w:type="dxa"/>{margins_xml}<w:vAlign w:val="center"/>{shading_xml}</w:tcPr>'
+        f"{_paragraph(text, bold=bold, align=align, size=22, spacing_after=0)}"
         "</w:tc>"
     )
 
@@ -272,13 +280,21 @@ def _table_cell_custom(
     size: int = 22,
     shaded: bool = False,
     grid_span: int | None = None,
-    spacing_after: int = 60,
+    spacing_after: int = 0,
 ) -> str:
     shading_xml = '<w:shd w:val="clear" w:color="auto" w:fill="D9E7F5"/>' if shaded else ""
     grid_span_xml = f'<w:gridSpan w:val="{int(grid_span)}"/>' if grid_span and int(grid_span) > 1 else ""
+    margins_xml = (
+        "<w:tcMar>"
+        '<w:top w:w="40" w:type="dxa"/>'
+        '<w:bottom w:w="40" w:type="dxa"/>'
+        '<w:left w:w="40" w:type="dxa"/>'
+        '<w:right w:w="40" w:type="dxa"/>'
+        "</w:tcMar>"
+    )
     return (
         "<w:tc>"
-        f'<w:tcPr><w:tcW w:w="{width}" w:type="dxa"/>{grid_span_xml}{shading_xml}</w:tcPr>'
+        f'<w:tcPr><w:tcW w:w="{width}" w:type="dxa"/>{grid_span_xml}{margins_xml}<w:vAlign w:val="center"/>{shading_xml}</w:tcPr>'
         f"{_paragraph(text, bold=bold, align=align, size=size, spacing_after=spacing_after)}"
         "</w:tc>"
     )
@@ -328,6 +344,7 @@ def _service_table(items: list[ActLineItem]) -> str:
 
 def _invoice_payment_table(executor_company: Client) -> str:
     widths = [3600, 1600, 900, 2800]
+    table_width = sum(widths)
     bank_name = _normalize_text(executor_company.bank_name) or "Банк не указан"
     bik = _normalize_text(executor_company.bik) or "-"
     correspondent_account = _normalize_text(executor_company.correspondent_account) or "-"
@@ -377,7 +394,7 @@ def _invoice_payment_table(executor_company: Client) -> str:
     )
     return (
         "<w:tbl>"
-        f"<w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/>{borders_xml}</w:tblPr>"
+        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/><w:jc w:val=\"right\"/>{borders_xml}</w:tblPr>"
         f"<w:tblGrid>{grid_xml}</w:tblGrid>"
         f"{rows_xml}"
         "</w:tbl>"
@@ -428,6 +445,7 @@ def _invoice_items_table(items: list[ActLineItem]) -> str:
 
 def _invoice_totals_table(amount: Decimal, currency: str) -> str:
     widths = [2200, 1800]
+    table_width = sum(widths)
     rows = [
         ("Итого:", _format_amount(amount)),
         ("Без налога (НДС)", "-"),
@@ -435,8 +453,8 @@ def _invoice_totals_table(amount: Decimal, currency: str) -> str:
     ]
     row_xml = "".join(
         "<w:tr>"
-        f"{_table_cell_custom(label, width=widths[0], bold=True, align='right', size=22, spacing_after=40)}"
-        f"{_table_cell_custom(value, width=widths[1], bold=True, align='right', size=22, spacing_after=40)}"
+        f"{_table_cell_custom(label, width=widths[0], bold=True, align='right', size=22)}"
+        f"{_table_cell_custom(value, width=widths[1], bold=True, align='right', size=22)}"
         "</w:tr>"
         for label, value in rows
     )
@@ -449,7 +467,7 @@ def _invoice_totals_table(amount: Decimal, currency: str) -> str:
     )
     return (
         "<w:tbl>"
-        f"<w:tblPr>{borders_xml}<w:jc w:val=\"right\"/></w:tblPr>"
+        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/>{borders_xml}<w:jc w:val=\"right\"/></w:tblPr>"
         f"<w:tblGrid>{grid_xml}</w:tblGrid>"
         f"{row_xml}"
         "</w:tbl>"
@@ -458,6 +476,7 @@ def _invoice_totals_table(amount: Decimal, currency: str) -> str:
 
 def _invoice_footer_signatures() -> str:
     widths = [2500, 2800, 1700, 2200]
+    table_width = sum(widths)
     grid_xml = "".join(f'<w:gridCol w:w="{width}"/>' for width in widths)
     borders_xml = (
         "<w:tblBorders>"
@@ -467,15 +486,15 @@ def _invoice_footer_signatures() -> str:
     )
     row1 = (
         "<w:tr>"
-        f"{_table_cell_custom('Руководитель', width=widths[0], bold=True, size=22, spacing_after=20)}"
-        f"{_table_cell_custom('________________________', width=widths[1], size=22, spacing_after=20)}"
-        f"{_table_cell_custom('Бухгалтер', width=widths[2], bold=True, size=22, spacing_after=20)}"
-        f"{_table_cell_custom('________________________', width=widths[3], size=22, spacing_after=20)}"
+        f"{_table_cell_custom('Руководитель', width=widths[0], bold=True, size=22)}"
+        f"{_table_cell_custom('________________________', width=widths[1], size=22)}"
+        f"{_table_cell_custom('Бухгалтер', width=widths[2], bold=True, size=22)}"
+        f"{_table_cell_custom('________________________', width=widths[3], size=22)}"
         "</w:tr>"
     )
     return (
         "<w:tbl>"
-        f"<w:tblPr>{borders_xml}</w:tblPr>"
+        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/><w:jc w:val=\"right\"/>{borders_xml}</w:tblPr>"
         f"<w:tblGrid>{grid_xml}</w:tblGrid>"
         f"{row1}"
         "</w:tbl>"

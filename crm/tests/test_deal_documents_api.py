@@ -201,3 +201,6 @@ class DealDocumentsApiTests(APITestCase):
         self.assertIn("Всего к оплате:", document_xml)
         self.assertIn("Переводческое сопровождение", document_xml)
         self.assertIn("36000,00", document_xml.replace(" ", ""))
+        self.assertIn('<w:jc w:val="right"/>', document_xml)
+        self.assertIn('<w:vAlign w:val="center"/>', document_xml)
+        self.assertIn('<w:tblLayout w:type="fixed"/>', document_xml)
