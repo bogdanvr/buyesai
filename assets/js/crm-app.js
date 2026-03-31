@@ -600,6 +600,10 @@
             startDate: "",
             endDate: "",
             note: "",
+            file: null,
+            fileName: "",
+            currentFileName: "",
+            currentFileUrl: "",
             isActive: true,
           },
           companySettlementContractGeneratorForm: {
@@ -4503,6 +4507,10 @@
             startDate: normalizedContract.startDate || "",
             endDate: normalizedContract.endDate || "",
             note: normalizedContract.note || "",
+            file: null,
+            fileName: "",
+            currentFileName: normalizedContract.originalName || "",
+            currentFileUrl: normalizedContract.fileUrl || "",
             isActive: normalizedContract.isActive !== false,
           };
           this.showCompanySettlementContractForm = true;
@@ -4616,8 +4624,13 @@
             startDate: "",
             endDate: "",
             note: "",
+            file: null,
+            fileName: "",
+            currentFileName: "",
+            currentFileUrl: "",
             isActive: true,
           };
+          this.clearCompanySettlementContractFileInput();
         },
         resetCompanySettlementContractGeneratorForm() {
           const preferredHourlyRate = Number(this.companySettlementContracts[0]?.hourlyRate || 0) || 0;
@@ -4810,6 +4823,12 @@
               : [],
           };
         },
+        handleCompanySettlementContractFileInput(event) {
+          const input = event?.target;
+          const file = input?.files && input.files[0] ? input.files[0] : null;
+          this.companySettlementContractForm.file = file;
+          this.companySettlementContractForm.fileName = file?.name || "";
+        },
         handleCompanySettlementDocumentFileInput(event) {
           const input = event?.target;
           const file = input?.files && input.files[0] ? input.files[0] : null;
@@ -4821,6 +4840,12 @@
         },
         clearCompanySettlementDocumentFileInput() {
           const input = this.$refs.companySettlementDocumentFileInput;
+          if (input) {
+            input.value = "";
+          }
+        },
+        clearCompanySettlementContractFileInput() {
+          const input = this.$refs.companySettlementContractFileInput;
           if (input) {
             input.value = "";
           }
@@ -4958,25 +4983,41 @@
           try {
             const contractId = this.toIntOrNull(this.companySettlementContractForm.id);
             const hourlyRate = this.parseFlexibleNumber(this.companySettlementContractForm.hourlyRate);
+            const contractPayload = {
+              client: this.editingCompanyId,
+              title: this.companySettlementContractForm.title.trim(),
+              number: this.companySettlementContractForm.number.trim(),
+              currency: this.companySettlementContractForm.currency || this.forms.companies.currency || "RUB",
+              hourly_rate: hourlyRate > 0 ? hourlyRate.toFixed(2) : null,
+              advance_percent: this.parseFlexibleNumber(this.companySettlementContractForm.advancePercent) > 0
+                ? this.parseFlexibleNumber(this.companySettlementContractForm.advancePercent).toFixed(2)
+                : null,
+              warranty_days: Number.parseInt(this.companySettlementContractForm.warrantyDays || 31, 10) || 31,
+              claim_response_days: Number.parseInt(this.companySettlementContractForm.claimResponseDays || 5, 10) || 5,
+              termination_notice_days: Number.parseInt(this.companySettlementContractForm.terminationNoticeDays || 5, 10) || 5,
+              start_date: this.companySettlementContractForm.startDate || null,
+              end_date: this.companySettlementContractForm.endDate || null,
+              note: this.companySettlementContractForm.note.trim(),
+              is_active: !!this.companySettlementContractForm.isActive,
+            };
+            const selectedFile = this.companySettlementContractForm.file;
+            const requestBody = selectedFile
+              ? (() => {
+                const formData = new FormData();
+                Object.entries(contractPayload).forEach(([key, value]) => {
+                  if (value === null || value === undefined) {
+                    return;
+                  }
+                  formData.append(key, value);
+                });
+                formData.append("file", selectedFile);
+                formData.append("original_name", this.companySettlementContractForm.fileName || selectedFile.name || "");
+                return formData;
+              })()
+              : contractPayload;
             await this.apiRequest(contractId ? `/api/v1/settlements/contracts/${contractId}/` : "/api/v1/settlements/contracts/", {
               method: contractId ? "PATCH" : "POST",
-              body: {
-                client: this.editingCompanyId,
-                title: this.companySettlementContractForm.title.trim(),
-                number: this.companySettlementContractForm.number.trim(),
-                currency: this.companySettlementContractForm.currency || this.forms.companies.currency || "RUB",
-                hourly_rate: hourlyRate > 0 ? hourlyRate.toFixed(2) : null,
-                advance_percent: this.parseFlexibleNumber(this.companySettlementContractForm.advancePercent) > 0
-                  ? this.parseFlexibleNumber(this.companySettlementContractForm.advancePercent).toFixed(2)
-                  : null,
-                warranty_days: Number.parseInt(this.companySettlementContractForm.warrantyDays || 31, 10) || 31,
-                claim_response_days: Number.parseInt(this.companySettlementContractForm.claimResponseDays || 5, 10) || 5,
-                termination_notice_days: Number.parseInt(this.companySettlementContractForm.terminationNoticeDays || 5, 10) || 5,
-                start_date: this.companySettlementContractForm.startDate || null,
-                end_date: this.companySettlementContractForm.endDate || null,
-                note: this.companySettlementContractForm.note.trim(),
-                is_active: !!this.companySettlementContractForm.isActive,
-              },
+              body: requestBody,
             });
             this.closeCompanySettlementContractForm();
             await this.loadCompanySettlements();

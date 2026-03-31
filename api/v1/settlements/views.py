@@ -91,6 +91,21 @@ def build_settlement_stats(documents):
 
 class SettlementContractViewSet(ModelViewSet):
     serializer_class = SettlementContractSerializer
+    parser_classes = (JSONParser, MultiPartParser, FormParser)
+    REGENERATION_FIELDS = {
+        "title",
+        "number",
+        "currency",
+        "hourly_rate",
+        "advance_percent",
+        "warranty_days",
+        "claim_response_days",
+        "termination_notice_days",
+        "start_date",
+        "end_date",
+        "note",
+        "is_active",
+    }
 
     def get_queryset(self):
         queryset = SettlementContract.objects.select_related("client").order_by("-created_at", "-id")
@@ -100,9 +115,18 @@ class SettlementContractViewSet(ModelViewSet):
         return queryset
 
     def perform_update(self, serializer):
+        current_instance = serializer.instance
+        payload = current_instance.generator_payload if isinstance(current_instance.generator_payload, dict) else {}
+        should_regenerate = (
+            payload.get("template_code") == SERVICE_AGREEMENT_TEMPLATE_CODE
+            and any(
+                field_name in serializer.validated_data
+                and serializer.validated_data[field_name] != getattr(current_instance, field_name)
+                for field_name in self.REGENERATION_FIELDS
+            )
+        )
         instance = serializer.save()
-        payload = instance.generator_payload if isinstance(instance.generator_payload, dict) else {}
-        if payload.get("template_code") == SERVICE_AGREEMENT_TEMPLATE_CODE:
+        if should_regenerate:
             refresh_generated_service_agreement(instance)
 
     @action(detail=False, methods=["post"], url_path="generate")

@@ -5060,6 +5060,30 @@
                         <span class="text-sm text-crm-muted">Комментарий</span>
                         <textarea v-model="companySettlementContractForm.note" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
                       </label>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Договор</span>
+                        <div class="mt-1 rounded-xl border border-crm-border bg-[#102f4a] px-3 py-3 space-y-2">
+                          <div v-if="companySettlementContractForm.currentFileUrl" class="text-sm text-white [overflow-wrap:anywhere]">
+                            Текущий файл:
+                            <a :href="companySettlementContractForm.currentFileUrl" target="_blank" rel="noopener noreferrer" class="text-crm-accent transition hover:text-white">
+                              [[ companySettlementContractForm.currentFileName || 'Открыть договор' ]]
+                            </a>
+                          </div>
+                          <div v-else class="text-sm text-crm-muted">
+                            Файл договора пока не загружен.
+                          </div>
+                          <input
+                            ref="companySettlementContractFileInput"
+                            type="file"
+                            accept=".doc,.docx,.pdf"
+                            @change="handleCompanySettlementContractFileInput"
+                            class="block w-full text-sm text-white file:mr-3 file:h-9 file:rounded-lg file:border-0 file:bg-[#123753] file:px-3 file:text-sm file:font-medium file:text-white"
+                          />
+                          <div v-if="companySettlementContractForm.fileName" class="text-xs text-crm-accent [overflow-wrap:anywhere]">
+                            Будет загружен новый файл: [[ companySettlementContractForm.fileName ]]
+                          </div>
+                        </div>
+                      </label>
                       <button type="button" @click="saveCompanySettlementContract" :disabled="isCompanySettlementSaving" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
                         [[ isCompanySettlementSaving ? 'Сохраняем...' : (companySettlementContractForm.id ? 'Сохранить изменения' : 'Сохранить договор') ]]
                       </button>

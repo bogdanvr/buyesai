@@ -99,6 +99,17 @@ class SettlementContractSerializer(serializers.ModelSerializer):
         except Exception:
             return 0
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        uploaded_file = attrs.get("file")
+        original_name_provided = "original_name" in attrs
+        original_name = str(attrs.get("original_name") or "").strip()
+        if uploaded_file is not None:
+            attrs["original_name"] = str(original_name or getattr(uploaded_file, "name", "") or "").strip()[:255]
+        elif original_name_provided:
+            attrs["original_name"] = original_name[:255]
+        return attrs
+
 
 class SettlementContractGenerateSerializer(serializers.Serializer):
     client = serializers.PrimaryKeyRelatedField(queryset=Client.objects.all())

@@ -464,6 +464,44 @@ class SettlementsApiTests(APITestCase):
             self.assertIn("составляет 60 календарных дней", xml)
 
     @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
+    def test_can_upload_contract_file_without_triggering_regeneration(self):
+        with override_settings(MEDIA_ROOT=self.media_root):
+            create_response = self.client.post(
+                reverse("settlement-contracts-generate"),
+                {
+                    "client": self.company.pk,
+                    "advance_percent": "20.00",
+                    "hourly_rate": "1000.00",
+                    "warranty_days": 31,
+                    "claim_response_days": 5,
+                    "termination_notice_days": 5,
+                },
+                format="json",
+            )
+            self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.content.decode())
+            contract = SettlementContract.objects.get(pk=create_response.data["id"])
+            uploaded_file = SimpleUploadedFile(
+                "manual-contract.docx",
+                b"manual-contract-binary",
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+            response = self.client.patch(
+                reverse("settlement-contracts-detail", kwargs={"pk": contract.pk}),
+                {
+                    "file": uploaded_file,
+                    "original_name": uploaded_file.name,
+                },
+                format="multipart",
+            )
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK, response.content.decode())
+            contract.refresh_from_db()
+            self.assertTrue(contract.file)
+            self.assertEqual(contract.original_name, "manual-contract.docx")
+            with contract.file.open("rb") as handle:
+                self.assertEqual(handle.read(), b"manual-contract-binary")
+
+    @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
     def test_contract_uses_strict_city_from_legal_address(self):
         self.executor_company.address = "644024, Омская область, г. Омск, ул. Ленина, д. 7"
         self.executor_company.save(update_fields=["address"])
