@@ -1455,7 +1455,7 @@ def touch_automation_drafts_signal(sender, instance: Touch, created, **kwargs):
     if should_create_next_step_queue_item:
         _upsert_touch_automation_queue_item(instance, rule, AutomationQueueItemKind.NEXT_STEP)
 
-    if should_auto_create_touch_follow_up_task(instance, rule):
+    if created and should_auto_create_touch_follow_up_task(instance, rule):
         upsert_touch_follow_up_task(instance, rule)
 
 
