@@ -961,8 +961,8 @@
             </button>
             <button
               type="button"
-              @click="startCallFromCommunications"
-              :disabled="!selectedCommunicationsCompany || !communicationsSelectedCompanyPhone"
+              @click="openCommunicationsCompose('call')"
+              :disabled="!selectedCommunicationsCompany"
               class="inline-flex h-10 items-center rounded-xl border border-crm-border bg-[#123753] px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
             >
               Позвонить
@@ -1556,12 +1556,16 @@
             <div class="border-b border-crm-border bg-[#10314d] px-5 py-4">
               <div class="text-sm font-semibold text-white">
                 [[ communicationsComposerMode
-                  ? (communicationsComposerMode === 'telegram' ? 'Новое сообщение в Telegram' : 'Новое письмо')
+                  ? (communicationsComposerMode === 'telegram'
+                    ? 'Новое сообщение в Telegram'
+                    : (communicationsComposerMode === 'call' ? 'Новый звонок' : 'Новое письмо'))
                   : (selectedCommunicationsTimelineItem?.timelineType === 'call' ? 'Детали звонка' : 'Детали сообщения') ]]
               </div>
               <div class="mt-1 text-xs text-crm-muted">
                 [[ communicationsComposerMode
-                  ? 'Отправка из общей карточки коммуникаций клиента'
+                  ? (communicationsComposerMode === 'call'
+                    ? 'Звонок из общей карточки коммуникаций клиента'
+                    : 'Отправка из общей карточки коммуникаций клиента')
                   : (selectedCommunicationsTimelineItem ? 'Полный текст и параметры выбранной коммуникации' : 'Выберите сообщение, звонок или начните новую коммуникацию') ]]
               </div>
             </div>
@@ -1579,7 +1583,28 @@
                     </option>
                   </select>
                 </label>
-                <label class="block">
+                <template v-if="communicationsComposerMode === 'call'">
+                  <div class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                    <div class="text-sm text-crm-muted">Номер</div>
+                    <div class="mt-2 flex flex-wrap items-center gap-3">
+                      <div class="min-w-0 flex-1 text-base font-semibold text-white break-all">
+                        [[ communicationsComposer.phone || 'У выбранного контакта нет номера' ]]
+                      </div>
+                      <button
+                        type="button"
+                        @click="startCallFromCommunications"
+                        :disabled="!communicationsComposer.phone || isNovofonCallStartingFor('company', communicationsSelectedCompanyId, communicationsComposer.phone)"
+                        class="inline-flex h-11 items-center gap-2 rounded-2xl border border-crm-accent/40 bg-crm-accent/15 px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75a3 3 0 0 1 3-3h2.098a1.5 1.5 0 0 1 1.465 1.178l.547 2.461a1.5 1.5 0 0 1-.438 1.407l-1.01 1.01a12.042 12.042 0 0 0 6.282 6.282l1.01-1.01a1.5 1.5 0 0 1 1.407-.438l2.461.547a1.5 1.5 0 0 1 1.178 1.465v2.098a3 3 0 0 1-3 3h-1.5C8.678 21.75 2.25 15.322 2.25 7.5v-.75Z" />
+                        </svg>
+                        [[ isNovofonCallStartingFor('company', communicationsSelectedCompanyId, communicationsComposer.phone) ? 'Звоним...' : 'Позвонить' ]]
+                      </button>
+                    </div>
+                  </div>
+                </template>
+                <label v-else class="block">
                   <span class="text-sm text-crm-muted">Получатель</span>
                   <input v-model.trim="communicationsComposer.recipient" type="text" class="mt-1 h-11 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" :placeholder="communicationsComposerMode === 'telegram' ? 'telegram:123456789' : 'email:client@example.com'" />
                 </label>
@@ -1587,12 +1612,13 @@
                   <span class="text-sm text-crm-muted">Тема</span>
                   <input v-model.trim="communicationsComposer.subject" type="text" class="mt-1 h-11 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                 </label>
-                <label class="block">
+                <label v-if="communicationsComposerMode !== 'call'" class="block">
                   <span class="text-sm text-crm-muted">Текст</span>
                   <textarea v-model.trim="communicationsComposer.bodyText" rows="10" class="mt-1 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 py-3 outline-none focus:border-crm-accent"></textarea>
                 </label>
                 <div class="flex flex-wrap gap-2">
                   <button
+                    v-if="communicationsComposerMode !== 'call'"
                     type="button"
                     @click="sendCommunicationsMessage"
                     :disabled="isCommunicationsSending"
@@ -4999,6 +5025,24 @@
                         <span class="text-sm text-crm-muted">Стоимость в час</span>
                         <input v-model="companySettlementContractForm.hourlyRate" type="number" min="0" step="0.01" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                       </label>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Размер аванса, %</span>
+                        <input v-model="companySettlementContractForm.advancePercent" type="number" min="0" step="0.01" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                      </label>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Гарантийный срок, дней</span>
+                          <input v-model="companySettlementContractForm.warrantyDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Ответ на претензию, дней</span>
+                          <input v-model="companySettlementContractForm.claimResponseDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                      </div>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Уведомление о расторжении, дней</span>
+                        <input v-model="companySettlementContractForm.terminationNoticeDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                      </label>
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <label class="block">
                           <span class="text-sm text-crm-muted">Дата начала</span>
@@ -5169,6 +5213,9 @@
                           </div>
                           <div class="flex items-center gap-2">
                             <div class="text-sm font-semibold text-white">[[ formatSettlementAmount(contract.stats.balance, contract.currency) ]]</div>
+                            <button v-if="contract.contractId" type="button" @click="openCompanySettlementContract(companySettlementContracts.find(item => String(item.id) === String(contract.contractId)) || contract)" class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent">
+                              Открыть
+                            </button>
                             <button v-if="contract.contractId" type="button" @click="openCompanySettlementContractEditor(companySettlementContracts.find(item => String(item.id) === String(contract.contractId)) || contract)" class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent">
                               Отредактировать
                             </button>
@@ -5628,7 +5675,58 @@
                 <div v-if="isCompanyDocumentsLoading" class="mt-3 text-sm text-crm-muted">Загрузка документов...</div>
                 <template v-else>
                   <div class="mt-4">
-                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Договоры</div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Договоры</div>
+                      <button
+                        type="button"
+                        @click="showCompanySettlementContractGeneratorForm ? closeCompanySettlementContractGeneratorForm() : openNewGeneratedCompanySettlementContractForm()"
+                        class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                      >
+                        [[ showCompanySettlementContractGeneratorForm ? 'Скрыть форму' : 'Сгенерировать новый договор' ]]
+                      </button>
+                    </div>
+                    <div v-if="showCompanySettlementContractGeneratorForm" class="mt-3 rounded-xl border border-crm-border bg-[#0f2f4a] p-4 space-y-3">
+                      <div class="text-sm font-semibold text-white">Новый договор</div>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Размер аванса, %</span>
+                          <input v-model="companySettlementContractGeneratorForm.advancePercent" type="number" min="0" step="0.01" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Стоимость часа</span>
+                          <input v-model="companySettlementContractGeneratorForm.hourlyRate" type="number" min="0" step="0.01" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Гарантийный срок, дней</span>
+                          <input v-model="companySettlementContractGeneratorForm.warrantyDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Срок ответа на претензию, дней</span>
+                          <input v-model="companySettlementContractGeneratorForm.claimResponseDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                      </div>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Срок уведомления о расторжении, дней</span>
+                        <input v-model="companySettlementContractGeneratorForm.terminationNoticeDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                      </label>
+                      <div class="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          @click="generateCompanySettlementContract"
+                          :disabled="isCompanySettlementContractGenerating"
+                          class="inline-flex h-10 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          [[ isCompanySettlementContractGenerating ? 'Генерируем...' : 'Сгенерировать договор' ]]
+                        </button>
+                        <button
+                          type="button"
+                          @click="closeCompanySettlementContractGeneratorForm"
+                          class="inline-flex h-10 items-center rounded-xl border border-crm-border bg-[#123753] px-4 text-sm font-semibold text-white transition hover:border-crm-accent"
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    </div>
                     <div v-if="companySettlementContracts.length === 0" class="mt-2 text-sm text-crm-muted">
                       Договоры компании пока не созданы.
                     </div>
@@ -5647,7 +5745,7 @@
                           </div>
                         </div>
                         <div class="flex shrink-0 items-center gap-2">
-                          <button type="button" @click="openCompanySettlementContractSummary(contract.id)" class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent">
+                          <button type="button" @click="openCompanySettlementContract(contract)" class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent">
                             Открыть
                           </button>
                           <button type="button" @click="openCompanySettlementContractEditor(contract)" class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent">

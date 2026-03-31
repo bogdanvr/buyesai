@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.urls import reverse
 from rest_framework import serializers
 
-from crm.models import SettlementAllocation, SettlementContract, SettlementDocument
+from crm.models import Client, SettlementAllocation, SettlementContract, SettlementDocument
 
 
 class SettlementAllocationHistorySerializer(serializers.ModelSerializer):
@@ -42,6 +42,9 @@ class SettlementAllocationHistorySerializer(serializers.ModelSerializer):
 
 class SettlementContractSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source="client.name", read_only=True)
+    file_url = serializers.SerializerMethodField()
+    download_url = serializers.SerializerMethodField()
+    file_size = serializers.SerializerMethodField()
 
     class Meta:
         model = SettlementContract
@@ -53,13 +56,57 @@ class SettlementContractSerializer(serializers.ModelSerializer):
             "number",
             "currency",
             "hourly_rate",
+            "advance_percent",
+            "warranty_days",
+            "claim_response_days",
+            "termination_notice_days",
             "start_date",
             "end_date",
             "note",
+            "generator_payload",
+            "file",
+            "file_url",
+            "download_url",
+            "original_name",
+            "file_size",
             "is_active",
             "created_at",
             "updated_at",
         ]
+
+    def get_file_url(self, obj):
+        file_field = getattr(obj, "file", None)
+        if not file_field:
+            return ""
+        try:
+            return file_field.url
+        except Exception:
+            return ""
+
+    def get_download_url(self, obj):
+        if not getattr(obj, "file", None):
+            return ""
+        request = self.context.get("request")
+        relative_url = reverse("settlement-contracts-download", kwargs={"pk": obj.pk})
+        return request.build_absolute_uri(relative_url) if request is not None else relative_url
+
+    def get_file_size(self, obj):
+        file_field = getattr(obj, "file", None)
+        if not file_field:
+            return 0
+        try:
+            return int(file_field.size or 0)
+        except Exception:
+            return 0
+
+
+class SettlementContractGenerateSerializer(serializers.Serializer):
+    client = serializers.PrimaryKeyRelatedField(queryset=Client.objects.all())
+    advance_percent = serializers.DecimalField(max_digits=6, decimal_places=2, min_value=Decimal("0.00"))
+    hourly_rate = serializers.DecimalField(max_digits=14, decimal_places=2, min_value=Decimal("0.00"))
+    warranty_days = serializers.IntegerField(min_value=1, default=31)
+    claim_response_days = serializers.IntegerField(min_value=1, default=5)
+    termination_notice_days = serializers.IntegerField(min_value=1, default=5)
 
 
 class SettlementDocumentSerializer(serializers.ModelSerializer):

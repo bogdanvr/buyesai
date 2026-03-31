@@ -21,6 +21,12 @@ def settlement_document_upload_to(instance, filename: str) -> str:
     return f"company_{client_id}/settlements/{safe_name}"
 
 
+def settlement_contract_upload_to(instance, filename: str) -> str:
+    client_id = getattr(instance, "client_id", None) or getattr(getattr(instance, "client", None), "id", None) or "new"
+    safe_name = truncate_upload_filename(filename)
+    return f"company_{client_id}/contracts/{safe_name}"
+
+
 class SettlementContract(TimestampedModel):
     client = models.ForeignKey(
         "crm.Client",
@@ -38,9 +44,28 @@ class SettlementContract(TimestampedModel):
         null=True,
         verbose_name="Стоимость в час",
     )
+    advance_percent = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        verbose_name="Размер аванса, %",
+    )
+    warranty_days = models.PositiveIntegerField(default=31, verbose_name="Гарантийный срок, дней")
+    claim_response_days = models.PositiveIntegerField(default=5, verbose_name="Срок ответа на претензию, дней")
+    termination_notice_days = models.PositiveIntegerField(default=5, verbose_name="Срок уведомления о расторжении, дней")
     start_date = models.DateField(blank=True, null=True, verbose_name="Дата начала")
     end_date = models.DateField(blank=True, null=True, verbose_name="Дата окончания")
     note = models.TextField(blank=True, default="", verbose_name="Комментарий")
+    generator_payload = models.JSONField(default=dict, blank=True, verbose_name="Параметры генерации")
+    file = models.FileField(
+        upload_to=settlement_contract_upload_to,
+        max_length=500,
+        blank=True,
+        null=True,
+        verbose_name="Файл договора",
+    )
+    original_name = models.CharField(max_length=255, blank=True, default="", verbose_name="Название файла")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
 
     class Meta:

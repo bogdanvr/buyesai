@@ -136,6 +136,7 @@
           communicationsComposerMode: "",
           communicationsComposer: {
             contactId: null,
+            phone: "",
             recipient: "",
             subject: "",
             bodyText: "",
@@ -227,10 +228,12 @@
           showCompanyRequisites: false,
           showCompanySettlementsPanel: false,
           showCompanySettlementContractForm: false,
+          showCompanySettlementContractGeneratorForm: false,
           showCompanySettlementDocumentForm: false,
           showCompanySettlementAllocationForm: false,
           isCompanySettlementsLoading: false,
           isCompanySettlementSaving: false,
+          isCompanySettlementContractGenerating: false,
           leadSummaryEditingField: "",
           dealSummaryEditingField: "",
           taskSummaryEditingField: "",
@@ -590,10 +593,21 @@
             number: "",
             currency: "RUB",
             hourlyRate: "",
+            advancePercent: "",
+            warrantyDays: 31,
+            claimResponseDays: 5,
+            terminationNoticeDays: 5,
             startDate: "",
             endDate: "",
             note: "",
             isActive: true,
+          },
+          companySettlementContractGeneratorForm: {
+            advancePercent: "",
+            hourlyRate: "",
+            warrantyDays: 31,
+            claimResponseDays: 5,
+            terminationNoticeDays: 5,
           },
           companySettlementDocumentForm: {
             contractId: null,
@@ -4413,9 +4427,20 @@
             number: item.number || "",
             currency: item.currency || this.forms.companies.currency || "RUB",
             hourlyRate: Number(item.hourly_rate ?? item.hourlyRate ?? 0) || 0,
+            advancePercent: Number(item.advance_percent ?? item.advancePercent ?? 0) || 0,
+            warrantyDays: Number(item.warranty_days ?? item.warrantyDays ?? 31) || 31,
+            claimResponseDays: Number(item.claim_response_days ?? item.claimResponseDays ?? 5) || 5,
+            terminationNoticeDays: Number(item.termination_notice_days ?? item.terminationNoticeDays ?? 5) || 5,
             startDate: item.start_date || item.startDate || "",
             endDate: item.end_date || item.endDate || "",
             note: item.note || "",
+            generatorPayload: (item.generator_payload && typeof item.generator_payload === "object")
+              ? item.generator_payload
+              : (item.generatorPayload && typeof item.generatorPayload === "object" ? item.generatorPayload : {}),
+            originalName: item.original_name || item.originalName || "",
+            fileUrl: item.download_url || item.downloadUrl || item.file_url || item.fileUrl || "",
+            downloadUrl: item.download_url || item.downloadUrl || "",
+            fileSize: Number.parseInt(item.file_size || item.fileSize || 0, 10) || 0,
             isActive: item.is_active !== false,
             createdAt: item.created_at || item.createdAt || "",
             updatedAt: item.updated_at || item.updatedAt || "",
@@ -4430,6 +4455,10 @@
         openNewCompanySettlementContractForm() {
           this.resetCompanySettlementContractForm();
           this.showCompanySettlementContractForm = true;
+        },
+        openNewGeneratedCompanySettlementContractForm() {
+          this.resetCompanySettlementContractGeneratorForm();
+          this.showCompanySettlementContractGeneratorForm = true;
         },
         async openCompanySettlementContractEditor(contract) {
           const normalizedContract = contract ? this.normalizeSettlementContract(contract) : null;
@@ -4447,6 +4476,10 @@
             number: normalizedContract.number || "",
             currency: normalizedContract.currency || this.forms.companies.currency || "RUB",
             hourlyRate: normalizedContract.hourlyRate > 0 ? normalizedContract.hourlyRate.toFixed(2) : "",
+            advancePercent: normalizedContract.advancePercent > 0 ? normalizedContract.advancePercent.toFixed(2) : "",
+            warrantyDays: normalizedContract.warrantyDays || 31,
+            claimResponseDays: normalizedContract.claimResponseDays || 5,
+            terminationNoticeDays: normalizedContract.terminationNoticeDays || 5,
             startDate: normalizedContract.startDate || "",
             endDate: normalizedContract.endDate || "",
             note: normalizedContract.note || "",
@@ -4463,6 +4496,21 @@
         closeCompanySettlementContractForm() {
           this.showCompanySettlementContractForm = false;
           this.resetCompanySettlementContractForm();
+        },
+        closeCompanySettlementContractGeneratorForm() {
+          this.showCompanySettlementContractGeneratorForm = false;
+          this.resetCompanySettlementContractGeneratorForm();
+        },
+        openCompanySettlementContract(contract) {
+          const normalizedContract = contract ? this.normalizeSettlementContract(contract) : null;
+          if (!normalizedContract?.id) {
+            return;
+          }
+          if (normalizedContract.fileUrl && typeof window !== "undefined" && typeof window.open === "function") {
+            window.open(normalizedContract.fileUrl, "_blank", "noopener,noreferrer");
+            return;
+          }
+          this.openCompanySettlementContractSummary(normalizedContract.id);
         },
         async openCompanySettlementContractSummary(contractId) {
           const normalizedContractId = this.toIntOrNull(contractId);
@@ -4541,10 +4589,24 @@
             number: "",
             currency: this.forms.companies.currency || "RUB",
             hourlyRate: "",
+            advancePercent: "",
+            warrantyDays: 31,
+            claimResponseDays: 5,
+            terminationNoticeDays: 5,
             startDate: "",
             endDate: "",
             note: "",
             isActive: true,
+          };
+        },
+        resetCompanySettlementContractGeneratorForm() {
+          const preferredHourlyRate = Number(this.companySettlementContracts[0]?.hourlyRate || 0) || 0;
+          this.companySettlementContractGeneratorForm = {
+            advancePercent: "",
+            hourlyRate: preferredHourlyRate > 0 ? preferredHourlyRate.toFixed(2) : "",
+            warrantyDays: 31,
+            claimResponseDays: 5,
+            terminationNoticeDays: 5,
           };
         },
         resetCompanySettlementDocumentForm() {
@@ -4576,15 +4638,18 @@
         },
         resetCompanySettlementState() {
           this.showCompanySettlementContractForm = false;
+          this.showCompanySettlementContractGeneratorForm = false;
           this.showCompanySettlementDocumentForm = false;
           this.showCompanySettlementAllocationForm = false;
           this.isCompanySettlementsLoading = false;
           this.isCompanySettlementSaving = false;
+          this.isCompanySettlementContractGenerating = false;
           this.companySettlementContracts = [];
           this.companySettlementDocuments = [];
           this.companySettlementDocumentStatusSaving = {};
           this.companySettlementSummary = this.defaultCompanySettlementSummary();
           this.resetCompanySettlementContractForm();
+          this.resetCompanySettlementContractGeneratorForm();
           this.resetCompanySettlementDocumentForm();
           this.resetCompanySettlementAllocationForm();
         },
@@ -4880,6 +4945,12 @@
                 number: this.companySettlementContractForm.number.trim(),
                 currency: this.companySettlementContractForm.currency || this.forms.companies.currency || "RUB",
                 hourly_rate: hourlyRate > 0 ? hourlyRate.toFixed(2) : null,
+                advance_percent: this.parseFlexibleNumber(this.companySettlementContractForm.advancePercent) > 0
+                  ? this.parseFlexibleNumber(this.companySettlementContractForm.advancePercent).toFixed(2)
+                  : null,
+                warranty_days: Number.parseInt(this.companySettlementContractForm.warrantyDays || 31, 10) || 31,
+                claim_response_days: Number.parseInt(this.companySettlementContractForm.claimResponseDays || 5, 10) || 5,
+                termination_notice_days: Number.parseInt(this.companySettlementContractForm.terminationNoticeDays || 5, 10) || 5,
                 start_date: this.companySettlementContractForm.startDate || null,
                 end_date: this.companySettlementContractForm.endDate || null,
                 note: this.companySettlementContractForm.note.trim(),
@@ -4896,6 +4967,41 @@
             this.setUiError(`Ошибка ${actionLabel} договора: ${error.message}`, { modal: true });
           } finally {
             this.isCompanySettlementSaving = false;
+          }
+        },
+        async generateCompanySettlementContract() {
+          if (!this.editingCompanyId || this.isCompanySettlementContractGenerating) {
+            return;
+          }
+          this.isCompanySettlementContractGenerating = true;
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            const hourlyRate = this.parseFlexibleNumber(this.companySettlementContractGeneratorForm.hourlyRate);
+            if (hourlyRate <= 0) {
+              throw new Error("Укажите стоимость часа больше нуля.");
+            }
+            const advancePercent = this.parseFlexibleNumber(this.companySettlementContractGeneratorForm.advancePercent);
+            const created = await this.apiRequest("/api/v1/settlements/contracts/generate/", {
+              method: "POST",
+              body: {
+                client: this.editingCompanyId,
+                advance_percent: advancePercent > 0 ? advancePercent.toFixed(2) : "0.00",
+                hourly_rate: hourlyRate.toFixed(2),
+                warranty_days: Number.parseInt(this.companySettlementContractGeneratorForm.warrantyDays || 31, 10) || 31,
+                claim_response_days: Number.parseInt(this.companySettlementContractGeneratorForm.claimResponseDays || 5, 10) || 5,
+                termination_notice_days: Number.parseInt(this.companySettlementContractGeneratorForm.terminationNoticeDays || 5, 10) || 5,
+              },
+            });
+            this.closeCompanySettlementContractGeneratorForm();
+            await this.loadCompanyDocuments();
+            if (this.showCompanySettlementsPanel) {
+              await this.loadCompanySettlements();
+            }
+            this.openCompanySettlementContract(created);
+          } catch (error) {
+            this.setUiError(`Ошибка генерации договора: ${error.message}`, { modal: true });
+          } finally {
+            this.isCompanySettlementContractGenerating = false;
           }
         },
         async createCompanySettlementDocument() {
@@ -5255,21 +5361,29 @@
           const preferredContact = (this.communicationsCompanyContactOptions || []).find((contact) => (
             normalizedMode === "telegram"
               ? !!String(contact.telegram || "").trim()
-              : !!String(contact.email || "").trim()
+              : (normalizedMode === "call"
+                ? !!String(contact.phone || "").trim()
+                : !!String(contact.email || "").trim())
           )) || this.communicationsCompanyContactOptions[0] || null;
           const contactId = this.toIntOrNull(preferredContact?.id);
           const pendingDocumentName = this.communicationsPendingDocumentName;
           return {
             contactId,
+            phone: this.resolveCommunicationsPhone(contactId),
             recipient: this.resolveCommunicationsRecipient(normalizedMode, contactId),
             subject: normalizedMode === "email"
               ? (pendingDocumentName || `По компании: ${this.selectedCommunicationsCompany?.name || ""}`.trim())
               : "",
-            bodyText: pendingDocumentName ? `Направляю ссылку на ${pendingDocumentName}.` : "",
+            bodyText: normalizedMode === "call"
+              ? ""
+              : (pendingDocumentName ? `Направляю ссылку на ${pendingDocumentName}.` : ""),
           };
         },
         resolveCommunicationsRecipient(channelCode, contactId) {
           const normalizedChannel = String(channelCode || "").trim().toLowerCase();
+          if (normalizedChannel === "call") {
+            return "";
+          }
           const normalizedContactId = this.toIntOrNull(contactId);
           const contact = normalizedContactId
             ? ((this.communicationsCompanyContactOptions || []).find((item) => String(item.id) === String(normalizedContactId)) || null)
@@ -5285,12 +5399,27 @@
           const companyEmail = String(this.selectedCommunicationsCompany?.email || "").trim();
           return companyEmail ? `email:${companyEmail}` : "";
         },
+        resolveCommunicationsPhone(contactId) {
+          const normalizedContactId = this.toIntOrNull(contactId);
+          const contact = normalizedContactId
+            ? ((this.communicationsCompanyContactOptions || []).find((item) => String(item.id) === String(normalizedContactId)) || null)
+            : null;
+          const contactPhone = String(contact?.phone || "").trim();
+          if (contactPhone) {
+            return contactPhone;
+          }
+          if (normalizedContactId) {
+            return "";
+          }
+          return this.communicationsSelectedCompanyPhone;
+        },
         syncCommunicationsComposerRecipient() {
           if (!this.communicationsComposerMode) {
             return;
           }
           this.communicationsComposer = {
             ...this.communicationsComposer,
+            phone: this.resolveCommunicationsPhone(this.communicationsComposer.contactId),
             recipient: this.resolveCommunicationsRecipient(this.communicationsComposerMode, this.communicationsComposer.contactId),
           };
         },
@@ -5425,6 +5554,7 @@
           this.communicationsComposerMode = "";
           this.communicationsComposer = {
             contactId: null,
+            phone: "",
             recipient: "",
             subject: "",
             bodyText: "",
@@ -5553,16 +5683,17 @@
         },
         async startCallFromCommunications() {
           const companyId = this.toIntOrNull(this.communicationsSelectedCompanyId);
-          const phone = this.communicationsSelectedCompanyPhone;
+          const phone = String(this.communicationsComposer.phone || "").trim() || this.communicationsSelectedCompanyPhone;
           if (!companyId || !phone) {
-            this.setUiError("У выбранной компании нет номера для звонка.", { modal: true });
+            this.setUiError("Выберите контакт с номером телефона или укажите компанию с телефоном.", { modal: true });
             return;
           }
+          const selectedContactName = String(this.communicationsComposerSelectedContact?.fullName || "").trim();
           await this.startNovofonCall({
             phone,
             entityType: "company",
             entityId: companyId,
-            comment: `Звонок из раздела коммуникаций по компании ${this.selectedCommunicationsCompany?.name || ""}`.trim(),
+            comment: `Звонок из раздела коммуникаций по компании ${this.selectedCommunicationsCompany?.name || ""}${selectedContactName ? `, контакт ${selectedContactName}` : ""}`.trim(),
           });
           await this.loadCommunicationsTimeline(companyId, { preserveSelection: true });
         },

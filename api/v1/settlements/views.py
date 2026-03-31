@@ -14,9 +14,15 @@ from rest_framework.viewsets import ModelViewSet
 from api.v1.settlements.serializers import (
     SettlementAllocationSerializer,
     SettlementContractSerializer,
+    SettlementContractGenerateSerializer,
     SettlementDocumentSerializer,
 )
 from crm.models import SettlementAllocation, SettlementContract, SettlementDocument
+from crm.services.contract_generation import (
+    SERVICE_AGREEMENT_TEMPLATE_CODE,
+    generate_service_agreement_contract,
+    refresh_generated_service_agreement,
+)
 
 
 ZERO = Decimal("0.00")
@@ -92,6 +98,37 @@ class SettlementContractViewSet(ModelViewSet):
         if client_id:
             queryset = queryset.filter(client_id=client_id)
         return queryset
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        payload = instance.generator_payload if isinstance(instance.generator_payload, dict) else {}
+        if payload.get("template_code") == SERVICE_AGREEMENT_TEMPLATE_CODE:
+            refresh_generated_service_agreement(instance)
+
+    @action(detail=False, methods=["post"], url_path="generate")
+    def generate(self, request):
+        request_serializer = SettlementContractGenerateSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        contract = generate_service_agreement_contract(**request_serializer.validated_data)
+        response_serializer = self.get_serializer(contract)
+        return Response(response_serializer.data, status=201)
+
+    @action(detail=True, methods=["get"], url_path="download")
+    def download(self, request, pk=None):
+        instance = self.get_object()
+        file_field = getattr(instance, "file", None)
+        if not file_field:
+            raise Http404("Файл не найден.")
+        try:
+            file_handle = file_field.open("rb")
+        except FileNotFoundError as exc:
+            raise Http404("Файл не найден.") from exc
+
+        filename = instance.original_name or file_field.name.rsplit("/", 1)[-1]
+        content_type, _ = mimetypes.guess_type(filename)
+        response = FileResponse(file_handle, as_attachment=False, filename=filename, content_type=content_type or "application/octet-stream")
+        response["Content-Disposition"] = content_disposition_header(False, filename)
+        return response
 
 
 class SettlementDocumentViewSet(ModelViewSet):
