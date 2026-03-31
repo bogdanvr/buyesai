@@ -4,6 +4,9 @@
     const currentUserId = appRootElement
       ? (Number.parseInt(appRootElement.dataset.currentUserId || "", 10) || null)
       : null;
+    const currentUserCanViewAllCommunications = appRootElement
+      ? String(appRootElement.dataset.currentUserCanViewAllCommunications || "").trim().toLowerCase() === "true"
+      : false;
 
     const SECTION_ENDPOINTS = {
       leads: "/api/v1/leads/?page_size=100",
@@ -92,6 +95,7 @@
           search: "",
           showModal: false,
           currentUserId,
+          currentUserCanViewAllCommunications,
           modalParentContext: null,
           isSectionLazyLoadingReady: false,
           isLoading: false,
@@ -120,6 +124,28 @@
           isUnboundConversationMessagesLoading: false,
           isUnboundConversationBinding: false,
           isUnboundCommunicationSending: false,
+          communicationsCompanies: [],
+          communicationsDeals: [],
+          communicationsContacts: [],
+          communicationsConversations: [],
+          communicationsMessages: [],
+          communicationsCalls: [],
+          communicationsTimelineFilter: "all",
+          communicationsSelectedCompanyId: null,
+          communicationsSelectedTimelineItemKey: "",
+          communicationsComposerMode: "",
+          communicationsComposer: {
+            contactId: null,
+            recipient: "",
+            subject: "",
+            bodyText: "",
+          },
+          communicationsPendingDealDocument: null,
+          communicationsContextDealId: null,
+          isCommunicationsCompaniesLoading: false,
+          isCommunicationsContactsLoading: false,
+          isCommunicationsTimelineLoading: false,
+          isCommunicationsSending: false,
           selectedStatusFilters: [],
           statusFiltersBySection: {
             leads: [],
@@ -479,6 +505,9 @@
           dealDocumentSendTarget: null,
           showDealActGenerator: false,
           dealDocumentGeneratorType: "",
+          dealDocumentGeneratorMode: "create",
+          dealDocumentGeneratorTargetDocumentId: null,
+          dealDocumentGeneratorTargetName: "",
           dealActGeneratorForm: {
             executorCompanyId: null,
             items: [],
@@ -647,6 +676,7 @@
             { key: "deals", label: "Сделки", shortLabel: "Сделки", icon: "◔" },
             { key: "contacts", label: "Контакты", shortLabel: "Контакты", icon: "◉" },
             { key: "companies", label: "Компании", shortLabel: "Компании", icon: "▣" },
+            { key: "communications", label: "Коммуникации", shortLabel: "Связь", icon: "✉" },
             { key: "tasks", label: "Задачи", shortLabel: "Задачи", icon: "✓" },
             { key: "touches", label: "Касания", shortLabel: "Касания", icon: "◌" },
             { key: "telephony", label: "Телефония", shortLabel: "Телефония", icon: "☎" }
@@ -674,6 +704,9 @@
         };
       },
       computed: {
+        isCommunicationsSection() {
+          return this.activeSection === "communications";
+        },
         isTelephonySection() {
           return this.activeSection === "telephony";
         },
@@ -683,6 +716,7 @@
             deals: "Все сделки",
             contacts: "Все контакты",
             companies: "Все компании",
+            communications: "Коммуникации",
             tasks: "Все задачи",
             touches: "Все касания",
             telephony: "Телефония Novofon"
@@ -695,6 +729,7 @@
             deals: "сделку",
             contacts: "контакт",
             companies: "компанию",
+            communications: "коммуникацию",
             tasks: "задачу",
             touches: "касание",
             telephony: "настройку"
@@ -790,29 +825,38 @@
           return company?.currency || this.editingDealItem?.currency || "RUB";
         },
         dealDocumentGeneratorMeta() {
+          const isEditMode = String(this.dealDocumentGeneratorMode || "create") === "edit";
           if (this.dealDocumentGeneratorType === "invoice") {
             return {
-              title: "Параметры счета",
-              subtitle: "Выберите собственную организацию и проверьте строки счета перед генерацией.",
-              submitLabel: "Сгенерировать счет",
-              preparingLabel: "Подготовка счета...",
-              endpoint: "/api/v1/deal-documents/generate-invoice/",
+              title: isEditMode ? "Редактирование счета" : "Параметры счета",
+              subtitle: isEditMode
+                ? "Измените строки счета и сохраните документ. Номер счета будет сохранен."
+                : "Выберите собственную организацию и проверьте строки счета перед генерацией.",
+              submitLabel: isEditMode ? "Сохранить счет" : "Сгенерировать счет",
+              preparingLabel: isEditMode ? "Подготовка редактирования счета..." : "Подготовка счета...",
+              endpoint: isEditMode && this.dealDocumentGeneratorTargetDocumentId
+                ? `/api/v1/deal-documents/${this.dealDocumentGeneratorTargetDocumentId}/regenerate/`
+                : "/api/v1/deal-documents/generate-invoice/",
               successPanelLabel: "Счет",
               emptyItemsMessage: "Добавьте хотя бы одну строку счета.",
               openErrorLabel: "счета",
-              generateErrorLabel: "счета",
+              generateErrorLabel: isEditMode ? "сохранения счета" : "счета",
             };
           }
           return {
-            title: "Параметры акта",
-            subtitle: "Выберите собственную организацию и проверьте строки документа перед генерацией.",
-            submitLabel: "Сгенерировать акт",
-            preparingLabel: "Подготовка акта...",
-            endpoint: "/api/v1/deal-documents/generate-act/",
+            title: isEditMode ? "Редактирование акта" : "Параметры акта",
+            subtitle: isEditMode
+              ? "Измените строки акта и сохраните документ. Номер акта будет сохранен."
+              : "Выберите собственную организацию и проверьте строки документа перед генерацией.",
+            submitLabel: isEditMode ? "Сохранить акт" : "Сгенерировать акт",
+            preparingLabel: isEditMode ? "Подготовка редактирования акта..." : "Подготовка акта...",
+            endpoint: isEditMode && this.dealDocumentGeneratorTargetDocumentId
+              ? `/api/v1/deal-documents/${this.dealDocumentGeneratorTargetDocumentId}/regenerate/`
+              : "/api/v1/deal-documents/generate-act/",
             successPanelLabel: "Акт",
             emptyItemsMessage: "Добавьте хотя бы одну строку акта.",
             openErrorLabel: "акта",
-            generateErrorLabel: "акта",
+            generateErrorLabel: isEditMode ? "сохранения акта" : "акта",
           };
         },
         dealActGeneratorTotal() {
@@ -1139,6 +1183,9 @@
           const conversationId = this.toIntOrNull(this.activeDealDocumentSendConversationId);
           if (!conversationId) return null;
           return (this.dealDocumentSendEmailConversations || []).find((item) => String(item.id) === String(conversationId)) || null;
+        },
+        dealDocumentSendDisplayName() {
+          return this.documentDisplayName(this.dealDocumentSendTarget?.originalName || "", "");
         },
         dealDocumentSendAttachmentName() {
           const originalName = String(this.dealDocumentSendTarget?.originalName || "").trim();
@@ -1804,6 +1851,7 @@
             deals: "сделок",
             contacts: "контактов",
             companies: "компаний",
+            communications: "коммуникаций",
             tasks: "задач",
             telephony: "настроек"
           };
@@ -1813,7 +1861,7 @@
           return this.activeSection === "contacts" ? "о" : "";
         },
         currentItems() {
-          if (this.isTelephonySection) {
+          if (this.isTelephonySection || this.isCommunicationsSection) {
             return [];
           }
           return this.datasets[this.activeSection] || [];
@@ -1845,8 +1893,94 @@
         telephonyActiveMappingsCount() {
           return (this.telephonySettings.mappings || []).filter((item) => item.isActive).length;
         },
+        communicationsOwnedCompanyIds() {
+          if (this.currentUserCanViewAllCommunications) {
+            return null;
+          }
+          const companyIds = new Set();
+          (this.communicationsDeals || []).forEach((deal) => {
+            if (String(this.toIntOrNull(deal.ownerId) || "") !== String(this.currentUserId || "")) {
+              return;
+            }
+            const companyId = this.toIntOrNull(deal.clientId);
+            if (companyId) {
+              companyIds.add(companyId);
+            }
+          });
+          return companyIds;
+        },
+        communicationsVisibleCompanies() {
+          const q = String(this.search || "").trim().toLowerCase();
+          const ownedIds = this.communicationsOwnedCompanyIds;
+          return (this.communicationsCompanies || [])
+            .filter((company) => String(company.companyType || "client").trim() === "client")
+            .filter((company) => (
+              ownedIds === null
+              || ownedIds.has(this.toIntOrNull(company.id))
+            ))
+            .filter((company) => {
+              if (!q) return true;
+              const haystack = [
+                company.name,
+                company.phone,
+                company.email,
+                company.inn,
+                company.legalName,
+              ].join(" ").toLowerCase();
+              return haystack.includes(q);
+            })
+            .slice()
+            .sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""), "ru"));
+        },
+        selectedCommunicationsCompany() {
+          const companyId = this.toIntOrNull(this.communicationsSelectedCompanyId);
+          if (!companyId) return null;
+          return (this.communicationsCompanies || []).find((item) => String(item.id) === String(companyId)) || null;
+        },
+        communicationsCompanyContactOptions() {
+          return (this.communicationsContacts || [])
+            .slice()
+            .sort((left, right) => (
+              (left.isPrimary === right.isPrimary ? 0 : (left.isPrimary ? -1 : 1))
+              || String(left.fullName || "").localeCompare(String(right.fullName || ""), "ru")
+            ));
+        },
+        communicationsFilteredTimelineItems() {
+          const filterValue = String(this.communicationsTimelineFilter || "all").trim().toLowerCase();
+          return [...(this.communicationsMessages || []), ...(this.communicationsCalls || [])]
+            .filter((item) => {
+              if (filterValue === "all") return true;
+              if (filterValue === "calls") return item.timelineType === "call";
+              return item.timelineChannel === filterValue;
+            })
+            .slice()
+            .sort((left, right) => (
+              (this.parseTaskDueTimestamp(right.timelineAt) || 0) - (this.parseTaskDueTimestamp(left.timelineAt) || 0)
+            ));
+        },
+        selectedCommunicationsTimelineItem() {
+          const itemKey = String(this.communicationsSelectedTimelineItemKey || "").trim();
+          if (!itemKey) return null;
+          return this.communicationsFilteredTimelineItems.find((item) => String(item.timelineKey || "") === itemKey) || null;
+        },
+        communicationsPendingDocumentName() {
+          return this.documentDisplayName(this.communicationsPendingDealDocument?.originalName || "", "");
+        },
+        communicationsSelectedCompanyPhone() {
+          const companyPhone = String(this.selectedCommunicationsCompany?.phone || "").trim();
+          if (companyPhone) {
+            return companyPhone;
+          }
+          const primaryContactPhone = (this.communicationsCompanyContactOptions || []).find((item) => String(item.phone || "").trim());
+          return String(primaryContactPhone?.phone || "").trim();
+        },
+        communicationsComposerSelectedContact() {
+          const contactId = this.toIntOrNull(this.communicationsComposer.contactId);
+          if (!contactId) return null;
+          return (this.communicationsCompanyContactOptions || []).find((item) => String(item.id) === String(contactId)) || null;
+        },
         activeFilterRows() {
-          if (this.isTelephonySection) {
+          if (this.isTelephonySection || this.isCommunicationsSection) {
             return [];
           }
           const rows = [];
@@ -1929,7 +2063,7 @@
           return rows;
         },
         filteredItemsBase() {
-          if (this.isTelephonySection) {
+          if (this.isTelephonySection || this.isCommunicationsSection) {
             return [];
           }
           const q = this.search.trim().toLowerCase();
@@ -2223,6 +2357,7 @@
             this.isSectionLazyLoadingReady
             && nextValue
             && !this.isTelephonySection
+            && !this.isCommunicationsSection
             && !this.sectionCollectionState?.[nextValue]?.loaded
             && !this.isLoading
           ) {
@@ -4876,6 +5011,472 @@
             })) : [],
           };
         },
+        mapCommunicationsTimelineMessage(item) {
+          const message = this.mapCommunicationMessage(item);
+          return {
+            ...message,
+            timelineType: "message",
+            timelineChannel: message.channel,
+            timelineAt: message.receivedAt || message.sentAt || message.deliveredAt || message.createdAt || "",
+            timelineKey: `message-${message.id}`,
+          };
+        },
+        mapCommunicationsTimelineCall(item) {
+          const direction = String(item.direction || "").trim().toLowerCase();
+          const status = String(item.status || "").trim().toLowerCase();
+          const displayPhone = direction === "inbound"
+            ? String(item.phone_from || item.client_phone_normalized || "").trim()
+            : String(item.phone_to || item.client_phone_normalized || "").trim();
+          return {
+            id: this.toIntOrNull(item.id),
+            timelineType: "call",
+            timelineChannel: "calls",
+            timelineAt: item.started_at || item.created_at || "",
+            timelineKey: `call-${item.id}`,
+            direction,
+            status,
+            statusLabel: ({
+              ringing: "Звонит",
+              answered: "Отвечен",
+              missed: "Пропущен",
+              completed: "Завершен",
+              failed: "Ошибка",
+              canceled: "Отменен",
+            })[status] || "Звонок",
+            displayPhone,
+            phoneFrom: String(item.phone_from || "").trim(),
+            phoneTo: String(item.phone_to || "").trim(),
+            recordingUrl: String(item.recording_url || "").trim(),
+            durationSec: Number.parseInt(item.duration_sec || 0, 10) || 0,
+            talkDurationSec: Number.parseInt(item.talk_duration_sec || 0, 10) || 0,
+            startedAt: item.started_at || "",
+            answeredAt: item.answered_at || "",
+            endedAt: item.ended_at || "",
+            responsibleUserName: String(item.responsible_user_name || "").trim(),
+            contactName: String(item.contact_name || "").trim(),
+            dealTitle: String(item.deal_title || "").trim(),
+            rawPayload: item.raw_payload_last && typeof item.raw_payload_last === "object" ? item.raw_payload_last : {},
+          };
+        },
+        communicationsTimelineFilterButtonClass(value) {
+          const normalized = String(value || "all").trim().toLowerCase();
+          const isActive = normalized === String(this.communicationsTimelineFilter || "all").trim().toLowerCase();
+          return isActive
+            ? "border-crm-accent bg-crm-accent/15 text-white"
+            : "border-crm-border bg-[#123753] text-crm-muted hover:border-crm-accent/70 hover:text-white";
+        },
+        communicationsTimelineItemTitle(item) {
+          if (!item || typeof item !== "object") {
+            return "Событие";
+          }
+          if (item.timelineType === "call") {
+            return item.displayPhone || "Звонок";
+          }
+          return item.subject || item.contactName || item.clientName || item.bodyPreview || `Сообщение #${item.id}`;
+        },
+        communicationsTimelineItemSubtitle(item) {
+          if (!item || typeof item !== "object") {
+            return "";
+          }
+          if (item.timelineType === "call") {
+            const parts = [item.statusLabel];
+            if (item.responsibleUserName) {
+              parts.push(item.responsibleUserName);
+            }
+            if (item.dealTitle) {
+              parts.push(item.dealTitle);
+            }
+            return parts.filter(Boolean).join(" · ");
+          }
+          const parts = [
+            item.directionLabel,
+            item.statusLabel,
+            item.contactName || item.clientName,
+          ];
+          return parts.filter(Boolean).join(" · ");
+        },
+        communicationsTimelineItemPreview(item) {
+          if (!item || typeof item !== "object") {
+            return "";
+          }
+          if (item.timelineType === "call") {
+            const parts = [];
+            if (item.phoneFrom) parts.push(`От: ${item.phoneFrom}`);
+            if (item.phoneTo) parts.push(`Кому: ${item.phoneTo}`);
+            if (item.talkDurationSec) parts.push(`Разговор: ${this.formatPhoneCallDuration(item.talkDurationSec)}`);
+            else if (item.durationSec) parts.push(`Длительность: ${this.formatPhoneCallDuration(item.durationSec)}`);
+            return parts.join(" · ");
+          }
+          return item.bodyPreview || this.communicationMessagePlainText(item) || "Без текста";
+        },
+        communicationsTimelineBadgeClass(item) {
+          if (item?.timelineType === "call") {
+            const status = String(item.status || "").trim().toLowerCase();
+            if (status === "completed" || status === "answered") return "border-emerald-400/30 bg-emerald-400/10 text-emerald-200";
+            if (status === "missed" || status === "failed" || status === "canceled") return "border-red-400/30 bg-red-400/10 text-red-200";
+            return "border-amber-400/30 bg-amber-400/10 text-amber-200";
+          }
+          return this.communicationMessageStatusClass(item?.status);
+        },
+        communicationsTimelineChannelLabel(item) {
+          if (item?.timelineType === "call") {
+            return "Звонок";
+          }
+          return this.communicationChannelLabel(item?.channel);
+        },
+        communicationMessagePlainText(message) {
+          const bodyText = String(message?.bodyText || "").trim();
+          if (bodyText) {
+            return bodyText;
+          }
+          return this.htmlToPlainText(message?.bodyHtml || "");
+        },
+        htmlToPlainText(value) {
+          const raw = String(value || "").trim();
+          if (!raw) return "";
+          if (typeof window !== "undefined" && typeof window.DOMParser !== "undefined") {
+            const parsed = new window.DOMParser().parseFromString(raw, "text/html");
+            return String(parsed.body?.textContent || "").trim();
+          }
+          return raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        },
+        formatPhoneCallDuration(seconds) {
+          const totalSeconds = Math.max(0, Number.parseInt(seconds || 0, 10) || 0);
+          const minutes = Math.floor(totalSeconds / 60);
+          const remainder = totalSeconds % 60;
+          if (!minutes) {
+            return `${remainder} сек`;
+          }
+          return `${minutes} мин ${String(remainder).padStart(2, "0")} сек`;
+        },
+        getDefaultCommunicationsComposer(mode = "email") {
+          const normalizedMode = String(mode || "email").trim().toLowerCase();
+          const preferredContact = (this.communicationsCompanyContactOptions || []).find((contact) => (
+            normalizedMode === "telegram"
+              ? !!String(contact.telegram || "").trim()
+              : !!String(contact.email || "").trim()
+          )) || this.communicationsCompanyContactOptions[0] || null;
+          const contactId = this.toIntOrNull(preferredContact?.id);
+          const pendingDocumentName = this.communicationsPendingDocumentName;
+          return {
+            contactId,
+            recipient: this.resolveCommunicationsRecipient(normalizedMode, contactId),
+            subject: normalizedMode === "email"
+              ? (pendingDocumentName || `По компании: ${this.selectedCommunicationsCompany?.name || ""}`.trim())
+              : "",
+            bodyText: pendingDocumentName ? `Направляю ссылку на ${pendingDocumentName}.` : "",
+          };
+        },
+        resolveCommunicationsRecipient(channelCode, contactId) {
+          const normalizedChannel = String(channelCode || "").trim().toLowerCase();
+          const normalizedContactId = this.toIntOrNull(contactId);
+          const contact = normalizedContactId
+            ? ((this.communicationsCompanyContactOptions || []).find((item) => String(item.id) === String(normalizedContactId)) || null)
+            : null;
+          if (normalizedChannel === "telegram") {
+            const contactTelegram = String(contact?.telegram || "").trim();
+            return contactTelegram ? `telegram:${contactTelegram}` : "";
+          }
+          const contactEmail = String(contact?.email || "").trim();
+          if (contactEmail) {
+            return `email:${contactEmail}`;
+          }
+          const companyEmail = String(this.selectedCommunicationsCompany?.email || "").trim();
+          return companyEmail ? `email:${companyEmail}` : "";
+        },
+        syncCommunicationsComposerRecipient() {
+          if (!this.communicationsComposerMode) {
+            return;
+          }
+          this.communicationsComposer = {
+            ...this.communicationsComposer,
+            recipient: this.resolveCommunicationsRecipient(this.communicationsComposerMode, this.communicationsComposer.contactId),
+          };
+        },
+        getLatestCommunicationsConversation(channelCode) {
+          const normalizedChannel = String(channelCode || "").trim().toLowerCase();
+          return (this.communicationsConversations || [])
+            .filter((item) => String(item.channel || "").trim().toLowerCase() === normalizedChannel)
+            .slice()
+            .sort((left, right) => (
+              (this.parseTaskDueTimestamp(right.lastMessageAt || right.updatedAt || right.createdAt) || 0)
+              - (this.parseTaskDueTimestamp(left.lastMessageAt || left.updatedAt || left.createdAt) || 0)
+            ))[0] || null;
+        },
+        async loadCommunicationsCompanies(force = false) {
+          if (this.isCommunicationsCompaniesLoading) {
+            return;
+          }
+          if (!force && this.communicationsCompanies.length) {
+            return;
+          }
+          this.isCommunicationsCompaniesLoading = true;
+          try {
+            const [companiesPayload, dealsPayload] = await Promise.all([
+              this.apiRequest("/api/v1/clients/?company_type=client&page_size=500"),
+              this.apiRequest("/api/v1/deals/?page_size=500"),
+            ]);
+            this.communicationsCompanies = this.normalizePaginatedResponse(companiesPayload).map((item) => this.mapClient(item));
+            this.communicationsDeals = this.normalizePaginatedResponse(dealsPayload).map((item) => this.mapDeal(item));
+          } finally {
+            this.isCommunicationsCompaniesLoading = false;
+          }
+        },
+        async ensureCommunicationsCompanySelection(options = {}) {
+          const preserveSelection = !!options.preserveSelection;
+          const selectedCompanyId = this.toIntOrNull(this.communicationsSelectedCompanyId);
+          const visibleCompanies = this.communicationsVisibleCompanies || [];
+          const hasSelectedVisibleCompany = !!selectedCompanyId && visibleCompanies.some(
+            (company) => String(company.id) === String(selectedCompanyId)
+          );
+
+          if (!visibleCompanies.length) {
+            this.communicationsSelectedCompanyId = null;
+            this.communicationsContacts = [];
+            this.communicationsConversations = [];
+            this.communicationsMessages = [];
+            this.communicationsCalls = [];
+            this.communicationsSelectedTimelineItemKey = "";
+            return;
+          }
+
+          if (hasSelectedVisibleCompany) {
+            if (preserveSelection) {
+              await this.selectCommunicationsCompany(selectedCompanyId, { preserveSelection: true });
+            }
+            return;
+          }
+
+          await this.selectCommunicationsCompany(visibleCompanies[0].id);
+        },
+        async loadCommunicationsContacts(companyId) {
+          const normalizedCompanyId = this.toIntOrNull(companyId);
+          if (!normalizedCompanyId) {
+            this.communicationsContacts = [];
+            return;
+          }
+          this.isCommunicationsContactsLoading = true;
+          try {
+            const payload = await this.apiRequest(`/api/v1/contacts/?client=${normalizedCompanyId}&page_size=100`);
+            this.communicationsContacts = this.normalizePaginatedResponse(payload).map((item) => this.mapContact(item));
+          } finally {
+            this.isCommunicationsContactsLoading = false;
+          }
+        },
+        async loadCommunicationsTimeline(companyId, options = {}) {
+          const normalizedCompanyId = this.toIntOrNull(companyId);
+          if (!normalizedCompanyId) {
+            this.communicationsConversations = [];
+            this.communicationsMessages = [];
+            this.communicationsCalls = [];
+            this.communicationsSelectedTimelineItemKey = "";
+            return;
+          }
+          const previousSelection = String(this.communicationsSelectedTimelineItemKey || "").trim();
+          this.isCommunicationsTimelineLoading = true;
+          try {
+            const [conversationsPayload, messagesPayload, callsPayload] = await Promise.all([
+              this.apiRequest(`/api/v1/communications/conversations/?client=${normalizedCompanyId}&page_size=100`),
+              this.apiRequest(`/api/v1/communications/messages/?client=${normalizedCompanyId}&page_size=200`),
+              this.apiRequest(`/api/telephony/calls/?entity_type=company&entity_id=${normalizedCompanyId}&page_size=100`),
+            ]);
+            this.communicationsConversations = this.normalizePaginatedResponse(conversationsPayload).map((item) => this.mapConversation(item));
+            this.communicationsMessages = this.normalizePaginatedResponse(messagesPayload).map((item) => this.mapCommunicationsTimelineMessage(item));
+            this.communicationsCalls = this.normalizePaginatedResponse(callsPayload).map((item) => this.mapCommunicationsTimelineCall(item));
+            if (options.preserveSelection && previousSelection && this.communicationsFilteredTimelineItems.some((item) => item.timelineKey === previousSelection)) {
+              this.communicationsSelectedTimelineItemKey = previousSelection;
+            } else {
+              this.communicationsSelectedTimelineItemKey = this.communicationsFilteredTimelineItems[0]?.timelineKey || "";
+            }
+          } finally {
+            this.isCommunicationsTimelineLoading = false;
+          }
+        },
+        async selectCommunicationsCompany(companyId, options = {}) {
+          const normalizedCompanyId = this.toIntOrNull(companyId);
+          this.communicationsSelectedCompanyId = normalizedCompanyId;
+          this.communicationsSelectedTimelineItemKey = "";
+          this.communicationsComposerMode = "";
+          if (!normalizedCompanyId) {
+            this.communicationsContacts = [];
+            this.communicationsConversations = [];
+            this.communicationsMessages = [];
+            this.communicationsCalls = [];
+            return;
+          }
+          await Promise.all([
+            this.loadCommunicationsContacts(normalizedCompanyId),
+            this.loadCommunicationsTimeline(normalizedCompanyId, { preserveSelection: !!options.preserveSelection }),
+          ]);
+          if (options.composeMode) {
+            this.openCommunicationsCompose(options.composeMode);
+          }
+        },
+        openCommunicationsCompose(mode) {
+          if (!this.toIntOrNull(this.communicationsSelectedCompanyId)) {
+            return;
+          }
+          const normalizedMode = String(mode || "email").trim().toLowerCase();
+          this.communicationsComposerMode = normalizedMode;
+          this.communicationsComposer = this.getDefaultCommunicationsComposer(normalizedMode);
+        },
+        closeCommunicationsCompose() {
+          this.communicationsComposerMode = "";
+          this.communicationsComposer = {
+            contactId: null,
+            recipient: "",
+            subject: "",
+            bodyText: "",
+          };
+        },
+        clearCommunicationsPendingDocument() {
+          this.communicationsPendingDealDocument = null;
+          this.communicationsContextDealId = null;
+        },
+        async sendCommunicationsMessage() {
+          const companyId = this.toIntOrNull(this.communicationsSelectedCompanyId);
+          const channel = String(this.communicationsComposerMode || "").trim().toLowerCase();
+          if (!companyId || !channel || this.isCommunicationsSending) {
+            return;
+          }
+          this.clearUiErrors({ modalOnly: true });
+          this.isCommunicationsSending = true;
+          try {
+            if (this.communicationsPendingDealDocument && channel !== "email") {
+              throw new Error("Ссылку на счет или акт сейчас можно отправить только по email.");
+            }
+            const recipient = String(this.communicationsComposer.recipient || "").trim();
+            if (!recipient) {
+              throw new Error(channel === "telegram" ? "Укажите telegram получателя." : "Укажите email получателя.");
+            }
+            const contactId = this.toIntOrNull(this.communicationsComposer.contactId);
+            const pendingDocumentId = this.toIntOrNull(this.communicationsPendingDealDocument?.id);
+            const pendingDocumentName = this.communicationsPendingDocumentName || "Документ";
+            const payload = {
+              recipient,
+              subject: channel === "email" ? String(this.communicationsComposer.subject || "").trim() : "",
+              body_text: String(this.communicationsComposer.bodyText || "").trim(),
+            };
+            if (pendingDocumentId) {
+              payload.deal_document = pendingDocumentId;
+              payload.touch_result_code = "proposal_sent";
+              payload.touch_summary = `Отправлен документ: ${this.communicationsPendingDealDocument.originalName || pendingDocumentName}`;
+            }
+
+            const existingConversation = this.getLatestCommunicationsConversation(channel);
+            let response = null;
+            if (existingConversation?.id) {
+              response = await this.apiRequest(`/api/v1/communications/conversations/${existingConversation.id}/send/`, {
+                method: "POST",
+                body: payload,
+              });
+            } else {
+              response = await this.apiRequest("/api/v1/communications/conversations/start/", {
+                method: "POST",
+                body: {
+                  channel,
+                  client: companyId,
+                  contact: contactId,
+                  deal: this.toIntOrNull(this.communicationsContextDealId),
+                  recipient,
+                  subject: payload.subject,
+                  body_text: payload.body_text,
+                  ...(pendingDocumentId ? {
+                    deal_document: pendingDocumentId,
+                    touch_result_code: payload.touch_result_code,
+                    touch_summary: payload.touch_summary,
+                  } : {}),
+                },
+              });
+            }
+            this.ensureOutgoingMessageDelivered(response, channel === "telegram" ? "Сообщение" : "Письмо");
+            const sentMessageId = this.toIntOrNull(response?.id || response?.message?.id);
+            await this.loadCommunicationsTimeline(companyId, { preserveSelection: false });
+            if (sentMessageId) {
+              this.communicationsSelectedTimelineItemKey = `message-${sentMessageId}`;
+            }
+            this.closeCommunicationsCompose();
+            this.clearCommunicationsPendingDocument();
+          } catch (error) {
+            this.setUiError(`Ошибка отправки: ${error.message}`, { modal: true });
+          } finally {
+            this.isCommunicationsSending = false;
+          }
+        },
+        async openCommunicationsSection(options = {}) {
+          const normalizedCompanyId = this.toIntOrNull(options.companyId);
+          const composeMode = String(options.composeMode || "").trim().toLowerCase();
+          const pendingDocument = options.pendingDocument && typeof options.pendingDocument === "object"
+            ? options.pendingDocument
+            : null;
+
+          this.setSection("communications");
+          if (pendingDocument) {
+            this.communicationsPendingDealDocument = pendingDocument;
+            this.communicationsContextDealId = this.toIntOrNull(options.dealId || pendingDocument.dealId);
+          }
+          await this.loadCommunicationsCompanies();
+          let targetCompanyId = normalizedCompanyId;
+          if (!targetCompanyId) {
+            targetCompanyId = this.toIntOrNull(this.communicationsSelectedCompanyId) || this.toIntOrNull(this.communicationsVisibleCompanies[0]?.id);
+          }
+          if (targetCompanyId) {
+            await this.selectCommunicationsCompany(targetCompanyId, { composeMode });
+          }
+        },
+        async openCommunicationsFromDealDocument(documentItem) {
+          const documentId = this.toIntOrNull(documentItem?.id);
+          const dealId = this.toIntOrNull(this.editingDealId);
+          const companyId = this.toIntOrNull(this.forms.deals.companyId);
+          if (!documentId || !dealId || !companyId) {
+            this.setUiError("Не удалось определить счет или компанию для отправки.", { modal: true });
+            return;
+          }
+          await this.openCommunicationsSection({
+            companyId,
+            dealId,
+            composeMode: "email",
+            pendingDocument: {
+              id: documentId,
+              originalName: documentItem.originalName || "Документ",
+              dealId,
+              companyId,
+            },
+          });
+        },
+        openTelephonySettingsFromCommunications() {
+          this.setSection("telephony");
+        },
+        async startCallFromCommunications() {
+          const companyId = this.toIntOrNull(this.communicationsSelectedCompanyId);
+          const phone = this.communicationsSelectedCompanyPhone;
+          if (!companyId || !phone) {
+            this.setUiError("У выбранной компании нет номера для звонка.", { modal: true });
+            return;
+          }
+          await this.startNovofonCall({
+            phone,
+            entityType: "company",
+            entityId: companyId,
+            comment: `Звонок из раздела коммуникаций по компании ${this.selectedCommunicationsCompany?.name || ""}`.trim(),
+          });
+          await this.loadCommunicationsTimeline(companyId, { preserveSelection: true });
+        },
+        selectCommunicationsTimelineItem(itemKey) {
+          this.communicationsSelectedTimelineItemKey = String(itemKey || "").trim();
+          this.closeCommunicationsCompose();
+        },
+        resetCommunicationsSectionState() {
+          this.communicationsSelectedCompanyId = null;
+          this.communicationsContacts = [];
+          this.communicationsConversations = [];
+          this.communicationsMessages = [];
+          this.communicationsCalls = [];
+          this.communicationsTimelineFilter = "all";
+          this.communicationsSelectedTimelineItemKey = "";
+          this.closeCommunicationsCompose();
+          this.clearCommunicationsPendingDocument();
+        },
         mapDealDocumentDeliveryEvent(item) {
           const metadata = item && typeof item.metadata === "object" && !Array.isArray(item.metadata) ? item.metadata : {};
           return {
@@ -5004,7 +5605,7 @@
           };
         },
         getDefaultDealDocumentSendComposer(conversation = null) {
-          const documentName = String(this.dealDocumentSendTarget?.originalName || "").trim();
+          const documentName = this.documentDisplayName(this.dealDocumentSendTarget?.originalName || "", "");
           return {
             subject: documentName || String(conversation?.subject || "").trim() || (this.forms.deals.title ? `По сделке: ${this.forms.deals.title}` : ""),
             bodyText: documentName ? `Направляю ссылку на ${documentName}.` : "",
@@ -5012,7 +5613,7 @@
           };
         },
         getDefaultDealDocumentSendStartForm() {
-          const documentName = String(this.dealDocumentSendTarget?.originalName || "").trim();
+          const documentName = this.documentDisplayName(this.dealDocumentSendTarget?.originalName || "", "");
           return {
             channel: "email",
             contactId: this.toIntOrNull(this.dealSummaryContact?.id),
@@ -8410,13 +9011,9 @@
           this.showDealTaskForm = false;
           this.resetDealCommunicationsState();
           this.showDealDocumentsPanel = false;
-          this.showDealActGenerator = false;
+          this.resetDealDocumentGeneratorState();
           this.showDealPhoneCallHistory = false;
           this.dealDocumentsForActiveDeal = [];
-          this.dealActGeneratorForm = {
-            executorCompanyId: null,
-            items: [],
-          };
           this.resetDealCompanyForm();
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
@@ -9279,10 +9876,31 @@
             price: normalizedPrice,
           };
         },
+        resetDealDocumentGeneratorState() {
+          this.showDealActGenerator = false;
+          this.dealDocumentGeneratorType = "";
+          this.dealDocumentGeneratorMode = "create";
+          this.dealDocumentGeneratorTargetDocumentId = null;
+          this.dealDocumentGeneratorTargetName = "";
+          this.dealActGeneratorForm = {
+            executorCompanyId: null,
+            items: [],
+          };
+        },
         resetDealActGeneratorForm() {
           this.dealActGeneratorForm = {
             executorCompanyId: this.preferredOwnCompanyId(),
             items: [this.createDealActGeneratorItem()],
+          };
+        },
+        hydrateDealDocumentGeneratorForm(payload = {}) {
+          const normalizedPayload = payload && typeof payload === "object" ? payload : {};
+          const items = Array.isArray(normalizedPayload.items) && normalizedPayload.items.length
+            ? normalizedPayload.items.map((item) => this.createDealActGeneratorItem(item))
+            : [this.createDealActGeneratorItem({ description: "", quantity: "1", price: "" })];
+          this.dealActGeneratorForm = {
+            executorCompanyId: this.toIntOrNull(normalizedPayload.executor_company_id || normalizedPayload.executorCompanyId) || this.preferredOwnCompanyId(),
+            items,
           };
         },
         async ensureOwnCompaniesLoaded() {
@@ -9302,11 +9920,14 @@
           this.clearUiErrors({ modalOnly: true });
           try {
             await this.ensureOwnCompaniesLoaded();
+            this.dealDocumentGeneratorMode = "create";
+            this.dealDocumentGeneratorTargetDocumentId = null;
+            this.dealDocumentGeneratorTargetName = "";
             this.resetDealActGeneratorForm();
             this.showDealActGenerator = true;
           } catch (error) {
             this.setUiError(`Ошибка подготовки ${this.dealDocumentGeneratorMeta.openErrorLabel}: ${error.message}`, { modal: true });
-            this.dealDocumentGeneratorType = "";
+            this.resetDealDocumentGeneratorState();
           } finally {
             this.isDealActGeneratorPreparing = false;
           }
@@ -9317,9 +9938,33 @@
         async openDealInvoiceGenerator() {
           await this.openDealDocumentGenerator("invoice");
         },
+        async openDealGeneratedDocumentEditor(documentItem) {
+          if (!this.editingDealId || !documentItem?.editableGeneratedDocument || this.isDealDocumentUploading || this.isDealActGenerating || this.isDealActGeneratorPreparing) {
+            return;
+          }
+          const documentType = String(documentItem.generatedDocumentType || "").trim();
+          if (documentType !== "invoice" && documentType !== "realization") {
+            return;
+          }
+          this.dealDocumentGeneratorType = documentType === "invoice" ? "invoice" : "act";
+          this.dealDocumentGeneratorMode = "edit";
+          this.dealDocumentGeneratorTargetDocumentId = this.toIntOrNull(documentItem.id);
+          this.dealDocumentGeneratorTargetName = String(documentItem.originalName || "").trim();
+          this.isDealActGeneratorPreparing = true;
+          this.clearUiErrors({ modalOnly: true });
+          try {
+            await this.ensureOwnCompaniesLoaded();
+            this.hydrateDealDocumentGeneratorForm(documentItem.generatorPayload || {});
+            this.showDealActGenerator = true;
+          } catch (error) {
+            this.setUiError(`Ошибка подготовки ${this.dealDocumentGeneratorMeta.openErrorLabel}: ${error.message}`, { modal: true });
+            this.resetDealDocumentGeneratorState();
+          } finally {
+            this.isDealActGeneratorPreparing = false;
+          }
+        },
         closeDealActGenerator() {
-          this.showDealActGenerator = false;
-          this.dealDocumentGeneratorType = "";
+          this.resetDealDocumentGeneratorState();
         },
         addDealActGeneratorItem() {
           const lastItem = Array.isArray(this.dealActGeneratorForm.items) && this.dealActGeneratorForm.items.length
@@ -9391,6 +10036,12 @@
             originalName: item.original_name || item.originalName || "",
             fileUrl: item.download_url || item.downloadUrl || item.file_url || item.fileUrl || "",
             fileSize: Number.parseInt(item.file_size || item.fileSize || 0, 10) || 0,
+            settlementDocumentId: this.toIntOrNull(item.settlement_document_id || item.settlementDocumentId),
+            generatedDocumentType: String(item.generated_document_type || item.generatedDocumentType || "").trim(),
+            editableGeneratedDocument: !!(item.editable_generated_document ?? item.editableGeneratedDocument),
+            generatorPayload: (item.generator_payload && typeof item.generator_payload === "object")
+              ? item.generator_payload
+              : (item.generatorPayload && typeof item.generatorPayload === "object" ? item.generatorPayload : {}),
             uploadedByName: item.uploaded_by_name || item.uploadedByName || "",
             createdAt: item.created_at || item.createdAt || "",
           };
@@ -9624,10 +10275,20 @@
               method: "POST",
               body: payload,
             });
-            this.dealDocumentsForActiveDeal = [
-              this.mapDealDocument(created),
-              ...this.dealDocumentsForActiveDeal,
-            ];
+            const mappedDocument = this.mapDealDocument(created);
+            if (this.dealDocumentGeneratorMode === "edit") {
+              this.dealDocumentsForActiveDeal = (this.dealDocumentsForActiveDeal || []).map((item) => (
+                String(item.id) === String(mappedDocument.id) ? mappedDocument : item
+              ));
+              if (this.dealDocumentSendTarget && String(this.dealDocumentSendTarget.id) === String(mappedDocument.id)) {
+                this.dealDocumentSendTarget = mappedDocument;
+              }
+            } else {
+              this.dealDocumentsForActiveDeal = [
+                mappedDocument,
+                ...this.dealDocumentsForActiveDeal,
+              ];
+            }
             const activeDeal = this.editingDealItem;
             const generatedDealClientId = this.toIntOrNull(activeDeal?.clientId);
             const openedCompanyId = this.toIntOrNull(this.editingCompanyId);
@@ -9640,10 +10301,12 @@
               }
             }
             this.showDealDocumentsPanel = true;
-            this.showDealActGenerator = false;
-            this.dealDocumentGeneratorType = "";
+            this.resetDealDocumentGeneratorState();
           } catch (error) {
-            this.setUiError(`Ошибка генерации ${this.dealDocumentGeneratorMeta.generateErrorLabel}: ${error.message}`, { modal: true });
+            const operationLabel = this.dealDocumentGeneratorMode === "edit"
+              ? (this.dealDocumentGeneratorType === "invoice" ? "сохранения счета" : "сохранения акта")
+              : this.dealDocumentGeneratorMeta.generateErrorLabel;
+            this.setUiError(`Ошибка ${operationLabel}: ${error.message}`, { modal: true });
           } finally {
             this.isDealActGenerating = false;
           }
@@ -11025,7 +11688,10 @@
           this.isLoading = true;
           this.errorMessage = "";
           try {
-            if (!this.isTelephonySection) {
+            if (this.isCommunicationsSection) {
+              await this.loadCommunicationsCompanies();
+              await this.ensureCommunicationsCompanySelection();
+            } else if (!this.isTelephonySection) {
               await this.loadSection(this.activeSection, { force: true });
             }
             if (this.sectionUsesAutomationData(this.activeSection)) {
@@ -11044,6 +11710,9 @@
           try {
             if (this.isTelephonySection) {
               await this.loadTelephonySettings(true);
+            } else if (this.isCommunicationsSection) {
+              await this.loadCommunicationsCompanies(true);
+              await this.ensureCommunicationsCompanySelection({ preserveSelection: true });
             } else {
               await this.loadSection(this.activeSection, { force: true });
             }
@@ -11058,7 +11727,7 @@
           }
         },
         async loadNextPageForActiveSection() {
-          if (this.isTelephonySection) {
+          if (this.isTelephonySection || this.isCommunicationsSection) {
             return;
           }
           const section = String(this.activeSection || "").trim();
@@ -11170,8 +11839,7 @@
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
           this.showDealDocumentsPanel = false;
-          this.showDealActGenerator = false;
-          this.dealDocumentGeneratorType = "";
+          this.resetDealDocumentGeneratorState();
           this.showDealPhoneCallHistory = false;
           this.showLeadDocumentsPanel = false;
           this.showLeadPhoneCallHistory = false;
@@ -11181,10 +11849,6 @@
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.dealDocumentsForActiveDeal = [];
-          this.dealActGeneratorForm = {
-            executorCompanyId: null,
-            items: [],
-          };
           this.leadDocumentsForActiveLead = [];
           this.touchDealDocuments = [];
           this.touchCompanyDocuments = [];
@@ -11205,12 +11869,23 @@
           this.companyDocumentsForActiveCompany = [];
           this.companyDealDocumentGroups = [];
           this.resetCompanySettlementState();
+          if (section !== "communications") {
+            this.resetCommunicationsSectionState();
+          }
           if (section === "telephony") {
             if (!this.telephonySettingsLoaded) {
               this.reloadActiveSection();
             } else {
               this.loadTelephonyHealth().catch(() => {});
             }
+            return;
+          }
+          if (section === "communications" && this.isSectionLazyLoadingReady) {
+            this.loadCommunicationsCompanies()
+              .then(() => this.ensureCommunicationsCompanySelection())
+              .catch((error) => {
+                this.errorMessage = `Ошибка загрузки коммуникаций: ${error.message}`;
+              });
             return;
           }
         },
@@ -11262,7 +11937,7 @@
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
           this.showDealDocumentsPanel = false;
-          this.showDealActGenerator = false;
+          this.resetDealDocumentGeneratorState();
           this.showDealPhoneCallHistory = false;
           this.showLeadDocumentsPanel = false;
           this.showLeadPhoneCallHistory = false;
@@ -11272,10 +11947,6 @@
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
           this.dealDocumentsForActiveDeal = [];
-          this.dealActGeneratorForm = {
-            executorCompanyId: null,
-            items: [],
-          };
           this.leadDocumentsForActiveLead = [];
           this.touchDealDocuments = [];
           this.touchCompanyDocuments = [];
@@ -11332,17 +12003,12 @@
           this.cancelSourceCreate();
           this.showDealCompanyForm = false;
           this.showDealContactsPanel = false;
-          this.showDealActGenerator = false;
-          this.dealDocumentGeneratorType = "";
+          this.resetDealDocumentGeneratorState();
           this.resetDealCommunicationsState();
           this.showDealContactForm = false;
           this.resetDealCompanyForm();
           this.dealCompanyContacts = [];
           this.dealTasksForActiveDeal = [];
-          this.dealActGeneratorForm = {
-            executorCompanyId: null,
-            items: [],
-          };
           this.touchDealDocuments = [];
           this.touchCompanyDocuments = [];
           this.showCompanyContactForm = false;
@@ -11496,6 +12162,16 @@
             return null;
           }
           return parsed;
+        },
+        documentDisplayName(value, fallback = "Документ") {
+          const normalized = String(value || "").trim();
+          if (!normalized) {
+            return fallback;
+          }
+          if (normalized.toLowerCase().endsWith(".docx")) {
+            return normalized.slice(0, -5).trim() || fallback;
+          }
+          return normalized;
         },
         toIsoDateTime(value) {
           if (!value) return null;
@@ -12346,7 +13022,11 @@
         const savedSection = window.localStorage.getItem("crm_active_section");
         if (
           savedSection
-          && (Object.prototype.hasOwnProperty.call(SECTION_ENDPOINTS, savedSection) || savedSection === "telephony")
+          && (
+            Object.prototype.hasOwnProperty.call(SECTION_ENDPOINTS, savedSection)
+            || savedSection === "telephony"
+            || savedSection === "communications"
+          )
         ) {
           this.activeSection = savedSection;
         }
@@ -12362,6 +13042,12 @@
             await this.loadTelephonySettings();
           } catch (error) {
             this.errorMessage = `Ошибка загрузки телефонии: ${error.message}`;
+          }
+        } else if (this.activeSection === "communications") {
+          try {
+            await this.loadCommunicationsCompanies();
+          } catch (error) {
+            this.errorMessage = `Ошибка загрузки коммуникаций: ${error.message}`;
           }
         }
         this.ensureTelephonyIncomingCallsPolling();

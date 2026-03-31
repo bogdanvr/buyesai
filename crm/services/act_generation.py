@@ -4,12 +4,14 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from io import BytesIO
+import re
 from zipfile import ZIP_DEFLATED, ZipFile
 from xml.sax.saxutils import escape
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.urls import reverse
 from django.utils import timezone
 
 from crm.models import Client, Deal, DealDocument, SettlementContract, SettlementDocument
@@ -710,6 +712,137 @@ def _coerce_line_item(raw_item: ActLineItem | dict) -> ActLineItem:
     return ActLineItem(description=description, quantity=quantity, unit=unit, price=price)
 
 
+def _line_items_payload(items: list[ActLineItem]) -> list[dict[str, str]]:
+    return [
+        {
+            "description": item.description,
+            "quantity": format(item.quantity, "f"),
+            "unit": item.unit,
+            "price": format(item.price, "f"),
+        }
+        for item in items
+    ]
+
+
+def _generator_payload(*, executor_company: Client, items: list[ActLineItem]) -> dict:
+    return {
+        "executor_company_id": executor_company.pk,
+        "items": _line_items_payload(items),
+    }
+
+
+def _document_file_name(*, file_prefix: str, settlement_document: SettlementDocument) -> str:
+    return f"{file_prefix}-{settlement_document.number or settlement_document.pk}.docx"
+
+
+def _document_original_name(*, original_label: str, settlement_document: SettlementDocument) -> str:
+    return f"{original_label} № {settlement_document.number} от {_format_date_short(settlement_document.document_date)}.docx"
+
+
+def _append_generated_document_update_event(*, deal: Deal | None, deal_document: DealDocument, settlement_document: SettlementDocument, actor) -> None:
+    if deal is None or not getattr(deal, "pk", None):
+        return
+    happened_at = timezone.localtime(timezone.now()).strftime("%d.%m.%Y %H:%M")
+    document_name = _normalize_text(deal_document.original_name) or f"Документ #{deal_document.pk}"
+    actor_name = ""
+    if actor is not None:
+        actor_name = _normalize_text(actor.get_full_name() if hasattr(actor, "get_full_name") else "") or _normalize_text(getattr(actor, "username", ""))
+    document_type = _normalize_text(getattr(settlement_document, "document_type", ""))
+    if document_type == SettlementDocument.DocumentType.INVOICE:
+        result_text = f"Редактирование счета: {document_name}"
+    elif document_type == SettlementDocument.DocumentType.REALIZATION:
+        result_text = f"Редактирование акта: {document_name}"
+    else:
+        result_text = f"Редактирование документа: {document_name}"
+    entry = "\n".join(
+        [
+            happened_at,
+            f"Результат: {result_text}",
+            "event_type: document_edited",
+            "priority: medium",
+            "title: Документ сделки",
+            f"actor_name: {actor_name}",
+            f"document_name: {document_name}",
+            f"document_url: {reverse('deal-documents-download', kwargs={'pk': deal_document.pk})}",
+            "document_scope: deal",
+            f"settlement_document_id: {settlement_document.pk}",
+            f"settlement_document_type: {document_type}",
+        ]
+    )
+    current_events = _normalize_text(getattr(deal, "events", ""))
+    updated_events = entry if not current_events else f"{entry}\n\n{current_events}"
+    Deal.objects.filter(pk=deal.pk).update(events=updated_events)
+
+
+def _document_type_from_original_name(original_name: str) -> str:
+    normalized_name = _normalize_text(original_name).lower().replace("ё", "е")
+    if "счет" in normalized_name:
+        return SettlementDocument.DocumentType.INVOICE
+    if "акт" in normalized_name:
+        return SettlementDocument.DocumentType.REALIZATION
+    return ""
+
+
+def _document_number_from_original_name(original_name: str) -> str:
+    match = re.search(r"№\s*([A-Za-zА-Яа-я0-9\-\/]+)", _normalize_text(original_name))
+    return _normalize_text(match.group(1) if match else "")
+
+
+def resolve_settlement_document_for_deal_document(deal_document: DealDocument) -> SettlementDocument | None:
+    linked = getattr(deal_document, "settlement_document", None)
+    if linked is not None:
+        return linked
+    deal_id = getattr(deal_document, "deal_id", None)
+    if not deal_id:
+        return None
+    document_type = _document_type_from_original_name(getattr(deal_document, "original_name", ""))
+    document_number = _document_number_from_original_name(getattr(deal_document, "original_name", ""))
+    if not document_type or not document_number:
+        return None
+    return SettlementDocument.objects.filter(
+        deal_id=deal_id,
+        document_type=document_type,
+        number=document_number,
+    ).order_by("-id").first()
+
+
+def deal_document_generator_context(deal_document: DealDocument) -> dict:
+    settlement_document = resolve_settlement_document_for_deal_document(deal_document)
+    if settlement_document is None:
+        return {
+            "editable": False,
+            "document_type": "",
+            "settlement_document_id": None,
+            "generator_payload": {},
+        }
+    payload = getattr(settlement_document, "generator_payload", None) or {}
+    normalized_payload = payload if isinstance(payload, dict) else {}
+    items = normalized_payload.get("items") if isinstance(normalized_payload.get("items"), list) else []
+    if not items:
+        items = [
+            {
+                "description": _normalize_text(getattr(deal_document.deal, "title", "")) or _normalize_text(getattr(settlement_document, "title", "")) or "Услуга",
+                "quantity": "1.00",
+                "unit": "час",
+                "price": format(Decimal(getattr(settlement_document, "amount", 0) or 0).quantize(Decimal("0.01")), "f"),
+            }
+        ]
+    return {
+        "editable": settlement_document.document_type in {
+            SettlementDocument.DocumentType.INVOICE,
+            SettlementDocument.DocumentType.REALIZATION,
+        },
+        "document_type": settlement_document.document_type,
+        "settlement_document_id": settlement_document.pk,
+        "generator_payload": {
+            "executor_company_id": normalized_payload.get("executor_company_id"),
+            "items": items,
+            "number": settlement_document.number,
+            "document_date": _format_date_short(settlement_document.document_date),
+        },
+    }
+
+
 def build_act_docx_bytes(*, settlement_document: SettlementDocument, deal: Deal, executor_company: Client, items: list[ActLineItem | dict]) -> bytes:
     executor_name, executor_requisites = _executor_details(executor_company)
     customer_name, customer_line = _customer_details(deal)
@@ -851,11 +984,74 @@ def _generate_deal_service_document(
             document_date=timezone.localdate(),
             currency=resolved_currency,
             amount=amount,
+            generator_payload=_generator_payload(executor_company=executor_company, items=line_items),
             realization_status=realization_status,
         )
 
-        file_name = f"{file_prefix}-{settlement_document.number or settlement_document.pk}.docx"
-        original_name = f"{original_label} № {settlement_document.number} от {_format_date_short(settlement_document.document_date)}.docx"
+        file_name = _document_file_name(file_prefix=file_prefix, settlement_document=settlement_document)
+        original_name = _document_original_name(original_label=original_label, settlement_document=settlement_document)
+        document_bytes = builder(
+            settlement_document=settlement_document,
+            deal=deal,
+            executor_company=executor_company,
+            items=line_items,
+        )
+        settlement_document.original_name = original_name
+        settlement_document.file.save(file_name, ContentFile(document_bytes, name=file_name), save=False)
+        settlement_document.save(update_fields=["generator_payload", "file", "original_name", "updated_at"])
+
+        content = ContentFile(document_bytes, name=file_name)
+        deal_document = DealDocument(
+            deal=deal,
+            settlement_document=settlement_document,
+            original_name=original_name,
+            uploaded_by=uploaded_by,
+        )
+        deal_document.file.save(file_name, content, save=False)
+        deal_document.save()
+        return deal_document, settlement_document
+
+
+def update_generated_deal_document(*, deal_document: DealDocument, executor_company: Client, items: list[ActLineItem | dict], uploaded_by=None) -> tuple[DealDocument, SettlementDocument]:
+    settlement_document = resolve_settlement_document_for_deal_document(deal_document)
+    if settlement_document is None:
+        raise ValidationError({"deal_document": "Документ не связан со счетом или актом."})
+
+    if settlement_document.document_type == SettlementDocument.DocumentType.INVOICE:
+        settlement_title = "Счет на оплату"
+        original_label = "Счет"
+        file_prefix = "invoice"
+        builder = build_invoice_docx_bytes
+    elif settlement_document.document_type == SettlementDocument.DocumentType.REALIZATION:
+        settlement_title = "Акт об оказании услуг"
+        original_label = "Акт"
+        file_prefix = "act"
+        builder = build_act_docx_bytes
+    else:
+        raise ValidationError({"deal_document": "Редактирование доступно только для счета или акта."})
+
+    deal = getattr(deal_document, "deal", None) or getattr(settlement_document, "deal", None)
+    client = getattr(deal, "client", None) if deal is not None else None
+    if deal is None or client is None:
+        raise ValidationError({"deal_document": "Документ должен быть привязан к сделке и компании."})
+
+    line_items = [_coerce_line_item(item) for item in items]
+    if not line_items:
+        raise ValidationError({"items": "Добавьте хотя бы одну строку документа."})
+    amount = sum((item.total for item in line_items), Decimal("0.00"))
+    if amount <= 0:
+        raise ValidationError({"items": "Сумма документа должна быть больше нуля."})
+
+    with transaction.atomic():
+        settlement_document.client = client
+        settlement_document.deal = deal
+        settlement_document.title = settlement_title
+        settlement_document.amount = amount
+        settlement_document.generator_payload = _generator_payload(executor_company=executor_company, items=line_items)
+        settlement_document.save()
+
+        file_name = _document_file_name(file_prefix=file_prefix, settlement_document=settlement_document)
+        original_name = _document_original_name(original_label=original_label, settlement_document=settlement_document)
         document_bytes = builder(
             settlement_document=settlement_document,
             deal=deal,
@@ -866,10 +1062,22 @@ def _generate_deal_service_document(
         settlement_document.file.save(file_name, ContentFile(document_bytes, name=file_name), save=False)
         settlement_document.save(update_fields=["file", "original_name", "updated_at"])
 
-        content = ContentFile(document_bytes, name=file_name)
-        deal_document = DealDocument(deal=deal, original_name=original_name, uploaded_by=uploaded_by)
-        deal_document.file.save(file_name, content, save=False)
-        deal_document.save()
+        deal_document.deal = deal
+        deal_document.settlement_document = settlement_document
+        deal_document.original_name = original_name
+        if uploaded_by is not None:
+            deal_document.uploaded_by = uploaded_by
+        deal_document.file.save(file_name, ContentFile(document_bytes, name=file_name), save=False)
+        update_fields = ["deal", "settlement_document", "file", "original_name", "updated_at"]
+        if uploaded_by is not None:
+            update_fields.append("uploaded_by")
+        deal_document.save(update_fields=update_fields)
+        _append_generated_document_update_event(
+            deal=deal,
+            deal_document=deal_document,
+            settlement_document=settlement_document,
+            actor=uploaded_by,
+        )
         return deal_document, settlement_document
 
 

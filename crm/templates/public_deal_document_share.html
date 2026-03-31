@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ document.original_name|default:"Документ" }}</title>
+  <title>{{ document_display_name|default:"Документ" }}</title>
   <style>
     body {
       margin: 0;
@@ -177,23 +177,7 @@
 <body>
   <div class="page">
     <div class="card">
-      <p class="eyebrow">Документ сделки</p>
-      <h1>{{ document.original_name|default:"Документ" }}</h1>
-
-      <div class="meta">
-        <div class="meta-item">
-          <strong>Сделка</strong>
-          {{ deal.title|default:"Не указана" }}
-        </div>
-        <div class="meta-item">
-          <strong>Компания</strong>
-          {{ company.name|default:"Не указана" }}
-        </div>
-        <div class="meta-item">
-          <strong>Отправлено</strong>
-          {% if share.message and share.message.sent_at %}{{ share.message.sent_at }}{% else %}Статус уточняется{% endif %}
-        </div>
-      </div>
+      <h1>{{ document_display_name|default:"Документ" }}</h1>
 
       <div class="actions">
         <a class="button button-primary" href="{{ download_url }}">Скачать PDF</a>
@@ -211,10 +195,10 @@
         data-preview-url="{{ preview_url }}"
         data-download-url="{{ download_url }}"
         data-event-url="{{ event_url }}"
-        data-document-name="{{ document.original_name|default:'Документ'|escape }}"
+        data-document-name="{{ document_display_name|default:'Документ'|escape }}"
       >
         <div class="viewer-toolbar">
-          <div class="viewer-title">{{ document.original_name|default:"Документ" }}</div>
+          <div class="viewer-title">{{ document_display_name|default:"Документ" }}</div>
           <div id="share-pdf-viewer-status" class="viewer-status">Загрузка PDF...</div>
         </div>
         <div id="share-pdf-viewer-pages" class="viewer-pages">

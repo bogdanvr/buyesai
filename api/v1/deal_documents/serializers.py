@@ -2,6 +2,7 @@ from django.urls import reverse
 from rest_framework import serializers
 
 from crm.models import Client, Deal, DealDocument
+from crm.services.act_generation import deal_document_generator_context
 from crm_communications.deal_document_shares import build_share_download_url, build_share_preview_url, build_share_public_url
 from crm_communications.models import DealDocumentShare, DealDocumentShareEvent
 
@@ -11,6 +12,10 @@ class DealDocumentSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
     download_url = serializers.SerializerMethodField()
     file_size = serializers.SerializerMethodField()
+    settlement_document_id = serializers.SerializerMethodField()
+    generated_document_type = serializers.SerializerMethodField()
+    editable_generated_document = serializers.SerializerMethodField()
+    generator_payload = serializers.SerializerMethodField()
 
     def get_uploaded_by_name(self, obj):
         user = getattr(obj, "uploaded_by", None)
@@ -42,6 +47,27 @@ class DealDocumentSerializer(serializers.ModelSerializer):
         relative_url = reverse("deal-documents-download", kwargs={"pk": obj.pk})
         return request.build_absolute_uri(relative_url) if request is not None else relative_url
 
+    def _generator_context(self, obj):
+        cache = getattr(self, "_generator_context_cache", None)
+        if cache is None:
+            cache = {}
+            self._generator_context_cache = cache
+        if obj.pk not in cache:
+            cache[obj.pk] = deal_document_generator_context(obj)
+        return cache[obj.pk]
+
+    def get_settlement_document_id(self, obj):
+        return self._generator_context(obj).get("settlement_document_id")
+
+    def get_generated_document_type(self, obj):
+        return self._generator_context(obj).get("document_type") or ""
+
+    def get_editable_generated_document(self, obj):
+        return bool(self._generator_context(obj).get("editable"))
+
+    def get_generator_payload(self, obj):
+        return self._generator_context(obj).get("generator_payload") or {}
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
         uploaded_file = attrs.get("file")
@@ -61,6 +87,10 @@ class DealDocumentSerializer(serializers.ModelSerializer):
             "download_url",
             "original_name",
             "file_size",
+            "settlement_document_id",
+            "generated_document_type",
+            "editable_generated_document",
+            "generator_payload",
             "uploaded_by",
             "uploaded_by_name",
             "created_at",
@@ -106,6 +136,18 @@ class DealActGenerateSerializer(serializers.Serializer):
     def validate_items(self, value):
         if not value:
             raise serializers.ValidationError("Добавьте хотя бы одну строку акта.")
+        return value
+
+
+class DealGeneratedDocumentUpdateSerializer(serializers.Serializer):
+    executor_company = serializers.PrimaryKeyRelatedField(
+        queryset=Client.objects.filter(company_type=Client.CompanyType.OWN)
+    )
+    items = DealActLineItemSerializer(many=True)
+
+    def validate_items(self, value):
+        if not value:
+            raise serializers.ValidationError("Добавьте хотя бы одну строку документа.")
         return value
 
 

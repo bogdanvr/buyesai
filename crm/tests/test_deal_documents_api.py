@@ -136,6 +136,9 @@ class DealDocumentsApiTests(APITestCase):
         self.assertEqual(generated_document.uploaded_by, self.user)
         self.assertIn(f"company_{self.company.pk}/deal_{self.deal.pk}/", generated_document.file.name)
         self.assertEqual(realization.original_name, generated_document.original_name)
+        self.assertEqual(generated_document.settlement_document_id, realization.pk)
+        self.assertEqual(realization.generator_payload.get("executor_company_id"), self.own_company.pk)
+        self.assertEqual(len(realization.generator_payload.get("items", [])), 2)
 
         with generated_document.file.open("rb") as file_handle:
             archive = ZipFile(file_handle)
@@ -179,10 +182,17 @@ class DealDocumentsApiTests(APITestCase):
         self.assertEqual(invoice.title, "Счет на оплату")
         self.assertEqual(invoice.currency, "KZT")
         self.assertTrue(bool(invoice.file))
+        self.assertEqual(invoice.generator_payload.get("executor_company_id"), self.own_company.pk)
+        self.assertEqual(len(invoice.generator_payload.get("items", [])), 1)
 
         generated_document = DealDocument.objects.get(pk=response.data["id"])
         self.assertEqual(invoice.original_name, generated_document.original_name)
         self.assertIn("Счет", generated_document.original_name)
+        self.assertEqual(generated_document.settlement_document_id, invoice.pk)
+        self.assertEqual(response.data["generated_document_type"], "invoice")
+        self.assertTrue(response.data["editable_generated_document"])
+        self.assertEqual(response.data["settlement_document_id"], invoice.pk)
+        self.assertEqual(response.data["generator_payload"]["executor_company_id"], self.own_company.pk)
 
         with generated_document.file.open("rb") as file_handle:
             archive = ZipFile(file_handle)
@@ -204,3 +214,68 @@ class DealDocumentsApiTests(APITestCase):
         self.assertIn('<w:jc w:val="right"/>', document_xml)
         self.assertIn('<w:vAlign w:val="center"/>', document_xml)
         self.assertIn('<w:tblLayout w:type="fixed"/>', document_xml)
+
+    @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
+    def test_can_regenerate_invoice_document_preserving_number_and_writing_deal_event(self):
+        create_response = self.client.post(
+            reverse("deal-documents-generate-invoice"),
+            {
+                "deal": self.deal.pk,
+                "executor_company": self.own_company.pk,
+                "items": [
+                    {
+                        "description": "Первоначальная услуга",
+                        "quantity": "2.00",
+                        "unit": "час",
+                        "price": "10000.00",
+                    },
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.content.decode())
+
+        generated_document = DealDocument.objects.get(pk=create_response.data["id"])
+        invoice = SettlementDocument.objects.get(pk=generated_document.settlement_document_id)
+        original_number = invoice.number
+
+        update_response = self.client.post(
+            reverse("deal-documents-regenerate", kwargs={"pk": generated_document.pk}),
+            {
+                "executor_company": self.own_company.pk,
+                "items": [
+                    {
+                        "description": "Обновленная услуга",
+                        "quantity": "3.00",
+                        "unit": "час",
+                        "price": "15000.00",
+                    },
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK, update_response.content.decode())
+        generated_document.refresh_from_db()
+        invoice.refresh_from_db()
+        self.deal.refresh_from_db()
+
+        self.assertEqual(invoice.number, original_number)
+        self.assertEqual(str(invoice.amount), "45000.00")
+        self.assertEqual(generated_document.settlement_document_id, invoice.pk)
+        self.assertEqual(update_response.data["id"], generated_document.pk)
+        self.assertEqual(update_response.data["settlement_document_id"], invoice.pk)
+        self.assertTrue(update_response.data["editable_generated_document"])
+        self.assertEqual(update_response.data["generated_document_type"], "invoice")
+        self.assertEqual(update_response.data["generator_payload"]["executor_company_id"], self.own_company.pk)
+        self.assertEqual(update_response.data["generator_payload"]["number"], original_number)
+        self.assertEqual(update_response.data["generator_payload"]["items"][0]["description"], "Обновленная услуга")
+        self.assertIn("Редактирование счета", self.deal.events)
+        self.assertIn("event_type: document_edited", self.deal.events)
+
+        with generated_document.file.open("rb") as file_handle:
+            archive = ZipFile(file_handle)
+            document_xml = archive.read("word/document.xml").decode("utf-8")
+
+        self.assertIn("Обновленная услуга", document_xml)
+        self.assertIn("45000,00", document_xml.replace(" ", ""))

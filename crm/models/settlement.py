@@ -126,6 +126,7 @@ class SettlementDocument(TimestampedModel):
     amount = models.DecimalField(max_digits=14, decimal_places=2, default=ZERO_DECIMAL, verbose_name="Сумма")
     open_amount = models.DecimalField(max_digits=14, decimal_places=2, default=ZERO_DECIMAL, verbose_name="Остаток")
     note = models.TextField(blank=True, default="", verbose_name="Комментарий")
+    generator_payload = models.JSONField(default=dict, blank=True, verbose_name="Параметры генерации")
     file = models.FileField(
         upload_to=settlement_document_upload_to,
         max_length=500,

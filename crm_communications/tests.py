@@ -1463,6 +1463,70 @@ class CommunicationsApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["results"][0]["id"], self.conversation.pk)
 
+    def test_list_messages_by_client_and_channel(self):
+        other_company = Client.objects.create(name="Other API Co", email="other@example.com")
+        other_contact = Contact.objects.create(
+            client=other_company,
+            first_name="Oleg",
+            email="oleg@example.com",
+        )
+        other_deal = Deal.objects.create(
+            title="Other API Deal",
+            client=other_company,
+            stage=self.stage_active,
+            owner=self.user,
+        )
+        telegram_conversation = Conversation.objects.create(
+            channel=CommunicationChannelCode.TELEGRAM,
+            client=self.client_company,
+            contact=self.contact,
+            deal=self.deal,
+            subject="Telegram thread",
+        )
+        Message.objects.create(
+            conversation=telegram_conversation,
+            channel=CommunicationChannelCode.TELEGRAM,
+            direction=MessageDirection.INCOMING,
+            status=MessageStatus.RECEIVED,
+            client=self.client_company,
+            contact=self.contact,
+            deal=self.deal,
+            body_text="Сообщение в telegram",
+            body_preview="Сообщение в telegram",
+            received_at=timezone.now(),
+        )
+        other_conversation = Conversation.objects.create(
+            channel=CommunicationChannelCode.EMAIL,
+            client=other_company,
+            contact=other_contact,
+            deal=other_deal,
+            subject="Other email thread",
+        )
+        Message.objects.create(
+            conversation=other_conversation,
+            channel=CommunicationChannelCode.EMAIL,
+            direction=MessageDirection.INCOMING,
+            status=MessageStatus.RECEIVED,
+            client=other_company,
+            contact=other_contact,
+            deal=other_deal,
+            subject="Чужое письмо",
+            body_text="Не должно попасть в выборку",
+            body_preview="Не должно попасть в выборку",
+            external_message_id="other-inbound-api@example.com",
+            received_at=timezone.now(),
+        )
+
+        response = self.client.get(
+            reverse("communications-messages-list"),
+            {"client": self.client_company.pk, "channel": CommunicationChannelCode.EMAIL},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["results"]
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]["id"], self.incoming_message.pk)
+
     @patch("crm_communications.email_outbound.EmailMultiAlternatives")
     def test_send_message_from_conversation(self, email_cls_mock):
         email_instance = email_cls_mock.return_value
@@ -1516,6 +1580,8 @@ class CommunicationsApiTests(TestCase):
         self.assertEqual(message.attachments.count(), 0)
         share = DealDocumentShare.objects.get(message=message, document=deal_document)
         self.assertIn(f"https://crm.example.com/documents/share/{share.token}/", message.body_text)
+        self.assertIn("Открыть Акт № 1235", message.body_html)
+        self.assertNotIn("Открыть Акт № 1235.docx", message.body_html)
         self.assertEqual(
             DealDocumentShareEvent.objects.filter(share=share, event_type=DealDocumentShareEventType.EMAIL_SENT).count(),
             1,
@@ -1600,6 +1666,8 @@ class CommunicationsApiTests(TestCase):
         self.assertEqual(message.attachments.count(), 0)
         share = DealDocumentShare.objects.get(message=message, document=deal_document)
         self.assertIn(f"https://crm.example.com/documents/share/{share.token}/", message.body_text)
+        self.assertIn("Открыть Счет № 1235", message.body_html)
+        self.assertNotIn("Открыть Счет № 1235.docx", message.body_html)
         self.assertEqual(message.touch.result_option.code, "proposal_sent")
         self.assertEqual(message.touch.summary, "Отправлен документ: Счет № 1235.docx")
         self.deal.refresh_from_db()
@@ -2028,6 +2096,12 @@ class DealDocumentDeliveryTests(TestCase):
         self.assertContains(open_response, reverse("deal-document-share-preview", kwargs={"token": share.token}))
         self.assertContains(open_response, reverse("deal-document-share-event", kwargs={"token": share.token}))
         self.assertContains(open_response, "pdfjs-dist@5.6.205")
+        self.assertContains(open_response, "Счет № 1235")
+        self.assertNotContains(open_response, "Счет № 1235.docx")
+        self.assertNotContains(open_response, "Документ сделки")
+        self.assertNotContains(open_response, "<strong>Сделка</strong>", html=False)
+        self.assertNotContains(open_response, "<strong>Компания</strong>", html=False)
+        self.assertNotContains(open_response, "<strong>Отправлено</strong>", html=False)
         self.assertNotContains(open_response, "<iframe", html=False)
 
         event_response = self.client.post(

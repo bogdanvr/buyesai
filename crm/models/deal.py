@@ -100,6 +100,14 @@ class DealDocument(TimestampedModel):
     )
     file = models.FileField(upload_to=deal_document_upload_to, max_length=500, verbose_name="Файл")
     original_name = models.CharField(max_length=255, blank=True, default="", verbose_name="Название файла")
+    settlement_document = models.ForeignKey(
+        "crm.SettlementDocument",
+        related_name="deal_documents",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Документ взаиморасчетов",
+    )
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name="crm_deal_documents",
@@ -115,6 +123,7 @@ class DealDocument(TimestampedModel):
         ordering = ("-created_at", "-id")
         indexes = [
             models.Index(fields=["deal"]),
+            models.Index(fields=["settlement_document"]),
         ]
 
     def __str__(self):

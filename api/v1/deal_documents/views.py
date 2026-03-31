@@ -10,9 +10,14 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.viewsets import ModelViewSet
 
-from api.v1.deal_documents.serializers import DealActGenerateSerializer, DealDocumentSerializer, DealDocumentShareSerializer
+from api.v1.deal_documents.serializers import (
+    DealActGenerateSerializer,
+    DealDocumentSerializer,
+    DealDocumentShareSerializer,
+    DealGeneratedDocumentUpdateSerializer,
+)
 from crm.models import DealDocument
-from crm.services.act_generation import generate_deal_act, generate_deal_invoice
+from crm.services.act_generation import generate_deal_act, generate_deal_invoice, update_generated_deal_document
 
 
 class DealDocumentViewSet(ModelViewSet):
@@ -20,7 +25,7 @@ class DealDocumentViewSet(ModelViewSet):
     parser_classes = (JSONParser, MultiPartParser, FormParser)
 
     def get_queryset(self):
-        queryset = DealDocument.objects.select_related("deal", "deal__client", "uploaded_by").order_by("-created_at", "-id")
+        queryset = DealDocument.objects.select_related("deal", "deal__client", "uploaded_by", "settlement_document").order_by("-created_at", "-id")
         deal_id = self.request.query_params.get("deal")
         if deal_id:
             queryset = queryset.filter(deal_id=deal_id)
@@ -86,3 +91,21 @@ class DealDocumentViewSet(ModelViewSet):
         queryset = instance.shares.select_related("message").prefetch_related("events").order_by("-created_at", "-id")
         serializer = DealDocumentShareSerializer(queryset, many=True, context={"request": request})
         return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="regenerate")
+    def regenerate(self, request, pk=None):
+        instance = self.get_object()
+        request_serializer = DealGeneratedDocumentUpdateSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        try:
+            deal_document, _ = update_generated_deal_document(
+                deal_document=instance,
+                executor_company=request_serializer.validated_data["executor_company"],
+                items=request_serializer.validated_data["items"],
+                uploaded_by=request.user,
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(getattr(exc, "message_dict", None) or getattr(exc, "messages", None) or {"detail": str(exc)})
+
+        serializer = self.get_serializer(deal_document)
+        return Response(serializer.data, status=status.HTTP_200_OK)

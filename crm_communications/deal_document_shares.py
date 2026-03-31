@@ -86,6 +86,16 @@ def _document_name(document: DealDocument | None) -> str:
     ).strip() or f"Документ #{getattr(document, 'pk', '')}"
 
 
+def document_display_name(document_or_name: DealDocument | str | None) -> str:
+    if isinstance(document_or_name, DealDocument):
+        normalized_name = _document_name(document_or_name)
+    else:
+        normalized_name = str(document_or_name or "").strip()
+    if normalized_name.lower().endswith(".docx"):
+        normalized_name = normalized_name[:-5].rstrip()
+    return normalized_name or "Документ"
+
+
 def _document_kind_code(document: DealDocument | None) -> str:
     normalized_name = _document_name(document).lower().replace("ё", "е")
     if "счет" in normalized_name or "invoice" in normalized_name:
@@ -196,7 +206,7 @@ def create_document_share(*, document: DealDocument, message: Message, request=N
 
 def apply_share_link_to_message(*, message: Message, share: DealDocumentShare, document_name: str, request=None) -> Message:
     public_url = build_share_public_url(share=share, request=request)
-    normalized_name = str(document_name or "документу").strip() or "документу"
+    normalized_name = document_display_name(document_name)
     existing_body_text = str(getattr(message, "body_text", "") or "").strip()
     link_text = f"Ссылка на документ: {public_url}\nPDF доступен на странице документа."
     body_text = f"{existing_body_text}\n\n{link_text}".strip() if existing_body_text else link_text

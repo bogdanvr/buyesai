@@ -63,7 +63,13 @@
 <body class="crm-startup-screen-active">
   <div id="crm-startup-screen"></div>
   
-  <div id="app" v-cloak class="crm-grid" data-current-user-id="{{ current_user_id|default:'' }}">
+  <div
+    id="app"
+    v-cloak
+    class="crm-grid"
+    data-current-user-id="{{ current_user_id|default:'' }}"
+    data-current-user-can-view-all-communications="{% if current_user_can_view_all_communications %}true{% else %}false{% endif %}"
+  >
     <div
       v-if="telephonyIncomingCallPopups.length"
       class="pointer-events-none fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[70] flex flex-col gap-3 md:inset-x-auto md:right-6 md:top-5 md:bottom-auto md:w-[380px]"
@@ -169,6 +175,10 @@
               <rect x="4" y="4" width="16" height="16" rx="2"></rect>
               <path stroke-linecap="round" d="M8 8h2M14 8h2M8 12h2M14 12h2M8 16h8"></path>
             </svg>
+            <svg v-else-if="item.key === 'communications'" xmlns="http://www.w3.org/2000/svg" class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 7.5A2.5 2.5 0 016.5 5h11A2.5 2.5 0 0120 7.5v7A2.5 2.5 0 0117.5 17h-5.6l-3.7 2.8a.7.7 0 01-1.12-.56V17H6.5A2.5 2.5 0 014 14.5v-7z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 9h8M8 12h5"></path>
+            </svg>
             <svg v-else-if="item.key === 'touches'" xmlns="http://www.w3.org/2000/svg" class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
               <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5"></path>
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 5h12a2 2 0 012 2v8a2 2 0 01-2 2h-5l-4 3v-3H6a2 2 0 01-2-2V7a2 2 0 012-2z"></path>
@@ -217,6 +227,10 @@
               <svg v-else-if="item.key === 'companies'" xmlns="http://www.w3.org/2000/svg" class="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                 <rect x="4" y="4" width="16" height="16" rx="2"></rect>
                 <path stroke-linecap="round" d="M8 8h2M14 8h2M8 12h2M14 12h2M8 16h8"></path>
+              </svg>
+              <svg v-else-if="item.key === 'communications'" xmlns="http://www.w3.org/2000/svg" class="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7.5A2.5 2.5 0 016.5 5h11A2.5 2.5 0 0120 7.5v7A2.5 2.5 0 0117.5 17h-5.6l-3.7 2.8a.7.7 0 01-1.12-.56V17H6.5A2.5 2.5 0 014 14.5v-7z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 9h8M8 12h5"></path>
               </svg>
               <svg v-else-if="item.key === 'touches'" xmlns="http://www.w3.org/2000/svg" class="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5"></path>
@@ -417,7 +431,7 @@
             </button>
 
             <button
-              v-if="!isTelephonySection"
+              v-if="!isTelephonySection && !isCommunicationsSection"
               @click="openCreateModal"
               class="h-8 md:h-11 px-3 md:px-5 rounded-lg md:rounded-xl bg-crm-accent hover:bg-crm-accentHover text-[12px] md:text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
               :disabled="isSaving"
@@ -605,7 +619,7 @@
             <div class="flex items-start justify-between gap-4 border-b border-crm-border px-4 py-4 md:px-5">
               <div class="min-w-0">
                 <div class="text-lg font-semibold text-white [overflow-wrap:anywhere]">Отправить документ</div>
-                <div class="mt-1 text-sm text-crm-muted [overflow-wrap:anywhere]">[[ dealDocumentSendTarget?.originalName || 'Документ сделки' ]]</div>
+                <div v-if="dealDocumentSendDisplayName" class="mt-1 text-sm text-crm-muted [overflow-wrap:anywhere]">[[ dealDocumentSendDisplayName ]]</div>
                 <div class="mt-1 text-xs text-crm-muted">В письмо будет добавлена ссылка на страницу документа на нашем сайте.</div>
               </div>
               <button
@@ -623,8 +637,7 @@
               </div>
 
               <div class="rounded-2xl border border-crm-border bg-[#102f4a] p-4">
-                <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Документ</div>
-                <div class="mt-2 text-sm font-semibold text-white [overflow-wrap:anywhere]">[[ dealDocumentSendTarget?.originalName || 'Документ сделки' ]]</div>
+                <div class="text-sm font-semibold text-white [overflow-wrap:anywhere]">[[ dealDocumentSendDisplayName || 'Документ' ]]</div>
                 <div class="mt-2 inline-flex max-w-full items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-3 py-2 text-xs font-semibold text-white">
                   Получатель откроет страницу документа и сможет скачать PDF оттуда.
                 </div>
@@ -927,6 +940,59 @@
               <span class="font-semibold text-white">[[ telephonyConnectionStatusLabel ]]</span>
             </div>
           </article>
+        </div>
+        <div v-else-if="isCommunicationsSection" class="flex flex-col gap-3">
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              @click="openCommunicationsCompose('email')"
+              :disabled="!selectedCommunicationsCompany"
+              class="inline-flex h-10 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Отправить письмо
+            </button>
+            <button
+              type="button"
+              @click="openCommunicationsCompose('telegram')"
+              :disabled="!selectedCommunicationsCompany"
+              class="inline-flex h-10 items-center rounded-xl border border-crm-border bg-[#123753] px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Отправить в Telegram
+            </button>
+            <button
+              type="button"
+              @click="startCallFromCommunications"
+              :disabled="!selectedCommunicationsCompany || !communicationsSelectedCompanyPhone"
+              class="inline-flex h-10 items-center rounded-xl border border-crm-border bg-[#123753] px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Позвонить
+            </button>
+            <button
+              type="button"
+              @click="openTelephonySettingsFromCommunications"
+              class="inline-flex h-10 items-center rounded-xl border border-crm-border bg-[#123753] px-4 text-sm font-semibold text-white transition hover:border-crm-accent"
+            >
+              Настройки телефонии
+            </button>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <div v-if="selectedCommunicationsCompany" class="inline-flex items-center rounded-2xl border border-crm-border bg-crm-panel px-4 py-2 text-white">
+              [[ selectedCommunicationsCompany.name ]]
+            </div>
+            <div v-if="communicationsSelectedCompanyPhone" class="inline-flex items-center rounded-2xl border border-crm-border bg-crm-panel px-4 py-2 text-crm-muted">
+              [[ communicationsSelectedCompanyPhone ]]
+            </div>
+            <div v-if="communicationsPendingDocumentName" class="inline-flex items-center gap-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-amber-100">
+              <span>Документ к отправке: [[ communicationsPendingDocumentName ]]</span>
+              <button
+                type="button"
+                @click="clearCommunicationsPendingDocument"
+                class="rounded-lg border border-amber-300/20 px-2 py-1 text-xs text-white transition hover:border-amber-200"
+              >
+                Убрать
+              </button>
+            </div>
+          </div>
         </div>
         <div v-else class="flex gap-2 md:gap-3 overflow-x-auto pb-1">
           <template v-if="activeSection === 'companies'">
@@ -1383,6 +1449,263 @@
               </section>
             </div>
           </div>
+        </div>
+        <div v-else-if="isCommunicationsSection" class="h-full min-h-0 grid gap-4 lg:grid-cols-[280px_minmax(320px,0.9fr)_minmax(360px,1.1fr)]">
+          <section class="min-h-0 rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel overflow-hidden flex flex-col">
+            <div class="border-b border-crm-border bg-[#10314d] px-5 py-4">
+              <div class="text-sm font-semibold text-white">Компании</div>
+              <div class="mt-1 text-xs text-crm-muted">Клиенты с коммуникациями и звонками</div>
+            </div>
+            <div v-if="isCommunicationsCompaniesLoading && !communicationsVisibleCompanies.length" class="flex-1 flex items-center justify-center px-5 text-sm text-crm-muted">
+              Загружаем компании...
+            </div>
+            <div v-else-if="!communicationsVisibleCompanies.length" class="flex-1 flex items-center justify-center px-5 text-sm text-crm-muted text-center">
+              Компании не найдены. Проверьте поиск или права доступа.
+            </div>
+            <div v-else class="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2">
+              <button
+                v-for="company in communicationsVisibleCompanies"
+                :key="`communications-company-${company.id}`"
+                type="button"
+                @click="selectCommunicationsCompany(company.id)"
+                class="w-full rounded-2xl border px-4 py-3 text-left transition"
+                :class="String(communicationsSelectedCompanyId || '') === String(company.id)
+                  ? 'border-crm-accent bg-crm-accent/10'
+                  : 'border-crm-border bg-[#102f4a] hover:border-crm-accent/70'"
+              >
+                <div class="text-sm font-semibold text-white [overflow-wrap:anywhere]">[[ company.name ]]</div>
+                <div class="mt-1 text-xs text-crm-muted [overflow-wrap:anywhere]">
+                  [[ company.phone || company.email || company.inn || 'Без контактных данных' ]]
+                </div>
+              </button>
+            </div>
+          </section>
+
+          <section class="min-h-0 rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel overflow-hidden flex flex-col">
+            <div class="border-b border-crm-border bg-[#10314d] px-5 py-4">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-white">
+                    [[ selectedCommunicationsCompany?.name || 'Коммуникации клиента' ]]
+                  </div>
+                  <div class="mt-1 text-xs text-crm-muted">
+                    [[ selectedCommunicationsCompany ? 'Все события клиента в хронологическом порядке' : 'Выберите компанию слева' ]]
+                  </div>
+                </div>
+                <div class="text-xs text-crm-muted whitespace-nowrap">
+                  [[ communicationsFilteredTimelineItems.length ]] шт.
+                </div>
+              </div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button type="button" @click="communicationsTimelineFilter = 'all'" :class="communicationsTimelineFilterButtonClass('all')" class="inline-flex h-8 items-center rounded-lg border px-3 text-xs font-semibold transition">
+                  Все
+                </button>
+                <button type="button" @click="communicationsTimelineFilter = 'email'" :class="communicationsTimelineFilterButtonClass('email')" class="inline-flex h-8 items-center rounded-lg border px-3 text-xs font-semibold transition">
+                  Email
+                </button>
+                <button type="button" @click="communicationsTimelineFilter = 'telegram'" :class="communicationsTimelineFilterButtonClass('telegram')" class="inline-flex h-8 items-center rounded-lg border px-3 text-xs font-semibold transition">
+                  Telegram
+                </button>
+                <button type="button" @click="communicationsTimelineFilter = 'calls'" :class="communicationsTimelineFilterButtonClass('calls')" class="inline-flex h-8 items-center rounded-lg border px-3 text-xs font-semibold transition">
+                  Звонки
+                </button>
+              </div>
+            </div>
+            <div v-if="!selectedCommunicationsCompany" class="flex-1 flex items-center justify-center px-5 text-sm text-crm-muted text-center">
+              Выберите компанию, чтобы открыть историю коммуникаций.
+            </div>
+            <div v-else-if="isCommunicationsTimelineLoading" class="flex-1 flex items-center justify-center px-5 text-sm text-crm-muted">
+              Загружаем переписку и звонки...
+            </div>
+            <div v-else-if="!communicationsFilteredTimelineItems.length" class="flex-1 flex items-center justify-center px-5 text-sm text-crm-muted text-center">
+              По выбранному фильтру коммуникаций пока нет.
+            </div>
+            <div v-else class="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2">
+              <button
+                v-for="item in communicationsFilteredTimelineItems"
+                :key="item.timelineKey"
+                type="button"
+                @click="selectCommunicationsTimelineItem(item.timelineKey)"
+                class="w-full rounded-2xl border px-4 py-3 text-left transition"
+                :class="String(communicationsSelectedTimelineItemKey || '') === String(item.timelineKey || '')
+                  ? 'border-crm-accent bg-crm-accent/10'
+                  : 'border-crm-border bg-[#102f4a] hover:border-crm-accent/70'"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold" :class="communicationsTimelineBadgeClass(item)">
+                        [[ communicationsTimelineChannelLabel(item) ]]
+                      </span>
+                      <span class="text-sm font-semibold text-white [overflow-wrap:anywhere]">[[ communicationsTimelineItemTitle(item) ]]</span>
+                    </div>
+                    <div class="mt-1 text-xs text-crm-muted [overflow-wrap:anywhere]">[[ communicationsTimelineItemSubtitle(item) ]]</div>
+                  </div>
+                  <div class="shrink-0 text-[11px] text-crm-muted">
+                    [[ formatEventTimestamp(item.timelineAt) || 'Без даты' ]]
+                  </div>
+                </div>
+                <div class="mt-2 text-sm text-crm-text whitespace-pre-wrap [overflow-wrap:anywhere]">
+                  [[ communicationsTimelineItemPreview(item) ]]
+                </div>
+              </button>
+            </div>
+          </section>
+
+          <section class="min-h-0 rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel overflow-hidden flex flex-col">
+            <div class="border-b border-crm-border bg-[#10314d] px-5 py-4">
+              <div class="text-sm font-semibold text-white">
+                [[ communicationsComposerMode
+                  ? (communicationsComposerMode === 'telegram' ? 'Новое сообщение в Telegram' : 'Новое письмо')
+                  : (selectedCommunicationsTimelineItem?.timelineType === 'call' ? 'Детали звонка' : 'Детали сообщения') ]]
+              </div>
+              <div class="mt-1 text-xs text-crm-muted">
+                [[ communicationsComposerMode
+                  ? 'Отправка из общей карточки коммуникаций клиента'
+                  : (selectedCommunicationsTimelineItem ? 'Полный текст и параметры выбранной коммуникации' : 'Выберите сообщение, звонок или начните новую коммуникацию') ]]
+              </div>
+            </div>
+            <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4">
+              <div v-if="communicationsComposerMode" class="space-y-4">
+                <div v-if="communicationsPendingDocumentName" class="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                  Будет отправлена ссылка на документ: [[ communicationsPendingDocumentName ]]
+                </div>
+                <label class="block">
+                  <span class="text-sm text-crm-muted">Контакт</span>
+                  <select v-model="communicationsComposer.contactId" @change="syncCommunicationsComposerRecipient" class="mt-1 h-11 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                    <option :value="null">Без контакта</option>
+                    <option v-for="contact in communicationsCompanyContactOptions" :key="`communications-contact-${contact.id}`" :value="contact.id">
+                      [[ contact.fullName ]]
+                    </option>
+                  </select>
+                </label>
+                <label class="block">
+                  <span class="text-sm text-crm-muted">Получатель</span>
+                  <input v-model.trim="communicationsComposer.recipient" type="text" class="mt-1 h-11 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" :placeholder="communicationsComposerMode === 'telegram' ? 'telegram:123456789' : 'email:client@example.com'" />
+                </label>
+                <label v-if="communicationsComposerMode === 'email'" class="block">
+                  <span class="text-sm text-crm-muted">Тема</span>
+                  <input v-model.trim="communicationsComposer.subject" type="text" class="mt-1 h-11 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                </label>
+                <label class="block">
+                  <span class="text-sm text-crm-muted">Текст</span>
+                  <textarea v-model.trim="communicationsComposer.bodyText" rows="10" class="mt-1 w-full rounded-2xl border border-crm-border bg-[#102f4a] px-3 py-3 outline-none focus:border-crm-accent"></textarea>
+                </label>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    @click="sendCommunicationsMessage"
+                    :disabled="isCommunicationsSending"
+                    class="inline-flex h-10 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    [[ isCommunicationsSending ? 'Отправляем...' : 'Отправить' ]]
+                  </button>
+                  <button
+                    type="button"
+                    @click="closeCommunicationsCompose"
+                    class="inline-flex h-10 items-center rounded-xl border border-crm-border bg-[#123753] px-4 text-sm font-semibold text-white transition hover:border-crm-accent"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+
+              <div v-else-if="selectedCommunicationsTimelineItem?.timelineType === 'message'" class="space-y-4">
+                <div class="flex flex-wrap gap-2">
+                  <span class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold" :class="communicationsTimelineBadgeClass(selectedCommunicationsTimelineItem)">
+                    [[ communicationsTimelineChannelLabel(selectedCommunicationsTimelineItem) ]]
+                  </span>
+                  <span class="inline-flex items-center rounded-full border border-crm-border bg-[#123753] px-3 py-1 text-xs font-semibold text-white">
+                    [[ selectedCommunicationsTimelineItem.directionLabel ]]
+                  </span>
+                </div>
+                <div class="text-lg font-semibold text-white [overflow-wrap:anywhere]">
+                  [[ selectedCommunicationsTimelineItem.subject || communicationsTimelineItemTitle(selectedCommunicationsTimelineItem) ]]
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2 text-sm">
+                  <div class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Статус</div>
+                    <div class="mt-2 text-white">[[ selectedCommunicationsTimelineItem.statusLabel ]]</div>
+                  </div>
+                  <div class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Дата</div>
+                    <div class="mt-2 text-white">[[ formatEventTimestamp(selectedCommunicationsTimelineItem.timelineAt) || 'Без даты' ]]</div>
+                  </div>
+                </div>
+                <div class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-4">
+                  <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Текст</div>
+                  <div class="mt-3 whitespace-pre-wrap text-sm text-white [overflow-wrap:anywhere]">[[ communicationMessagePlainText(selectedCommunicationsTimelineItem) || 'Без текста' ]]</div>
+                </div>
+                <div v-if="selectedCommunicationsTimelineItem.attachments?.length" class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-4">
+                  <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Вложения</div>
+                  <div class="mt-3 space-y-2">
+                    <a
+                      v-for="attachment in selectedCommunicationsTimelineItem.attachments"
+                      :key="`communications-attachment-${attachment.id}`"
+                      :href="attachment.fileUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="flex items-center justify-between gap-3 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 py-2 text-sm text-white transition hover:border-crm-accent"
+                    >
+                      <span class="min-w-0 [overflow-wrap:anywhere]">[[ attachment.originalName || 'Файл' ]]</span>
+                      <span class="shrink-0 text-xs text-crm-muted">[[ formatFileSize(attachment.sizeBytes) || '—' ]]</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else-if="selectedCommunicationsTimelineItem?.timelineType === 'call'" class="space-y-4">
+                <div class="flex flex-wrap gap-2">
+                  <span class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold" :class="communicationsTimelineBadgeClass(selectedCommunicationsTimelineItem)">
+                    Звонок
+                  </span>
+                  <span class="inline-flex items-center rounded-full border border-crm-border bg-[#123753] px-3 py-1 text-xs font-semibold text-white">
+                    [[ selectedCommunicationsTimelineItem.direction === 'inbound' ? 'Входящий' : 'Исходящий' ]]
+                  </span>
+                </div>
+                <div class="text-lg font-semibold text-white [overflow-wrap:anywhere]">
+                  [[ selectedCommunicationsTimelineItem.displayPhone || 'Номер не определён' ]]
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <div class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Статус</div>
+                    <div class="mt-2 text-white">[[ selectedCommunicationsTimelineItem.statusLabel ]]</div>
+                  </div>
+                  <div class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Начало</div>
+                    <div class="mt-2 text-white">[[ formatEventTimestamp(selectedCommunicationsTimelineItem.startedAt || selectedCommunicationsTimelineItem.timelineAt) || '—' ]]</div>
+                  </div>
+                  <div class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Длительность</div>
+                    <div class="mt-2 text-white">[[ selectedCommunicationsTimelineItem.talkDurationSec ? formatPhoneCallDuration(selectedCommunicationsTimelineItem.talkDurationSec) : formatPhoneCallDuration(selectedCommunicationsTimelineItem.durationSec) ]]</div>
+                  </div>
+                  <div class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-3">
+                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Ответственный</div>
+                    <div class="mt-2 text-white">[[ selectedCommunicationsTimelineItem.responsibleUserName || 'Не указан' ]]</div>
+                  </div>
+                </div>
+                <div class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-4 text-sm text-white space-y-2">
+                  <div><span class="text-crm-muted">От:</span> [[ selectedCommunicationsTimelineItem.phoneFrom || '—' ]]</div>
+                  <div><span class="text-crm-muted">Кому:</span> [[ selectedCommunicationsTimelineItem.phoneTo || '—' ]]</div>
+                  <div v-if="selectedCommunicationsTimelineItem.contactName"><span class="text-crm-muted">Контакт:</span> [[ selectedCommunicationsTimelineItem.contactName ]]</div>
+                  <div v-if="selectedCommunicationsTimelineItem.dealTitle"><span class="text-crm-muted">Сделка:</span> [[ selectedCommunicationsTimelineItem.dealTitle ]]</div>
+                </div>
+                <a
+                  v-if="selectedCommunicationsTimelineItem.recordingUrl"
+                  :href="selectedCommunicationsTimelineItem.recordingUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex h-10 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-4 text-sm font-semibold text-white transition hover:border-crm-accent"
+                >
+                  Открыть запись звонка
+                </a>
+              </div>
+
+              <div v-else class="h-full flex items-center justify-center text-sm text-crm-muted text-center">
+                Выберите сообщение, звонок или используйте верхние кнопки для новой коммуникации.
+              </div>
+            </div>
+          </section>
         </div>
         <div v-else class="h-full min-h-0 rounded-[28px] border border-crm-border bg-[#0b2740] overflow-hidden shadow-panel md:min-h-[540px] flex flex-col">
           <div
@@ -3388,8 +3711,16 @@
                       Открыть
                     </a>
                     <button
+                      v-if="documentItem.editableGeneratedDocument"
                       type="button"
-                      @click="openDealDocumentSendSidebar(documentItem)"
+                      @click="openDealGeneratedDocumentEditor(documentItem)"
+                      class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
+                    >
+                      Отредактировать
+                    </button>
+                    <button
+                      type="button"
+                      @click="openCommunicationsFromDealDocument(documentItem)"
                       class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent"
                     >
                       Отправить
@@ -6496,6 +6827,9 @@
                 <div class="min-w-0">
                   <div class="text-lg font-semibold text-white">[[ dealDocumentGeneratorMeta.title ]]</div>
                   <div class="mt-1 text-sm text-crm-muted">[[ dealDocumentGeneratorMeta.subtitle ]]</div>
+                  <div v-if="dealDocumentGeneratorMode === 'edit' && dealDocumentGeneratorTargetName" class="mt-2 text-xs text-crm-muted [overflow-wrap:anywhere]">
+                    Редактируется: [[ dealDocumentGeneratorTargetName ]]
+                  </div>
                 </div>
                 <button type="button" @click="closeDealActGenerator" class="h-10 w-10 shrink-0 rounded-xl border border-crm-border bg-[#123753] text-white transition hover:border-crm-accent">✕</button>
               </div>
@@ -6570,8 +6904,8 @@
   
 
   <script
-    src="{% static '/js/crm-app.js' %}?v=20260320"
-    onerror="this.onerror=null;this.src='/crm/_asset/js/crm-app.js?v=20260320';"
+    src="{% static '/js/crm-app.js' %}?v=20260331"
+    onerror="this.onerror=null;this.src='/crm/_asset/js/crm-app.js?v=20260331';"
   ></script>
 </body>
 </html>

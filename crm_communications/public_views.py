@@ -14,6 +14,7 @@ from crm_communications.deal_document_shares import (
     build_share_event_url,
     build_share_preview_url,
     build_share_public_url,
+    document_display_name,
     record_share_pdf_download,
     record_share_viewer_event,
 )
@@ -40,6 +41,7 @@ class DealDocumentSharePageView(View):
         context = {
             "share": share,
             "document": document,
+            "document_display_name": document_display_name(document),
             "deal": deal,
             "company": company,
             "public_url": build_share_public_url(share=share, request=request),

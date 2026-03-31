@@ -333,9 +333,18 @@ class MessageViewSet(viewsets.ReadOnlyModelViewSet):
             "author_user",
         ).prefetch_related("attachments").order_by("-created_at", "-id")
         conversation_id = self.request.query_params.get("conversation")
+        client_id = self.request.query_params.get("client")
+        deal_id = self.request.query_params.get("deal")
+        channel = self.request.query_params.get("channel")
         status_code = self.request.query_params.get("status")
         if conversation_id:
             queryset = queryset.filter(conversation_id=conversation_id)
+        if client_id:
+            queryset = queryset.filter(client_id=client_id)
+        if deal_id:
+            queryset = queryset.filter(deal_id=deal_id)
+        if channel:
+            queryset = queryset.filter(channel=channel)
         if status_code:
             queryset = queryset.filter(status=status_code)
         return queryset

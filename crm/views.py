@@ -7,9 +7,51 @@ from django.http import FileResponse, Http404
 from django.shortcuts import render
 
 
+def _can_view_all_company_communications(user) -> bool:
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+
+    role_values = []
+    assignments = getattr(user, "crm_user_role_assignments", None)
+    if assignments is not None:
+        for assignment in assignments.select_related("role").all():
+            role = getattr(assignment, "role", None)
+            if role is None:
+                continue
+            role_values.append(str(getattr(role, "code", "") or "").strip().lower())
+            role_values.append(str(getattr(role, "name", "") or "").strip().lower())
+
+    leadership_markers = (
+        "director",
+        "head",
+        "owner",
+        "admin",
+        "ceo",
+        "lead",
+        "руковод",
+        "директор",
+        "управ",
+        "супервайз",
+    )
+    return any(
+        marker in role_value
+        for role_value in role_values
+        for marker in leadership_markers
+    )
+
+
 @staff_member_required
 def crm_dashboard(request):
-    return render(request, "crm.html", {"current_user_id": getattr(request.user, "id", None)})
+    return render(
+        request,
+        "crm.html",
+        {
+            "current_user_id": getattr(request.user, "id", None),
+            "current_user_can_view_all_communications": _can_view_all_company_communications(request.user),
+        },
+    )
 
 
 @staff_member_required
