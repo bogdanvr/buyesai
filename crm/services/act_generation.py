@@ -304,7 +304,7 @@ def _table_cell_custom(
 
 
 def _service_table(items: list[ActLineItem]) -> str:
-    widths = [500, 4500, 900, 700, 1300, 1500]
+    widths = [500, 4600, 900, 700, 1199, 1730]
     table_width = sum(widths)
     headers = ["№", "Наименование работ, услуг", "Кол-во", "Ед.", "Цена", "Сумма"]
     header_xml = "".join(
@@ -316,7 +316,7 @@ def _service_table(items: list[ActLineItem]) -> str:
             "<w:tr>"
             f"{_table_cell(str(index), width=widths[0], align='center')}"
             f"{_table_cell(item.description, width=widths[1])}"
-            f"{_table_cell(_format_compact_number(item.quantity), width=widths[2], align='center')}"
+            f"{_table_cell(_format_compact_number(item.quantity), width=widths[2], align='right')}"
             f"{_table_cell(item.unit or 'час', width=widths[3], align='center')}"
             f"{_table_cell(_format_amount(item.price), width=widths[4], align='right')}"
             f"{_table_cell(_format_amount(item.total), width=widths[5], align='right')}"
@@ -337,7 +337,7 @@ def _service_table(items: list[ActLineItem]) -> str:
     )
     return (
         "<w:tbl>"
-        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/>{borders_xml}</w:tblPr>"
+        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:jc w:val=\"left\"/><w:tblInd w:w=\"28\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/><w:tblCellMar><w:top w:w=\"40\" w:type=\"dxa\"/><w:left w:w=\"40\" w:type=\"dxa\"/><w:bottom w:w=\"40\" w:type=\"dxa\"/><w:right w:w=\"40\" w:type=\"dxa\"/></w:tblCellMar>{borders_xml}</w:tblPr>"
         f"<w:tblGrid>{grid_xml}</w:tblGrid>"
         f"<w:tr>{header_xml}</w:tr>"
         f"{rows_xml}"
@@ -346,7 +346,7 @@ def _service_table(items: list[ActLineItem]) -> str:
 
 
 def _invoice_payment_table(executor_company: Client) -> str:
-    widths = [3600, 1600, 900, 2800]
+    widths = [4364, 1600, 887, 2788]
     table_width = sum(widths)
     bank_name = _normalize_text(executor_company.bank_name) or "Банк не указан"
     bik = _normalize_text(executor_company.bik) or "-"
@@ -397,7 +397,7 @@ def _invoice_payment_table(executor_company: Client) -> str:
     )
     return (
         "<w:tbl>"
-        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/><w:jc w:val=\"right\"/>{borders_xml}</w:tblPr>"
+        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:jc w:val=\"left\"/><w:tblInd w:w=\"26\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/><w:tblCellMar><w:top w:w=\"40\" w:type=\"dxa\"/><w:left w:w=\"40\" w:type=\"dxa\"/><w:bottom w:w=\"40\" w:type=\"dxa\"/><w:right w:w=\"40\" w:type=\"dxa\"/></w:tblCellMar>{borders_xml}</w:tblPr>"
         f"<w:tblGrid>{grid_xml}</w:tblGrid>"
         f"{rows_xml}"
         "</w:tbl>"
@@ -405,7 +405,7 @@ def _invoice_payment_table(executor_company: Client) -> str:
 
 
 def _invoice_items_table(items: list[ActLineItem]) -> str:
-    widths = [500, 4600, 900, 700, 1200, 1500]
+    widths = [500, 4600, 900, 700, 1199, 1730]
     table_width = sum(widths)
     headers = ["№", "Товары (работы, услуги)", "Кол-во", "Ед.", "Цена", "Сумма"]
     header_xml = "".join(
@@ -438,7 +438,7 @@ def _invoice_items_table(items: list[ActLineItem]) -> str:
     )
     return (
         "<w:tbl>"
-        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/>{borders_xml}</w:tblPr>"
+        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:jc w:val=\"left\"/><w:tblInd w:w=\"28\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/><w:tblCellMar><w:top w:w=\"40\" w:type=\"dxa\"/><w:left w:w=\"40\" w:type=\"dxa\"/><w:bottom w:w=\"40\" w:type=\"dxa\"/><w:right w:w=\"40\" w:type=\"dxa\"/></w:tblCellMar>{borders_xml}</w:tblPr>"
         f"<w:tblGrid>{grid_xml}</w:tblGrid>"
         f"<w:tr>{header_xml}</w:tr>"
         f"{rows_xml}"
@@ -470,7 +470,7 @@ def _invoice_totals_table(amount: Decimal, currency: str) -> str:
     )
     return (
         "<w:tbl>"
-        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/>{borders_xml}<w:jc w:val=\"right\"/></w:tblPr>"
+        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:jc w:val=\"right\"/><w:tblInd w:w=\"0\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/><w:tblCellMar><w:top w:w=\"40\" w:type=\"dxa\"/><w:left w:w=\"40\" w:type=\"dxa\"/><w:bottom w:w=\"40\" w:type=\"dxa\"/><w:right w:w=\"40\" w:type=\"dxa\"/></w:tblCellMar>{borders_xml}</w:tblPr>"
         f"<w:tblGrid>{grid_xml}</w:tblGrid>"
         f"{row_xml}"
         "</w:tbl>"
@@ -478,7 +478,7 @@ def _invoice_totals_table(amount: Decimal, currency: str) -> str:
 
 
 def _invoice_footer_signatures() -> str:
-    widths = [2500, 2800, 1700, 2200]
+    widths = [2938, 2793, 1702, 2211]
     table_width = sum(widths)
     grid_xml = "".join(f'<w:gridCol w:w="{width}"/>' for width in widths)
     borders_xml = (
@@ -497,7 +497,7 @@ def _invoice_footer_signatures() -> str:
     )
     return (
         "<w:tbl>"
-        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/><w:jc w:val=\"right\"/>{borders_xml}</w:tblPr>"
+        f"<w:tblPr><w:tblW w:w=\"{table_width}\" w:type=\"dxa\"/><w:jc w:val=\"left\"/><w:tblInd w:w=\"41\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/><w:tblCellMar><w:top w:w=\"40\" w:type=\"dxa\"/><w:left w:w=\"40\" w:type=\"dxa\"/><w:bottom w:w=\"40\" w:type=\"dxa\"/><w:right w:w=\"40\" w:type=\"dxa\"/></w:tblCellMar>{borders_xml}</w:tblPr>"
         f"<w:tblGrid>{grid_xml}</w:tblGrid>"
         f"{row1}"
         "</w:tbl>"
@@ -561,7 +561,7 @@ def _signatures_table(executor_name: str, customer_name: str) -> str:
     )
     return (
         "<w:tbl>"
-        f"<w:tblPr>{borders_xml}</w:tblPr>"
+        f"<w:tblPr><w:tblW w:w=\"9200\" w:type=\"dxa\"/><w:jc w:val=\"left\"/><w:tblInd w:w=\"41\" w:type=\"dxa\"/><w:tblLayout w:type=\"fixed\"/><w:tblCellMar><w:top w:w=\"40\" w:type=\"dxa\"/><w:left w:w=\"40\" w:type=\"dxa\"/><w:bottom w:w=\"40\" w:type=\"dxa\"/><w:right w:w=\"40\" w:type=\"dxa\"/></w:tblCellMar>{borders_xml}</w:tblPr>"
         f"<w:tblGrid>{grid_xml}</w:tblGrid>"
         f"<w:tr>{left_cell}{right_cell}</w:tr>"
         "</w:tbl>"
