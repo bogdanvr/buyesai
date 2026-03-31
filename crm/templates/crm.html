@@ -4610,6 +4610,16 @@
               <textarea v-model="forms.touches.summary" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
             <label class="block md:col-span-2">
+              <span class="text-sm text-crm-muted">Закрыть связанную задачу</span>
+              <select v-model="forms.touches.taskId" :disabled="!touchTaskOptions.length" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed">
+                <option :value="null">[[ touchTaskOptions.length ? 'Не выбрана' : 'Нет открытых задач по компании или сделке' ]]</option>
+                <option v-for="task in touchTaskOptions" :key="task.id" :value="task.id">[[ task.title ]]</option>
+              </select>
+              <div class="mt-2 text-xs text-crm-muted">
+                При сохранении касания выбранная задача будет закрыта, а в её результат попадёт текст из поля «Краткое содержание».
+              </div>
+            </label>
+            <label class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Следующая задача</span>
               <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3 rounded-xl border border-crm-border bg-[#0f2f4a] p-3">
                 <label class="block md:col-span-2">
@@ -4651,16 +4661,6 @@
                   <span class="text-sm text-crm-muted">Описание</span>
                   <textarea v-model="touchFollowUpForm.description" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
                 </label>
-              </div>
-            </label>
-            <label class="block md:col-span-2">
-              <span class="text-sm text-crm-muted">Закрыть связанную задачу</span>
-              <select v-model="forms.touches.taskId" :disabled="!touchTaskOptions.length" class="mt-2 w-full h-11 rounded-xl border border-crm-border bg-[#102f4a] px-4 outline-none focus:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed">
-                <option :value="null">[[ touchTaskOptions.length ? 'Не выбрана' : 'Нет открытых задач по компании или сделке' ]]</option>
-                <option v-for="task in touchTaskOptions" :key="task.id" :value="task.id">[[ task.title ]]</option>
-              </select>
-              <div class="mt-2 text-xs text-crm-muted">
-                При сохранении касания выбранная задача будет закрыта, а в её результат попадёт текст из поля «Краткое содержание».
               </div>
             </label>
             <div class="md:col-span-2 rounded-xl border border-crm-border bg-[#0f2f4a] p-4">

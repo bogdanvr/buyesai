@@ -224,6 +224,7 @@
           isCompanyDocumentUploading: false,
           isLeadDocumentUploading: false,
           isTaskTouchesLoading: false,
+          isTouchTaskOptionsLoading: false,
           showCompanyContactForm: false,
           showCompanyContactsPanel: false,
           showCompanyDocumentsPanel: false,
@@ -2579,6 +2580,7 @@
                 this.loadTouchContactsForSelectedCompany();
               }
               this.loadTouchDocuments();
+              this.loadTouchTaskOptions();
             }
             this.applyTouchOwnerFromContext();
           }
@@ -2612,6 +2614,7 @@
                 this.forms.touches.documentUploadTarget = "deal";
               }
               this.loadTouchDocuments();
+              this.loadTouchTaskOptions();
             }
             this.applyTouchOwnerFromContext();
           }
@@ -4153,6 +4156,40 @@
           const payload = await this.apiRequest(`/api/v1/activities/${normalizedTaskId}/`);
           return this.mapTask(payload);
         },
+        async loadTouchTaskOptions() {
+          const companyId = this.toIntOrNull(this.forms.touches.companyId);
+          const dealId = this.toIntOrNull(this.forms.touches.dealId);
+          const currentTaskId = this.toIntOrNull(this.forms.touches.taskId);
+          if (!companyId && !dealId && !currentTaskId) {
+            return;
+          }
+
+          this.isTouchTaskOptionsLoading = true;
+          try {
+            const requests = [];
+            if (dealId) {
+              requests.push(this.apiRequest(`/api/v1/activities/?type=task&deal=${dealId}&is_done=false&page_size=200`));
+            } else if (companyId) {
+              requests.push(this.apiRequest(`/api/v1/activities/?type=task&client=${companyId}&is_done=false&page_size=200`));
+            }
+            if (currentTaskId) {
+              requests.push(this.apiRequest(`/api/v1/activities/${currentTaskId}/`));
+            }
+
+            const responses = await Promise.all(requests);
+            const loadedTasks = [];
+            responses.forEach((payload) => {
+              if (Array.isArray(payload?.results) || Array.isArray(payload)) {
+                loadedTasks.push(...this.normalizePaginatedResponse(payload).map((item) => this.mapTask(item)));
+              } else if (payload && typeof payload === "object" && payload.id) {
+                loadedTasks.push(this.mapTask(payload));
+              }
+            });
+            this.datasets.tasks = this.mergeSectionRecords(this.datasets.tasks, loadedTasks);
+          } finally {
+            this.isTouchTaskOptionsLoading = false;
+          }
+        },
         async fetchLeadById(leadId) {
           const normalizedLeadId = this.toIntOrNull(leadId);
           if (!normalizedLeadId) {
@@ -4194,6 +4231,18 @@
 
           const payload = await this.apiRequest(`/api/v1/clients/${normalizedCompanyId}/`);
           return this.mapClient(payload);
+        },
+        async ensureCompanyLoadedForTouchEditor(companyId) {
+          const normalizedCompanyId = this.toIntOrNull(companyId);
+          if (!normalizedCompanyId) {
+            return;
+          }
+          const alreadyLoaded = (this.datasets.companies || []).some((item) => String(item.id) === String(normalizedCompanyId));
+          if (alreadyLoaded) {
+            return;
+          }
+          const company = await this.fetchCompanyById(normalizedCompanyId);
+          this.datasets.companies = this.mergeSectionRecords(this.datasets.companies, [company]);
         },
         async openTaskFromEvent(taskId) {
           try {
@@ -9940,7 +9989,7 @@
           }
           return false;
         },
-        openTouchEditor(item, options = {}) {
+        async openTouchEditor(item, options = {}) {
           if (Object.prototype.hasOwnProperty.call(options, "parentContext")) {
             this.modalParentContext = options.parentContext;
           }
@@ -9955,12 +10004,7 @@
           this.editingTaskId = null;
           this.editingTouchId = null;
           this.editingTouchId = item.id;
-          const resolvedOwnerId = this.toIntOrNull(item.ownerId) || this.resolveTouchOwnerIdFromContext({
-            dealId: this.toIntOrNull(item.dealId),
-            leadId: this.toIntOrNull(item.leadId),
-            taskId: this.toIntOrNull(item.taskId),
-            companyId: this.toIntOrNull(item.clientId),
-          });
+          await this.ensureCompanyLoadedForTouchEditor(item.clientId);
           this.forms.touches = {
             happenedAt: this.toDateTimeLocal(item.happenedAtRaw),
             channelId: this.toIntOrNull(item.channelId),
@@ -9979,6 +10023,14 @@
             clientDocumentIds: (item.clientDocuments || []).map((document) => this.toIntOrNull(document.id)).filter(Boolean),
             documentUploadTarget: this.toIntOrNull(item.dealId) ? "deal" : (this.toIntOrNull(item.clientId) ? "company" : ""),
           };
+          await this.loadTouchTaskOptions();
+          const resolvedOwnerId = this.toIntOrNull(item.ownerId) || this.resolveTouchOwnerIdFromContext({
+            dealId: this.toIntOrNull(item.dealId),
+            leadId: this.toIntOrNull(item.leadId),
+            taskId: this.toIntOrNull(item.taskId),
+            companyId: this.toIntOrNull(item.clientId),
+          });
+          this.forms.touches.ownerId = resolvedOwnerId;
           this.resetTouchFollowUpForm();
           this.loadTouchDocuments();
           this.showModal = true;
