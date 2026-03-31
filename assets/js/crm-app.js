@@ -9851,7 +9851,7 @@
           throw new Error("Сделка без активных задач допустима только в статусах «Успешно» и «Провален»");
         },
         validateDealFailureReason() {
-          if (!this.isDealFailedStageSelected()) {
+          if (!this.isDealFailedStageSelected) {
             return;
           }
           if (!String(this.forms.deals.failureReason || "").trim()) {

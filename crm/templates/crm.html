@@ -3983,7 +3983,7 @@
               </div>
 
             </div>
-            <label v-if="isDealFailedStageSelected()" class="block md:col-span-2">
+            <label v-if="isDealFailedStageSelected" class="block md:col-span-2">
               <span class="text-sm text-crm-muted">Причина провала</span>
               <textarea v-model="forms.deals.failureReason" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
             </label>
@@ -6126,6 +6126,21 @@
                     [[ forms.companies.workRules.preferences || 'Не указаны' ]]
                   </button>
                 </div>
+                <div class="md:col-span-2 pt-2">
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-crm-muted">Заметки</span>
+                    <button
+                      type="button"
+                      @click="toggleCompanyNoteDraft"
+                      class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent shrink-0"
+                      :title="showCompanyNoteDraft ? 'Скрыть поле заметки' : 'Добавить заметку'"
+                    >
+                      <span class="text-xs">[[ showCompanyNoteDraft ? '−' : '+' ]]</span>
+                    </button>
+                  </div>
+                  <textarea v-if="showCompanyNoteDraft" v-model="forms.companies.noteDraft" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
+                  <textarea v-if="forms.companies.notes.trim()" :value="forms.companies.notes" rows="3" readonly class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none opacity-90 cursor-not-allowed"></textarea>
+                </div>
               </div>
               <div id="company-contacts-panel" v-if="showCompanyContactsPanel && editingCompanyId" class="mt-4 rounded-xl border border-crm-border bg-[#102f4a] px-4 py-4">
                 <button
@@ -6404,21 +6419,6 @@
                   <span class="text-crm-muted"> — [[ entry.name || 'без названия' ]]</span>
                 </div>
               </div>
-            </div>
-            <div class="block md:col-span-2">
-              <div class="flex items-center gap-2">
-                <span class="text-sm text-crm-muted">Заметки</span>
-                <button
-                  type="button"
-                  @click="toggleCompanyNoteDraft"
-                  class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-crm-accent hover:border-crm-accent shrink-0"
-                  :title="showCompanyNoteDraft ? 'Скрыть поле заметки' : 'Добавить заметку'"
-                >
-                  <span class="text-xs">[[ showCompanyNoteDraft ? '−' : '+' ]]</span>
-                </button>
-              </div>
-              <textarea v-if="showCompanyNoteDraft" v-model="forms.companies.noteDraft" rows="3" class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none focus:border-crm-accent"></textarea>
-              <textarea v-if="forms.companies.notes.trim()" :value="forms.companies.notes" rows="3" readonly class="mt-2 w-full rounded-xl border border-crm-border bg-[#102f4a] px-4 py-3 outline-none opacity-90 cursor-not-allowed"></textarea>
             </div>
             <div v-if="parsedCompanyEventItems.length" class="block md:col-span-2">
               <button
