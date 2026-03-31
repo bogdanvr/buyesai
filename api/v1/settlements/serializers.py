@@ -1,9 +1,24 @@
+from datetime import date
 from decimal import Decimal
+import json
 
 from django.urls import reverse
 from rest_framework import serializers
 
 from crm.models import Client, Contact, SettlementAllocation, SettlementContract, SettlementDocument
+from crm.services.contract_generation import (
+    DEFAULT_CLAIM_RESPONSE_DAYS,
+    DEFAULT_OFFER_ACCEPTANCE_DAYS,
+    DEFAULT_OFFER_ACCEPTANCE_TERM_DAYS,
+    DEFAULT_OFFER_ADVANCE_PAYMENT_DAYS,
+    DEFAULT_OFFER_FINAL_PAYMENT_DAYS,
+    DEFAULT_OFFER_PENALTY_CAP_PERCENT,
+    DEFAULT_OFFER_PENALTY_RATE,
+    DEFAULT_TERMINATION_NOTICE_DAYS,
+    DEFAULT_WARRANTY_DAYS,
+    OFFER_AGREEMENT_TEMPLATE_CODE,
+    SERVICE_AGREEMENT_TEMPLATE_CODE,
+)
 
 
 class SettlementAllocationHistorySerializer(serializers.ModelSerializer):
@@ -101,6 +116,20 @@ class SettlementContractSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        generator_payload = attrs.get("generator_payload")
+        if isinstance(generator_payload, str):
+            try:
+                generator_payload = json.loads(generator_payload)
+            except json.JSONDecodeError as exc:
+                raise serializers.ValidationError({"generator_payload": "Некорректный JSON параметров генерации."}) from exc
+        if generator_payload is not None and not isinstance(generator_payload, dict):
+            raise serializers.ValidationError({"generator_payload": "Параметры генерации должны быть объектом."})
+        if isinstance(generator_payload, dict):
+            attrs["generator_payload"] = self._validate_generator_payload(
+                generator_payload,
+                attrs,
+                instance=self.instance,
+            )
         uploaded_file = attrs.get("file")
         original_name_provided = "original_name" in attrs
         original_name = str(attrs.get("original_name") or "").strip()
@@ -110,15 +139,70 @@ class SettlementContractSerializer(serializers.ModelSerializer):
             attrs["original_name"] = original_name[:255]
         return attrs
 
+    def _validate_generator_payload(self, payload, attrs, *, instance=None):
+        normalized = dict(payload)
+        template_code = str(normalized.get("template_code") or "").strip()
+        if template_code not in {SERVICE_AGREEMENT_TEMPLATE_CODE, OFFER_AGREEMENT_TEMPLATE_CODE}:
+            raise serializers.ValidationError({"generator_payload": "Неизвестный шаблон договора."})
+
+        if template_code == SERVICE_AGREEMENT_TEMPLATE_CODE:
+            return {
+                **normalized,
+                "template_code": SERVICE_AGREEMENT_TEMPLATE_CODE,
+                "customer_contact_id": normalized.get("customer_contact_id"),
+                "executor_company_id": normalized.get("executor_company_id"),
+            }
+
+        acceptance_mode = str(normalized.get("offer_acceptance_mode") or "days").strip() or "days"
+        explicit_date = normalized.get("offer_acceptance_deadline_date")
+        if isinstance(explicit_date, date):
+            explicit_date = explicit_date.isoformat()
+        explicit_date = str(explicit_date or "").strip()
+        if explicit_date:
+            try:
+                date.fromisoformat(explicit_date)
+            except ValueError as exc:
+                raise serializers.ValidationError({"generator_payload": "Дата акцепта должна быть в формате YYYY-MM-DD."}) from exc
+        if acceptance_mode == "date" and not explicit_date:
+            raise serializers.ValidationError({"generator_payload": "Для режима даты укажите дату акцепта."})
+        if acceptance_mode not in {"days", "date"}:
+            raise serializers.ValidationError({"generator_payload": "Некорректный режим срока акцепта."})
+
+        return {
+            **normalized,
+            "template_code": OFFER_AGREEMENT_TEMPLATE_CODE,
+            "customer_contact_id": normalized.get("customer_contact_id"),
+            "executor_company_id": normalized.get("executor_company_id"),
+            "offer_acceptance_mode": acceptance_mode,
+            "offer_acceptance_term_days": int(normalized.get("offer_acceptance_term_days") or DEFAULT_OFFER_ACCEPTANCE_TERM_DAYS),
+            "offer_acceptance_deadline_date": explicit_date,
+            "offer_advance_payment_days": int(normalized.get("offer_advance_payment_days") or DEFAULT_OFFER_ADVANCE_PAYMENT_DAYS),
+            "offer_final_payment_days": int(normalized.get("offer_final_payment_days") or DEFAULT_OFFER_FINAL_PAYMENT_DAYS),
+            "offer_acceptance_days": int(normalized.get("offer_acceptance_days") or DEFAULT_OFFER_ACCEPTANCE_DAYS),
+            "offer_penalty_rate": str(normalized.get("offer_penalty_rate") or DEFAULT_OFFER_PENALTY_RATE),
+            "offer_penalty_cap_percent": str(normalized.get("offer_penalty_cap_percent") or DEFAULT_OFFER_PENALTY_CAP_PERCENT),
+        }
+
 
 class SettlementContractGenerateSerializer(serializers.Serializer):
+    template_code = serializers.ChoiceField(choices=[
+        (SERVICE_AGREEMENT_TEMPLATE_CODE, SERVICE_AGREEMENT_TEMPLATE_CODE),
+        (OFFER_AGREEMENT_TEMPLATE_CODE, OFFER_AGREEMENT_TEMPLATE_CODE),
+    ], default=SERVICE_AGREEMENT_TEMPLATE_CODE)
     client = serializers.PrimaryKeyRelatedField(queryset=Client.objects.all())
     representative_contact = serializers.PrimaryKeyRelatedField(queryset=Contact.objects.all(), allow_null=True, required=False)
     advance_percent = serializers.DecimalField(max_digits=6, decimal_places=2, min_value=Decimal("0.00"))
     hourly_rate = serializers.DecimalField(max_digits=14, decimal_places=2, min_value=Decimal("0.00"))
-    warranty_days = serializers.IntegerField(min_value=1, default=31)
-    claim_response_days = serializers.IntegerField(min_value=1, default=5)
-    termination_notice_days = serializers.IntegerField(min_value=1, default=5)
+    warranty_days = serializers.IntegerField(min_value=1, default=DEFAULT_WARRANTY_DAYS, required=False)
+    claim_response_days = serializers.IntegerField(min_value=1, default=DEFAULT_CLAIM_RESPONSE_DAYS, required=False)
+    termination_notice_days = serializers.IntegerField(min_value=1, default=DEFAULT_TERMINATION_NOTICE_DAYS, required=False)
+    offer_acceptance_term_days = serializers.IntegerField(min_value=1, default=DEFAULT_OFFER_ACCEPTANCE_TERM_DAYS, required=False)
+    offer_acceptance_deadline_date = serializers.DateField(required=False, allow_null=True)
+    offer_advance_payment_days = serializers.IntegerField(min_value=1, default=DEFAULT_OFFER_ADVANCE_PAYMENT_DAYS, required=False)
+    offer_final_payment_days = serializers.IntegerField(min_value=1, default=DEFAULT_OFFER_FINAL_PAYMENT_DAYS, required=False)
+    offer_acceptance_days = serializers.IntegerField(min_value=1, default=DEFAULT_OFFER_ACCEPTANCE_DAYS, required=False)
+    offer_penalty_rate = serializers.DecimalField(max_digits=6, decimal_places=2, min_value=Decimal("0.00"), default=DEFAULT_OFFER_PENALTY_RATE, required=False)
+    offer_penalty_cap_percent = serializers.DecimalField(max_digits=6, decimal_places=2, min_value=Decimal("0.00"), default=DEFAULT_OFFER_PENALTY_CAP_PERCENT, required=False)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -126,6 +210,13 @@ class SettlementContractGenerateSerializer(serializers.Serializer):
         representative_contact = attrs.get("representative_contact")
         if representative_contact is not None and client is not None and representative_contact.client_id != client.pk:
             raise serializers.ValidationError({"representative_contact": "Контакт должен принадлежать выбранной компании."})
+        template_code = attrs.get("template_code") or SERVICE_AGREEMENT_TEMPLATE_CODE
+        if template_code == SERVICE_AGREEMENT_TEMPLATE_CODE:
+            attrs["warranty_days"] = int(attrs.get("warranty_days") or DEFAULT_WARRANTY_DAYS)
+        if template_code == OFFER_AGREEMENT_TEMPLATE_CODE:
+            explicit_date = attrs.get("offer_acceptance_deadline_date")
+            if explicit_date is not None and explicit_date < date.today():
+                raise serializers.ValidationError({"offer_acceptance_deadline_date": "Дата акцепта не может быть в прошлом."})
         return attrs
 
 

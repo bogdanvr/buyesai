@@ -83,6 +83,12 @@
     ];
 
     const SETTLEMENT_DIRECTION_REQUIRED_TYPES = ["debt_adjustment", "refund"];
+    const SERVICE_AGREEMENT_TEMPLATE_CODE = "service_agreement";
+    const OFFER_AGREEMENT_TEMPLATE_CODE = "offer_agreement";
+    const SETTLEMENT_CONTRACT_TEMPLATE_OPTIONS = [
+      { value: SERVICE_AGREEMENT_TEMPLATE_CODE, label: "Договор об оказании услуг" },
+      { value: OFFER_AGREEMENT_TEMPLATE_CODE, label: "Договор-оферта" },
+    ];
 
     const app = createApp({
       compilerOptions: {
@@ -589,6 +595,8 @@
           },
           companySettlementContractForm: {
             id: null,
+            templateCode: "",
+            generatorPayload: {},
             title: "",
             number: "",
             currency: "RUB",
@@ -597,6 +605,13 @@
             warrantyDays: 31,
             claimResponseDays: 5,
             terminationNoticeDays: 5,
+            offerAcceptanceTermDays: 5,
+            offerAcceptanceDeadlineDate: "",
+            offerAdvancePaymentDays: 5,
+            offerFinalPaymentDays: 5,
+            offerAcceptanceDays: 5,
+            offerPenaltyRate: "0.10",
+            offerPenaltyCapPercent: "10.00",
             startDate: "",
             endDate: "",
             note: "",
@@ -607,12 +622,20 @@
             isActive: true,
           },
           companySettlementContractGeneratorForm: {
+            templateCode: SERVICE_AGREEMENT_TEMPLATE_CODE,
             contactId: null,
             advancePercent: "",
             hourlyRate: "",
             warrantyDays: 31,
             claimResponseDays: 5,
             terminationNoticeDays: 5,
+            offerAcceptanceTermDays: 5,
+            offerAcceptanceDeadlineDate: "",
+            offerAdvancePaymentDays: 5,
+            offerFinalPaymentDays: 5,
+            offerAcceptanceDays: 5,
+            offerPenaltyRate: "0.10",
+            offerPenaltyCapPercent: "10.00",
           },
           companySettlementDocumentForm: {
             contractId: null,
@@ -4413,6 +4436,110 @@
           }
           return (this.datasets.deals || []).find((deal) => String(deal.id) === String(dealId)) || null;
         },
+        settlementContractTemplateOptions() {
+          return SETTLEMENT_CONTRACT_TEMPLATE_OPTIONS.slice();
+        },
+        normalizeSettlementContractTemplateCode(value) {
+          const templateCode = String(value || "").trim();
+          if (templateCode === OFFER_AGREEMENT_TEMPLATE_CODE) {
+            return OFFER_AGREEMENT_TEMPLATE_CODE;
+          }
+          if (templateCode === SERVICE_AGREEMENT_TEMPLATE_CODE) {
+            return SERVICE_AGREEMENT_TEMPLATE_CODE;
+          }
+          return "";
+        },
+        isServiceSettlementContractTemplate(value) {
+          return this.normalizeSettlementContractTemplateCode(value) === SERVICE_AGREEMENT_TEMPLATE_CODE;
+        },
+        isOfferSettlementContractTemplate(value) {
+          return this.normalizeSettlementContractTemplateCode(value) === OFFER_AGREEMENT_TEMPLATE_CODE;
+        },
+        defaultCompanySettlementContractGeneratorForm(templateCode = SERVICE_AGREEMENT_TEMPLATE_CODE) {
+          const preferredHourlyRate = Number(this.companySettlementContracts[0]?.hourlyRate || 0) || 0;
+          return {
+            templateCode: this.normalizeSettlementContractTemplateCode(templateCode) || SERVICE_AGREEMENT_TEMPLATE_CODE,
+            contactId: this.preferredCompanySettlementContractContactId(),
+            advancePercent: "",
+            hourlyRate: preferredHourlyRate > 0 ? preferredHourlyRate.toFixed(2) : "",
+            warrantyDays: 31,
+            claimResponseDays: 5,
+            terminationNoticeDays: 5,
+            offerAcceptanceTermDays: 5,
+            offerAcceptanceDeadlineDate: "",
+            offerAdvancePaymentDays: 5,
+            offerFinalPaymentDays: 5,
+            offerAcceptanceDays: 5,
+            offerPenaltyRate: "0.10",
+            offerPenaltyCapPercent: "10.00",
+          };
+        },
+        defaultCompanySettlementContractForm(templateCode = "") {
+          return {
+            id: null,
+            templateCode: this.normalizeSettlementContractTemplateCode(templateCode),
+            generatorPayload: {},
+            title: "",
+            number: "",
+            currency: this.forms.companies.currency || "RUB",
+            hourlyRate: "",
+            advancePercent: "",
+            warrantyDays: 31,
+            claimResponseDays: 5,
+            terminationNoticeDays: 5,
+            offerAcceptanceTermDays: 5,
+            offerAcceptanceDeadlineDate: "",
+            offerAdvancePaymentDays: 5,
+            offerFinalPaymentDays: 5,
+            offerAcceptanceDays: 5,
+            offerPenaltyRate: "0.10",
+            offerPenaltyCapPercent: "10.00",
+            startDate: "",
+            endDate: "",
+            note: "",
+            file: null,
+            fileName: "",
+            currentFileName: "",
+            currentFileUrl: "",
+            isActive: true,
+          };
+        },
+        buildSettlementContractGeneratorPayloadFromForm(form, fallbackPayload = {}) {
+          const templateCode = this.normalizeSettlementContractTemplateCode(form?.templateCode);
+          if (!templateCode) {
+            return null;
+          }
+          const basePayload = (fallbackPayload && typeof fallbackPayload === "object") ? fallbackPayload : {};
+          if (templateCode === SERVICE_AGREEMENT_TEMPLATE_CODE) {
+            return {
+              ...basePayload,
+              template_code: SERVICE_AGREEMENT_TEMPLATE_CODE,
+              customer_contact_id: this.toIntOrNull(basePayload.customer_contact_id),
+              executor_company_id: this.toIntOrNull(basePayload.executor_company_id),
+            };
+          }
+          const explicitDate = String(form?.offerAcceptanceDeadlineDate || "").trim();
+          return {
+            ...basePayload,
+            template_code: OFFER_AGREEMENT_TEMPLATE_CODE,
+            customer_contact_id: this.toIntOrNull(basePayload.customer_contact_id),
+            executor_company_id: this.toIntOrNull(basePayload.executor_company_id),
+            offer_acceptance_mode: explicitDate ? "date" : "days",
+            offer_acceptance_term_days: Number.parseInt(form?.offerAcceptanceTermDays || 5, 10) || 5,
+            offer_acceptance_deadline_date: explicitDate,
+            offer_advance_payment_days: Number.parseInt(form?.offerAdvancePaymentDays || 5, 10) || 5,
+            offer_final_payment_days: Number.parseInt(form?.offerFinalPaymentDays || 5, 10) || 5,
+            offer_acceptance_days: Number.parseInt(form?.offerAcceptanceDays || 5, 10) || 5,
+            offer_penalty_rate: (() => {
+              const value = this.parseFlexibleNumber(form?.offerPenaltyRate);
+              return (value > 0 ? value : 0.1).toFixed(2);
+            })(),
+            offer_penalty_cap_percent: (() => {
+              const value = this.parseFlexibleNumber(form?.offerPenaltyCapPercent);
+              return (value > 0 ? value : 10).toFixed(2);
+            })(),
+          };
+        },
         async ensureCompanySettlementDealsLoaded() {
           const companyId = this.toIntOrNull(this.editingCompanyId);
           if (!companyId) {
@@ -4426,6 +4553,9 @@
           return this.settlementDocumentIsRealization(documentType) ? "Акт об оказании услуг" : "";
         },
         normalizeSettlementContract(item = {}) {
+          const generatorPayload = (item.generator_payload && typeof item.generator_payload === "object")
+            ? item.generator_payload
+            : (item.generatorPayload && typeof item.generatorPayload === "object" ? item.generatorPayload : {});
           return {
             id: this.toIntOrNull(item.id),
             clientId: this.toIntOrNull(item.client),
@@ -4440,9 +4570,8 @@
             startDate: item.start_date || item.startDate || "",
             endDate: item.end_date || item.endDate || "",
             note: item.note || "",
-            generatorPayload: (item.generator_payload && typeof item.generator_payload === "object")
-              ? item.generator_payload
-              : (item.generatorPayload && typeof item.generatorPayload === "object" ? item.generatorPayload : {}),
+            generatorPayload,
+            templateCode: this.normalizeSettlementContractTemplateCode(generatorPayload.template_code),
             originalName: item.original_name || item.originalName || "",
             fileUrl: item.download_url || item.downloadUrl || item.file_url || item.fileUrl || "",
             downloadUrl: item.download_url || item.downloadUrl || "",
@@ -4494,8 +4623,14 @@
           } else if (!this.companySettlementContracts.length) {
             await this.loadCompanySettlements();
           }
+          const generatorPayload = (normalizedContract.generatorPayload && typeof normalizedContract.generatorPayload === "object")
+            ? normalizedContract.generatorPayload
+            : {};
           this.companySettlementContractForm = {
+            ...this.defaultCompanySettlementContractForm(normalizedContract.templateCode),
             id: normalizedContract.id,
+            templateCode: normalizedContract.templateCode || "",
+            generatorPayload,
             title: normalizedContract.title || "",
             number: normalizedContract.number || "",
             currency: normalizedContract.currency || this.forms.companies.currency || "RUB",
@@ -4504,6 +4639,13 @@
             warrantyDays: normalizedContract.warrantyDays || 31,
             claimResponseDays: normalizedContract.claimResponseDays || 5,
             terminationNoticeDays: normalizedContract.terminationNoticeDays || 5,
+            offerAcceptanceTermDays: Number.parseInt(generatorPayload.offer_acceptance_term_days || 5, 10) || 5,
+            offerAcceptanceDeadlineDate: generatorPayload.offer_acceptance_deadline_date || "",
+            offerAdvancePaymentDays: Number.parseInt(generatorPayload.offer_advance_payment_days || 5, 10) || 5,
+            offerFinalPaymentDays: Number.parseInt(generatorPayload.offer_final_payment_days || 5, 10) || 5,
+            offerAcceptanceDays: Number.parseInt(generatorPayload.offer_acceptance_days || 5, 10) || 5,
+            offerPenaltyRate: String(generatorPayload.offer_penalty_rate || "0.10"),
+            offerPenaltyCapPercent: String(generatorPayload.offer_penalty_cap_percent || "10.00"),
             startDate: normalizedContract.startDate || "",
             endDate: normalizedContract.endDate || "",
             note: normalizedContract.note || "",
@@ -4528,6 +4670,19 @@
         closeCompanySettlementContractGeneratorForm() {
           this.showCompanySettlementContractGeneratorForm = false;
           this.resetCompanySettlementContractGeneratorForm();
+        },
+        handleCompanySettlementContractGeneratorTemplateChange() {
+          const nextTemplateCode = this.normalizeSettlementContractTemplateCode(this.companySettlementContractGeneratorForm.templateCode) || SERVICE_AGREEMENT_TEMPLATE_CODE;
+          const preservedContactId = this.companySettlementContractGeneratorForm.contactId;
+          const preservedHourlyRate = this.companySettlementContractGeneratorForm.hourlyRate;
+          const preservedAdvancePercent = this.companySettlementContractGeneratorForm.advancePercent;
+          this.companySettlementContractGeneratorForm = {
+            ...this.defaultCompanySettlementContractGeneratorForm(nextTemplateCode),
+            templateCode: nextTemplateCode,
+            contactId: preservedContactId,
+            hourlyRate: preservedHourlyRate,
+            advancePercent: preservedAdvancePercent,
+          };
         },
         openCompanySettlementContract(contract) {
           const normalizedContract = contract ? this.normalizeSettlementContract(contract) : null;
@@ -4611,37 +4766,11 @@
           };
         },
         resetCompanySettlementContractForm() {
-          this.companySettlementContractForm = {
-            id: null,
-            title: "",
-            number: "",
-            currency: this.forms.companies.currency || "RUB",
-            hourlyRate: "",
-            advancePercent: "",
-            warrantyDays: 31,
-            claimResponseDays: 5,
-            terminationNoticeDays: 5,
-            startDate: "",
-            endDate: "",
-            note: "",
-            file: null,
-            fileName: "",
-            currentFileName: "",
-            currentFileUrl: "",
-            isActive: true,
-          };
+          this.companySettlementContractForm = this.defaultCompanySettlementContractForm();
           this.clearCompanySettlementContractFileInput();
         },
         resetCompanySettlementContractGeneratorForm() {
-          const preferredHourlyRate = Number(this.companySettlementContracts[0]?.hourlyRate || 0) || 0;
-          this.companySettlementContractGeneratorForm = {
-            contactId: this.preferredCompanySettlementContractContactId(),
-            advancePercent: "",
-            hourlyRate: preferredHourlyRate > 0 ? preferredHourlyRate.toFixed(2) : "",
-            warrantyDays: 31,
-            claimResponseDays: 5,
-            terminationNoticeDays: 5,
-          };
+          this.companySettlementContractGeneratorForm = this.defaultCompanySettlementContractGeneratorForm();
         },
         resetCompanySettlementDocumentForm() {
           this.companySettlementDocumentForm = {
@@ -4983,6 +5112,10 @@
           try {
             const contractId = this.toIntOrNull(this.companySettlementContractForm.id);
             const hourlyRate = this.parseFlexibleNumber(this.companySettlementContractForm.hourlyRate);
+            const generatorPayload = this.buildSettlementContractGeneratorPayloadFromForm(
+              this.companySettlementContractForm,
+              this.companySettlementContractForm.generatorPayload,
+            );
             const contractPayload = {
               client: this.editingCompanyId,
               title: this.companySettlementContractForm.title.trim(),
@@ -5000,6 +5133,9 @@
               note: this.companySettlementContractForm.note.trim(),
               is_active: !!this.companySettlementContractForm.isActive,
             };
+            if (generatorPayload) {
+              contractPayload.generator_payload = generatorPayload;
+            }
             const selectedFile = this.companySettlementContractForm.file;
             const requestBody = selectedFile
               ? (() => {
@@ -5008,7 +5144,7 @@
                   if (value === null || value === undefined) {
                     return;
                   }
-                  formData.append(key, value);
+                  formData.append(key, typeof value === "object" ? JSON.stringify(value) : value);
                 });
                 formData.append("file", selectedFile);
                 formData.append("original_name", this.companySettlementContractForm.fileName || selectedFile.name || "");
@@ -5043,17 +5179,36 @@
               throw new Error("Укажите стоимость часа больше нуля.");
             }
             const advancePercent = this.parseFlexibleNumber(this.companySettlementContractGeneratorForm.advancePercent);
+            const templateCode = this.normalizeSettlementContractTemplateCode(this.companySettlementContractGeneratorForm.templateCode) || SERVICE_AGREEMENT_TEMPLATE_CODE;
+            const requestBody = {
+              client: this.editingCompanyId,
+              template_code: templateCode,
+              representative_contact: this.toIntOrNull(this.companySettlementContractGeneratorForm.contactId),
+              advance_percent: advancePercent > 0 ? advancePercent.toFixed(2) : "0.00",
+              hourly_rate: hourlyRate.toFixed(2),
+              claim_response_days: Number.parseInt(this.companySettlementContractGeneratorForm.claimResponseDays || 5, 10) || 5,
+              termination_notice_days: Number.parseInt(this.companySettlementContractGeneratorForm.terminationNoticeDays || 5, 10) || 5,
+            };
+            if (templateCode === SERVICE_AGREEMENT_TEMPLATE_CODE) {
+              requestBody.warranty_days = Number.parseInt(this.companySettlementContractGeneratorForm.warrantyDays || 31, 10) || 31;
+            } else if (templateCode === OFFER_AGREEMENT_TEMPLATE_CODE) {
+              requestBody.offer_acceptance_term_days = Number.parseInt(this.companySettlementContractGeneratorForm.offerAcceptanceTermDays || 5, 10) || 5;
+              requestBody.offer_acceptance_deadline_date = this.companySettlementContractGeneratorForm.offerAcceptanceDeadlineDate || null;
+              requestBody.offer_advance_payment_days = Number.parseInt(this.companySettlementContractGeneratorForm.offerAdvancePaymentDays || 5, 10) || 5;
+              requestBody.offer_final_payment_days = Number.parseInt(this.companySettlementContractGeneratorForm.offerFinalPaymentDays || 5, 10) || 5;
+              requestBody.offer_acceptance_days = Number.parseInt(this.companySettlementContractGeneratorForm.offerAcceptanceDays || 5, 10) || 5;
+              requestBody.offer_penalty_rate = (() => {
+                const value = this.parseFlexibleNumber(this.companySettlementContractGeneratorForm.offerPenaltyRate);
+                return (value > 0 ? value : 0.1).toFixed(2);
+              })();
+              requestBody.offer_penalty_cap_percent = (() => {
+                const value = this.parseFlexibleNumber(this.companySettlementContractGeneratorForm.offerPenaltyCapPercent);
+                return (value > 0 ? value : 10).toFixed(2);
+              })();
+            }
             const created = await this.apiRequest("/api/v1/settlements/contracts/generate/", {
               method: "POST",
-              body: {
-                client: this.editingCompanyId,
-                representative_contact: this.toIntOrNull(this.companySettlementContractGeneratorForm.contactId),
-                advance_percent: advancePercent > 0 ? advancePercent.toFixed(2) : "0.00",
-                hourly_rate: hourlyRate.toFixed(2),
-                warranty_days: Number.parseInt(this.companySettlementContractGeneratorForm.warrantyDays || 31, 10) || 31,
-                claim_response_days: Number.parseInt(this.companySettlementContractGeneratorForm.claimResponseDays || 5, 10) || 5,
-                termination_notice_days: Number.parseInt(this.companySettlementContractGeneratorForm.terminationNoticeDays || 5, 10) || 5,
-              },
+              body: requestBody,
             });
             this.closeCompanySettlementContractGeneratorForm();
             await this.loadCompanyDocuments();

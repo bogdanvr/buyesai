@@ -426,6 +426,97 @@ class SettlementsApiTests(APITestCase):
             self.assertNotIn("электронная почта director@acme.example, а также иные письменно согласованные каналы связи.", xml)
 
     @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
+    def test_can_generate_offer_contract_from_template(self):
+        with override_settings(MEDIA_ROOT=self.media_root):
+            response = self.client.post(
+                reverse("settlement-contracts-generate"),
+                {
+                    "client": self.company.pk,
+                    "template_code": "offer_agreement",
+                    "advance_percent": "30.00",
+                    "hourly_rate": "3500.00",
+                    "claim_response_days": 6,
+                    "termination_notice_days": 9,
+                    "offer_acceptance_term_days": 5,
+                    "offer_advance_payment_days": 4,
+                    "offer_final_payment_days": 6,
+                    "offer_acceptance_days": 7,
+                    "offer_penalty_rate": "0.15",
+                    "offer_penalty_cap_percent": "12.00",
+                },
+                format="json",
+            )
+
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content.decode())
+            contract = SettlementContract.objects.get(pk=response.data["id"])
+            self.assertEqual(contract.title, "Договор-оферта")
+            self.assertEqual(contract.generator_payload.get("template_code"), "offer_agreement")
+            xml = self._contract_document_xml(contract)
+            self.assertIn("ДОГОВОР-ОФЕРТА", xml)
+            self.assertIn('ООО "Акме"', xml)
+            self.assertIn('ОГРН 1025500000000, ИНН 5500000000', xml)
+            self.assertIn('"Байес"', xml)
+            self.assertIn("аванс в размере 30 % стоимости соответствующего этапа", xml)
+            self.assertIn("в течение 4 рабочих дней", xml)
+            self.assertIn("в течение 6 рабочих дней", xml)
+            self.assertIn("составляет 3500 рублей.", xml)
+            self.assertIn("в течение 7 рабочих дней с даты получения акта", xml)
+            self.assertIn("в размере 0,15 % от суммы просроченного платежа", xml)
+            self.assertIn("но не более 12 % от суммы соответствующей задолженности.", xml)
+            self.assertIn("не менее чем за 9 календарных дней.", xml)
+            self.assertIn("Срок ответа на претензию составляет 6 календарных дней с даты ее получения.", xml)
+            self.assertIn("БИК 045004774", xml)
+
+    @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
+    def test_updating_generated_offer_contract_regenerates_docx(self):
+        with override_settings(MEDIA_ROOT=self.media_root):
+            create_response = self.client.post(
+                reverse("settlement-contracts-generate"),
+                {
+                    "client": self.company.pk,
+                    "template_code": "offer_agreement",
+                    "advance_percent": "25.00",
+                    "hourly_rate": "1800.00",
+                    "claim_response_days": 5,
+                    "termination_notice_days": 5,
+                    "offer_acceptance_term_days": 5,
+                    "offer_advance_payment_days": 5,
+                    "offer_final_payment_days": 5,
+                    "offer_acceptance_days": 5,
+                    "offer_penalty_rate": "0.10",
+                    "offer_penalty_cap_percent": "10.00",
+                },
+                format="json",
+            )
+            self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.content.decode())
+            contract = SettlementContract.objects.get(pk=create_response.data["id"])
+
+            update_response = self.client.patch(
+                reverse("settlement-contracts-detail", kwargs={"pk": contract.pk}),
+                {
+                    "hourly_rate": "4200.00",
+                    "claim_response_days": 8,
+                    "generator_payload": {
+                        **contract.generator_payload,
+                        "template_code": "offer_agreement",
+                        "offer_acceptance_days": 9,
+                        "offer_penalty_rate": "0.25",
+                        "offer_penalty_cap_percent": "15.00",
+                    },
+                },
+                format="json",
+            )
+
+            self.assertEqual(update_response.status_code, status.HTTP_200_OK, update_response.content.decode())
+            contract.refresh_from_db()
+            xml = self._contract_document_xml(contract)
+            self.assertIn("составляет 4200 рублей.", xml)
+            self.assertIn("в течение 9 рабочих дней с даты получения акта", xml)
+            self.assertIn("в размере 0,25 % от суммы просроченного платежа", xml)
+            self.assertIn("но не более 15 % от суммы соответствующей задолженности.", xml)
+            self.assertIn("Срок ответа на претензию составляет 8 календарных дней с даты ее получения.", xml)
+
+    @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
     def test_updating_generated_contract_regenerates_docx_and_keeps_number(self):
         with override_settings(MEDIA_ROOT=self.media_root):
             create_response = self.client.post(

@@ -5007,6 +5007,14 @@
                           Отмена
                         </button>
                       </div>
+                      <label v-if="companySettlementContractForm.templateCode" class="block">
+                        <span class="text-sm text-crm-muted">Шаблон</span>
+                        <select v-model="companySettlementContractForm.templateCode" disabled class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 opacity-80 outline-none">
+                          <option v-for="option in settlementContractTemplateOptions()" :key="`company-settlement-contract-template-${option.value}`" :value="option.value">
+                            [[ option.label ]]
+                          </option>
+                        </select>
+                      </label>
                       <label class="block">
                         <span class="text-sm text-crm-muted">Название</span>
                         <input v-model="companySettlementContractForm.title" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
@@ -5032,7 +5040,7 @@
                         <span class="text-sm text-crm-muted">Размер аванса, %</span>
                         <input v-model="companySettlementContractForm.advancePercent" type="number" min="0" step="0.01" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                       </label>
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div v-if="!companySettlementContractForm.templateCode || isServiceSettlementContractTemplate(companySettlementContractForm.templateCode)" class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <label class="block">
                           <span class="text-sm text-crm-muted">Гарантийный срок, дней</span>
                           <input v-model="companySettlementContractForm.warrantyDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
@@ -5042,8 +5050,46 @@
                           <input v-model="companySettlementContractForm.claimResponseDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                         </label>
                       </div>
-                      <label class="block">
+                      <label v-if="!companySettlementContractForm.templateCode || isServiceSettlementContractTemplate(companySettlementContractForm.templateCode)" class="block">
                         <span class="text-sm text-crm-muted">Уведомление о расторжении, дней</span>
+                        <input v-model="companySettlementContractForm.terminationNoticeDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                      </label>
+                      <div v-if="isOfferSettlementContractTemplate(companySettlementContractForm.templateCode)" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Срок для акцепта, дней</span>
+                          <input v-model="companySettlementContractForm.offerAcceptanceTermDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Дата акцепта</span>
+                          <input v-model="companySettlementContractForm.offerAcceptanceDeadlineDate" type="date" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Срок оплаты аванса, рабочих дней</span>
+                          <input v-model="companySettlementContractForm.offerAdvancePaymentDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Срок окончательной оплаты, рабочих дней</span>
+                          <input v-model="companySettlementContractForm.offerFinalPaymentDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Срок приемки, рабочих дней</span>
+                          <input v-model="companySettlementContractForm.offerAcceptanceDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Срок ответа на претензию, календарных дней</span>
+                          <input v-model="companySettlementContractForm.claimResponseDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Неустойка, % в день</span>
+                          <input v-model="companySettlementContractForm.offerPenaltyRate" type="number" min="0" step="0.01" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-sm text-crm-muted">Лимит неустойки, %</span>
+                          <input v-model="companySettlementContractForm.offerPenaltyCapPercent" type="number" min="0" step="0.01" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                      </div>
+                      <label v-if="isOfferSettlementContractTemplate(companySettlementContractForm.templateCode)" class="block">
+                        <span class="text-sm text-crm-muted">Срок уведомления о расторжении, календарных дней</span>
                         <input v-model="companySettlementContractForm.terminationNoticeDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                       </label>
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -5715,6 +5761,14 @@
                     <div v-if="showCompanySettlementContractGeneratorForm" class="mt-3 rounded-xl border border-crm-border bg-[#0f2f4a] p-4 space-y-3">
                       <div class="text-sm font-semibold text-white">Новый договор</div>
                       <label class="block">
+                        <span class="text-sm text-crm-muted">Шаблон договора</span>
+                        <select v-model="companySettlementContractGeneratorForm.templateCode" @change="handleCompanySettlementContractGeneratorTemplateChange" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
+                          <option v-for="option in settlementContractTemplateOptions()" :key="`company-settlement-generator-template-${option.value}`" :value="option.value">
+                            [[ option.label ]]
+                          </option>
+                        </select>
+                      </label>
+                      <label v-if="isServiceSettlementContractTemplate(companySettlementContractGeneratorForm.templateCode)" class="block">
                         <span class="text-sm text-crm-muted">Контакт для подстановки как директор</span>
                         <select v-model="companySettlementContractGeneratorForm.contactId" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent">
                           <option :value="null">Автовыбор по ЛПР или основному контакту</option>
@@ -5736,13 +5790,41 @@
                           <span class="text-sm text-crm-muted">Стоимость часа</span>
                           <input v-model="companySettlementContractGeneratorForm.hourlyRate" type="number" min="0" step="0.01" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                         </label>
-                        <label class="block">
+                        <label v-if="isServiceSettlementContractTemplate(companySettlementContractGeneratorForm.templateCode)" class="block">
                           <span class="text-sm text-crm-muted">Гарантийный срок, дней</span>
                           <input v-model="companySettlementContractGeneratorForm.warrantyDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                         </label>
                         <label class="block">
                           <span class="text-sm text-crm-muted">Срок ответа на претензию, дней</span>
                           <input v-model="companySettlementContractGeneratorForm.claimResponseDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label v-if="isOfferSettlementContractTemplate(companySettlementContractGeneratorForm.templateCode)" class="block">
+                          <span class="text-sm text-crm-muted">Срок для акцепта, дней</span>
+                          <input v-model="companySettlementContractGeneratorForm.offerAcceptanceTermDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label v-if="isOfferSettlementContractTemplate(companySettlementContractGeneratorForm.templateCode)" class="block">
+                          <span class="text-sm text-crm-muted">Дата акцепта</span>
+                          <input v-model="companySettlementContractGeneratorForm.offerAcceptanceDeadlineDate" type="date" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label v-if="isOfferSettlementContractTemplate(companySettlementContractGeneratorForm.templateCode)" class="block">
+                          <span class="text-sm text-crm-muted">Срок оплаты аванса, рабочих дней</span>
+                          <input v-model="companySettlementContractGeneratorForm.offerAdvancePaymentDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label v-if="isOfferSettlementContractTemplate(companySettlementContractGeneratorForm.templateCode)" class="block">
+                          <span class="text-sm text-crm-muted">Срок окончательной оплаты, рабочих дней</span>
+                          <input v-model="companySettlementContractGeneratorForm.offerFinalPaymentDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label v-if="isOfferSettlementContractTemplate(companySettlementContractGeneratorForm.templateCode)" class="block">
+                          <span class="text-sm text-crm-muted">Срок приемки, рабочих дней</span>
+                          <input v-model="companySettlementContractGeneratorForm.offerAcceptanceDays" type="number" min="1" step="1" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label v-if="isOfferSettlementContractTemplate(companySettlementContractGeneratorForm.templateCode)" class="block">
+                          <span class="text-sm text-crm-muted">Неустойка, % в день</span>
+                          <input v-model="companySettlementContractGeneratorForm.offerPenaltyRate" type="number" min="0" step="0.01" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label v-if="isOfferSettlementContractTemplate(companySettlementContractGeneratorForm.templateCode)" class="block">
+                          <span class="text-sm text-crm-muted">Лимит неустойки, %</span>
+                          <input v-model="companySettlementContractGeneratorForm.offerPenaltyCapPercent" type="number" min="0" step="0.01" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
                         </label>
                       </div>
                       <label class="block">

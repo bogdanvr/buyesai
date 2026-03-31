@@ -19,9 +19,9 @@ from api.v1.settlements.serializers import (
 )
 from crm.models import SettlementAllocation, SettlementContract, SettlementDocument
 from crm.services.contract_generation import (
-    SERVICE_AGREEMENT_TEMPLATE_CODE,
-    generate_service_agreement_contract,
-    refresh_generated_service_agreement,
+    GENERATED_CONTRACT_TEMPLATE_CODES,
+    generate_contract,
+    refresh_generated_contract,
 )
 
 
@@ -105,6 +105,7 @@ class SettlementContractViewSet(ModelViewSet):
         "end_date",
         "note",
         "is_active",
+        "generator_payload",
     }
 
     def get_queryset(self):
@@ -118,7 +119,7 @@ class SettlementContractViewSet(ModelViewSet):
         current_instance = serializer.instance
         payload = current_instance.generator_payload if isinstance(current_instance.generator_payload, dict) else {}
         should_regenerate = (
-            payload.get("template_code") == SERVICE_AGREEMENT_TEMPLATE_CODE
+            payload.get("template_code") in GENERATED_CONTRACT_TEMPLATE_CODES
             and any(
                 field_name in serializer.validated_data
                 and serializer.validated_data[field_name] != getattr(current_instance, field_name)
@@ -127,13 +128,13 @@ class SettlementContractViewSet(ModelViewSet):
         )
         instance = serializer.save()
         if should_regenerate:
-            refresh_generated_service_agreement(instance)
+            refresh_generated_contract(instance)
 
     @action(detail=False, methods=["post"], url_path="generate")
     def generate(self, request):
         request_serializer = SettlementContractGenerateSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
-        contract = generate_service_agreement_contract(**request_serializer.validated_data)
+        contract = generate_contract(**request_serializer.validated_data)
         response_serializer = self.get_serializer(contract)
         return Response(response_serializer.data, status=201)
 
