@@ -347,6 +347,7 @@ def _service_table(items: list[ActLineItem]) -> str:
 
 def _invoice_payment_table(executor_company: Client) -> str:
     widths = [4364, 1600, 887, 2788]
+    inn_row_widths = [3098, 2865, 888, 2788]
     table_width = sum(widths)
     bank_name = _normalize_text(executor_company.bank_name) or "Банк не указан"
     bik = _normalize_text(executor_company.bik) or "-"
@@ -368,10 +369,10 @@ def _invoice_payment_table(executor_company: Client) -> str:
         f"{_table_cell_custom(correspondent_account, width=widths[3], size=22)}"
         "</w:tr>",
         "<w:tr>"
-        f"{_table_cell_custom(f'ИНН {inn}', width=widths[0], bold=True, size=20)}"
-        f"{_table_cell_custom(f'КПП {kpp}', width=widths[1], bold=True, size=20)}"
-        f"{_table_cell_custom(settlement_label, width=widths[2], bold=True, size=20)}"
-        f"{_table_cell_custom(settlement_account, width=widths[3], size=22)}"
+        f"{_table_cell_custom(f'ИНН {inn}', width=inn_row_widths[0], bold=True, size=20)}"
+        f"{_table_cell_custom(f'КПП {kpp}', width=inn_row_widths[1], bold=True, size=20)}"
+        f"{_table_cell_custom(settlement_label, width=inn_row_widths[2], bold=True, size=20)}"
+        f"{_table_cell_custom(settlement_account, width=inn_row_widths[3], size=22)}"
         "</w:tr>",
         "<w:tr>"
         f"{_table_cell_custom(recipient_name, width=widths[0] + widths[1], size=22, grid_span=2)}"

@@ -236,6 +236,7 @@ class DealDocumentsApiTests(APITestCase):
         self.assertIn('<w:tblInd w:w="26" w:type="dxa"/>', document_xml)
         self.assertIn('<w:gridCol w:w="4364"/>', document_xml)
         self.assertIn('<w:gridCol w:w="2788"/>', document_xml)
+        self.assertIn('<w:tcW w:w="2865" w:type="dxa"/>', document_xml)
         self.assertIn('<w:gridCol w:w="1199"/>', document_xml)
         self.assertIn('<w:gridCol w:w="1730"/>', document_xml)
         self.assertIn('<w:vAlign w:val="center"/>', document_xml)
