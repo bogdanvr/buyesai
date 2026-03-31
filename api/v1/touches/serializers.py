@@ -158,7 +158,7 @@ class TouchSerializer(serializers.ModelSerializer):
 
     def _validate_deal_next_activity(self, attrs, deal, has_follow_up_task=False):
         stage_code = str(getattr(getattr(deal, "stage", None), "code", "") or "").strip().lower()
-        if stage_code in {"won", "failed"}:
+        if stage_code in {"won", "failed", "lost"}:
             return
         if has_follow_up_task:
             return

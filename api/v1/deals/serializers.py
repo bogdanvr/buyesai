@@ -6,6 +6,8 @@ from crm.models.activity import ActivityType, TaskStatus
 
 class DealSerializer(serializers.ModelSerializer):
     ACTIVE_TASK_STATUSES = {TaskStatus.TODO, TaskStatus.IN_PROGRESS}
+    FAILED_STAGE_CODES = {"failed", "lost"}
+    CLOSED_STAGE_CODES = {"won", *FAILED_STAGE_CODES}
     client_name = serializers.CharField(source="client.name", read_only=True)
     lead_title = serializers.CharField(source="lead.title", read_only=True)
     source_name = serializers.CharField(source="source.name", read_only=True)
@@ -48,11 +50,11 @@ class DealSerializer(serializers.ModelSerializer):
                 type=ActivityType.TASK,
                 status__in=self.ACTIVE_TASK_STATUSES,
             ).exists()
-        if stage_code not in {"won", "failed"} and not has_active_tasks and not has_pending_task:
+        if stage_code not in self.CLOSED_STAGE_CODES and not has_active_tasks and not has_pending_task:
             raise serializers.ValidationError(
                 {"stage": "Сделка без активных задач допустима только в статусах 'Успешно' и 'Провален'."}
             )
-        if stage_code == "failed":
+        if stage_code in self.FAILED_STAGE_CODES:
             effective_failure_reason = failure_reason or str(metadata.get("failed_reason", "") or "").strip()
             if not effective_failure_reason:
                 raise serializers.ValidationError({"failure_reason": "Укажите причину провала сделки."})

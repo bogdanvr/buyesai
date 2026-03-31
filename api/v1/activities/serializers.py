@@ -185,7 +185,7 @@ class ActivitySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"company_note": "Укажите важные факты о компании."})
         if activity_type == ActivityType.TASK and is_done and deal is not None:
             stage_code = str(getattr(getattr(deal, "stage", None), "code", "") or "").strip().lower()
-            if stage_code not in {"won", "failed"}:
+            if stage_code not in {"won", "failed", "lost"}:
                 if not has_other_active_task and not has_follow_up_task and not has_automatic_follow_up_task:
                     raise serializers.ValidationError(
                         {"has_follow_up_task": "Для активной сделки укажите следующую задачу или держите другую активную задачу."}

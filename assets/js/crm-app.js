@@ -1552,7 +1552,7 @@
         companySummaryFailedDeals() {
           return this.companySummaryDeals.filter((deal) => {
             const stageCode = String(deal.stageCode || "").trim().toLowerCase();
-            return stageCode === "failed";
+            return stageCode === "failed" || stageCode === "lost";
           });
         },
         companySummaryTouches() {
@@ -1672,7 +1672,8 @@
           return this.forms.companies.isActive ? "Активный" : "Неактивный";
         },
         isDealFailedStageSelected() {
-          return this.resolveDealStageCode(this.forms.deals.stageId) === "failed";
+          const stageCode = this.resolveDealStageCode(this.forms.deals.stageId);
+          return stageCode === "failed" || stageCode === "lost";
         },
         canSubmitDealCompanyAction() {
           return !!this.dealCompanyForm.name.trim();
@@ -1809,7 +1810,7 @@
           const deal = this.taskActiveDeal;
           if (!deal) return false;
           const stageCode = String(deal.stageCode || "").trim().toLowerCase();
-          return !["won", "failed"].includes(stageCode);
+          return !["won", "failed", "lost"].includes(stageCode);
         },
         showTaskFollowUpSuggestion() {
           return !!this.editingTaskId
@@ -9820,7 +9821,7 @@
             (candidate) => String(candidate.id) === String(stageId)
           );
           const stageCode = String((stage && stage.code) || "").trim().toLowerCase();
-          return ["won", "failed"].includes(stageCode);
+          return ["won", "failed", "lost"].includes(stageCode);
         },
         isDealStageRequiringCompany(stageId) {
           const stage = this.metaOptions.dealStages.find(
@@ -13170,7 +13171,7 @@
           }
           const deal = (this.datasets.deals || []).find((item) => String(item.id) === String(dealId));
           const stageCode = String(deal?.stageCode || "").trim().toLowerCase();
-          if (stageCode === "won" || stageCode === "failed") {
+          if (stageCode === "won" || stageCode === "failed" || stageCode === "lost") {
             return;
           }
 

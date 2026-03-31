@@ -1095,7 +1095,7 @@ def deal_sync_lead_contact_on_first_company_bind(sender, instance: Deal, created
 def deal_failed_reason_events_signal(sender, instance: Deal, created, **kwargs):
     previous = getattr(instance, "_previous_deal_state", None)
     current_stage_code = str(getattr(getattr(instance, "stage", None), "code", "") or "").strip().lower()
-    if current_stage_code != "failed":
+    if current_stage_code not in {"failed", "lost"}:
         return
 
     current_reason = _extract_deal_failed_reason(instance)
@@ -1105,7 +1105,7 @@ def deal_failed_reason_events_signal(sender, instance: Deal, created, **kwargs):
     previous_stage_code = str(getattr(getattr(previous, "stage", None), "code", "") or "").strip().lower()
     previous_reason = _extract_deal_failed_reason(previous)
 
-    if created or previous is None or previous_stage_code != "failed":
+    if created or previous is None or previous_stage_code not in {"failed", "lost"}:
         result_text = f"Сделка провалена. Причина: {current_reason}"
     elif previous_reason != current_reason:
         result_text = f"Причина провала сделки обновлена: {current_reason}"

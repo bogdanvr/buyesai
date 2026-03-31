@@ -31,6 +31,13 @@ class DealTasksRequiredByStageTests(APITestCase):
             is_active=True,
             is_final=True,
         )
+        self.stage_lost = DealStage.objects.create(
+            name="Провал",
+            code="lost",
+            order=110,
+            is_active=True,
+            is_final=True,
+        )
         self.stage_thinking = DealStage.objects.create(
             name="Думают",
             code="thinking",
@@ -148,6 +155,22 @@ class DealTasksRequiredByStageTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_can_update_deal_without_tasks_to_lost_stage(self):
+        deal = Deal.objects.create(
+            title="Сделка без задач",
+            source=self.source,
+            client=self.company,
+            stage=self.stage_in_progress,
+        )
+
+        response = self.client.patch(
+            reverse("deals-detail", kwargs={"pk": deal.pk}),
+            {"stage": self.stage_lost.pk, "failure_reason": "Выбрали другого подрядчика"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content.decode())
 
     def test_canceled_task_does_not_count_as_active_for_deal(self):
         deal = Deal.objects.create(
