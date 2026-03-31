@@ -6,6 +6,7 @@ from django.urls import reverse
 from crm.models import ClientDocument, DealDocument, Touch
 from crm.models.activity import ActivityType, TaskStatus
 from crm.models.touch import normalize_touch_channel_code
+from crm.services.automation import resolve_touch_automation_rule, should_auto_create_touch_follow_up_task
 
 
 class TouchSerializer(serializers.ModelSerializer):
@@ -156,11 +157,31 @@ class TouchSerializer(serializers.ModelSerializer):
     def _validate_result_option_channel(self, result_option, channel):
         return
 
+    def _matched_touch_automation_rule(self, attrs):
+        touch_like = Touch(
+            channel=attrs.get("channel", getattr(self.instance, "channel", None)),
+            result_option=attrs.get("result_option", getattr(self.instance, "result_option", None)),
+            direction=attrs.get("direction", getattr(self.instance, "direction", None)),
+        )
+        _, rule = resolve_touch_automation_rule(touch_like)
+        return rule
+
+    def _allows_automatic_follow_up_task(self, attrs) -> bool:
+        rule = self._matched_touch_automation_rule(attrs)
+        touch_like = Touch(
+            channel=attrs.get("channel", getattr(self.instance, "channel", None)),
+            result_option=attrs.get("result_option", getattr(self.instance, "result_option", None)),
+            direction=attrs.get("direction", getattr(self.instance, "direction", None)),
+        )
+        return should_auto_create_touch_follow_up_task(touch_like, rule)
+
     def _validate_deal_next_activity(self, attrs, deal, has_follow_up_task=False):
         stage_code = str(getattr(getattr(deal, "stage", None), "code", "") or "").strip().lower()
         if stage_code in {"won", "failed", "lost"}:
             return
         if has_follow_up_task:
+            return
+        if self._allows_automatic_follow_up_task(attrs):
             return
 
         now = timezone.now()

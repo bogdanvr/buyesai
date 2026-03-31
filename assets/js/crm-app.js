@@ -1035,6 +1035,15 @@
           if (!templateId) return null;
           return (this.metaOptions.nextStepTemplates || []).find((item) => String(item.id) === String(templateId)) || null;
         },
+        matchedTouchAutomationWillAutoCreateTask() {
+          const rule = this.matchedTouchAutomationRule;
+          if (!rule) return false;
+          return !!(
+            rule.allow_auto_create_task
+            && rule.next_step_template
+            && !rule.require_manager_confirmation
+          );
+        },
         pendingAutomationDrafts() {
           return (this.datasets.automationDrafts || []).filter((item) => String(item.status || "") === "pending");
         },
@@ -13534,6 +13543,9 @@
             return;
           }
           if (this.hasValidTouchFollowUp()) {
+            return;
+          }
+          if (this.matchedTouchAutomationWillAutoCreateTask) {
             return;
           }
 

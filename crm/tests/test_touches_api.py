@@ -6,8 +6,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from datetime import timedelta
 
-from crm.models import Activity, Client, ClientDocument, CommunicationChannel, Contact, Deal, DealDocument, DealStage, Lead, LeadStatus, Touch, TouchResult
-from crm.models.activity import ActivityType
+from crm.models import Activity, AutomationRule, Client, ClientDocument, CommunicationChannel, Contact, Deal, DealDocument, DealStage, Lead, LeadStatus, NextStepTemplate, Touch, TouchResult
+from crm.models.activity import ActivityType, TaskStatus
 
 
 class TouchesApiTests(APITestCase):
@@ -185,6 +185,64 @@ class TouchesApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["result_option_name"], self.touch_result.name)
+
+    def test_touch_with_auto_follow_up_rule_saves_without_next_step_and_creates_task(self):
+        waiting_payment_result = TouchResult.objects.create(
+            name="Ждём оплату",
+            code="waiting_payment",
+            group="payment",
+            result_class="neutral",
+            requires_next_step=False,
+            allowed_touch_types=["call"],
+            sort_order=30,
+        )
+        self.channel.touch_results.add(waiting_payment_result)
+        self.stage.touch_results.add(waiting_payment_result)
+        next_step_template = NextStepTemplate.objects.create(
+            code="payment_control_next_day",
+            name="Контроль оплаты на следующий день",
+        )
+        AutomationRule.objects.create(
+            event_type="payment_waiting",
+            ui_mode="next_step_prompt",
+            ui_priority="medium",
+            write_timeline=True,
+            show_in_summary=False,
+            show_in_attention_queue=False,
+            merge_key="invoice",
+            auto_open_panel=False,
+            create_message=False,
+            create_touchpoint_mode="none",
+            allow_auto_create_task=True,
+            require_manager_confirmation=False,
+            next_step_template=next_step_template,
+            is_active=True,
+            sort_order=10,
+        )
+
+        response = self.client.post(
+            reverse("touches-list"),
+            {
+                "happened_at": timezone.now().isoformat(),
+                "channel": self.channel.pk,
+                "result_option": waiting_payment_result.pk,
+                "direction": "outgoing",
+                "summary": "Ожидаем оплату счета",
+                "owner": self.user.pk,
+                "deal": self.deal.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        follow_up_task = Activity.objects.filter(
+            type=ActivityType.TASK,
+            deal=self.deal,
+            subject="Контроль оплаты на следующий день",
+        ).order_by("-id").first()
+        self.assertIsNotNone(follow_up_task)
+        self.assertEqual(follow_up_task.status, TaskStatus.TODO)
+        self.assertEqual(follow_up_task.communication_channel_id, self.channel.pk)
 
     def test_channel_touch_results_do_not_block_manual_save(self):
         restricted_channel = CommunicationChannel.objects.create(name="Telegram")
