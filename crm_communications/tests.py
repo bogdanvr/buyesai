@@ -2026,7 +2026,45 @@ class DealDocumentDeliveryTests(TestCase):
         )
         self.assertEqual(open_response.status_code, 200)
         self.assertContains(open_response, reverse("deal-document-share-preview", kwargs={"token": share.token}))
-        self.assertContains(open_response, "<iframe", html=False)
+        self.assertContains(open_response, reverse("deal-document-share-event", kwargs={"token": share.token}))
+        self.assertContains(open_response, "pdfjs-dist@5.6.205")
+        self.assertNotContains(open_response, "<iframe", html=False)
+
+        event_response = self.client.post(
+            reverse("deal-document-share-event", kwargs={"token": share.token}),
+            data={
+                "event_type": DealDocumentShareEventType.DOCUMENT_OPENED,
+                "metadata": {"total_pages": 3},
+            },
+            content_type="application/json",
+            HTTP_USER_AGENT="TrackedBrowser/1.0",
+            REMOTE_ADDR="203.0.113.10",
+        )
+        self.assertEqual(event_response.status_code, 201)
+
+        page_view_response = self.client.post(
+            reverse("deal-document-share-event", kwargs={"token": share.token}),
+            data={
+                "event_type": DealDocumentShareEventType.PAGE_VIEWED,
+                "metadata": {"page_number": 1, "total_pages": 3},
+            },
+            content_type="application/json",
+            HTTP_USER_AGENT="TrackedBrowser/1.0",
+            REMOTE_ADDR="203.0.113.10",
+        )
+        self.assertEqual(page_view_response.status_code, 201)
+
+        last_page_response = self.client.post(
+            reverse("deal-document-share-event", kwargs={"token": share.token}),
+            data={
+                "event_type": DealDocumentShareEventType.LAST_PAGE_REACHED,
+                "metadata": {"page_number": 3, "total_pages": 3},
+            },
+            content_type="application/json",
+            HTTP_USER_AGENT="TrackedBrowser/1.0",
+            REMOTE_ADDR="203.0.113.10",
+        )
+        self.assertEqual(last_page_response.status_code, 201)
 
         preview_response = self.client.get(
             reverse("deal-document-share-preview", kwargs={"token": share.token}),
@@ -2044,6 +2082,30 @@ class DealDocumentDeliveryTests(TestCase):
         self.assertEqual(download_response.status_code, 200)
         self.assertEqual(download_response["Content-Disposition"], 'attachment; filename="invoice-1235.pdf"')
 
+        viewer_closed_response = self.client.post(
+            reverse("deal-document-share-event", kwargs={"token": share.token}),
+            data={
+                "event_type": DealDocumentShareEventType.VIEWER_CLOSED,
+                "metadata": {"current_page": 3, "last_observed_page": 3, "total_pages": 3},
+            },
+            content_type="application/json",
+            HTTP_USER_AGENT="TrackedBrowser/1.0",
+            REMOTE_ADDR="203.0.113.10",
+        )
+        self.assertEqual(viewer_closed_response.status_code, 201)
+
+        time_in_viewer_response = self.client.post(
+            reverse("deal-document-share-event", kwargs={"token": share.token}),
+            data={
+                "event_type": DealDocumentShareEventType.TIME_IN_VIEWER,
+                "metadata": {"duration_ms": 12500, "duration_seconds": 13},
+            },
+            content_type="application/json",
+            HTTP_USER_AGENT="TrackedBrowser/1.0",
+            REMOTE_ADDR="203.0.113.10",
+        )
+        self.assertEqual(time_in_viewer_response.status_code, 201)
+
         share.refresh_from_db()
         self.assertEqual(share.open_count, 1)
         self.assertEqual(share.download_count, 1)
@@ -2052,13 +2114,35 @@ class DealDocumentDeliveryTests(TestCase):
         self.assertTrue(share.first_opened_at)
         self.assertTrue(share.last_downloaded_at)
         self.assertEqual(
-            DealDocumentShareEvent.objects.filter(share=share, event_type=DealDocumentShareEventType.PAGE_OPENED).count(),
+            DealDocumentShareEvent.objects.filter(share=share, event_type=DealDocumentShareEventType.DOCUMENT_OPENED).count(),
             1,
         )
         self.assertEqual(
             DealDocumentShareEvent.objects.filter(share=share, event_type=DealDocumentShareEventType.PDF_DOWNLOADED).count(),
             1,
         )
+        self.assertEqual(
+            DealDocumentShareEvent.objects.filter(share=share, event_type=DealDocumentShareEventType.PAGE_VIEWED).count(),
+            1,
+        )
+        self.assertEqual(
+            DealDocumentShareEvent.objects.filter(share=share, event_type=DealDocumentShareEventType.LAST_PAGE_REACHED).count(),
+            1,
+        )
+        self.assertEqual(
+            DealDocumentShareEvent.objects.filter(share=share, event_type=DealDocumentShareEventType.VIEWER_CLOSED).count(),
+            1,
+        )
+        self.assertEqual(
+            DealDocumentShareEvent.objects.filter(share=share, event_type=DealDocumentShareEventType.TIME_IN_VIEWER).count(),
+            1,
+        )
         self.deal.refresh_from_db()
+        self.assertIn("event_type: document_opened", self.deal.events)
+        self.assertIn("event_type: page_viewed", self.deal.events)
+        self.assertIn("event_type: last_page_reached", self.deal.events)
+        self.assertIn("event_type: pdf_downloaded", self.deal.events)
+        self.assertIn("event_type: viewer_closed", self.deal.events)
+        self.assertIn("event_type: time_in_viewer", self.deal.events)
         self.assertIn("Счет открыт", self.deal.events)
         self.assertIn("Счет скачан", self.deal.events)

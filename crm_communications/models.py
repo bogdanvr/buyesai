@@ -93,8 +93,13 @@ class DeliveryFailureResolutionStatus(models.TextChoices):
 class DealDocumentShareEventType(models.TextChoices):
     EMAIL_SENT = "email_sent", "Письмо отправлено"
     EMAIL_FAILED = "email_failed", "Ошибка отправки письма"
+    DOCUMENT_OPENED = "document_opened", "Документ открыт"
     PAGE_OPENED = "page_opened", "Страница документа открыта"
+    PAGE_VIEWED = "page_viewed", "Страница PDF просмотрена"
+    LAST_PAGE_REACHED = "last_page_reached", "Последняя страница достигнута"
     PDF_DOWNLOADED = "pdf_downloaded", "PDF документа скачан"
+    VIEWER_CLOSED = "viewer_closed", "Viewer закрыт"
+    TIME_IN_VIEWER = "time_in_viewer", "Время в viewer"
 
 
 class Conversation(TimestampedModel):

@@ -1,3 +1,4 @@
+{% load static %}
 <!doctype html>
 <html lang="ru">
 <head>
@@ -89,18 +90,70 @@
     }
     .preview-shell {
       margin-top: 28px;
-      border-radius: 18px;
+      border-radius: 24px;
       overflow: hidden;
       border: 1px solid #dbe6f3;
-      background: #dfe9f5;
+      background: linear-gradient(180deg, #eff5fb 0%, #dfe9f5 100%);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
     }
-    .preview-frame {
-      display: block;
+    .viewer-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid #dbe6f3;
+      background: rgba(255, 255, 255, 0.86);
+      backdrop-filter: blur(10px);
+    }
+    .viewer-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #153b5e;
+    }
+    .viewer-status {
+      font-size: 13px;
+      color: #5e7896;
+    }
+    .viewer-pages {
       width: 100%;
-      min-height: 840px;
-      border: 0;
+      min-height: 70vh;
+      padding: 22px 14px 28px;
+      box-sizing: border-box;
+      overflow: auto;
+      background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.85), rgba(223, 233, 245, 0.85)),
+        linear-gradient(180deg, #edf3f9 0%, #dfe9f5 100%);
+    }
+    .viewer-empty {
+      padding: 48px 18px;
+      text-align: center;
+      font-size: 15px;
+      color: #5e7896;
+    }
+    .viewer-page {
+      width: fit-content;
+      max-width: 100%;
+      margin: 0 auto 20px;
+      padding: 10px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.72);
+      box-shadow: 0 20px 40px rgba(14, 39, 64, 0.08);
+    }
+    .viewer-page canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: 10px;
       background: #fff;
+    }
+    .viewer-page-meta {
+      margin-top: 8px;
+      text-align: center;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #6884a2;
     }
     .preview-caption {
       padding: 12px 16px;
@@ -110,8 +163,13 @@
       border-top: 1px solid #dbe6f3;
     }
     @media (max-width: 720px) {
-      .preview-frame {
+      .viewer-toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .viewer-pages {
         min-height: 68vh;
+        padding: 16px 8px 20px;
       }
     }
   </style>
@@ -139,25 +197,35 @@
 
       <div class="actions">
         <a class="button button-primary" href="{{ download_url }}">Скачать PDF</a>
-        <a class="button button-secondary" href="{{ preview_url }}" target="_blank" rel="noopener noreferrer">Открыть PDF</a>
+        <a class="button button-secondary" href="{{ preview_url }}" target="_blank" rel="noopener noreferrer">Открыть исходный PDF</a>
         <a class="button button-secondary" href="{{ public_url }}">Обновить страницу</a>
       </div>
 
       <p class="note">
-        По ссылке счет открывается сразу в PDF-просмотре. Скачивание PDF фиксируется отдельно, как и открытие страницы.
+        Счет открыт через viewer на pdf.js. Скачивание PDF фиксируется отдельно, а просмотр страниц и время в viewer попадают в события сделки.
       </p>
 
-      <div class="preview-shell">
-        <iframe
-          class="preview-frame"
-          src="{{ preview_url }}#toolbar=1&navpanes=0&view=FitH"
-          title="Предпросмотр PDF документа"
-        ></iframe>
+      <div
+        id="share-pdf-viewer"
+        class="preview-shell"
+        data-preview-url="{{ preview_url }}"
+        data-download-url="{{ download_url }}"
+        data-event-url="{{ event_url }}"
+        data-document-name="{{ document.original_name|default:'Документ'|escape }}"
+      >
+        <div class="viewer-toolbar">
+          <div class="viewer-title">{{ document.original_name|default:"Документ" }}</div>
+          <div id="share-pdf-viewer-status" class="viewer-status">Загрузка PDF...</div>
+        </div>
+        <div id="share-pdf-viewer-pages" class="viewer-pages">
+          <div class="viewer-empty">Подготавливаем PDF для просмотра…</div>
+        </div>
         <div class="preview-caption">
-          Если встроенный просмотр PDF не открылся, используйте кнопку «Открыть PDF» или скачайте файл.
+          Если viewer не загрузился, используйте кнопку «Открыть исходный PDF» или скачайте файл.
         </div>
       </div>
     </div>
   </div>
+  <script type="module" src="{% static 'js/deal-document-share-viewer.js' %}"></script>
 </body>
 </html>

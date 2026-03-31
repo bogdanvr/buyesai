@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from urllib.parse import urljoin
 
 from django.conf import settings
@@ -59,6 +60,16 @@ def build_share_preview_url(*, share: DealDocumentShare, request=None) -> str:
     return relative_url
 
 
+def build_share_event_url(*, share: DealDocumentShare, request=None) -> str:
+    relative_url = reverse("deal-document-share-event", kwargs={"token": share.token})
+    public_base_url = str(getattr(settings, "CRM_PUBLIC_BASE_URL", "") or "").strip()
+    if public_base_url:
+        return urljoin(f"{public_base_url.rstrip('/')}/", relative_url.lstrip("/"))
+    if request is not None:
+        return request.build_absolute_uri(relative_url)
+    return relative_url
+
+
 def _message_status_event_type(message: Message) -> str:
     if str(getattr(message, "status", "") or "").strip().lower() == MessageStatus.SENT:
         return DealDocumentShareEventType.EMAIL_SENT
@@ -98,6 +109,50 @@ def _result_text(*, document: DealDocument | None, action: str) -> str:
     return f"{_document_kind_label(document)} {action_map[action]}: {_document_name(document)}"
 
 
+def _normalize_metadata(raw_metadata) -> dict:
+    if isinstance(raw_metadata, dict):
+        return raw_metadata
+    if isinstance(raw_metadata, str):
+        try:
+            parsed = json.loads(raw_metadata)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _result_text_for_event(*, document: DealDocument | None, event_type: str, metadata: dict) -> str:
+    if event_type == DealDocumentShareEventType.DOCUMENT_OPENED:
+        return _result_text(document=document, action="opened")
+    if event_type == DealDocumentShareEventType.PAGE_VIEWED:
+        page_number = metadata.get("page_number")
+        total_pages = metadata.get("total_pages")
+        if page_number and total_pages:
+            return f"Просмотрена страница {page_number} из {total_pages}: {_document_name(document)}"
+        if page_number:
+            return f"Просмотрена страница {page_number}: {_document_name(document)}"
+        return f"Просматривается документ: {_document_name(document)}"
+    if event_type == DealDocumentShareEventType.LAST_PAGE_REACHED:
+        total_pages = metadata.get("total_pages")
+        if total_pages:
+            return f"Достигнута последняя страница {total_pages}: {_document_name(document)}"
+        return f"Достигнута последняя страница документа: {_document_name(document)}"
+    if event_type == DealDocumentShareEventType.VIEWER_CLOSED:
+        return f"Viewer закрыт: {_document_name(document)}"
+    if event_type == DealDocumentShareEventType.TIME_IN_VIEWER:
+        seconds = metadata.get("duration_seconds")
+        if seconds is not None:
+            return f"Время в viewer: {seconds} сек. {_document_name(document)}"
+        return f"Зафиксировано время в viewer: {_document_name(document)}"
+    if event_type == DealDocumentShareEventType.PDF_DOWNLOADED:
+        return _result_text(document=document, action="downloaded")
+    if event_type == DealDocumentShareEventType.EMAIL_SENT:
+        return _result_text(document=document, action="sent")
+    if event_type == DealDocumentShareEventType.EMAIL_FAILED:
+        return _result_text(document=document, action="failed")
+    return f"Событие документа: {_document_name(document)}"
+
+
 def _timeline_entry(*, deal_id: int | None, result_text: str, happened_at, event_type: str, document_name: str, share: DealDocumentShare, extra_lines: list[str] | None = None) -> str:
     timestamp = timezone.localtime(happened_at or timezone.now()).strftime("%d.%m.%Y %H:%M")
     lines = [
@@ -111,6 +166,7 @@ def _timeline_entry(*, deal_id: int | None, result_text: str, happened_at, event
         f"document_share_token: {share.token}",
         f"document_share_url: {build_share_public_url(share=share)}",
         f"document_share_preview_url: {build_share_preview_url(share=share)}",
+        f"document_share_event_url: {build_share_event_url(share=share)}",
         f"document_share_download_url: {build_share_download_url(share=share)}",
     ]
     if deal_id:
@@ -218,57 +274,72 @@ def record_share_message_status(*, share: DealDocumentShare, message: Message) -
 
 
 @transaction.atomic
-def record_share_page_open(*, share: DealDocumentShare, request) -> DealDocumentShareEvent:
+def record_share_viewer_event(*, share: DealDocumentShare, request, event_type: str, metadata: dict | None = None) -> DealDocumentShareEvent:
+    normalized_metadata = _normalize_metadata(metadata)
     happened_at = timezone.now()
     ip_address = _request_ip_address(request)
     user_agent = _request_user_agent(request)
-    if not share.first_opened_at:
-        share.first_opened_at = happened_at
-        share.first_open_ip = ip_address or None
-        share.first_open_user_agent = user_agent
-    share.last_opened_at = happened_at
-    share.last_open_ip = ip_address or None
-    share.last_open_user_agent = user_agent
-    share.open_count = int(getattr(share, "open_count", 0) or 0) + 1
-    share.save(
-        update_fields=[
-            "first_opened_at",
-            "last_opened_at",
-            "open_count",
-            "first_open_ip",
-            "last_open_ip",
-            "first_open_user_agent",
-            "last_open_user_agent",
-            "updated_at",
-        ]
-    )
+    if event_type == DealDocumentShareEventType.DOCUMENT_OPENED:
+        if not share.first_opened_at:
+            share.first_opened_at = happened_at
+            share.first_open_ip = ip_address or None
+            share.first_open_user_agent = user_agent
+        share.last_opened_at = happened_at
+        share.last_open_ip = ip_address or None
+        share.last_open_user_agent = user_agent
+        share.open_count = int(getattr(share, "open_count", 0) or 0) + 1
+        share.save(
+            update_fields=[
+                "first_opened_at",
+                "last_opened_at",
+                "open_count",
+                "first_open_ip",
+                "last_open_ip",
+                "first_open_user_agent",
+                "last_open_user_agent",
+                "updated_at",
+            ]
+        )
 
     event = DealDocumentShareEvent.objects.create(
         share=share,
         message=share.message,
-        event_type=DealDocumentShareEventType.PAGE_OPENED,
+        event_type=event_type,
         happened_at=happened_at,
         ip_address=ip_address or None,
         user_agent=user_agent,
-        metadata={"open_count": share.open_count},
+        metadata=normalized_metadata,
     )
     document = getattr(share, "document", None)
     document_name = _document_name(document)
+    extra_lines = [
+        f"ip_address: {ip_address}",
+        f"user_agent: {user_agent}",
+    ]
+    if event_type == DealDocumentShareEventType.DOCUMENT_OPENED:
+        extra_lines.insert(0, f"open_count: {share.open_count}")
+    for key, value in normalized_metadata.items():
+        extra_lines.append(f"{key}: {value}")
     entry = _timeline_entry(
         deal_id=getattr(getattr(document, "deal", None), "pk", None),
-        result_text=_result_text(document=document, action="opened"),
+        result_text=_result_text_for_event(document=document, event_type=event_type, metadata=normalized_metadata),
         happened_at=happened_at,
-        event_type="document_share_page_opened",
+        event_type=event_type,
         document_name=document_name,
         share=share,
-        extra_lines=[
-            f"open_count: {share.open_count}",
-            f"ip_address: {ip_address}",
-            f"user_agent: {user_agent}",
-        ],
+        extra_lines=extra_lines,
     )
     _append_deal_event(deal=getattr(document, "deal", None), entry=entry)
     return event
+
+
+def record_share_page_open(*, share: DealDocumentShare, request) -> DealDocumentShareEvent:
+    return record_share_viewer_event(
+        share=share,
+        request=request,
+        event_type=DealDocumentShareEventType.DOCUMENT_OPENED,
+        metadata={"open_count": int(getattr(share, "open_count", 0) or 0) + 1},
+    )
 
 
 @transaction.atomic
@@ -293,9 +364,9 @@ def record_share_pdf_download(*, share: DealDocumentShare, request) -> DealDocum
     document_name = _document_name(document)
     entry = _timeline_entry(
         deal_id=getattr(getattr(document, "deal", None), "pk", None),
-        result_text=_result_text(document=document, action="downloaded"),
+        result_text=_result_text_for_event(document=document, event_type=DealDocumentShareEventType.PDF_DOWNLOADED, metadata={"download_count": share.download_count}),
         happened_at=happened_at,
-        event_type="document_share_pdf_downloaded",
+        event_type=DealDocumentShareEventType.PDF_DOWNLOADED,
         document_name=document_name,
         share=share,
         extra_lines=[

@@ -31,7 +31,7 @@ from integrations.novofon.views import (
     TelephonyHealthAPIView,
     TelephonyEventReprocessAPIView,
 )
-from crm_communications.public_views import DealDocumentShareDownloadView, DealDocumentSharePageView, DealDocumentSharePreviewView
+from crm_communications.public_views import DealDocumentShareDownloadView, DealDocumentShareEventView, DealDocumentSharePageView, DealDocumentSharePreviewView
 from main.views import (
     mainview,
     dadata_party,
@@ -71,6 +71,7 @@ urlpatterns = [
     path("api/consultant/chat/", consultant_chat, name="consultant_chat"),
     path("documents/share/<str:token>/", DealDocumentSharePageView.as_view(), name="deal-document-share-page"),
     path("documents/share/<str:token>/preview/", DealDocumentSharePreviewView.as_view(), name="deal-document-share-preview"),
+    path("documents/share/<str:token>/events/", DealDocumentShareEventView.as_view(), name="deal-document-share-event"),
     path("documents/share/<str:token>/download/", DealDocumentShareDownloadView.as_view(), name="deal-document-share-download"),
     path("api/integrations/novofon/webhook/", NovofonWebhookAPIView.as_view(), name="integrations-novofon-webhook"),
     path("api/telephony/novofon/settings/", NovofonSettingsAPIView.as_view(), name="telephony-novofon-settings"),
