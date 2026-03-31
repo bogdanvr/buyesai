@@ -182,6 +182,7 @@ class SettlementSummaryAPIView(APIView):
                     "title": str(getattr(contract, "title", "") or getattr(contract, "number", "") or "Без договора").strip(),
                     "number": str(getattr(contract, "number", "") or "").strip(),
                     "currency": str(getattr(contract, "currency", "") or first_document.currency or "").strip(),
+                    "hourly_rate": getattr(contract, "hourly_rate", None),
                     "documents_count": len(items),
                     "stats": stats,
                 }

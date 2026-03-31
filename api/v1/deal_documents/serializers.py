@@ -1,7 +1,7 @@
 from django.urls import reverse
 from rest_framework import serializers
 
-from crm.models import Client, Deal, DealDocument
+from crm.models import Client, Deal, DealDocument, SettlementContract
 from crm.services.act_generation import deal_document_generator_context
 from crm_communications.deal_document_shares import build_share_download_url, build_share_preview_url, build_share_public_url
 from crm_communications.models import DealDocumentShare, DealDocumentShareEvent
@@ -131,6 +131,11 @@ class DealActGenerateSerializer(serializers.Serializer):
     executor_company = serializers.PrimaryKeyRelatedField(
         queryset=Client.objects.filter(company_type=Client.CompanyType.OWN)
     )
+    contract = serializers.PrimaryKeyRelatedField(
+        queryset=SettlementContract.objects.select_related("client"),
+        required=False,
+        allow_null=True,
+    )
     items = DealActLineItemSerializer(many=True)
 
     def validate_items(self, value):
@@ -138,10 +143,23 @@ class DealActGenerateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Добавьте хотя бы одну строку акта.")
         return value
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        contract = attrs.get("contract") if "contract" in attrs else None
+        deal = attrs.get("deal")
+        if contract is not None and deal is not None and contract.client_id != deal.client_id:
+            raise serializers.ValidationError({"contract": "Договор должен принадлежать компании сделки."})
+        return attrs
+
 
 class DealGeneratedDocumentUpdateSerializer(serializers.Serializer):
     executor_company = serializers.PrimaryKeyRelatedField(
         queryset=Client.objects.filter(company_type=Client.CompanyType.OWN)
+    )
+    contract = serializers.PrimaryKeyRelatedField(
+        queryset=SettlementContract.objects.select_related("client"),
+        required=False,
+        allow_null=True,
     )
     items = DealActLineItemSerializer(many=True)
 

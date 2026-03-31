@@ -38,13 +38,16 @@ class DealDocumentViewSet(ModelViewSet):
     def generate_act(self, request):
         request_serializer = DealActGenerateSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
+        service_kwargs = {
+            "deal": request_serializer.validated_data["deal"],
+            "executor_company": request_serializer.validated_data["executor_company"],
+            "items": request_serializer.validated_data["items"],
+            "uploaded_by": request.user,
+        }
+        if "contract" in request_serializer.validated_data:
+            service_kwargs["contract"] = request_serializer.validated_data["contract"]
         try:
-            deal_document, _ = generate_deal_act(
-                deal=request_serializer.validated_data["deal"],
-                executor_company=request_serializer.validated_data["executor_company"],
-                items=request_serializer.validated_data["items"],
-                uploaded_by=request.user,
-            )
+            deal_document, _ = generate_deal_act(**service_kwargs)
         except DjangoValidationError as exc:
             raise ValidationError(getattr(exc, "message_dict", None) or getattr(exc, "messages", None) or {"detail": str(exc)})
 
@@ -55,13 +58,16 @@ class DealDocumentViewSet(ModelViewSet):
     def generate_invoice(self, request):
         request_serializer = DealActGenerateSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
+        service_kwargs = {
+            "deal": request_serializer.validated_data["deal"],
+            "executor_company": request_serializer.validated_data["executor_company"],
+            "items": request_serializer.validated_data["items"],
+            "uploaded_by": request.user,
+        }
+        if "contract" in request_serializer.validated_data:
+            service_kwargs["contract"] = request_serializer.validated_data["contract"]
         try:
-            deal_document, _ = generate_deal_invoice(
-                deal=request_serializer.validated_data["deal"],
-                executor_company=request_serializer.validated_data["executor_company"],
-                items=request_serializer.validated_data["items"],
-                uploaded_by=request.user,
-            )
+            deal_document, _ = generate_deal_invoice(**service_kwargs)
         except DjangoValidationError as exc:
             raise ValidationError(getattr(exc, "message_dict", None) or getattr(exc, "messages", None) or {"detail": str(exc)})
 
@@ -97,13 +103,16 @@ class DealDocumentViewSet(ModelViewSet):
         instance = self.get_object()
         request_serializer = DealGeneratedDocumentUpdateSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
+        service_kwargs = {
+            "deal_document": instance,
+            "executor_company": request_serializer.validated_data["executor_company"],
+            "items": request_serializer.validated_data["items"],
+            "uploaded_by": request.user,
+        }
+        if "contract" in request_serializer.validated_data:
+            service_kwargs["contract"] = request_serializer.validated_data["contract"]
         try:
-            deal_document, _ = update_generated_deal_document(
-                deal_document=instance,
-                executor_company=request_serializer.validated_data["executor_company"],
-                items=request_serializer.validated_data["items"],
-                uploaded_by=request.user,
-            )
+            deal_document, _ = update_generated_deal_document(**service_kwargs)
         except DjangoValidationError as exc:
             raise ValidationError(getattr(exc, "message_dict", None) or getattr(exc, "messages", None) or {"detail": str(exc)})
 

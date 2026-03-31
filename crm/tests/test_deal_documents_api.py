@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from zipfile import ZipFile
 
-from crm.models import Client, ClientDocument, Deal, DealDocument, SettlementDocument
+from crm.models import Client, ClientDocument, Deal, DealDocument, SettlementContract, SettlementDocument
 
 
 class DealDocumentsApiTests(APITestCase):
@@ -44,6 +44,22 @@ class DealDocumentsApiTests(APITestCase):
             currency="KZT",
         )
         self.deal = Deal.objects.create(title="Сделка для документов", client=self.company, amount="77000.00", currency="RUB")
+        self.contract_old = SettlementContract.objects.create(
+            client=self.company,
+            title="Договор 2025",
+            number="2025-01",
+            currency="KZT",
+            hourly_rate="800.00",
+            is_active=True,
+        )
+        self.contract_latest = SettlementContract.objects.create(
+            client=self.company,
+            title="Договор 2026",
+            number="2026-02",
+            currency="KZT",
+            hourly_rate="1000.00",
+            is_active=True,
+        )
 
     @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
     def test_can_upload_document_with_long_filename_after_company_deal_prefix(self):
@@ -130,6 +146,7 @@ class DealDocumentsApiTests(APITestCase):
         self.assertEqual(str(realization.amount), "52000.00")
         self.assertEqual(realization.number, "1235")
         self.assertEqual(realization.currency, "KZT")
+        self.assertEqual(realization.contract_id, self.contract_latest.pk)
         self.assertTrue(bool(realization.file))
 
         generated_document = DealDocument.objects.get(pk=response.data["id"])
@@ -138,6 +155,7 @@ class DealDocumentsApiTests(APITestCase):
         self.assertEqual(realization.original_name, generated_document.original_name)
         self.assertEqual(generated_document.settlement_document_id, realization.pk)
         self.assertEqual(realization.generator_payload.get("executor_company_id"), self.own_company.pk)
+        self.assertEqual(realization.generator_payload.get("contract_id"), self.contract_latest.pk)
         self.assertEqual(len(realization.generator_payload.get("items", [])), 2)
 
         with generated_document.file.open("rb") as file_handle:
@@ -181,8 +199,10 @@ class DealDocumentsApiTests(APITestCase):
         self.assertEqual(invoice.number, "1235")
         self.assertEqual(invoice.title, "Счет на оплату")
         self.assertEqual(invoice.currency, "KZT")
+        self.assertEqual(invoice.contract_id, self.contract_latest.pk)
         self.assertTrue(bool(invoice.file))
         self.assertEqual(invoice.generator_payload.get("executor_company_id"), self.own_company.pk)
+        self.assertEqual(invoice.generator_payload.get("contract_id"), self.contract_latest.pk)
         self.assertEqual(len(invoice.generator_payload.get("items", [])), 1)
 
         generated_document = DealDocument.objects.get(pk=response.data["id"])
@@ -193,6 +213,7 @@ class DealDocumentsApiTests(APITestCase):
         self.assertTrue(response.data["editable_generated_document"])
         self.assertEqual(response.data["settlement_document_id"], invoice.pk)
         self.assertEqual(response.data["generator_payload"]["executor_company_id"], self.own_company.pk)
+        self.assertEqual(response.data["generator_payload"]["contract_id"], self.contract_latest.pk)
 
         with generated_document.file.open("rb") as file_handle:
             archive = ZipFile(file_handle)
@@ -238,11 +259,20 @@ class DealDocumentsApiTests(APITestCase):
         generated_document = DealDocument.objects.get(pk=create_response.data["id"])
         invoice = SettlementDocument.objects.get(pk=generated_document.settlement_document_id)
         original_number = invoice.number
+        replacement_contract = SettlementContract.objects.create(
+            client=self.company,
+            title="Договор 2027",
+            number="2027-03",
+            currency="KZT",
+            hourly_rate="1500.00",
+            is_active=True,
+        )
 
         update_response = self.client.post(
             reverse("deal-documents-regenerate", kwargs={"pk": generated_document.pk}),
             {
                 "executor_company": self.own_company.pk,
+                "contract": replacement_contract.pk,
                 "items": [
                     {
                         "description": "Обновленная услуга",
@@ -262,12 +292,14 @@ class DealDocumentsApiTests(APITestCase):
 
         self.assertEqual(invoice.number, original_number)
         self.assertEqual(str(invoice.amount), "45000.00")
+        self.assertEqual(invoice.contract_id, replacement_contract.pk)
         self.assertEqual(generated_document.settlement_document_id, invoice.pk)
         self.assertEqual(update_response.data["id"], generated_document.pk)
         self.assertEqual(update_response.data["settlement_document_id"], invoice.pk)
         self.assertTrue(update_response.data["editable_generated_document"])
         self.assertEqual(update_response.data["generated_document_type"], "invoice")
         self.assertEqual(update_response.data["generator_payload"]["executor_company_id"], self.own_company.pk)
+        self.assertEqual(update_response.data["generator_payload"]["contract_id"], replacement_contract.pk)
         self.assertEqual(update_response.data["generator_payload"]["number"], original_number)
         self.assertEqual(update_response.data["generator_payload"]["items"][0]["description"], "Обновленная услуга")
         self.assertIn("Редактирование счета", self.deal.events)

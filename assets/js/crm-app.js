@@ -510,8 +510,10 @@
           dealDocumentGeneratorTargetName: "",
           dealActGeneratorForm: {
             executorCompanyId: null,
+            contractId: null,
             items: [],
           },
+          dealDocumentGeneratorContracts: [],
           leadDocumentsForActiveLead: [],
           dealCommunications: [],
           dealManualBindingConversations: [],
@@ -583,9 +585,11 @@
             contracts: [],
           },
           companySettlementContractForm: {
+            id: null,
             title: "",
             number: "",
             currency: "RUB",
+            hourlyRate: "",
             startDate: "",
             endDate: "",
             note: "",
@@ -823,6 +827,14 @@
           const companyId = this.toIntOrNull(this.forms.deals.companyId) || this.toIntOrNull(this.editingDealItem?.clientId);
           const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId)) || null;
           return company?.currency || this.editingDealItem?.currency || "RUB";
+        },
+        selectedDealDocumentGeneratorContract() {
+          const contractId = this.toIntOrNull(this.dealActGeneratorForm.contractId);
+          if (!contractId) return null;
+          return (this.dealDocumentGeneratorContracts || []).find((item) => String(item.id) === String(contractId)) || null;
+        },
+        selectedDealDocumentGeneratorHourlyRate() {
+          return Number(this.selectedDealDocumentGeneratorContract?.hourlyRate || 0);
         },
         dealDocumentGeneratorMeta() {
           const isEditMode = String(this.dealDocumentGeneratorMode || "create") === "edit";
@@ -4393,11 +4405,70 @@
         defaultCompanySettlementDocumentTitle(documentType) {
           return this.settlementDocumentIsRealization(documentType) ? "Акт об оказании услуг" : "";
         },
+        normalizeSettlementContract(item = {}) {
+          return {
+            id: this.toIntOrNull(item.id),
+            clientId: this.toIntOrNull(item.client),
+            title: item.title || "",
+            number: item.number || "",
+            currency: item.currency || this.forms.companies.currency || "RUB",
+            hourlyRate: Number(item.hourly_rate ?? item.hourlyRate ?? 0) || 0,
+            startDate: item.start_date || item.startDate || "",
+            endDate: item.end_date || item.endDate || "",
+            note: item.note || "",
+            isActive: item.is_active !== false,
+            createdAt: item.created_at || item.createdAt || "",
+            updatedAt: item.updated_at || item.updatedAt || "",
+          };
+        },
         preferredCompanySettlementContractId() {
           const latestContract = Array.isArray(this.companySettlementContracts) && this.companySettlementContracts.length
             ? this.companySettlementContracts[0]
             : null;
           return this.toIntOrNull(latestContract?.id);
+        },
+        openNewCompanySettlementContractForm() {
+          this.resetCompanySettlementContractForm();
+          this.showCompanySettlementContractForm = true;
+        },
+        openCompanySettlementContractEditor(contract) {
+          const normalizedContract = contract ? this.normalizeSettlementContract(contract) : null;
+          if (!normalizedContract?.id) {
+            return;
+          }
+          this.companySettlementContractForm = {
+            id: normalizedContract.id,
+            title: normalizedContract.title || "",
+            number: normalizedContract.number || "",
+            currency: normalizedContract.currency || this.forms.companies.currency || "RUB",
+            hourlyRate: normalizedContract.hourlyRate > 0 ? normalizedContract.hourlyRate.toFixed(2) : "",
+            startDate: normalizedContract.startDate || "",
+            endDate: normalizedContract.endDate || "",
+            note: normalizedContract.note || "",
+            isActive: normalizedContract.isActive !== false,
+          };
+          this.showCompanySettlementContractForm = true;
+        },
+        closeCompanySettlementContractForm() {
+          this.showCompanySettlementContractForm = false;
+          this.resetCompanySettlementContractForm();
+        },
+        async openCompanySettlementContractSummary(contractId) {
+          const normalizedContractId = this.toIntOrNull(contractId);
+          if (!normalizedContractId || !this.editingCompanyId) {
+            return;
+          }
+          if (!this.showCompanySettlementsPanel) {
+            await this.toggleCompanySettlementsPanel();
+          } else if (!this.companySettlementSummary.contracts.length) {
+            await this.loadCompanySettlements();
+          }
+          this.$nextTick(() => {
+            const panel = document.getElementById(`company-settlement-contract-card-${normalizedContractId}`);
+            if (panel && typeof panel.scrollIntoView === "function") {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
         },
         toggleCompanySettlementDocumentForm() {
           const shouldOpen = !this.showCompanySettlementDocumentForm;
@@ -4454,9 +4525,11 @@
         },
         resetCompanySettlementContractForm() {
           this.companySettlementContractForm = {
+            id: null,
             title: "",
             number: "",
             currency: this.forms.companies.currency || "RUB",
+            hourlyRate: "",
             startDate: "",
             endDate: "",
             note: "",
@@ -4577,6 +4650,7 @@
                 title: contract.title || "Без договора",
                 number: contract.number || "",
                 currency: contract.currency || this.forms.companies.currency || "RUB",
+                hourlyRate: Number(contract.hourly_rate || 0) || 0,
                 documentsCount: Number(contract.documents_count || 0),
                 stats: {
                   expectedReceivable: Number(stats.expected_receivable || 0),
@@ -4718,16 +4792,12 @@
               this.apiRequest(`/api/v1/settlements/documents/?client=${this.editingCompanyId}&page_size=200`),
             ]);
             const normalizedSummary = this.normalizeCompanySettlementSummary(summaryPayload);
-            this.companySettlementContracts = this.normalizePaginatedResponse(contractsPayload).map((item) => ({
-              id: this.toIntOrNull(item.id),
-              title: item.title || "",
-              number: item.number || "",
-              currency: item.currency || this.forms.companies.currency || "RUB",
-              startDate: item.start_date || "",
-              endDate: item.end_date || "",
-              note: item.note || "",
-              isActive: item.is_active !== false,
-            }));
+            this.companySettlementContracts = this.normalizePaginatedResponse(contractsPayload).map((item) => this.normalizeSettlementContract(item));
+            const contractsById = new Map(
+              (this.companySettlementContracts || [])
+                .filter((contract) => this.toIntOrNull(contract.id))
+                .map((contract) => [this.toIntOrNull(contract.id), contract])
+            );
             const existingContractIds = new Set(
               (normalizedSummary.contracts || [])
                 .map((item) => this.toIntOrNull(item.contractId))
@@ -4740,6 +4810,7 @@
                 title: contract.title || contract.number || `Договор #${contract.id}`,
                 number: contract.number || "",
                 currency: contract.currency || this.forms.companies.currency || "RUB",
+                hourlyRate: Number(contract.hourlyRate || 0) || 0,
                 documentsCount: 0,
                 stats: {
                   receivable: 0,
@@ -4754,7 +4825,20 @@
               }));
             this.companySettlementSummary = {
               ...normalizedSummary,
-              contracts: [...(normalizedSummary.contracts || []), ...emptyContracts].sort((left, right) => (
+              contracts: [...(normalizedSummary.contracts || []), ...emptyContracts]
+                .map((contract) => {
+                  const normalizedContractId = this.toIntOrNull(contract.contractId);
+                  const linkedContract = normalizedContractId ? contractsById.get(normalizedContractId) : null;
+                  return {
+                    ...contract,
+                    title: linkedContract?.title || contract.title,
+                    number: linkedContract?.number || contract.number,
+                    currency: linkedContract?.currency || contract.currency,
+                    hourlyRate: Number(linkedContract?.hourlyRate || contract.hourlyRate || 0) || 0,
+                    isActive: linkedContract ? linkedContract.isActive !== false : true,
+                  };
+                })
+                .sort((left, right) => (
                 String(left.title || "").localeCompare(String(right.title || ""), "ru")
               )),
             };
@@ -4768,31 +4852,37 @@
             this.isCompanySettlementsLoading = false;
           }
         },
-        async createCompanySettlementContract() {
+        async saveCompanySettlementContract() {
           if (!this.editingCompanyId) {
             throw new Error("Сначала откройте компанию");
           }
           this.isCompanySettlementSaving = true;
           this.clearUiErrors({ modalOnly: true });
           try {
-            await this.apiRequest("/api/v1/settlements/contracts/", {
-              method: "POST",
+            const contractId = this.toIntOrNull(this.companySettlementContractForm.id);
+            const hourlyRate = this.parseFlexibleNumber(this.companySettlementContractForm.hourlyRate);
+            await this.apiRequest(contractId ? `/api/v1/settlements/contracts/${contractId}/` : "/api/v1/settlements/contracts/", {
+              method: contractId ? "PATCH" : "POST",
               body: {
                 client: this.editingCompanyId,
                 title: this.companySettlementContractForm.title.trim(),
                 number: this.companySettlementContractForm.number.trim(),
                 currency: this.companySettlementContractForm.currency || this.forms.companies.currency || "RUB",
+                hourly_rate: hourlyRate > 0 ? hourlyRate.toFixed(2) : null,
                 start_date: this.companySettlementContractForm.startDate || null,
                 end_date: this.companySettlementContractForm.endDate || null,
                 note: this.companySettlementContractForm.note.trim(),
                 is_active: !!this.companySettlementContractForm.isActive,
               },
             });
-            this.resetCompanySettlementContractForm();
-            this.showCompanySettlementContractForm = false;
+            this.closeCompanySettlementContractForm();
             await this.loadCompanySettlements();
+            if (this.showCompanyDocumentsPanel) {
+              await this.loadCompanyDocuments();
+            }
           } catch (error) {
-            this.setUiError(`Ошибка создания договора: ${error.message}`, { modal: true });
+            const actionLabel = this.toIntOrNull(this.companySettlementContractForm.id) ? "обновления" : "создания";
+            this.setUiError(`Ошибка ${actionLabel} договора: ${error.message}`, { modal: true });
           } finally {
             this.isCompanySettlementSaving = false;
           }
@@ -9049,12 +9139,12 @@
             this.errorMessage = `Ошибка открытия лида: ${error.message}`;
           }
         },
-        async openCompanyEditorById(companyId) {
+        async openCompanyEditorById(companyId, options = {}) {
           const normalizedId = this.toIntOrNull(companyId);
           if (!normalizedId) return;
           try {
             const company = await this.fetchCompanyById(normalizedId);
-            this.openCompanyEditor(company);
+            this.openCompanyEditor(company, options);
           } catch (error) {
             this.errorMessage = `Ошибка открытия компании: ${error.message}`;
           }
@@ -9085,7 +9175,7 @@
           this.showModal = true;
           this.ensurePhoneCallHistoryLoaded("contact", this.editingContactId).catch(() => {});
         },
-        openCompanyEditor(item) {
+        openCompanyEditor(item, options = {}) {
           this.clearUiErrors({ modalOnly: true });
           this.activeSection = "companies";
           this.editingLeadId = null;
@@ -9159,6 +9249,13 @@
           this.loadContactsForCompany();
           this.showModal = true;
           this.enrichCompanyFromDadataByInn();
+          if (String(options.openPanel || "").trim() === "settlements") {
+            this.$nextTick(() => {
+              this.toggleCompanySettlementsPanel().catch((error) => {
+                this.errorMessage = `Ошибка загрузки взаиморасчетов: ${error.message}`;
+              });
+            });
+          }
         },
         openTaskEditor(item, options = {}) {
           if (Object.prototype.hasOwnProperty.call(options, "parentContext")) {
@@ -9839,6 +9936,14 @@
         quickOpenDealDocuments() {
           this.toggleDealDocumentsPanel();
         },
+        async openDealCompanySettlements() {
+          const companyId = this.toIntOrNull(this.forms.deals.companyId) || this.toIntOrNull(this.editingDealItem?.clientId);
+          if (!companyId) {
+            this.setUiError("У сделки не выбрана компания.", { modal: true });
+            return;
+          }
+          await this.openCompanyEditorById(companyId, { openPanel: "settlements" });
+        },
         formatFileSize(bytes) {
           const size = Number.parseInt(bytes, 10);
           if (!Number.isFinite(size) || size <= 0) return "0 Б";
@@ -9852,10 +9957,29 @@
             : null;
           return this.toIntOrNull(preferred?.id);
         },
+        dealDocumentGeneratorCompanyId() {
+          return this.toIntOrNull(this.forms.deals.companyId) || this.toIntOrNull(this.editingDealItem?.clientId);
+        },
+        preferredDealDocumentGeneratorContractId() {
+          const activeContract = (this.dealDocumentGeneratorContracts || []).find((contract) => contract.isActive !== false);
+          return this.toIntOrNull(activeContract?.id || this.dealDocumentGeneratorContracts[0]?.id);
+        },
         defaultDealActLineDescription() {
           return String(this.forms.deals.title || this.editingDealItem?.title || "").trim() || "Услуги по сделке";
         },
+        defaultDealActLineQuantity(rateOverride = null) {
+          const hourlyRate = Number(rateOverride ?? this.selectedDealDocumentGeneratorHourlyRate ?? 0);
+          const amount = this.parseFlexibleNumber(this.forms.deals.amount || this.editingDealItem?.amount);
+          if (hourlyRate > 0 && amount > 0) {
+            return (amount / hourlyRate).toFixed(2);
+          }
+          return "1";
+        },
         defaultDealActLinePrice() {
+          const hourlyRate = Number(this.selectedDealDocumentGeneratorHourlyRate || 0);
+          if (hourlyRate > 0) {
+            return hourlyRate.toFixed(2);
+          }
           const amount = this.parseFlexibleNumber(this.forms.deals.amount || this.editingDealItem?.amount);
           return amount > 0 ? amount.toFixed(2) : "";
         },
@@ -9865,7 +9989,7 @@
             : this.defaultDealActLineDescription();
           const normalizedQuantity = overrides.quantity !== undefined && overrides.quantity !== null
             ? String(overrides.quantity)
-            : "1";
+            : this.defaultDealActLineQuantity();
           const normalizedUnit = typeof overrides.unit === "string" && overrides.unit.trim()
             ? overrides.unit.trim()
             : "час";
@@ -9879,22 +10003,67 @@
             price: normalizedPrice,
           };
         },
+        async loadDealDocumentGeneratorContracts() {
+          const companyId = this.dealDocumentGeneratorCompanyId();
+          if (!companyId) {
+            this.dealDocumentGeneratorContracts = [];
+            return;
+          }
+          const payload = await this.apiRequest(`/api/v1/settlements/contracts/?client=${companyId}&page_size=100`);
+          this.dealDocumentGeneratorContracts = this.normalizePaginatedResponse(payload).map((item) => this.normalizeSettlementContract(item));
+        },
+        applyDealDocumentGeneratorContractDefaults(options = {}) {
+          const force = !!options.force;
+          const hourlyRate = Number(this.selectedDealDocumentGeneratorHourlyRate || 0);
+          const items = Array.isArray(this.dealActGeneratorForm.items) ? this.dealActGeneratorForm.items.slice() : [];
+          if (!items.length) {
+            this.dealActGeneratorForm.items = [this.createDealActGeneratorItem()];
+            return;
+          }
+          const nextItems = items.map((item, index) => {
+            const nextItem = { ...item };
+            if (hourlyRate > 0 && (force || !String(nextItem.price || "").trim())) {
+              nextItem.price = hourlyRate.toFixed(2);
+            }
+            if (index === 0 && (force || !String(nextItem.quantity || "").trim() || String(nextItem.quantity || "").trim() === "1")) {
+              nextItem.quantity = this.defaultDealActLineQuantity(hourlyRate);
+            }
+            if (!String(nextItem.description || "").trim()) {
+              nextItem.description = this.defaultDealActLineDescription();
+            }
+            if (!String(nextItem.unit || "").trim()) {
+              nextItem.unit = "час";
+            }
+            return nextItem;
+          });
+          this.dealActGeneratorForm = {
+            ...this.dealActGeneratorForm,
+            items: nextItems,
+          };
+        },
+        handleDealDocumentGeneratorContractChange() {
+          this.applyDealDocumentGeneratorContractDefaults({ force: true });
+        },
         resetDealDocumentGeneratorState() {
           this.showDealActGenerator = false;
           this.dealDocumentGeneratorType = "";
           this.dealDocumentGeneratorMode = "create";
           this.dealDocumentGeneratorTargetDocumentId = null;
           this.dealDocumentGeneratorTargetName = "";
+          this.dealDocumentGeneratorContracts = [];
           this.dealActGeneratorForm = {
             executorCompanyId: null,
+            contractId: null,
             items: [],
           };
         },
         resetDealActGeneratorForm() {
           this.dealActGeneratorForm = {
             executorCompanyId: this.preferredOwnCompanyId(),
+            contractId: this.preferredDealDocumentGeneratorContractId(),
             items: [this.createDealActGeneratorItem()],
           };
+          this.applyDealDocumentGeneratorContractDefaults({ force: true });
         },
         hydrateDealDocumentGeneratorForm(payload = {}) {
           const normalizedPayload = payload && typeof payload === "object" ? payload : {};
@@ -9903,8 +10072,10 @@
             : [this.createDealActGeneratorItem({ description: "", quantity: "1", price: "" })];
           this.dealActGeneratorForm = {
             executorCompanyId: this.toIntOrNull(normalizedPayload.executor_company_id || normalizedPayload.executorCompanyId) || this.preferredOwnCompanyId(),
+            contractId: this.toIntOrNull(normalizedPayload.contract_id || normalizedPayload.contractId) || this.preferredDealDocumentGeneratorContractId(),
             items,
           };
+          this.applyDealDocumentGeneratorContractDefaults();
         },
         async ensureOwnCompaniesLoaded() {
           if (Array.isArray(this.ownCompanyOptions) && this.ownCompanyOptions.length) {
@@ -9923,6 +10094,7 @@
           this.clearUiErrors({ modalOnly: true });
           try {
             await this.ensureOwnCompaniesLoaded();
+            await this.loadDealDocumentGeneratorContracts();
             this.dealDocumentGeneratorMode = "create";
             this.dealDocumentGeneratorTargetDocumentId = null;
             this.dealDocumentGeneratorTargetName = "";
@@ -9957,6 +10129,7 @@
           this.clearUiErrors({ modalOnly: true });
           try {
             await this.ensureOwnCompaniesLoaded();
+            await this.loadDealDocumentGeneratorContracts();
             this.hydrateDealDocumentGeneratorForm(documentItem.generatorPayload || {});
             this.showDealActGenerator = true;
           } catch (error) {
@@ -9973,20 +10146,21 @@
           const lastItem = Array.isArray(this.dealActGeneratorForm.items) && this.dealActGeneratorForm.items.length
             ? this.dealActGeneratorForm.items[this.dealActGeneratorForm.items.length - 1]
             : null;
+          const hourlyRate = Number(this.selectedDealDocumentGeneratorHourlyRate || 0);
           this.dealActGeneratorForm.items = [
             ...(this.dealActGeneratorForm.items || []),
             this.createDealActGeneratorItem({
               description: "",
               quantity: "1",
               unit: lastItem?.unit || "час",
-              price: "",
+              price: hourlyRate > 0 ? hourlyRate.toFixed(2) : (lastItem?.price || ""),
             }),
           ];
         },
         removeDealActGeneratorItem(index) {
           const items = Array.isArray(this.dealActGeneratorForm.items) ? this.dealActGeneratorForm.items.slice() : [];
           if (items.length <= 1) {
-            this.dealActGeneratorForm.items = [this.createDealActGeneratorItem({ description: "", quantity: "1", price: "" })];
+            this.dealActGeneratorForm.items = [this.createDealActGeneratorItem({ description: "", quantity: this.defaultDealActLineQuantity(), price: this.defaultDealActLinePrice() })];
             return;
           }
           items.splice(index, 1);
@@ -10028,6 +10202,7 @@
           return {
             deal: this.editingDealId,
             executor_company: executorCompanyId,
+            contract: this.toIntOrNull(this.dealActGeneratorForm.contractId),
             items: normalizedItems,
           };
         },
@@ -10081,15 +10256,18 @@
           if (!companyId) {
             this.companyDocumentsForActiveCompany = [];
             this.companyDealDocumentGroups = [];
+            this.companySettlementContracts = [];
             return;
           }
           this.isCompanyDocumentsLoading = true;
           try {
-            const [companyPayload] = await Promise.all([
+            const [companyPayload, contractsPayload] = await Promise.all([
               this.apiRequest(`/api/v1/client-documents/?client=${companyId}&page_size=100`),
+              this.apiRequest(`/api/v1/settlements/contracts/?client=${companyId}&page_size=100`),
             ]);
             const companyRecords = Array.isArray(companyPayload?.results) ? companyPayload.results : (Array.isArray(companyPayload) ? companyPayload : []);
             this.companyDocumentsForActiveCompany = companyRecords.map((item) => this.mapClientDocument(item));
+            this.companySettlementContracts = this.normalizePaginatedResponse(contractsPayload).map((item) => this.normalizeSettlementContract(item));
 
             const deals = (this.datasets.deals || [])
               .filter((deal) => String(deal.clientId || "") === String(companyId))

@@ -3198,6 +3198,10 @@
                 <span class="text-crm-accent">+</span>
                 <span>Документы</span>
               </button>
+              <button type="button" @click="openDealCompanySettlements" :disabled="!dealHasSelectedCompany" class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed">
+                <span class="text-crm-accent">₽</span>
+                <span>Взаиморасчёты</span>
+              </button>
               <button type="button" @click="toggleDealPhoneCallHistoryPanel" :disabled="!editingDealId" class="inline-flex h-9 items-center gap-2 rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent disabled:opacity-50 disabled:cursor-not-allowed">
                 <span class="text-crm-accent">☎</span>
                 <span>История звонков</span>
@@ -4911,7 +4915,7 @@
                   <div class="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      @click="showCompanySettlementContractForm = !showCompanySettlementContractForm"
+                      @click="showCompanySettlementContractForm ? closeCompanySettlementContractForm() : openNewCompanySettlementContractForm()"
                       class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-medium text-white transition hover:border-crm-accent"
                     >
                       [[ showCompanySettlementContractForm ? 'Скрыть договор' : 'Добавить договор' ]]
@@ -4968,7 +4972,12 @@
 
                   <div v-if="showCompanySettlementContractForm || showCompanySettlementDocumentForm || showCompanySettlementAllocationForm" class="mt-4 grid grid-cols-1 xl:grid-cols-3 gap-4">
                     <div v-if="showCompanySettlementContractForm" class="rounded-xl border border-crm-border bg-[#0d2942] p-4 space-y-3">
-                      <div class="text-sm font-semibold text-white">Новый договор</div>
+                      <div class="flex items-center justify-between gap-3">
+                        <div class="text-sm font-semibold text-white">[[ companySettlementContractForm.id ? 'Редактирование договора' : 'Новый договор' ]]</div>
+                        <button type="button" @click="closeCompanySettlementContractForm" class="text-sm text-crm-muted transition hover:text-white">
+                          Отмена
+                        </button>
+                      </div>
                       <label class="block">
                         <span class="text-sm text-crm-muted">Название</span>
                         <input v-model="companySettlementContractForm.title" type="text" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
@@ -4986,6 +4995,10 @@
                           <option value="EUR">EUR</option>
                         </select>
                       </label>
+                      <label class="block">
+                        <span class="text-sm text-crm-muted">Стоимость в час</span>
+                        <input v-model="companySettlementContractForm.hourlyRate" type="number" min="0" step="0.01" class="mt-1 w-full h-10 rounded-xl border border-crm-border bg-[#102f4a] px-3 outline-none focus:border-crm-accent" />
+                      </label>
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <label class="block">
                           <span class="text-sm text-crm-muted">Дата начала</span>
@@ -5000,8 +5013,8 @@
                         <span class="text-sm text-crm-muted">Комментарий</span>
                         <textarea v-model="companySettlementContractForm.note" rows="2" class="mt-1 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 py-2 outline-none focus:border-crm-accent"></textarea>
                       </label>
-                      <button type="button" @click="createCompanySettlementContract" :disabled="isCompanySettlementSaving" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
-                        [[ isCompanySettlementSaving ? 'Сохраняем...' : 'Сохранить договор' ]]
+                      <button type="button" @click="saveCompanySettlementContract" :disabled="isCompanySettlementSaving" class="h-10 px-4 rounded-xl bg-crm-accent hover:bg-crm-accentHover text-white font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed">
+                        [[ isCompanySettlementSaving ? 'Сохраняем...' : (companySettlementContractForm.id ? 'Сохранить изменения' : 'Сохранить договор') ]]
                       </button>
                     </div>
 
@@ -5141,7 +5154,7 @@
                       Договоров и остатков пока нет.
                     </div>
                     <div v-else class="mt-2 grid grid-cols-1 xl:grid-cols-2 gap-3">
-                      <div v-for="contract in companySettlementSummary.contracts" :key="`company-settlement-contract-${contract.contractId || 'none'}-${contract.title}`" class="rounded-xl border border-crm-border bg-[#0d2942] p-4">
+                      <div v-for="contract in companySettlementSummary.contracts" :id="contract.contractId ? `company-settlement-contract-card-${contract.contractId}` : null" :key="`company-settlement-contract-${contract.contractId || 'none'}-${contract.title}`" class="rounded-xl border border-crm-border bg-[#0d2942] p-4">
                         <div class="flex flex-wrap items-start justify-between gap-2">
                           <div>
                             <div class="text-sm font-semibold text-white">[[ contract.title || 'Без договора' ]]</div>
@@ -5150,8 +5163,16 @@
                               <span v-if="contract.number"> • </span>
                               [[ contract.documentsCount ]] документов
                             </div>
+                            <div v-if="contract.hourlyRate > 0" class="mt-1 text-xs text-crm-muted">
+                              Ставка: [[ formatSettlementAmount(contract.hourlyRate, contract.currency) ]]
+                            </div>
                           </div>
-                          <div class="text-sm font-semibold text-white">[[ formatSettlementAmount(contract.stats.balance, contract.currency) ]]</div>
+                          <div class="flex items-center gap-2">
+                            <div class="text-sm font-semibold text-white">[[ formatSettlementAmount(contract.stats.balance, contract.currency) ]]</div>
+                            <button v-if="contract.contractId" type="button" @click="openCompanySettlementContractEditor(companySettlementContracts.find(item => String(item.id) === String(contract.contractId)) || contract)" class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent">
+                              Отредактировать
+                            </button>
+                          </div>
                         </div>
                         <div class="mt-3 grid grid-cols-2 xl:grid-cols-3 gap-2 text-xs">
                           <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
@@ -5606,6 +5627,36 @@
                 </div>
                 <div v-if="isCompanyDocumentsLoading" class="mt-3 text-sm text-crm-muted">Загрузка документов...</div>
                 <template v-else>
+                  <div class="mt-4">
+                    <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Договоры</div>
+                    <div v-if="companySettlementContracts.length === 0" class="mt-2 text-sm text-crm-muted">
+                      Договоры компании пока не созданы.
+                    </div>
+                    <div v-else class="mt-2 space-y-2">
+                      <div
+                        v-for="contract in companySettlementContracts"
+                        :key="`company-document-contract-${contract.id}`"
+                        class="flex min-w-0 items-start justify-between gap-3 rounded-xl border border-crm-border bg-[#0f2f4a] px-3 py-3"
+                      >
+                        <div class="min-w-0">
+                          <div class="text-sm font-medium text-white [overflow-wrap:anywhere]">[[ contract.number || contract.title || `Договор #${contract.id}` ]]</div>
+                          <div class="mt-1 text-xs text-crm-muted">
+                            <span>[[ contract.title || 'Без названия' ]]</span>
+                            <span v-if="contract.hourlyRate > 0"> • [[ formatSettlementAmount(contract.hourlyRate, contract.currency) ]] / час</span>
+                            <span v-if="contract.startDate"> • c [[ formatSettlementDate(contract.startDate) ]]</span>
+                          </div>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2">
+                          <button type="button" @click="openCompanySettlementContractSummary(contract.id)" class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent">
+                            Открыть
+                          </button>
+                          <button type="button" @click="openCompanySettlementContractEditor(contract)" class="inline-flex h-8 items-center rounded-lg border border-crm-border bg-[#123753] px-3 text-xs font-semibold text-white transition hover:border-crm-accent">
+                            Отредактировать
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <div class="mt-4">
                     <div class="text-xs uppercase tracking-[0.12em] text-crm-muted">Документы компании</div>
                     <div v-if="companyDocumentsForActiveCompany.length === 0" class="mt-2 text-sm text-crm-muted">
@@ -6842,6 +6893,23 @@
                       <option v-for="company in ownCompanyOptions" :key="`deal-act-own-company-${company.id}`" :value="company.id">[[ company.name ]]</option>
                     </select>
                   </label>
+                  <label class="block">
+                    <span class="text-sm text-crm-muted">Договор</span>
+                    <select v-model="dealActGeneratorForm.contractId" @change="handleDealDocumentGeneratorContractChange" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent">
+                      <option :value="null">Без договора</option>
+                      <option v-for="contract in dealDocumentGeneratorContracts" :key="`deal-generator-contract-${contract.id}`" :value="contract.id">
+                        [[ contract.number || contract.title || `Договор #${contract.id}` ]][[ contract.isActive === false ? ' • неактивен' : '' ]]
+                      </option>
+                    </select>
+                  </label>
+                  <div class="rounded-2xl border border-crm-border/80 bg-[#102f4a] px-4 py-3">
+                    <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Стоимость в час по договору</div>
+                    <div class="mt-1 text-lg font-semibold text-white">
+                      [[ selectedDealDocumentGeneratorContract && selectedDealDocumentGeneratorContract.hourlyRate > 0
+                        ? formatSettlementAmount(selectedDealDocumentGeneratorContract.hourlyRate, selectedDealDocumentGeneratorContract.currency || dealActGeneratorCurrency)
+                        : 'Не указана' ]]
+                    </div>
+                  </div>
                   <div class="rounded-2xl border border-crm-border/80 bg-[#102f4a] px-4 py-3">
                     <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Итого по акту</div>
                     <div class="mt-1 text-lg font-semibold text-white">[[ formatSettlementAmount(dealActGeneratorTotal, dealActGeneratorCurrency) ]]</div>

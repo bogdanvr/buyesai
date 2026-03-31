@@ -61,6 +61,7 @@ PAGE_MARGIN_SIDE = "1134"
 PAGE_MARGIN_BOTTOM = "1134"
 PAGE_HEADER_MARGIN = "708"
 PAGE_FOOTER_MARGIN = "708"
+AUTO_CONTRACT = object()
 
 
 @dataclass(frozen=True)
@@ -724,9 +725,10 @@ def _line_items_payload(items: list[ActLineItem]) -> list[dict[str, str]]:
     ]
 
 
-def _generator_payload(*, executor_company: Client, items: list[ActLineItem]) -> dict:
+def _generator_payload(*, executor_company: Client, items: list[ActLineItem], contract: SettlementContract | None = None) -> dict:
     return {
         "executor_company_id": executor_company.pk,
+        "contract_id": getattr(contract, "pk", None),
         "items": _line_items_payload(items),
     }
 
@@ -836,6 +838,7 @@ def deal_document_generator_context(deal_document: DealDocument) -> dict:
         "settlement_document_id": settlement_document.pk,
         "generator_payload": {
             "executor_company_id": normalized_payload.get("executor_company_id"),
+            "contract_id": normalized_payload.get("contract_id", settlement_document.contract_id),
             "items": items,
             "number": settlement_document.number,
             "document_date": _format_date_short(settlement_document.document_date),
@@ -948,6 +951,7 @@ def _generate_deal_service_document(
     *,
     deal: Deal,
     executor_company: Client,
+    contract: SettlementContract | None | object = AUTO_CONTRACT,
     items: list[ActLineItem | dict],
     uploaded_by,
     document_type: str,
@@ -968,23 +972,27 @@ def _generate_deal_service_document(
         raise ValidationError({"items": "Сумма документа должна быть больше нуля."})
 
     with transaction.atomic():
-        contract = SettlementContract.objects.filter(client_id=client.pk, is_active=True).order_by("-created_at", "-id").first()
+        resolved_contract = contract
+        if resolved_contract is AUTO_CONTRACT:
+            resolved_contract = SettlementContract.objects.filter(client_id=client.pk, is_active=True).order_by("-created_at", "-id").first()
+        if resolved_contract is not None and getattr(resolved_contract, "client_id", None) != client.pk:
+            raise ValidationError({"contract": "Договор должен принадлежать компании сделки."})
         resolved_currency = (
-            _normalize_text(getattr(contract, "currency", ""))
+            _normalize_text(getattr(resolved_contract, "currency", ""))
             or _normalize_text(getattr(client, "currency", ""))
             or _normalize_text(getattr(deal, "currency", ""))
             or "RUB"
         )
         settlement_document = SettlementDocument.objects.create(
             client=client,
-            contract=contract,
+            contract=resolved_contract,
             deal=deal,
             document_type=document_type,
             title=settlement_title,
             document_date=timezone.localdate(),
             currency=resolved_currency,
             amount=amount,
-            generator_payload=_generator_payload(executor_company=executor_company, items=line_items),
+            generator_payload=_generator_payload(executor_company=executor_company, contract=resolved_contract, items=line_items),
             realization_status=realization_status,
         )
 
@@ -1012,7 +1020,14 @@ def _generate_deal_service_document(
         return deal_document, settlement_document
 
 
-def update_generated_deal_document(*, deal_document: DealDocument, executor_company: Client, items: list[ActLineItem | dict], uploaded_by=None) -> tuple[DealDocument, SettlementDocument]:
+def update_generated_deal_document(
+    *,
+    deal_document: DealDocument,
+    executor_company: Client,
+    contract: SettlementContract | None | object = AUTO_CONTRACT,
+    items: list[ActLineItem | dict],
+    uploaded_by=None,
+) -> tuple[DealDocument, SettlementDocument]:
     settlement_document = resolve_settlement_document_for_deal_document(deal_document)
     if settlement_document is None:
         raise ValidationError({"deal_document": "Документ не связан со счетом или актом."})
@@ -1043,11 +1058,15 @@ def update_generated_deal_document(*, deal_document: DealDocument, executor_comp
         raise ValidationError({"items": "Сумма документа должна быть больше нуля."})
 
     with transaction.atomic():
+        resolved_contract = settlement_document.contract if contract is AUTO_CONTRACT else contract
+        if resolved_contract is not None and getattr(resolved_contract, "client_id", None) != client.pk:
+            raise ValidationError({"contract": "Договор должен принадлежать компании сделки."})
         settlement_document.client = client
+        settlement_document.contract = resolved_contract
         settlement_document.deal = deal
         settlement_document.title = settlement_title
         settlement_document.amount = amount
-        settlement_document.generator_payload = _generator_payload(executor_company=executor_company, items=line_items)
+        settlement_document.generator_payload = _generator_payload(executor_company=executor_company, contract=resolved_contract, items=line_items)
         settlement_document.save()
 
         file_name = _document_file_name(file_prefix=file_prefix, settlement_document=settlement_document)
@@ -1081,10 +1100,18 @@ def update_generated_deal_document(*, deal_document: DealDocument, executor_comp
         return deal_document, settlement_document
 
 
-def generate_deal_act(*, deal: Deal, executor_company: Client, items: list[ActLineItem | dict], uploaded_by=None) -> tuple[DealDocument, SettlementDocument]:
+def generate_deal_act(
+    *,
+    deal: Deal,
+    executor_company: Client,
+    contract: SettlementContract | None | object = AUTO_CONTRACT,
+    items: list[ActLineItem | dict],
+    uploaded_by=None,
+) -> tuple[DealDocument, SettlementDocument]:
     return _generate_deal_service_document(
         deal=deal,
         executor_company=executor_company,
+        contract=contract,
         items=items,
         uploaded_by=uploaded_by,
         document_type=SettlementDocument.DocumentType.REALIZATION,
@@ -1096,10 +1123,18 @@ def generate_deal_act(*, deal: Deal, executor_company: Client, items: list[ActLi
     )
 
 
-def generate_deal_invoice(*, deal: Deal, executor_company: Client, items: list[ActLineItem | dict], uploaded_by=None) -> tuple[DealDocument, SettlementDocument]:
+def generate_deal_invoice(
+    *,
+    deal: Deal,
+    executor_company: Client,
+    contract: SettlementContract | None | object = AUTO_CONTRACT,
+    items: list[ActLineItem | dict],
+    uploaded_by=None,
+) -> tuple[DealDocument, SettlementDocument]:
     return _generate_deal_service_document(
         deal=deal,
         executor_company=executor_company,
+        contract=contract,
         items=items,
         uploaded_by=uploaded_by,
         document_type=SettlementDocument.DocumentType.INVOICE,

@@ -31,6 +31,13 @@ class SettlementContract(TimestampedModel):
     title = models.CharField(max_length=255, blank=True, default="", verbose_name="Название договора")
     number = models.CharField(max_length=128, blank=True, default="", verbose_name="Номер договора")
     currency = models.CharField(max_length=3, default="RUB", verbose_name="Валюта")
+    hourly_rate = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        verbose_name="Стоимость в час",
+    )
     start_date = models.DateField(blank=True, null=True, verbose_name="Дата начала")
     end_date = models.DateField(blank=True, null=True, verbose_name="Дата окончания")
     note = models.TextField(blank=True, default="", verbose_name="Комментарий")

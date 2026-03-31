@@ -52,6 +52,7 @@ class SettlementContractSerializer(serializers.ModelSerializer):
             "title",
             "number",
             "currency",
+            "hourly_rate",
             "start_date",
             "end_date",
             "note",
