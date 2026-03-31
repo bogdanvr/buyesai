@@ -4431,10 +4431,15 @@
           this.resetCompanySettlementContractForm();
           this.showCompanySettlementContractForm = true;
         },
-        openCompanySettlementContractEditor(contract) {
+        async openCompanySettlementContractEditor(contract) {
           const normalizedContract = contract ? this.normalizeSettlementContract(contract) : null;
           if (!normalizedContract?.id) {
             return;
+          }
+          if (!this.showCompanySettlementsPanel) {
+            await this.toggleCompanySettlementsPanel();
+          } else if (!this.companySettlementContracts.length) {
+            await this.loadCompanySettlements();
           }
           this.companySettlementContractForm = {
             id: normalizedContract.id,
@@ -4448,6 +4453,12 @@
             isActive: normalizedContract.isActive !== false,
           };
           this.showCompanySettlementContractForm = true;
+          this.$nextTick(() => {
+            const panel = document.getElementById("company-settlements-panel");
+            if (panel && typeof panel.scrollIntoView === "function") {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
         },
         closeCompanySettlementContractForm() {
           this.showCompanySettlementContractForm = false;
