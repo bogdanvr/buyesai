@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.db import transaction
 from django.utils import timezone
 
 from django.urls import reverse
@@ -111,8 +112,7 @@ class TouchSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"happened_at": "Укажите дату и время касания."})
         if lead is None and deal is None and client is None and contact is None and task is None:
             raise serializers.ValidationError({"lead": "Привяжите касание хотя бы к одному объекту CRM."})
-        if task is not None and task.type != ActivityType.TASK:
-            raise serializers.ValidationError({"task": "Можно привязать только задачу."})
+        self._validate_task_link(task, deal, client)
         self._validate_result_option_channel(result_option, channel)
         self._validate_documents(deal_documents, client_documents, deal, client)
         if deal is not None:
@@ -134,24 +134,62 @@ class TouchSerializer(serializers.ModelSerializer):
             if invalid_client_documents:
                 raise serializers.ValidationError({"client_document_ids": "Выбран документ другой компании."})
 
+    def _validate_task_link(self, task, deal, client):
+        if task is None:
+            return
+        if task.type != ActivityType.TASK:
+            raise serializers.ValidationError({"task": "Можно выбрать только задачу."})
+        if deal is not None:
+            if task.deal_id != deal.pk:
+                raise serializers.ValidationError({"task": "Можно выбрать только задачу выбранной сделки."})
+            return
+        if client is not None:
+            task_client_id = task.client_id or getattr(getattr(task, "deal", None), "client_id", None)
+            if task_client_id != client.pk:
+                raise serializers.ValidationError({"task": "Можно выбрать только задачу выбранной компании."})
+
+    def _close_related_task(self, instance):
+        task = getattr(instance, "task", None)
+        if task is None or task.type != ActivityType.TASK:
+            return
+        result_text = str(getattr(instance, "summary", "") or "").strip()
+        update_fields = []
+        if task.status != TaskStatus.DONE:
+            task.status = TaskStatus.DONE
+            task.is_done = True
+            update_fields.extend(["status", "is_done"])
+        if result_text and str(task.result or "").strip() != result_text:
+            task.result = result_text
+            update_fields.append("result")
+        completed_at = getattr(instance, "happened_at", None) or timezone.now()
+        if task.completed_at != completed_at:
+            task.completed_at = completed_at
+            update_fields.append("completed_at")
+        if update_fields:
+            task.save(update_fields=[*update_fields, "updated_at"])
+
     def create(self, validated_data):
         deal_documents = validated_data.pop("deal_documents", [])
         client_documents = validated_data.pop("client_documents", [])
-        instance = super().create(validated_data)
-        if deal_documents:
-            instance.deal_documents.set(deal_documents)
-        if client_documents:
-            instance.client_documents.set(client_documents)
+        with transaction.atomic():
+            instance = super().create(validated_data)
+            if deal_documents:
+                instance.deal_documents.set(deal_documents)
+            if client_documents:
+                instance.client_documents.set(client_documents)
+            self._close_related_task(instance)
         return instance
 
     def update(self, instance, validated_data):
         deal_documents = validated_data.pop("deal_documents", None)
         client_documents = validated_data.pop("client_documents", None)
-        instance = super().update(instance, validated_data)
-        if deal_documents is not None:
-            instance.deal_documents.set(deal_documents)
-        if client_documents is not None:
-            instance.client_documents.set(client_documents)
+        with transaction.atomic():
+            instance = super().update(instance, validated_data)
+            if deal_documents is not None:
+                instance.deal_documents.set(deal_documents)
+            if client_documents is not None:
+                instance.client_documents.set(client_documents)
+            self._close_related_task(instance)
         return instance
 
     def _validate_result_option_channel(self, result_option, channel):

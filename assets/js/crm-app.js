@@ -1001,7 +1001,29 @@
             .map((contact) => ({ id: contact.id, title: contact.fullName || contact.name }));
         },
         touchTaskOptions() {
-          return this.datasets.tasks.map((task) => ({ id: task.id, title: task.subject || task.name }));
+          const selectedDealId = this.toIntOrNull(this.forms.touches.dealId);
+          const selectedCompanyId = this.toIntOrNull(this.forms.touches.companyId);
+          const currentTaskId = this.toIntOrNull(this.forms.touches.taskId);
+          return (this.datasets.tasks || [])
+            .filter((task) => (
+              this.isTaskActiveStatus(task.taskStatus || task.status)
+              || String(task.id) === String(currentTaskId || "")
+            ))
+            .filter((task) => {
+              if (selectedDealId) {
+                return String(task.dealId || "") === String(selectedDealId);
+              }
+              if (selectedCompanyId) {
+                const deal = (this.datasets.deals || []).find((item) => String(item.id) === String(task.dealId || ""));
+                const taskCompanyId = this.toIntOrNull(task.clientId) || this.toIntOrNull(deal?.clientId);
+                return String(taskCompanyId || "") === String(selectedCompanyId);
+              }
+              return false;
+            })
+            .map((task) => ({
+              id: task.id,
+              title: `${task.subject || task.name}${task.dueAtRaw ? ` · ${this.formatDueLabel(task.dueAtRaw)}` : ""}`,
+            }));
         },
         selectedTouchChannel() {
           const channelId = this.toIntOrNull(this.forms.touches.channelId);
@@ -2537,10 +2559,9 @@
             }
 
             const selectedTaskId = this.toIntOrNull(this.forms.touches.taskId);
-            if (selectedTaskId && this.toIntOrNull(this.forms.touches.dealId)) {
-              const taskStillAvailable = (this.datasets.tasks || []).some(
+            if (selectedTaskId) {
+              const taskStillAvailable = this.touchTaskOptions.some(
                 (task) => String(task.id) === String(selectedTaskId)
-                  && String(task.dealId || "") === String(this.forms.touches.dealId)
               );
               if (!taskStillAvailable) {
                 this.forms.touches.taskId = null;
@@ -2572,9 +2593,8 @@
           handler() {
             const selectedTaskId = this.toIntOrNull(this.forms.touches.taskId);
             if (selectedTaskId) {
-              const taskStillAvailable = (this.datasets.tasks || []).some(
+              const taskStillAvailable = this.touchTaskOptions.some(
                 (task) => String(task.id) === String(selectedTaskId)
-                  && String(task.dealId || "") === String(this.forms.touches.dealId || "")
               );
               if (!taskStillAvailable) {
                 this.forms.touches.taskId = null;

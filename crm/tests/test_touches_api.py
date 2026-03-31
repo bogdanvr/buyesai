@@ -53,6 +53,7 @@ class TouchesApiTests(APITestCase):
             type=ActivityType.TASK,
             subject="Задача для касания",
             due_at=timezone.now() + timedelta(days=1),
+            client=self.company,
         )
 
     def test_cannot_create_touch_without_link(self):
@@ -243,6 +244,70 @@ class TouchesApiTests(APITestCase):
         self.assertIsNotNone(follow_up_task)
         self.assertEqual(follow_up_task.status, TaskStatus.TODO)
         self.assertEqual(follow_up_task.communication_channel_id, self.channel.pk)
+
+    def test_can_close_selected_related_task_from_touch(self):
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Проконтролировать оплату",
+            due_at=timezone.now() + timedelta(days=1),
+            status=TaskStatus.TODO,
+            client=self.company,
+            deal=self.deal,
+            created_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("touches-list"),
+            {
+                "happened_at": timezone.now().isoformat(),
+                "channel": self.channel.pk,
+                "result_option": self.touch_result.pk,
+                "direction": "outgoing",
+                "summary": "Клиент обещал оплатить сегодня",
+                "next_step_at": (timezone.now() + timedelta(days=1)).isoformat(),
+                "owner": self.user.pk,
+                "client": self.company.pk,
+                "deal": self.deal.pk,
+                "task": task.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        task.refresh_from_db()
+        self.assertEqual(task.status, TaskStatus.DONE)
+        self.assertEqual(task.result, "Клиент обещал оплатить сегодня")
+        self.assertEqual(response.data["task_subject"], "Проконтролировать оплату")
+
+    def test_cannot_select_task_from_another_company(self):
+        other_company = Client.objects.create(name="Other company")
+        other_task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Чужая задача",
+            due_at=timezone.now() + timedelta(days=1),
+            status=TaskStatus.TODO,
+            client=other_company,
+            created_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("touches-list"),
+            {
+                "happened_at": timezone.now().isoformat(),
+                "channel": self.channel.pk,
+                "result_option": self.touch_result.pk,
+                "direction": "outgoing",
+                "summary": "Попытка закрыть чужую задачу",
+                "next_step_at": (timezone.now() + timedelta(days=1)).isoformat(),
+                "owner": self.user.pk,
+                "client": self.company.pk,
+                "task": other_task.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("task", response.data)
 
     def test_channel_touch_results_do_not_block_manual_save(self):
         restricted_channel = CommunicationChannel.objects.create(name="Telegram")
