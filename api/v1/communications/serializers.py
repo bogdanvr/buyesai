@@ -212,6 +212,9 @@ class ConversationSendSerializer(serializers.Serializer):
     body_html = serializers.CharField(required=False, allow_blank=True, default="")
     recipient = serializers.CharField(required=False, allow_blank=True, default="")
     deal_document = serializers.IntegerField(required=False, allow_null=True)
+    deal_documents = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)
+    client_documents = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)
+    settlement_contracts = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)
     touch_result_code = serializers.CharField(required=False, allow_blank=True, default="")
     touch_summary = serializers.CharField(required=False, allow_blank=True, default="")
 
@@ -223,7 +226,12 @@ class ConversationSendSerializer(serializers.Serializer):
             str(attrs.get("subject") or "").strip()
             or str(attrs.get("body_text") or attrs.get("body_html") or "").strip()
         )
-        has_document_attachment = bool(attrs.get("deal_document"))
+        has_document_attachment = bool(
+            attrs.get("deal_document")
+            or attrs.get("deal_documents")
+            or attrs.get("client_documents")
+            or attrs.get("settlement_contracts")
+        )
         if has_document_attachment and not normalized_recipient:
             raise serializers.ValidationError({"recipient": "Укажите получателя письма."})
         if not has_text_payload and not has_document_attachment:

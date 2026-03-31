@@ -17,9 +17,9 @@ from api.v1.communications.serializers import (
     MessageAttemptLogSerializer,
     MessageSerializer,
 )
-from crm.models import Client, Contact, Deal, DealDocument, TouchResult
+from crm.models import Client, ClientDocument, Contact, Deal, DealDocument, SettlementContract, TouchResult
 from crm_communications.deal_document_shares import (
-    apply_share_link_to_message,
+    apply_share_links_to_message,
     create_document_share,
     record_share_message_status,
 )
@@ -57,15 +57,105 @@ def sync_conversation_message_contexts_from_conversation(*, conversation: Conver
         sync_message_context_from_conversation(message=message)
 
 
-def _resolve_deal_document_for_outbound(*, deal_document_id: int | None, deal_id: int | None):
-    if not deal_document_id:
-        return None
-    document = DealDocument.objects.select_related("deal").filter(pk=deal_document_id).first()
-    if document is None:
-        raise ValueError("Документ сделки не найден.")
-    if deal_id and document.deal_id != deal_id:
-        raise ValueError("Документ сделки не принадлежит выбранной сделке.")
-    return document
+def _unique_ints(values) -> list[int]:
+    normalized = []
+    seen = set()
+    for value in values or []:
+        try:
+            candidate = int(value)
+        except (TypeError, ValueError):
+            continue
+        if candidate <= 0 or candidate in seen:
+            continue
+        normalized.append(candidate)
+        seen.add(candidate)
+    return normalized
+
+
+def _resolve_outbound_documents(
+    *,
+    deal_document_id: int | None,
+    deal_document_ids,
+    client_document_ids,
+    settlement_contract_ids,
+    deal_id: int | None,
+    client_id: int | None,
+):
+    resolved_documents = []
+    errors = {}
+    seen_keys = set()
+
+    normalized_deal_document_ids = _unique_ints(deal_document_ids)
+    if deal_document_id:
+        normalized_single_id = int(deal_document_id)
+        if normalized_single_id not in normalized_deal_document_ids:
+            normalized_deal_document_ids.insert(0, normalized_single_id)
+    normalized_client_document_ids = _unique_ints(client_document_ids)
+    normalized_settlement_contract_ids = _unique_ints(settlement_contract_ids)
+
+    deal_documents_map = {
+        item.pk: item
+        for item in DealDocument.objects.select_related("deal").filter(pk__in=normalized_deal_document_ids)
+    }
+    for document_id in normalized_deal_document_ids:
+        document = deal_documents_map.get(document_id)
+        if document is None:
+            errors.setdefault("deal_documents", "Один или несколько документов сделки не найдены.")
+            continue
+        if deal_id and document.deal_id != deal_id:
+            errors["deal_documents"] = "Один из документов сделки не принадлежит выбранной сделке."
+            continue
+        if client_id and getattr(document.deal, "client_id", None) != client_id:
+            errors["deal_documents"] = "Один из документов сделки не принадлежит выбранной компании."
+            continue
+        key = ("deal", document.pk)
+        if key not in seen_keys:
+            resolved_documents.append(document)
+            seen_keys.add(key)
+    if len([item for item in seen_keys if item[0] == "deal"]) != len(normalized_deal_document_ids):
+        errors.setdefault("deal_documents", "Один или несколько документов сделки не найдены.")
+
+    client_documents_map = {
+        item.pk: item
+        for item in ClientDocument.objects.select_related("client").filter(pk__in=normalized_client_document_ids)
+    }
+    for document_id in normalized_client_document_ids:
+        document = client_documents_map.get(document_id)
+        if document is None:
+            errors.setdefault("client_documents", "Один или несколько документов компании не найдены.")
+            continue
+        if client_id and document.client_id != client_id:
+            errors["client_documents"] = "Один из документов компании не принадлежит выбранной компании."
+            continue
+        key = ("client", document.pk)
+        if key not in seen_keys:
+            resolved_documents.append(document)
+            seen_keys.add(key)
+    if len([item for item in seen_keys if item[0] == "client"]) != len(normalized_client_document_ids):
+        errors.setdefault("client_documents", "Один или несколько документов компании не найдены.")
+
+    settlement_contracts_map = {
+        item.pk: item
+        for item in SettlementContract.objects.select_related("client").filter(pk__in=normalized_settlement_contract_ids)
+    }
+    for contract_id in normalized_settlement_contract_ids:
+        contract = settlement_contracts_map.get(contract_id)
+        if contract is None:
+            errors.setdefault("settlement_contracts", "Один или несколько договоров не найдены.")
+            continue
+        if client_id and contract.client_id != client_id:
+            errors["settlement_contracts"] = "Один из договоров не принадлежит выбранной компании."
+            continue
+        key = ("contract", contract.pk)
+        if key not in seen_keys:
+            resolved_documents.append(contract)
+            seen_keys.add(key)
+    if len([item for item in seen_keys if item[0] == "contract"]) != len(normalized_settlement_contract_ids):
+        errors.setdefault("settlement_contracts", "Один или несколько договоров не найдены.")
+
+    if errors:
+        raise ValueError(errors)
+    return resolved_documents
 
 
 def _apply_outbound_touch_metadata(*, message: Message, touch_result_code: str = "", touch_summary: str = "") -> None:
@@ -159,14 +249,18 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         payload = serializer.validated_data
         try:
-            deal_document = _resolve_deal_document_for_outbound(
+            selected_documents = _resolve_outbound_documents(
                 deal_document_id=payload.get("deal_document"),
+                deal_document_ids=payload.get("deal_documents"),
+                client_document_ids=payload.get("client_documents"),
+                settlement_contract_ids=payload.get("settlement_contracts"),
                 deal_id=conversation.deal_id,
+                client_id=conversation.client_id,
             )
         except ValueError as exc:
-            return Response({"deal_document": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        if deal_document is not None and conversation.channel != "email":
-            return Response({"deal_document": "Отправка документа ссылкой сейчас поддерживается только для email-диалогов."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(exc.args[0] if exc.args and isinstance(exc.args[0], dict) else {"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if selected_documents and conversation.channel != "email":
+            return Response({"documents": "Отправка документов ссылками сейчас поддерживается только для email-диалогов."}, status=status.HTTP_400_BAD_REQUEST)
         message = Message.objects.create(
             conversation=conversation,
             channel=conversation.channel,
@@ -182,19 +276,18 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
             body_preview=str(payload.get("body_text") or payload.get("subject") or "").strip()[:500],
             external_recipient_key=str(payload.get("recipient") or "").strip(),
         )
-        share = None
-        if deal_document is not None:
+        shares = []
+        if selected_documents:
             try:
-                share = create_document_share(document=deal_document, message=message, request=request)
-                apply_share_link_to_message(
+                shares = [create_document_share(document=document, message=message, request=request) for document in selected_documents]
+                apply_share_links_to_message(
                     message=message,
-                    share=share,
-                    document_name=str(deal_document.original_name or "").strip() or "документ",
+                    shares=[(share, share.source_document) for share in shares],
                     request=request,
                 )
             except DjangoValidationError as exc:
                 message.delete()
-                return Response(getattr(exc, "message_dict", None) or {"deal_document": getattr(exc, "messages", [str(exc)])}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(getattr(exc, "message_dict", None) or {"documents": getattr(exc, "messages", [str(exc)])}, status=status.HTTP_400_BAD_REQUEST)
         MessageQueueService.enqueue_message(message=message)
         try:
             message = dispatch_outgoing_message(message=message)
@@ -208,7 +301,7 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
             touch_summary=str(payload.get("touch_summary") or "").strip(),
         )
         message.refresh_from_db()
-        if share is not None:
+        for share in shares:
             record_share_message_status(share=share, message=message)
         return Response(MessageSerializer(message, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
@@ -227,14 +320,18 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
         body_text = str(payload.get("body_text") or "").strip()
         body_html = str(payload.get("body_html") or "").strip()
         try:
-            deal_document = _resolve_deal_document_for_outbound(
+            selected_documents = _resolve_outbound_documents(
                 deal_document_id=payload.get("deal_document"),
+                deal_document_ids=payload.get("deal_documents"),
+                client_document_ids=payload.get("client_documents"),
+                settlement_contract_ids=payload.get("settlement_contracts"),
                 deal_id=getattr(deal, "pk", None),
+                client_id=getattr(client, "pk", None),
             )
         except ValueError as exc:
-            return Response({"deal_document": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        if deal_document is not None and channel != "email":
-            return Response({"deal_document": "Отправка документа ссылкой сейчас поддерживается только для email-диалогов."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(exc.args[0] if exc.args and isinstance(exc.args[0], dict) else {"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if selected_documents and channel != "email":
+            return Response({"documents": "Отправка документов ссылками сейчас поддерживается только для email-диалогов."}, status=status.HTTP_400_BAD_REQUEST)
 
         conversation = Conversation.objects.create(
             channel=channel,
@@ -283,19 +380,18 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
             body_preview=str(body_text or subject or "").strip()[:500],
             external_recipient_key=recipient,
         )
-        share = None
-        if deal_document is not None:
+        shares = []
+        if selected_documents:
             try:
-                share = create_document_share(document=deal_document, message=message, request=request)
-                apply_share_link_to_message(
+                shares = [create_document_share(document=document, message=message, request=request) for document in selected_documents]
+                apply_share_links_to_message(
                     message=message,
-                    share=share,
-                    document_name=str(deal_document.original_name or "").strip() or "документ",
+                    shares=[(share, share.source_document) for share in shares],
                     request=request,
                 )
             except DjangoValidationError as exc:
                 message.delete()
-                return Response(getattr(exc, "message_dict", None) or {"deal_document": getattr(exc, "messages", [str(exc)])}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(getattr(exc, "message_dict", None) or {"documents": getattr(exc, "messages", [str(exc)])}, status=status.HTTP_400_BAD_REQUEST)
         MessageQueueService.enqueue_message(message=message)
         try:
             message = dispatch_outgoing_message(message=message)
@@ -310,7 +406,7 @@ class ConversationViewSet(viewsets.ReadOnlyModelViewSet):
             touch_summary=str(payload.get("touch_summary") or "").strip(),
         )
         message.refresh_from_db()
-        if share is not None:
+        for share in shares:
             record_share_message_status(share=share, message=message)
         return Response(
             {

@@ -1,4 +1,5 @@
 from decimal import Decimal
+import re
 import shutil
 import tempfile
 from zipfile import ZipFile
@@ -466,6 +467,10 @@ class SettlementsApiTests(APITestCase):
             self.assertIn("не менее чем за 9 календарных дней.", xml)
             self.assertIn("Срок ответа на претензию составляет 6 календарных дней с даты ее получения.", xml)
             self.assertIn("БИК 045004774", xml)
+            tables = re.findall(r"<w:tbl\b.*?</w:tbl>", xml, flags=re.DOTALL)
+            self.assertTrue(tables)
+            self.assertTrue(all('w:after="200"' not in table for table in tables))
+            self.assertGreaterEqual(sum(table.count('<w:vAlign w:val="center"/>') for table in tables), 12)
 
     @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
     def test_updating_generated_offer_contract_regenerates_docx(self):

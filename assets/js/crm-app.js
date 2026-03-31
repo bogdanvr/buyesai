@@ -147,10 +147,13 @@
             subject: "",
             bodyText: "",
           },
-          communicationsPendingDealDocument: null,
+          communicationsDocuments: [],
+          communicationsSelectedDocumentKeys: [],
           communicationsContextDealId: null,
           isCommunicationsCompaniesLoading: false,
           isCommunicationsContactsLoading: false,
+          isCommunicationsDocumentsLoading: false,
+          isCommunicationsDocumentUploading: false,
           isCommunicationsTimelineLoading: false,
           isCommunicationsSending: false,
           selectedStatusFilters: [],
@@ -2018,8 +2021,27 @@
           if (!itemKey) return null;
           return this.communicationsFilteredTimelineItems.find((item) => String(item.timelineKey || "") === itemKey) || null;
         },
-        communicationsPendingDocumentName() {
-          return this.documentDisplayName(this.communicationsPendingDealDocument?.originalName || "", "");
+        communicationsAvailableDocuments() {
+          return (this.communicationsDocuments || [])
+            .slice()
+            .sort((left, right) => (
+              (this.parseTaskDueTimestamp(right.createdAt || right.updatedAt) || 0)
+              - (this.parseTaskDueTimestamp(left.createdAt || left.updatedAt) || 0)
+            ));
+        },
+        communicationsSelectedDocuments() {
+          const selectedKeys = new Set((this.communicationsSelectedDocumentKeys || []).map((item) => String(item || "").trim()).filter(Boolean));
+          return this.communicationsAvailableDocuments.filter((item) => selectedKeys.has(this.communicationsDocumentSelectionKey(item.scope, item.id)));
+        },
+        communicationsSelectedDocumentsSummary() {
+          const selectedDocuments = this.communicationsSelectedDocuments || [];
+          if (!selectedDocuments.length) {
+            return "";
+          }
+          if (selectedDocuments.length === 1) {
+            return this.documentDisplayName(selectedDocuments[0].originalName || "", "Документ");
+          }
+          return `${selectedDocuments.length} документов`;
         },
         communicationsSelectedCompanyPhone() {
           const companyPhone = String(this.selectedCommunicationsCompany?.phone || "").trim();
@@ -5584,17 +5606,18 @@
                 : !!String(contact.email || "").trim())
           )) || this.communicationsCompanyContactOptions[0] || null;
           const contactId = this.toIntOrNull(preferredContact?.id);
-          const pendingDocumentName = this.communicationsPendingDocumentName;
+          const selectedDocuments = this.communicationsSelectedDocuments || [];
+          const bodyText = normalizedMode === "call"
+            ? ""
+            : (selectedDocuments.length === 1
+              ? `Направляю ссылку на ${this.documentDisplayName(selectedDocuments[0].originalName || "", "документ")}.`
+              : (selectedDocuments.length > 1 ? "Направляю ссылки на документы." : ""));
           return {
             contactId,
             phone: this.resolveCommunicationsPhone(contactId),
             recipient: this.resolveCommunicationsRecipient(normalizedMode, contactId),
-            subject: normalizedMode === "email"
-              ? (pendingDocumentName || `По компании: ${this.selectedCommunicationsCompany?.name || ""}`.trim())
-              : "",
-            bodyText: normalizedMode === "call"
-              ? ""
-              : (pendingDocumentName ? `Направляю ссылку на ${pendingDocumentName}.` : ""),
+            subject: "",
+            bodyText,
           };
         },
         resolveCommunicationsRecipient(channelCode, contactId) {
@@ -5612,10 +5635,10 @@
           }
           const contactEmail = String(contact?.email || "").trim();
           if (contactEmail) {
-            return `email:${contactEmail}`;
+            return contactEmail;
           }
           const companyEmail = String(this.selectedCommunicationsCompany?.email || "").trim();
-          return companyEmail ? `email:${companyEmail}` : "";
+          return companyEmail || "";
         },
         resolveCommunicationsPhone(contactId) {
           const normalizedContactId = this.toIntOrNull(contactId);
@@ -5711,6 +5734,124 @@
             this.isCommunicationsContactsLoading = false;
           }
         },
+        communicationsDocumentSelectionKey(scope, id) {
+          const normalizedId = this.toIntOrNull(id);
+          return normalizedId ? `${String(scope || "").trim()}:${normalizedId}` : "";
+        },
+        normalizeCommunicationsDocument(item, scope, extras = {}) {
+          const normalizedScope = String(scope || "").trim();
+          const baseItem = normalizedScope === "deal"
+            ? this.mapDealDocument(item)
+            : (normalizedScope === "company" ? this.mapClientDocument(item) : this.normalizeSettlementContract(item));
+          const typeLabel = normalizedScope === "deal"
+            ? (String(baseItem.generatedDocumentType || "").trim() === "invoice"
+              ? "Счет"
+              : (String(baseItem.generatedDocumentType || "").trim() === "act" ? "Акт" : "Документ сделки"))
+            : (normalizedScope === "company" ? "Документ компании" : "Договор");
+          return {
+            ...baseItem,
+            scope: normalizedScope,
+            selectionKey: this.communicationsDocumentSelectionKey(normalizedScope, baseItem.id),
+            typeLabel,
+            sourceLabel: String(extras.sourceLabel || "").trim(),
+            createdAt: baseItem.createdAt || extras.createdAt || "",
+            updatedAt: baseItem.updatedAt || extras.updatedAt || "",
+          };
+        },
+        sanitizeCommunicationsSelectedDocuments() {
+          const allowedKeys = new Set((this.communicationsDocuments || []).map((item) => item.selectionKey).filter(Boolean));
+          this.communicationsSelectedDocumentKeys = (this.communicationsSelectedDocumentKeys || []).filter((item) => allowedKeys.has(String(item || "").trim()));
+        },
+        isCommunicationsDocumentSelected(documentItem) {
+          const key = this.communicationsDocumentSelectionKey(documentItem?.scope, documentItem?.id);
+          return !!key && (this.communicationsSelectedDocumentKeys || []).includes(key);
+        },
+        toggleCommunicationsDocumentSelection(documentItem) {
+          const key = this.communicationsDocumentSelectionKey(documentItem?.scope, documentItem?.id);
+          if (!key) {
+            return;
+          }
+          const selectedKeys = new Set((this.communicationsSelectedDocumentKeys || []).map((item) => String(item || "").trim()).filter(Boolean));
+          if (selectedKeys.has(key)) {
+            selectedKeys.delete(key);
+          } else {
+            selectedKeys.add(key);
+          }
+          this.communicationsSelectedDocumentKeys = Array.from(selectedKeys);
+        },
+        async loadCommunicationsDocuments(companyId) {
+          const normalizedCompanyId = this.toIntOrNull(companyId);
+          if (!normalizedCompanyId) {
+            this.communicationsDocuments = [];
+            this.communicationsSelectedDocumentKeys = [];
+            return;
+          }
+          this.isCommunicationsDocumentsLoading = true;
+          try {
+            const companyDeals = (this.communicationsDeals || [])
+              .filter((deal) => String(deal.clientId || "") === String(normalizedCompanyId));
+            const [companyPayload, contractsPayload, ...dealPayloads] = await Promise.all([
+              this.apiRequest(`/api/v1/client-documents/?client=${normalizedCompanyId}&page_size=100`),
+              this.apiRequest(`/api/v1/settlements/contracts/?client=${normalizedCompanyId}&page_size=100`),
+              ...companyDeals.map((deal) => this.apiRequest(`/api/v1/deal-documents/?deal=${deal.id}&page_size=100`)),
+            ]);
+            const companyRecords = this.normalizePaginatedResponse(companyPayload).map((item) => (
+              this.normalizeCommunicationsDocument(item, "company")
+            ));
+            const contractRecords = this.normalizePaginatedResponse(contractsPayload).map((item) => (
+              this.normalizeCommunicationsDocument(item, "contract")
+            ));
+            const dealRecords = companyDeals.flatMap((deal, index) => {
+              const payload = dealPayloads[index];
+              return this.normalizePaginatedResponse(payload).map((item) => (
+                this.normalizeCommunicationsDocument(item, "deal", {
+                  sourceLabel: deal.title || deal.name || `Сделка #${deal.id}`,
+                })
+              ));
+            });
+            this.communicationsDocuments = [...companyRecords, ...contractRecords, ...dealRecords];
+            this.sanitizeCommunicationsSelectedDocuments();
+          } finally {
+            this.isCommunicationsDocumentsLoading = false;
+          }
+        },
+        openCommunicationsDocumentPicker() {
+          if (!this.toIntOrNull(this.communicationsSelectedCompanyId) || this.isCommunicationsDocumentUploading) {
+            return;
+          }
+          const input = this.$refs.communicationsDocumentInput;
+          if (input) {
+            input.click();
+          }
+        },
+        async handleCommunicationsDocumentInput(event) {
+          const input = event?.target;
+          const file = input?.files && input.files[0] ? input.files[0] : null;
+          const companyId = this.toIntOrNull(this.communicationsSelectedCompanyId);
+          if (!file || !companyId) {
+            if (input) input.value = "";
+            return;
+          }
+          const formData = new FormData();
+          formData.append("client", String(companyId));
+          formData.append("file", file);
+          formData.append("original_name", file.name || "");
+          this.isCommunicationsDocumentUploading = true;
+          try {
+            const created = await this.apiRequest("/api/v1/client-documents/", {
+              method: "POST",
+              body: formData,
+            });
+            const normalizedDocument = this.normalizeCommunicationsDocument(created, "company");
+            this.communicationsDocuments = [normalizedDocument, ...(this.communicationsDocuments || [])];
+            const selectedKeys = new Set(this.communicationsSelectedDocumentKeys || []);
+            selectedKeys.add(normalizedDocument.selectionKey);
+            this.communicationsSelectedDocumentKeys = Array.from(selectedKeys);
+          } finally {
+            this.isCommunicationsDocumentUploading = false;
+            if (input) input.value = "";
+          }
+        },
         async loadCommunicationsTimeline(companyId, options = {}) {
           const normalizedCompanyId = this.toIntOrNull(companyId);
           if (!normalizedCompanyId) {
@@ -5742,6 +5883,7 @@
         },
         async selectCommunicationsCompany(companyId, options = {}) {
           const normalizedCompanyId = this.toIntOrNull(companyId);
+          const previousCompanyId = this.toIntOrNull(this.communicationsSelectedCompanyId);
           this.communicationsSelectedCompanyId = normalizedCompanyId;
           this.communicationsSelectedTimelineItemKey = "";
           this.communicationsComposerMode = "";
@@ -5750,10 +5892,20 @@
             this.communicationsConversations = [];
             this.communicationsMessages = [];
             this.communicationsCalls = [];
+            this.communicationsDocuments = [];
+            this.communicationsSelectedDocumentKeys = [];
+            this.communicationsContextDealId = null;
             return;
+          }
+          if (previousCompanyId !== normalizedCompanyId) {
+            this.communicationsSelectedDocumentKeys = [];
+            if (!options.preserveContextDeal) {
+              this.communicationsContextDealId = null;
+            }
           }
           await Promise.all([
             this.loadCommunicationsContacts(normalizedCompanyId),
+            this.loadCommunicationsDocuments(normalizedCompanyId),
             this.loadCommunicationsTimeline(normalizedCompanyId, { preserveSelection: !!options.preserveSelection }),
           ]);
           if (options.composeMode) {
@@ -5778,8 +5930,8 @@
             bodyText: "",
           };
         },
-        clearCommunicationsPendingDocument() {
-          this.communicationsPendingDealDocument = null;
+        clearCommunicationsSelectedDocuments() {
+          this.communicationsSelectedDocumentKeys = [];
           this.communicationsContextDealId = null;
         },
         async sendCommunicationsMessage() {
@@ -5791,25 +5943,32 @@
           this.clearUiErrors({ modalOnly: true });
           this.isCommunicationsSending = true;
           try {
-            if (this.communicationsPendingDealDocument && channel !== "email") {
-              throw new Error("Ссылку на счет или акт сейчас можно отправить только по email.");
+            const selectedDocuments = this.communicationsSelectedDocuments || [];
+            if (selectedDocuments.length && channel !== "email") {
+              throw new Error("Ссылки на документы сейчас можно отправить только по email.");
             }
             const recipient = String(this.communicationsComposer.recipient || "").trim();
             if (!recipient) {
               throw new Error(channel === "telegram" ? "Укажите telegram получателя." : "Укажите email получателя.");
             }
             const contactId = this.toIntOrNull(this.communicationsComposer.contactId);
-            const pendingDocumentId = this.toIntOrNull(this.communicationsPendingDealDocument?.id);
-            const pendingDocumentName = this.communicationsPendingDocumentName || "Документ";
+            const dealDocumentIds = selectedDocuments.filter((item) => item.scope === "deal").map((item) => this.toIntOrNull(item.id)).filter(Boolean);
+            const clientDocumentIds = selectedDocuments.filter((item) => item.scope === "company").map((item) => this.toIntOrNull(item.id)).filter(Boolean);
+            const settlementContractIds = selectedDocuments.filter((item) => item.scope === "contract").map((item) => this.toIntOrNull(item.id)).filter(Boolean);
+            const selectedDocumentNames = selectedDocuments.map((item) => this.documentDisplayName(item.originalName || item.title || "", "Документ")).filter(Boolean);
             const payload = {
               recipient,
               subject: channel === "email" ? String(this.communicationsComposer.subject || "").trim() : "",
               body_text: String(this.communicationsComposer.bodyText || "").trim(),
             };
-            if (pendingDocumentId) {
-              payload.deal_document = pendingDocumentId;
+            if (dealDocumentIds.length || clientDocumentIds.length || settlementContractIds.length) {
+              payload.deal_documents = dealDocumentIds;
+              payload.client_documents = clientDocumentIds;
+              payload.settlement_contracts = settlementContractIds;
               payload.touch_result_code = "proposal_sent";
-              payload.touch_summary = `Отправлен документ: ${this.communicationsPendingDealDocument.originalName || pendingDocumentName}`;
+              payload.touch_summary = selectedDocumentNames.length > 1
+                ? `Отправлены документы: ${selectedDocumentNames.join(", ")}`
+                : `Отправлен документ: ${selectedDocumentNames[0] || "Документ"}`;
             }
 
             const existingConversation = this.getLatestCommunicationsConversation(channel);
@@ -5830,8 +5989,10 @@
                   recipient,
                   subject: payload.subject,
                   body_text: payload.body_text,
-                  ...(pendingDocumentId ? {
-                    deal_document: pendingDocumentId,
+                  ...((dealDocumentIds.length || clientDocumentIds.length || settlementContractIds.length) ? {
+                    deal_documents: dealDocumentIds,
+                    client_documents: clientDocumentIds,
+                    settlement_contracts: settlementContractIds,
                     touch_result_code: payload.touch_result_code,
                     touch_summary: payload.touch_summary,
                   } : {}),
@@ -5845,7 +6006,7 @@
               this.communicationsSelectedTimelineItemKey = `message-${sentMessageId}`;
             }
             this.closeCommunicationsCompose();
-            this.clearCommunicationsPendingDocument();
+            this.clearCommunicationsSelectedDocuments();
           } catch (error) {
             this.setUiError(`Ошибка отправки: ${error.message}`, { modal: true });
           } finally {
@@ -5855,14 +6016,14 @@
         async openCommunicationsSection(options = {}) {
           const normalizedCompanyId = this.toIntOrNull(options.companyId);
           const composeMode = String(options.composeMode || "").trim().toLowerCase();
-          const pendingDocument = options.pendingDocument && typeof options.pendingDocument === "object"
-            ? options.pendingDocument
-            : null;
+          const preselectedDocumentKeys = Array.isArray(options.preselectedDocumentKeys)
+            ? options.preselectedDocumentKeys.map((item) => String(item || "").trim()).filter(Boolean)
+            : [];
 
           this.setSection("communications");
-          if (pendingDocument) {
-            this.communicationsPendingDealDocument = pendingDocument;
-            this.communicationsContextDealId = this.toIntOrNull(options.dealId || pendingDocument.dealId);
+          if (preselectedDocumentKeys.length) {
+            this.communicationsSelectedDocumentKeys = preselectedDocumentKeys;
+            this.communicationsContextDealId = this.toIntOrNull(options.dealId);
           }
           await this.loadCommunicationsCompanies();
           let targetCompanyId = normalizedCompanyId;
@@ -5888,12 +6049,7 @@
             companyId,
             dealId,
             composeMode: "email",
-            pendingDocument: {
-              id: documentId,
-              originalName: documentItem.originalName || "Документ",
-              dealId,
-              companyId,
-            },
+            preselectedDocumentKeys: [this.communicationsDocumentSelectionKey("deal", documentId)],
           });
         },
         openTelephonySettingsFromCommunications() {
@@ -5925,10 +6081,11 @@
           this.communicationsConversations = [];
           this.communicationsMessages = [];
           this.communicationsCalls = [];
+          this.communicationsDocuments = [];
           this.communicationsTimelineFilter = "all";
           this.communicationsSelectedTimelineItemKey = "";
           this.closeCommunicationsCompose();
-          this.clearCommunicationsPendingDocument();
+          this.clearCommunicationsSelectedDocuments();
         },
         mapDealDocumentDeliveryEvent(item) {
           const metadata = item && typeof item.metadata === "object" && !Array.isArray(item.metadata) ? item.metadata : {};

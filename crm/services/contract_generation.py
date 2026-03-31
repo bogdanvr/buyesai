@@ -327,6 +327,21 @@ def _write_docx_from_template(template_path: Path, xml: str) -> bytes:
         return result.getvalue()
 
 
+def _normalize_table_cell_layout(xml: str) -> str:
+    def normalize_table(match):
+        table_xml = match.group(0).replace('w:after="200"', 'w:after="0"')
+
+        def ensure_cell_valign(cell_match):
+            cell_props = cell_match.group(1)
+            if "<w:vAlign" in cell_props:
+                return f"<w:tcPr>{cell_props}</w:tcPr>"
+            return f"<w:tcPr>{cell_props}<w:vAlign w:val=\"center\"/></w:tcPr>"
+
+        return re.sub(r"<w:tcPr>(.*?)</w:tcPr>", ensure_cell_valign, table_xml, flags=re.DOTALL)
+
+    return re.sub(r"<w:tbl\b.*?</w:tbl>", normalize_table, xml, flags=re.DOTALL)
+
+
 def _normalize_generated_payload(contract: SettlementContract, payload: dict | None = None) -> dict:
     source = payload if isinstance(payload, dict) else {}
     template_code = _template_code(source)
@@ -537,6 +552,7 @@ def _build_offer_agreement_docx(contract: SettlementContract, executor_company: 
     xml = _replace_text(xml, "[р/с, банк, БИК, к/с]", _company_bank_requisites_line(executor_company), count=1)
     xml = _replace_text(xml, "[____________________]", _company_contacts_line(executor_company), count=1)
     xml = _replace_text(xml, "[ФИО, должность]", executor_signatory, count=1)
+    xml = _normalize_table_cell_layout(xml)
     return _write_docx_from_template(OFFER_AGREEMENT_TEMPLATE_PATH, xml)
 
 
