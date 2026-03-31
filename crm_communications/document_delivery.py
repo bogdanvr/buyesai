@@ -8,7 +8,7 @@ import tempfile
 from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError
 
-from crm.models import DealDocument
+from crm.models import ClientDocument, DealDocument, SettlementContract
 from crm_communications.models import Message, MessageAttachment
 
 
@@ -21,7 +21,17 @@ SOFFICE_CANDIDATE_PATHS = (
 )
 
 
-def _normalized_original_name(document: DealDocument) -> str:
+def _document_label(document) -> str:
+    if isinstance(document, DealDocument):
+        return "deal_document"
+    if isinstance(document, ClientDocument):
+        return "client_document"
+    if isinstance(document, SettlementContract):
+        return "settlement_contract"
+    return "document"
+
+
+def _normalized_original_name(document) -> str:
     file_field = getattr(document, "file", None)
     fallback_name = ""
     if file_field:
@@ -29,7 +39,7 @@ def _normalized_original_name(document: DealDocument) -> str:
     return str(document.original_name or fallback_name or f"document-{document.pk}").strip()
 
 
-def _pdf_name_for_document(document: DealDocument) -> str:
+def _pdf_name_for_document(document) -> str:
     original_name = _normalized_original_name(document)
     stem = Path(original_name).stem or f"document-{document.pk}"
     return f"{stem}.pdf"
@@ -42,7 +52,7 @@ def _resolve_soffice_path() -> str:
             return str(resolved)
     raise ValidationError(
         {
-            "deal_document": (
+            "document": (
                 "В системе недоступен LibreOffice (`soffice`) для конвертации документа в PDF. "
                 "Установите пакет libreoffice/libreoffice-writer на сервере."
             )
@@ -50,10 +60,11 @@ def _resolve_soffice_path() -> str:
     )
 
 
-def build_deal_document_pdf_bytes(document: DealDocument) -> tuple[bytes, str]:
+def build_document_pdf_bytes(document) -> tuple[bytes, str]:
     file_field = getattr(document, "file", None)
+    error_key = _document_label(document)
     if not file_field:
-        raise ValidationError({"deal_document": "У документа сделки отсутствует файл."})
+        raise ValidationError({error_key: "У документа отсутствует файл."})
 
     original_name = _normalized_original_name(document)
     suffix = Path(original_name).suffix.lower()
@@ -69,7 +80,7 @@ def build_deal_document_pdf_bytes(document: DealDocument) -> tuple[bytes, str]:
             pass
 
     if not source_bytes:
-        raise ValidationError({"deal_document": "Файл документа сделки пустой."})
+        raise ValidationError({error_key: "Файл документа пустой."})
 
     if suffix == ".pdf":
         return source_bytes, pdf_name
@@ -103,9 +114,9 @@ def build_deal_document_pdf_bytes(document: DealDocument) -> tuple[bytes, str]:
             )
         except subprocess.CalledProcessError as exc:
             error_text = (exc.stderr or exc.stdout or "").strip() or str(exc)
-            raise ValidationError({"deal_document": f"LibreOffice не смог сконвертировать документ в PDF: {error_text}"}) from exc
+            raise ValidationError({error_key: f"LibreOffice не смог сконвертировать документ в PDF: {error_text}"}) from exc
         except subprocess.TimeoutExpired as exc:
-            raise ValidationError({"deal_document": "LibreOffice не успел сконвертировать документ в PDF."}) from exc
+            raise ValidationError({error_key: "LibreOffice не успел сконвертировать документ в PDF."}) from exc
 
         pdf_path = output_dir / pdf_name
         if not pdf_path.exists():
@@ -113,12 +124,16 @@ def build_deal_document_pdf_bytes(document: DealDocument) -> tuple[bytes, str]:
             if generated_candidates:
                 pdf_path = generated_candidates[0]
             else:
-                raise ValidationError({"deal_document": "LibreOffice не создал PDF-файл."})
+                raise ValidationError({error_key: "LibreOffice не создал PDF-файл."})
         return pdf_path.read_bytes(), pdf_name
 
 
+def build_deal_document_pdf_bytes(document: DealDocument) -> tuple[bytes, str]:
+    return build_document_pdf_bytes(document)
+
+
 def attach_deal_document_pdf_to_message(*, message: Message, document: DealDocument) -> MessageAttachment:
-    pdf_bytes, pdf_name = build_deal_document_pdf_bytes(document)
+    pdf_bytes, pdf_name = build_document_pdf_bytes(document)
     attachment = MessageAttachment(
         message=message,
         original_name=pdf_name[:255],

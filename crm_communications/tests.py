@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 from unittest.mock import patch
 
-from crm.models import Client, Contact, Deal, DealDocument, DealStage, Lead, LeadSource, LeadStatus, Touch, TouchResult
+from crm.models import Client, ClientDocument, Contact, Deal, DealDocument, DealStage, Lead, LeadSource, LeadStatus, SettlementContract, Touch, TouchResult
 from crm_communications.email_outbound import EmailOutboundMessageService
 from crm_communications.models import (
     AttemptStatus,
@@ -1093,7 +1093,7 @@ class EmailInboundServiceTests(TestCase):
             DealDocumentShareEvent.objects.filter(share=share, event_type=DealDocumentShareEventType.EMAIL_FAILED).count(),
             1,
         )
-        self.assertIn("Ошибка отправки письма со ссылкой на документ", self.deal.events)
+        self.assertIn("Счет не отправлен", self.deal.events)
 
 
 class EmailOutboundMessageServiceTests(TestCase):
@@ -1589,10 +1589,76 @@ class CommunicationsApiTests(TestCase):
         self.assertEqual(message.touch.result_option.code, "proposal_sent")
         self.assertEqual(message.touch.summary, "Отправлен документ: Акт № 1235.docx")
         self.deal.refresh_from_db()
-        self.assertIn("Документ отправлен", self.deal.events)
+        self.assertIn("Акт отправлен", self.deal.events)
         history_response = self.client.get(reverse("deal-documents-delivery-history", kwargs={"pk": deal_document.pk}))
         self.assertEqual(history_response.status_code, 200)
         self.assertEqual(history_response.json()[0]["message_status"], "sent")
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", CRM_PUBLIC_BASE_URL="https://crm.example.com")
+    def test_send_message_from_conversation_supports_multiple_documents_with_share_links(self):
+        deal_document = DealDocument.objects.create(
+            deal=self.deal,
+            file=SimpleUploadedFile(
+                "act-1235.docx",
+                b"docx-content",
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ),
+            original_name="Акт № 1235.docx",
+            uploaded_by=self.user,
+        )
+        client_document = ClientDocument.objects.create(
+            client=self.client_company,
+            file=SimpleUploadedFile(
+                "specification.docx",
+                b"docx-content",
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ),
+            original_name="Спецификация.docx",
+            uploaded_by=self.user,
+        )
+        contract = SettlementContract.objects.create(
+            client=self.client_company,
+            title="Договор на услуги",
+            number="15",
+            original_name="Договор № 15.docx",
+            file=SimpleUploadedFile(
+                "contract-15.docx",
+                b"docx-content",
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ),
+        )
+
+        response = self.client.post(
+            reverse("communications-conversations-send", kwargs={"pk": self.conversation.pk}),
+            data={
+                "subject": "Документы по сделке",
+                "body_text": "Направляю пакет документов.",
+                "recipient": "client@example.com",
+                "deal_documents": [deal_document.pk],
+                "client_documents": [client_document.pk],
+                "settlement_contracts": [contract.pk],
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        message = Message.objects.get(pk=response.json()["id"])
+        shares = list(DealDocumentShare.objects.filter(message=message).order_by("id"))
+        self.assertEqual(len(shares), 3)
+        self.assertTrue(any(share.document_id == deal_document.pk for share in shares))
+        self.assertTrue(any(share.client_document_id == client_document.pk for share in shares))
+        self.assertTrue(any(share.settlement_contract_id == contract.pk for share in shares))
+        self.assertIn("Ссылки на документы:", message.body_text)
+        for share in shares:
+            self.assertIn(f"https://crm.example.com/documents/share/{share.token}/", message.body_text)
+            self.assertIn(f"/documents/share/{share.token}/", message.body_html)
+            self.assertEqual(
+                DealDocumentShareEvent.objects.filter(share=share, event_type=DealDocumentShareEventType.EMAIL_SENT).count(),
+                1,
+            )
+        self.assertIn("Открыть Акт № 1235", message.body_html)
+        self.assertIn("Открыть Договор № 15", message.body_html)
+        self.assertIn("Открыть Спецификация", message.body_html)
 
     @patch("crm_communications.email_outbound.EmailMultiAlternatives")
     def test_start_conversation_from_deal(self, email_cls_mock):
@@ -2061,7 +2127,7 @@ class DealDocumentDeliveryTests(TestCase):
         self.assertEqual(pdf_bytes, b"%PDF-1.4 generated by soffice")
 
     @override_settings(CRM_PUBLIC_BASE_URL="https://crm.example.com", ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
-    @patch("crm_communications.public_views.build_deal_document_pdf_bytes")
+    @patch("crm_communications.public_views.build_document_pdf_bytes")
     def test_public_share_page_and_pdf_download_are_tracked_and_written_to_deal_events(self, build_pdf_mock):
         build_pdf_mock.return_value = (b"%PDF-1.4 tracked", "invoice-1235.pdf")
         document = DealDocument.objects.create(
@@ -2095,7 +2161,7 @@ class DealDocumentDeliveryTests(TestCase):
         self.assertEqual(open_response.status_code, 200)
         self.assertContains(open_response, reverse("deal-document-share-preview", kwargs={"token": share.token}))
         self.assertContains(open_response, reverse("deal-document-share-event", kwargs={"token": share.token}))
-        self.assertContains(open_response, "pdfjs-dist@5.6.205")
+        self.assertContains(open_response, "/assets/js/deal-document-share-viewer.js")
         self.assertContains(open_response, "Счет № 1235")
         self.assertNotContains(open_response, "Счет № 1235.docx")
         self.assertNotContains(open_response, "Документ сделки")

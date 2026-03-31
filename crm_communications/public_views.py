@@ -18,7 +18,7 @@ from crm_communications.deal_document_shares import (
     record_share_pdf_download,
     record_share_viewer_event,
 )
-from crm_communications.document_delivery import build_deal_document_pdf_bytes
+from crm_communications.document_delivery import build_document_pdf_bytes
 from crm_communications.models import DealDocumentShare, DealDocumentShareEventType
 
 
@@ -31,13 +31,17 @@ class DealDocumentSharePageView(View):
                 "document",
                 "document__deal",
                 "document__deal__client",
+                "client_document",
+                "client_document__client",
+                "settlement_contract",
+                "settlement_contract__client",
                 "message",
             ),
             token=token,
         )
-        document = share.document
-        deal = getattr(document, "deal", None)
-        company = getattr(deal, "client", None) if deal is not None else None
+        document = share.source_document
+        deal = share.source_deal
+        company = share.source_client
         context = {
             "share": share,
             "document": document,
@@ -55,11 +59,16 @@ class DealDocumentSharePageView(View):
 class DealDocumentSharePreviewView(View):
     def get(self, request, token: str):
         share = get_object_or_404(
-            DealDocumentShare.objects.select_related("document", "document__deal"),
+            DealDocumentShare.objects.select_related(
+                "document",
+                "document__deal",
+                "client_document",
+                "settlement_contract",
+            ),
             token=token,
         )
         try:
-            pdf_bytes, pdf_name = build_deal_document_pdf_bytes(share.document)
+            pdf_bytes, pdf_name = build_document_pdf_bytes(share.source_document)
         except FileNotFoundError as exc:
             raise Http404("Файл документа не найден.") from exc
 
@@ -86,7 +95,13 @@ class DealDocumentShareEventView(View):
 
     def post(self, request, token: str):
         share = get_object_or_404(
-            DealDocumentShare.objects.select_related("document", "document__deal", "message"),
+            DealDocumentShare.objects.select_related(
+                "document",
+                "document__deal",
+                "client_document",
+                "settlement_contract",
+                "message",
+            ),
             token=token,
         )
         try:
@@ -118,11 +133,16 @@ class DealDocumentShareEventView(View):
 class DealDocumentShareDownloadView(View):
     def get(self, request, token: str):
         share = get_object_or_404(
-            DealDocumentShare.objects.select_related("document", "document__deal"),
+            DealDocumentShare.objects.select_related(
+                "document",
+                "document__deal",
+                "client_document",
+                "settlement_contract",
+            ),
             token=token,
         )
         try:
-            pdf_bytes, pdf_name = build_deal_document_pdf_bytes(share.document)
+            pdf_bytes, pdf_name = build_document_pdf_bytes(share.source_document)
         except FileNotFoundError as exc:
             raise Http404("Файл документа не найден.") from exc
         record_share_pdf_download(share=share, request=request)

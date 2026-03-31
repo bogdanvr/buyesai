@@ -439,8 +439,26 @@ class DealDocumentShare(TimestampedModel):
     document = models.ForeignKey(
         "crm.DealDocument",
         related_name="shares",
+        blank=True,
+        null=True,
         on_delete=models.CASCADE,
         verbose_name="Документ сделки",
+    )
+    client_document = models.ForeignKey(
+        "crm.ClientDocument",
+        related_name="shares",
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,
+        verbose_name="Документ компании",
+    )
+    settlement_contract = models.ForeignKey(
+        "crm.SettlementContract",
+        related_name="shares",
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,
+        verbose_name="Договор взаиморасчетов",
     )
     message = models.ForeignKey(
         "crm_communications.Message",
@@ -474,13 +492,37 @@ class DealDocumentShare(TimestampedModel):
         ordering = ("-created_at", "-id")
         indexes = [
             models.Index(fields=["document"]),
+            models.Index(fields=["client_document"]),
+            models.Index(fields=["settlement_contract"]),
             models.Index(fields=["message"]),
             models.Index(fields=["channel"]),
             models.Index(fields=["last_opened_at"]),
         ]
 
     def __str__(self):
-        return f"Share #{self.pk} for document #{self.document_id}"
+        source_document = self.source_document
+        source_id = getattr(source_document, "pk", None)
+        return f"Share #{self.pk} for document #{source_id or 'unknown'}"
+
+    @property
+    def source_document(self):
+        return self.document or self.client_document or self.settlement_contract
+
+    @property
+    def source_client(self):
+        if self.document_id and getattr(self.document, "deal", None) is not None:
+            return getattr(self.document.deal, "client", None)
+        if self.client_document_id:
+            return getattr(self.client_document, "client", None)
+        if self.settlement_contract_id:
+            return getattr(self.settlement_contract, "client", None)
+        return None
+
+    @property
+    def source_deal(self):
+        if self.document_id:
+            return getattr(self.document, "deal", None)
+        return None
 
 
 class DealDocumentShareEvent(TimestampedModel):
