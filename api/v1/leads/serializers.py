@@ -75,7 +75,13 @@ class LeadSerializer(serializers.ModelSerializer):
         )
 
     def get_source_names(self, obj):
-        return [source.name for source in obj.sources.all()]
+        source_names = []
+        for source in obj.sources.all():
+            code = str(getattr(source, "code", "") or "").strip().lower()
+            if code.startswith("traffic-") or code == "phone":
+                continue
+            source_names.append(source.name)
+        return source_names
 
     def get_assigned_to_name(self, obj):
         user = getattr(obj, "assigned_to", None)

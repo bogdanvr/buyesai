@@ -4124,19 +4124,19 @@
             pushUnique(this.humanizeLeadSourceName(form.sourceName));
           }
 
+          const sourceNames = Array.isArray(form.sourceNames) ? form.sourceNames : [];
+          sourceNames.forEach((sourceName) => {
+            const humanized = this.humanizeLeadSourceName(sourceName);
+            if (humanized) {
+              pushUnique(humanized);
+            }
+          });
+
           const history = Array.isArray(form.history) ? form.history : [];
           history.forEach((historyItem) => {
             const eventLabel = this.leadEventPathLabel(historyItem);
             if (eventLabel) {
               pushUnique(eventLabel);
-            }
-          });
-
-          const sourceNames = Array.isArray(form.sourceNames) ? form.sourceNames : [];
-          sourceNames.forEach((sourceName) => {
-            const humanized = this.humanizeLeadSourceName(sourceName);
-            if (humanized && humanized.indexOf("клик по форме ") === 0) {
-              pushUnique(humanized);
             }
           });
 

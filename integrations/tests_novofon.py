@@ -12,7 +12,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from crm.models import Client, Contact, Deal, DealStage, Lead
+from crm.models import Client, Contact, Deal, DealStage, Lead, TrafficSource
 from integrations.models import (
     PhoneCall,
     PhoneCallDirection,
@@ -436,6 +436,30 @@ class NovofonWebhookApiTests(APITestCase):
         self.assertEqual(event.status, TelephonyEventStatus.PROCESSED)
         call = PhoneCall.objects.get(external_call_id="187020303")
         self.assertEqual(call.direction, PhoneCallDirection.INBOUND)
+
+    def test_webhook_creates_unknown_lead_with_phone_source(self):
+        self.account.create_lead_for_unknown_number = True
+        self.account.save(update_fields=["create_lead_for_unknown_number", "updated_at"])
+
+        payload = self._payload(event_id="event-phone-source")
+        payload["call_id"] = "call-phone-source"
+        payload["from"] = "+7 (901) 111-22-33"
+
+        response = self.client.post(
+            reverse("integrations-novofon-webhook"),
+            payload,
+            format="json",
+            HTTP_X_WEBHOOK_SECRET="secret",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        call_command("process_novofon_webhook_queue", stdout=StringIO())
+
+        call = PhoneCall.objects.get(external_call_id="call-phone-source")
+        self.assertIsNotNone(call.lead_id)
+        self.assertEqual(call.lead.source.code, "phone")
+        self.assertEqual(call.lead.source.name, "Телефон")
+        self.assertTrue(TrafficSource.objects.filter(code="phone").exists())
 
 
 class NovofonCallApiTests(APITestCase):

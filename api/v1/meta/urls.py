@@ -7,12 +7,12 @@ from api.v1.meta.views import (
     ContactStatusListAPIView,
     CurrencyRatesAPIView,
     DealStageListAPIView,
-    LeadSourceListAPIView,
     LeadStatusListAPIView,
     NextStepTemplateListAPIView,
     OutcomeCatalogListAPIView,
     TaskCategoryListAPIView,
     TaskTypeListAPIView,
+    TrafficSourceListAPIView,
     TouchResultListAPIView,
     UserOptionListAPIView,
 )
@@ -20,7 +20,7 @@ from api.v1.meta.views import (
 urlpatterns = [
     path("lead-statuses/", LeadStatusListAPIView.as_view(), name="meta-lead-statuses"),
     path("deal-stages/", DealStageListAPIView.as_view(), name="meta-deal-stages"),
-    path("lead-sources/", LeadSourceListAPIView.as_view(), name="meta-lead-sources"),
+    path("lead-sources/", TrafficSourceListAPIView.as_view(), name="meta-lead-sources"),
     path("communication-channels/", CommunicationChannelListAPIView.as_view(), name="meta-communication-channels"),
     path("contact-roles/", ContactRoleListAPIView.as_view(), name="meta-contact-roles"),
     path("contact-statuses/", ContactStatusListAPIView.as_view(), name="meta-contact-statuses"),

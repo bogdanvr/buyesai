@@ -8,12 +8,12 @@ from crm.models import (
     ContactRole,
     ContactStatus,
     DealStage,
-    LeadSource,
     LeadStatus,
     NextStepTemplate,
     OutcomeCatalog,
     TaskCategory,
     TaskType,
+    TrafficSource,
     TouchResult,
 )
 
@@ -37,7 +37,7 @@ class DealStageSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "code", "order", "is_active", "is_final", "touch_result_ids"]
 
 
-class LeadSourceSerializer(serializers.ModelSerializer):
+class TrafficSourceSerializer(serializers.ModelSerializer):
     def validate_name(self, value):
         normalized = str(value or "").strip()
         if not normalized:
@@ -49,7 +49,7 @@ class LeadSourceSerializer(serializers.ModelSerializer):
         base_code = slugify(name, allow_unicode=False).replace("-", "_") or "source"
         code = base_code
         index = 2
-        while LeadSource.objects.filter(code=code).exists():
+        while TrafficSource.objects.filter(code=code).exists():
             code = f"{base_code}_{index}"
             index += 1
         validated_data["code"] = code
@@ -57,7 +57,7 @@ class LeadSourceSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     class Meta:
-        model = LeadSource
+        model = TrafficSource
         fields = ["id", "name", "code", "description", "is_active"]
         read_only_fields = ("code",)
 

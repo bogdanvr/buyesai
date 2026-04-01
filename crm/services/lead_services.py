@@ -8,7 +8,7 @@ from django.utils import timezone
 from crm.models import Client, ClientDocument, Contact, Deal, Lead, LeadDocument
 from crm.models.lead import normalize_lead_phone
 from main.tracking import (
-    build_tracking_sources,
+    build_tracking_actions,
     get_primary_tracking_source,
     sync_lead_tracking_data,
 )
@@ -381,7 +381,11 @@ def _merge_duplicate_lead(
         lead.utm_data = merged_utm
         update_fields.append("utm_data")
 
-    effective_primary_source = get_primary_tracking_source(website_session, source)
+    effective_primary_source = get_primary_tracking_source(
+        website_session,
+        source,
+        utm_data=merged_utm,
+    )
     if effective_primary_source is not None and lead.source_id is None:
         lead.source = effective_primary_source
         update_fields.append("source")
@@ -392,23 +396,11 @@ def _merge_duplicate_lead(
 
     if website_session is not None:
         if lead.website_session_id in (None, website_session.id):
-            sync_lead_tracking_data(lead, website_session, source)
+            sync_lead_tracking_data(lead, website_session, effective_primary_source)
         else:
-            sources_to_add = build_tracking_sources(website_session)
-            if source is not None:
-                sources_to_add.append(source)
-            if effective_primary_source is not None:
-                sources_to_add.append(effective_primary_source)
-            if sources_to_add:
-                lead.sources.add(*sources_to_add)
-    elif source is not None or effective_primary_source is not None:
-        sources_to_add = []
-        if source is not None:
-            sources_to_add.append(source)
-        if effective_primary_source is not None:
-            sources_to_add.append(effective_primary_source)
-        if sources_to_add:
-            lead.sources.add(*sources_to_add)
+            actions_to_add = build_tracking_actions(website_session)
+            if actions_to_add:
+                lead.sources.add(*actions_to_add)
 
     return lead
 
@@ -422,6 +414,11 @@ def create_lead_from_payload(
     created_by=None,
     website_session=None,
 ) -> Lead:
+    effective_primary_source = get_primary_tracking_source(
+        website_session,
+        source,
+        utm_data=payload.get("utm_data") if isinstance(payload.get("utm_data"), dict) else None,
+    )
     company_profile = _extract_company_profile(payload)
     company_name = company_profile["name"]
     company_inn = company_profile["inn"]
@@ -441,12 +438,12 @@ def create_lead_from_payload(
             industry=company_profile["industry"],
             okved=company_profile["okved"],
             okveds=company_profile["okveds"],
-            source=source,
+            source=effective_primary_source,
         )
     elif client is not None:
         update_fields = []
-        if source and client.source_id is None:
-            client.source = source
+        if effective_primary_source and client.source_id is None:
+            client.source = effective_primary_source
             update_fields.append("source")
         if company_name and client.name != company_name:
             client.name = company_name
@@ -498,14 +495,14 @@ def create_lead_from_payload(
         email=_text_or_empty(payload.get("email")),
         company=company_name,
         client=client,
-        source=source,
+        source=effective_primary_source,
         website_session=website_session,
         payload=payload,
         utm_data=payload.get("utm_data") if isinstance(payload.get("utm_data"), dict) else {},
         created_by=created_by,
     )
     if website_session is not None:
-        sync_lead_tracking_data(lead, website_session, source)
+        sync_lead_tracking_data(lead, website_session, effective_primary_source)
     return lead
 
 

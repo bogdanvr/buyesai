@@ -12,7 +12,7 @@ from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 
 from audit.services import log_event
-from crm.models import Activity, Client, Contact, Deal, Lead
+from crm.models import Activity, Client, Contact, Deal, Lead, TrafficSource
 from crm.models.activity import ActivityType, TaskPriority, TaskStatus
 from integrations.models import (
     PhoneCall,
@@ -251,10 +251,23 @@ def _apply_entity_binding(call: PhoneCall, *, entity_type: str, instance) -> Pho
     return call
 
 
+def _get_or_create_phone_traffic_source() -> TrafficSource:
+    source, _ = TrafficSource.objects.get_or_create(
+        code="phone",
+        defaults={
+            "name": "Телефон",
+            "description": "Автоматически создано из входящего телефонного звонка",
+            "is_active": True,
+        },
+    )
+    return source
+
+
 def _create_unknown_lead(*, account: TelephonyProviderAccount, phone_normalized: str, raw_phone: str, responsible_user=None) -> Lead:
     lead = Lead.objects.create(
         title=f"Неизвестный звонок {raw_phone or phone_normalized}",
         phone=raw_phone or phone_normalized,
+        source=_get_or_create_phone_traffic_source(),
         assigned_to=responsible_user or account.default_owner,
     )
     return lead

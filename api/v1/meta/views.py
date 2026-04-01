@@ -15,12 +15,12 @@ from api.v1.meta.serializers import (
     ContactRoleSerializer,
     ContactStatusSerializer,
     DealStageSerializer,
-    LeadSourceSerializer,
     LeadStatusSerializer,
     NextStepTemplateSerializer,
     OutcomeCatalogSerializer,
     TaskCategorySerializer,
     TaskTypeSerializer,
+    TrafficSourceSerializer,
     TouchResultSerializer,
     UserOptionSerializer,
 )
@@ -30,12 +30,12 @@ from crm.models import (
     ContactRole,
     ContactStatus,
     DealStage,
-    LeadSource,
     LeadStatus,
     NextStepTemplate,
     OutcomeCatalog,
     TaskCategory,
     TaskType,
+    TrafficSource,
     TouchResult,
 )
 from crm.models.activity import get_available_task_categories_for_user, get_available_task_types_for_user
@@ -120,12 +120,12 @@ class DealStageListAPIView(ListAPIView):
         )
 
 
-class LeadSourceListAPIView(ListCreateAPIView):
-    serializer_class = LeadSourceSerializer
+class TrafficSourceListAPIView(ListCreateAPIView):
+    serializer_class = TrafficSourceSerializer
     pagination_class = None
 
     def get_queryset(self):
-        return LeadSource.objects.filter(is_active=True).order_by("name")
+        return TrafficSource.objects.filter(is_active=True).order_by("name")
 
 
 class CommunicationChannelListAPIView(ListAPIView):

@@ -77,7 +77,7 @@ class Client(TimestampedModel):
     okved = models.CharField(max_length=64, blank=True, default="", verbose_name="ОКВЭД")
     okveds = models.JSONField(default=list, blank=True, verbose_name="ОКВЭД (все виды)")
     source = models.ForeignKey(
-        "crm.LeadSource",
+        "crm.TrafficSource",
         related_name="clients",
         blank=True,
         null=True,

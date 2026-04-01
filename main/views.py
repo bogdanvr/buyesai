@@ -4,7 +4,6 @@ from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.conf import settings
 from django.views.generic import TemplateView
-from django.utils.text import slugify
 from dadata import Dadata
 from main.services import get_client_ip, send_form_to_telegram
 from main.models import FormSubmission
@@ -14,7 +13,6 @@ from main.tracking import (
     normalize_session_id,
     record_website_event,
 )
-from crm.models import LeadSource
 from crm.services.lead_services import create_lead_from_payload
 import ipaddress
 import json
@@ -206,21 +204,6 @@ def _find_party_profile_by_inn(inn: str, token: str) -> dict | None:
     if not first:
         return None
     return _extract_party_profile(first)
-
-
-def _get_or_create_form_lead_source(form_type: str) -> LeadSource:
-    normalized_form_type = str(form_type or "").strip() or "unknown"
-    code_suffix = slugify(normalized_form_type.replace("_", "-")) or "unknown"
-    code = f"site-{code_suffix}"[:64]
-    source, _ = LeadSource.objects.get_or_create(
-        code=code,
-        defaults={
-            "name": f"Форма сайта: {normalized_form_type}"[:128],
-            "description": "Автоматически создано из отправки формы сайта",
-            "is_active": True,
-        },
-    )
-    return source
 
 
 def _extract_utm_from_url(url):
@@ -528,11 +511,9 @@ def sendform_view(request):
             form_submission.company = str(lead_payload.get("company") or form_submission.company or "").strip()
             form_submission.save(update_fields=["payload", "company"])
 
-        source = _get_or_create_form_lead_source(form_type)
         crm_lead = create_lead_from_payload(
             form_type=form_type,
             payload=lead_payload,
-            source=source,
             website_session=tracking_session,
         )
         crm_lead_id = crm_lead.id

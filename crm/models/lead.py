@@ -62,7 +62,7 @@ class Lead(TimestampedModel):
     email = models.EmailField(blank=True, default="", verbose_name="Email")
     company = models.CharField(max_length=255, blank=True, default="", verbose_name="Компания")
     source = models.ForeignKey(
-        "crm.LeadSource",
+        "crm.TrafficSource",
         related_name="leads",
         blank=True,
         null=True,
@@ -73,7 +73,7 @@ class Lead(TimestampedModel):
         "crm.LeadSource",
         related_name="tracked_leads",
         blank=True,
-        verbose_name="Источники",
+        verbose_name="Действия на сайте",
     )
     status = models.ForeignKey(
         "crm.LeadStatus",

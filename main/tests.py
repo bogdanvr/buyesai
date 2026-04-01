@@ -4,7 +4,7 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from crm.models import Client, Contact, Lead, LeadSource
+from crm.models import Client, Contact, Lead, LeadSource, TrafficSource
 from main.models import FormSubmission, WebsiteSession, WebsiteSessionEvent
 
 
@@ -97,16 +97,15 @@ class SendFormViewTests(TestCase):
 
         form_submission = FormSubmission.objects.get()
         lead = Lead.objects.get()
-        source = LeadSource.objects.get()
         client = Client.objects.get()
 
         self.assertEqual(form_submission.form_type, "hero")
         self.assertEqual(lead.name, "Иван")
         self.assertEqual(lead.phone, "+79990000000")
         self.assertEqual(lead.company, "ООО «Акме»")
-        self.assertEqual(lead.source_id, source.id)
+        self.assertIsNone(lead.source_id)
         self.assertEqual(lead.client_id, client.id)
-        self.assertEqual(source.code, "site-hero")
+        self.assertEqual(TrafficSource.objects.count(), 0)
         self.assertEqual(lead.payload.get("form_submission_id"), form_submission.id)
         self.assertEqual(lead.utm_data.get("utm_source"), "google")
         self.assertEqual(response.json().get("crm_lead_id"), lead.id)
@@ -165,17 +164,41 @@ class SendFormViewTests(TestCase):
         session = WebsiteSession.objects.get(session_id="session-with-lead")
 
         self.assertEqual(lead.website_session_id, session.id)
-        self.assertEqual(lead.source.name, "Источник трафика: google")
+        self.assertIsNone(lead.source_id)
         self.assertEqual(
             [item["event"] for item in lead.history],
             ["page_view", "first_message_sent", "form_submitted"],
         )
         self.assertEqual(lead.history[-1]["form_type"], "hero")
-        self.assertTrue(lead.sources.filter(code="site-hero").exists())
-        self.assertTrue(lead.sources.filter(name="Источник трафика: google").exists())
-        self.assertTrue(lead.sources.filter(name="Кампания: campaign-1").exists())
-        self.assertTrue(lead.sources.filter(name="Объявление: creative-7").exists())
-        self.assertTrue(lead.sources.filter(name="Действие: Отправка формы").exists())
+        self.assertTrue(lead.sources.filter(name="Просмотр страницы").exists())
+        self.assertTrue(lead.sources.filter(name="Первое сообщение").exists())
+        self.assertTrue(lead.sources.filter(name="Клик по форме hero").exists())
+        self.assertFalse(lead.sources.filter(name="Источник трафика: google").exists())
+
+    def test_send_form_sets_yandex_as_primary_source_from_utm(self):
+        response = self.client.post(
+            reverse("send_form"),
+            data=json.dumps(
+                {
+                    "form_type": "hero",
+                    "payload": {
+                        "name": "Иван",
+                        "phone": "+79990000000",
+                        "company": "Acme",
+                        "utm_data": {"utm_source": "yandex"},
+                    },
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        lead = Lead.objects.get()
+        client = Client.objects.get()
+
+        self.assertIsNotNone(lead.source_id)
+        self.assertEqual(lead.source.code, "traffic-source-yandex")
+        self.assertEqual(client.source_id, lead.source_id)
 
     def test_deduplicates_lead_by_external_id(self):
         first_response = self.client.post(

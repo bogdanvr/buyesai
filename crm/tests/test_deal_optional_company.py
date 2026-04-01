@@ -3,7 +3,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from crm.models import Client, Contact, Deal, DealStage, Lead, LeadSource
+from crm.models import Client, Contact, Deal, DealStage, Lead, TrafficSource
 
 
 class DealOptionalCompanyTests(APITestCase):
@@ -14,7 +14,7 @@ class DealOptionalCompanyTests(APITestCase):
             is_staff=True,
         )
         self.client.force_authenticate(user=user)
-        self.source = LeadSource.objects.create(name="Сайт", code="site")
+        self.source = TrafficSource.objects.create(name="Сайт", code="site")
         self.stage = DealStage.objects.create(
             name="В работе",
             code="in_progress",

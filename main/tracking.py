@@ -3,7 +3,7 @@ import hashlib
 from django.utils import timezone
 from django.utils.text import slugify
 
-from crm.models import LeadSource
+from crm.models import LeadSource, TrafficSource
 from main.models import WebsiteSession, WebsiteSessionEvent
 
 
@@ -29,16 +29,6 @@ TRACKING_SOURCE_DEFINITIONS = (
     ("utm_content", "traffic-content", "Объявление"),
     ("utm_term", "traffic-term", "Ключ"),
 )
-
-TRACKING_ACTION_LABELS = {
-    "page_view": "Просмотр страницы",
-    "chat_opened": "Открытие чата",
-    "first_message_sent": "Первое сообщение",
-    "form_submitted": "Отправка формы",
-    "phone_clicked": "Клик по телефону",
-    "messenger_clicked": "Клик по мессенджеру",
-}
-
 
 def _clean_text(value) -> str:
     return str(value or "").strip()
@@ -166,70 +156,125 @@ def _tracking_source_code(prefix: str, value: str) -> str:
     return f"{prefix}-{slug}"[:64]
 
 
-def build_tracking_sources(session: WebsiteSession | None) -> list[LeadSource]:
+def _site_action_label(event_type: str, payload: dict | None = None) -> str:
+    payload = payload if isinstance(payload, dict) else {}
+    normalized_event_type = _clean_text(event_type)
+    if normalized_event_type == "page_view":
+        return "Просмотр страницы"
+    if normalized_event_type == "chat_opened":
+        return "Открытие чата"
+    if normalized_event_type == "first_message_sent":
+        return "Первое сообщение"
+    if normalized_event_type == "phone_clicked":
+        return "Клик по телефону"
+    if normalized_event_type == "messenger_clicked":
+        return "Клик по мессенджеру"
+    if normalized_event_type == "form_submitted":
+        form_type = _clean_text(payload.get("form_type"))
+        return f"Клик по форме {form_type}" if form_type else "Отправка формы"
+    return normalized_event_type or "Событие сайта"
+
+
+def _site_action_code(event_type: str, payload: dict | None = None) -> str:
+    payload = payload if isinstance(payload, dict) else {}
+    normalized_event_type = _clean_text(event_type) or "site_event"
+    if normalized_event_type == "form_submitted":
+        form_type = _clean_text(payload.get("form_type"))
+        if form_type:
+            return _tracking_source_code("site-form", form_type)
+    return _tracking_source_code("site-action", normalized_event_type)
+
+
+def build_tracking_actions(session: WebsiteSession | None) -> list[LeadSource]:
     if session is None:
         return []
 
-    sources = []
-    for field_name, code_prefix, label in TRACKING_SOURCE_DEFINITIONS:
-        value = _clean_text(getattr(session, field_name, ""))
-        if not value:
+    actions = []
+    seen_codes = set()
+    for event in session.events.order_by("created_at", "id"):
+        payload = event.payload if isinstance(event.payload, dict) else {}
+        code = _site_action_code(event.event_type, payload)
+        if code in seen_codes:
             continue
-        source, _ = LeadSource.objects.get_or_create(
-            code=_tracking_source_code(code_prefix, value),
+        seen_codes.add(code)
+        action, _ = LeadSource.objects.get_or_create(
+            code=code,
             defaults={
-                "name": f"{label}: {value}"[:128],
-                "description": f"Автоматически создано из {field_name}",
+                "name": _site_action_label(event.event_type, payload)[:128],
+                "description": f"Автоматически создано из события сайта {event.event_type}",
                 "is_active": True,
             },
         )
-        sources.append(source)
+        actions.append(action)
 
-    seen_events = set()
-    for event_type in session.events.order_by("created_at", "id").values_list("event_type", flat=True):
-        if event_type in seen_events:
-            continue
-        seen_events.add(event_type)
-        label = TRACKING_ACTION_LABELS.get(event_type)
-        if not label:
-            continue
-        source, _ = LeadSource.objects.get_or_create(
-            code=_tracking_source_code("site-action", event_type),
-            defaults={
-                "name": f"Действие: {label}"[:128],
-                "description": "Автоматически создано из действий пользователя на сайте",
-                "is_active": True,
-            },
+    return actions
+
+
+def _has_yandex_tracking_marker(*, session: WebsiteSession | None, utm_data: dict | None = None) -> bool:
+    if session is not None and _clean_text(getattr(session, "yclid", "")):
+        return True
+    if isinstance(utm_data, dict) and _clean_text(utm_data.get("yclid", "")):
+        return True
+
+    markers = []
+    if session is not None:
+        markers.extend(
+            [
+                getattr(session, "utm_source", ""),
+                getattr(session, "utm_medium", ""),
+                getattr(session, "utm_campaign", ""),
+                getattr(session, "utm_content", ""),
+                getattr(session, "utm_term", ""),
+                getattr(session, "yclid", ""),
+            ]
         )
-        sources.append(source)
-
-    return sources
+    if isinstance(utm_data, dict):
+        markers.extend(
+            [
+                utm_data.get("utm_source", ""),
+                utm_data.get("utm_medium", ""),
+                utm_data.get("utm_campaign", ""),
+                utm_data.get("utm_content", ""),
+                utm_data.get("utm_term", ""),
+                utm_data.get("yclid", ""),
+            ]
+        )
+    for marker in markers:
+        normalized_marker = _clean_text(marker).lower()
+        if not normalized_marker:
+            continue
+        if "yandex" in normalized_marker:
+            return True
+    return False
 
 
 def get_primary_tracking_source(
     session: WebsiteSession | None,
-    fallback_source: LeadSource | None = None,
-) -> LeadSource | None:
-    if session is not None:
-        utm_source = _clean_text(getattr(session, "utm_source", ""))
-        if utm_source:
-            source, _ = LeadSource.objects.get_or_create(
-                code=_tracking_source_code("traffic-source", utm_source),
-                defaults={
-                    "name": f"Источник трафика: {utm_source}"[:128],
-                    "description": "Автоматически создано из utm_source",
-                    "is_active": True,
-                },
-            )
-            return source
+    fallback_source: TrafficSource | None = None,
+    utm_data: dict | None = None,
+) -> TrafficSource | None:
+    if _has_yandex_tracking_marker(session=session, utm_data=utm_data):
+        source, _ = TrafficSource.objects.get_or_create(
+            code=_tracking_source_code("traffic-source", "yandex"),
+            defaults={
+                "name": "Источник трафика: yandex",
+                "description": "Автоматически создано из yandex UTM-метки",
+                "is_active": True,
+            },
+        )
+        return source
     return fallback_source
 
 
-def sync_lead_tracking_data(lead, session: WebsiteSession | None, primary_source: LeadSource | None = None) -> None:
+def sync_lead_tracking_data(lead, session: WebsiteSession | None, primary_source: TrafficSource | None = None) -> None:
     if session is None or lead is None:
         return
 
-    effective_primary_source = get_primary_tracking_source(session, primary_source)
+    effective_primary_source = get_primary_tracking_source(
+        session,
+        primary_source,
+        utm_data=getattr(lead, "utm_data", None),
+    )
     update_fields = []
     if getattr(lead, "website_session_id", None) != session.id:
         lead.website_session = session
@@ -248,13 +293,9 @@ def sync_lead_tracking_data(lead, session: WebsiteSession | None, primary_source
         update_fields.append("updated_at")
         lead.save(update_fields=update_fields)
 
-    sources_to_add = build_tracking_sources(session)
-    if primary_source is not None:
-        sources_to_add.append(primary_source)
-    if effective_primary_source is not None:
-        sources_to_add.append(effective_primary_source)
-    if sources_to_add:
-        lead.sources.add(*sources_to_add)
+    actions_to_add = build_tracking_actions(session)
+    if actions_to_add:
+        lead.sources.add(*actions_to_add)
 
 
 def sync_lead_tracking_for_session(session: WebsiteSession | None) -> None:

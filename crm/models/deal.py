@@ -30,7 +30,7 @@ class Deal(TimestampedModel):
     title = models.CharField(max_length=255, verbose_name="Сделка")
     description = models.TextField(blank=True, default="", verbose_name="Описание сделки")
     source = models.ForeignKey(
-        "crm.LeadSource",
+        "crm.TrafficSource",
         related_name="deals",
         blank=True,
         null=True,

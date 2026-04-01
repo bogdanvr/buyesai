@@ -12,9 +12,9 @@ from crm.models import (
     CommunicationChannel,
     Deal,
     DealStage,
-    LeadSource,
     TaskCategory,
     TaskType,
+    TrafficSource,
     Touch,
     UserRole,
     UserRoleAssignment,
@@ -36,7 +36,7 @@ class TaskResultAndEventsTests(APITestCase):
         )
         self.client.force_authenticate(user=self.user)
         self.company = Client.objects.create(name="Acme")
-        self.source = LeadSource.objects.create(name="Сайт", code="site")
+        self.source = TrafficSource.objects.create(name="Сайт", code="site")
         self.stage_new = DealStage.objects.create(
             name="Первичный контакт",
             code="primary_contact",

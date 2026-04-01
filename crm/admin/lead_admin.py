@@ -1,11 +1,19 @@
 from django.contrib import admin
 
 from crm.admin.site import crm_admin_site
-from crm.models import Lead, LeadDocument, LeadSource, LeadStatus
+from crm.models import Lead, LeadDocument, LeadSource, LeadStatus, TrafficSource
 
 
 @admin.register(LeadSource, site=crm_admin_site)
 class LeadSourceAdmin(admin.ModelAdmin):
+    admin_group = "Лиды"
+    list_display = ("name", "code", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("name", "code")
+
+
+@admin.register(TrafficSource, site=crm_admin_site)
+class TrafficSourceAdmin(admin.ModelAdmin):
     admin_group = "Лиды"
     list_display = ("name", "code", "is_active")
     list_filter = ("is_active",)
