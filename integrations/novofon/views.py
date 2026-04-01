@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.v1.pagination import StandardResultsSetPagination
-from integrations.models import PhoneCall, TelephonyEventLog, TelephonyEventStatus, TelephonyProvider
+from integrations.models import PhoneCall, PhoneCallTranscriptionStatus, TelephonyEventLog, TelephonyEventStatus, TelephonyProvider
 from integrations.novofon.client import NovofonClientError
 from integrations.novofon.serializers import (
     IncomingPhoneCallPopupSerializer,
@@ -24,6 +24,7 @@ from integrations.novofon.serializers import (
 )
 from integrations.novofon.security import validate_novofon_webhook_auth
 from integrations.novofon.services import (
+    _resolve_novofon_timezone,
     check_novofon_connection,
     get_novofon_account,
     import_novofon_calls_history,
@@ -32,9 +33,22 @@ from integrations.novofon.services import (
     reprocess_novofon_event,
     sync_novofon_employees,
 )
+from integrations.soniox.services import refresh_phone_call_transcription
 
 
 logger = logging.getLogger(__name__)
+
+
+def _refresh_pending_transcriptions(calls):
+    for call in calls:
+        if str(getattr(call, "transcription_external_id", "") or "").strip() and getattr(call, "transcription_status", "") in {
+            PhoneCallTranscriptionStatus.QUEUED,
+            PhoneCallTranscriptionStatus.PROCESSING,
+        }:
+            try:
+                refresh_phone_call_transcription(call)
+            except Exception as error:
+                logger.warning("Failed to refresh Soniox transcription for call id=%s: %s", getattr(call, "pk", None), error)
 
 
 def _normalize_novofon_scalar(value):
@@ -198,10 +212,29 @@ class PhoneCallListAPIView(generics.ListAPIView):
             queryset = queryset.filter(status=call_status)
         return queryset
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            items = list(page)
+            _refresh_pending_transcriptions(items)
+            serializer = self.get_serializer(items, many=True)
+            return self.get_paginated_response(serializer.data)
+        items = list(queryset)
+        _refresh_pending_transcriptions(items)
+        serializer = self.get_serializer(items, many=True)
+        return Response(serializer.data)
+
 
 class PhoneCallDetailAPIView(generics.RetrieveAPIView):
     serializer_class = PhoneCallSerializer
     queryset = PhoneCall.objects.select_related("crm_user", "responsible_user", "contact", "company", "lead", "deal").all()
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        _refresh_pending_transcriptions([instance])
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 
 class IncomingPhoneCallPopupAPIView(APIView):
@@ -317,7 +350,7 @@ class NovofonWebhookAPIView(APIView):
         )
         if auth_error:
             return Response({"ok": False, "error": auth_error}, status=status.HTTP_403_FORBIDDEN)
-        event = queue_novofon_webhook_event(payload=payload, headers=headers)
+        event = queue_novofon_webhook_event(payload=payload, headers=headers, account=account)
         return Response(
             {"ok": True, "event_id": event.pk, "queued": True, "status": event.status},
             status=status.HTTP_202_ACCEPTED,

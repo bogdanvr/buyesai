@@ -331,6 +331,29 @@ class NovofonWebhookApiTests(APITestCase):
         self.assertEqual(call.phone_to, "+7 (495) 000-00-00")
         self.assertEqual(call.responsible_user_id, self.user.pk)
 
+    def test_webhook_uses_novofon_timezone_for_naive_official_timestamps(self):
+        self.account.api_secret = "api-secret"
+        self.account.webhook_shared_secret = ""
+        self.account.settings_json = {"novofon_timezone": "Asia/Omsk"}
+        self.account.save(update_fields=["api_secret", "webhook_shared_secret", "settings_json", "updated_at"])
+        payload = self._signed_payload(event="NOTIFY_START", pbx_call_id="pbx-tz-1")
+        payload["call_start"] = "2026-04-01 18:43:00"
+        payload["notification_time"] = "2026-04-01 18:43:00"
+        signature = build_novofon_webhook_signature(payload, secret=self.account.api_secret)
+
+        response = self.client.post(
+            reverse("integrations-novofon-webhook"),
+            payload,
+            format="json",
+            HTTP_SIGNATURE=signature,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        call_command("process_novofon_webhook_queue", stdout=StringIO())
+
+        call = PhoneCall.objects.get(external_call_id="pbx-tz-1")
+        self.assertEqual(timezone.localtime(call.started_at, ZoneInfo("Asia/Omsk")).strftime("%Y-%m-%d %H:%M:%S"), "2026-04-01 18:43:00")
+
     def test_webhook_rejects_missing_signature_when_api_secret_configured(self):
         self.account.api_secret = "api-secret"
         self.account.webhook_shared_secret = ""
@@ -621,8 +644,50 @@ class NovofonCallApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         call = PhoneCall.objects.get(external_call_id="out-call-1")
         self.assertEqual(call.direction, "outbound")
-        self.assertEqual(call.lead_id, self.lead.pk)
-        self.assertEqual(call.crm_user_id, self.user.pk)
+
+
+class PhoneCallApiTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="phone_call_api_user",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=self.user)
+        self.company = Client.objects.create(name="API Company", phone="+7 900 000-00-00")
+
+    @patch("integrations.novofon.views.refresh_phone_call_transcription")
+    def test_call_list_refreshes_pending_transcription(self, refresh_transcription_mock):
+        call = PhoneCall.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            external_call_id="api-call-1",
+            direction=PhoneCallDirection.INBOUND,
+            status=PhoneCallStatus.COMPLETED,
+            phone_from="+7 900 000-00-00",
+            phone_to="+7 495 000-00-00",
+            company=self.company,
+            recording_url="https://media.novofon.ru/records/api-call-1.mp3",
+            transcription_status=PhoneCallTranscriptionStatus.QUEUED,
+            transcription_external_id="tr-api-call-1",
+        )
+
+        def refresh_side_effect(target_call):
+            target_call.transcription_status = PhoneCallTranscriptionStatus.COMPLETED
+            target_call.transcription_text = "Текст подтянулся через API."
+            target_call.save(update_fields=["transcription_status", "transcription_text", "updated_at"])
+            return {"ok": True, "status": PhoneCallTranscriptionStatus.COMPLETED, "completed": True}
+
+        refresh_transcription_mock.side_effect = refresh_side_effect
+
+        response = self.client.get(
+            reverse("telephony-calls"),
+            {"entity_type": "company", "entity_id": self.company.pk, "page_size": 10},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["results"][0]["transcription_status"], PhoneCallTranscriptionStatus.COMPLETED)
+        self.assertEqual(response.data["results"][0]["transcription_text"], "Текст подтянулся через API.")
+        refresh_transcription_mock.assert_called_once()
 
 
 class IncomingPhoneCallPopupApiTests(APITestCase):

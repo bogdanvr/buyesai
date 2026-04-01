@@ -115,7 +115,7 @@ def _parse_embedded_json_candidate(candidate: str):
             return None
 
 
-def _parse_timestamp(value) -> datetime | None:
+def _parse_timestamp(value, *, source_timezone=None) -> datetime | None:
     if value in (None, "", 0, "0"):
         return None
     if isinstance(value, (int, float)):
@@ -132,7 +132,7 @@ def _parse_timestamp(value) -> datetime | None:
     if parsed is None:
         return None
     if timezone.is_naive(parsed):
-        return timezone.make_aware(parsed, timezone=dt_timezone.utc)
+        return timezone.make_aware(parsed, timezone=source_timezone or dt_timezone.utc)
     return parsed
 
 
@@ -185,7 +185,7 @@ def _map_status(value: str, event_type: str) -> str:
     return PhoneCallStatus.RINGING
 
 
-def parse_novofon_webhook(payload: dict, headers: dict | None = None) -> ParsedNovofonEvent:
+def parse_novofon_webhook(payload: dict, headers: dict | None = None, *, source_timezone=None) -> ParsedNovofonEvent:
     payload = payload if isinstance(payload, dict) else {}
     payload = _normalize_payload(_unwrap_embedded_json_payload(payload))
     call = payload.get("call") if isinstance(payload.get("call"), dict) else {}
@@ -300,7 +300,8 @@ def parse_novofon_webhook(payload: dict, headers: dict | None = None) -> ParsedN
             call.get("call_start"),
             payload.get("timestamp"),
             payload.get("notification_time"),
-        )
+        ),
+        source_timezone=source_timezone,
     )
     answered_at = _parse_timestamp(
         _pick(
@@ -308,7 +309,8 @@ def parse_novofon_webhook(payload: dict, headers: dict | None = None) -> ParsedN
             payload.get("answer_time"),
             call.get("answered_at"),
             call.get("answer_time"),
-        )
+        ),
+        source_timezone=source_timezone,
     )
     ended_at = _parse_timestamp(
         _pick(
@@ -319,7 +321,8 @@ def parse_novofon_webhook(payload: dict, headers: dict | None = None) -> ParsedN
             call.get("end_time"),
             call.get("call_end"),
             payload.get("notification_time"),
-        )
+        ),
+        source_timezone=source_timezone,
     )
     duration_sec = _parse_int(
         _pick(

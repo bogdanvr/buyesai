@@ -429,8 +429,12 @@ def refresh_call_recording_if_needed(call: PhoneCall):
     }
 
 
-def queue_novofon_webhook_event(*, payload: dict, headers: dict | None = None) -> TelephonyEventLog:
-    parsed = parse_novofon_webhook(payload, headers or {})
+def queue_novofon_webhook_event(*, payload: dict, headers: dict | None = None, account: TelephonyProviderAccount | None = None) -> TelephonyEventLog:
+    parsed = parse_novofon_webhook(
+        payload,
+        headers or {},
+        source_timezone=_resolve_novofon_timezone(account) if account is not None else None,
+    )
     return TelephonyEventLog.objects.create(
         provider=TelephonyProvider.NOVOFON,
         event_type=parsed.event_type,
@@ -580,7 +584,11 @@ def process_novofon_webhook_event(event: TelephonyEventLog) -> dict:
     if account is None:
         raise ValueError("Аккаунт Novofon не инициализирован.")
 
-    parsed = parse_novofon_webhook(event.payload_json or {}, event.headers_json or {})
+    parsed = parse_novofon_webhook(
+        event.payload_json or {},
+        event.headers_json or {},
+        source_timezone=_resolve_novofon_timezone(account),
+    )
     duplicate = (
         TelephonyEventLog.objects
         .exclude(pk=event.pk)

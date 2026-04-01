@@ -302,6 +302,8 @@
           telephonyIncomingCallPopups: [],
           isTelephonyIncomingCallsPolling: false,
           telephonyIncomingCallsPollTimer: null,
+          isPhoneCallHistoryPolling: false,
+          phoneCallHistoryPollTimer: null,
           telephonyImportForm: {
             days: 30,
             limit: 500,
@@ -3284,6 +3286,64 @@
           }
           return null;
         },
+        resolveOpenPhoneCallHistoryTargets() {
+          if (!this.showModal) {
+            return [];
+          }
+          const targets = [];
+          if (this.activeSection === "contacts" && this.toIntOrNull(this.editingContactId)) {
+            targets.push({ entityType: "contact", entityId: this.toIntOrNull(this.editingContactId) });
+          }
+          if (this.activeSection === "leads" && this.showLeadPhoneCallHistory && this.toIntOrNull(this.editingLeadId)) {
+            targets.push({ entityType: "lead", entityId: this.toIntOrNull(this.editingLeadId) });
+          }
+          if (this.activeSection === "deals" && this.showDealPhoneCallHistory && this.toIntOrNull(this.editingDealId)) {
+            targets.push({ entityType: "deal", entityId: this.toIntOrNull(this.editingDealId) });
+          }
+          if (this.activeSection === "companies" && this.showCompanyPhoneCallHistory && this.toIntOrNull(this.editingCompanyId)) {
+            targets.push({ entityType: "company", entityId: this.toIntOrNull(this.editingCompanyId) });
+          }
+          return targets;
+        },
+        ensurePhoneCallHistoryPolling() {
+          if (this.phoneCallHistoryPollTimer || typeof window === "undefined") return;
+          this.pollOpenPhoneCallHistoryPanels().catch(() => {});
+          this.phoneCallHistoryPollTimer = window.setInterval(() => {
+            this.pollOpenPhoneCallHistoryPanels().catch(() => {});
+          }, 10000);
+        },
+        stopPhoneCallHistoryPollingIfIdle() {
+          if (this.resolveOpenPhoneCallHistoryTargets().length) {
+            return;
+          }
+          if (this.phoneCallHistoryPollTimer && typeof window !== "undefined") {
+            window.clearInterval(this.phoneCallHistoryPollTimer);
+          }
+          this.phoneCallHistoryPollTimer = null;
+          this.isPhoneCallHistoryPolling = false;
+        },
+        async pollOpenPhoneCallHistoryPanels() {
+          if (this.isPhoneCallHistoryPolling) return;
+          const targets = this.resolveOpenPhoneCallHistoryTargets();
+          if (!targets.length) {
+            this.stopPhoneCallHistoryPollingIfIdle();
+            return;
+          }
+          if (typeof document !== "undefined" && document.hidden) return;
+          this.isPhoneCallHistoryPolling = true;
+          try {
+            await Promise.all(targets.map(({ entityType, entityId }) => {
+              const state = this.getPhoneCallHistoryEntityState(entityType, entityId, true);
+              return this.loadPhoneCallHistory(entityType, entityId, {
+                force: true,
+                filterValue: state.currentFilter || "all",
+                page: Math.max(1, Number(state.page || 1) || 1),
+              });
+            }));
+          } finally {
+            this.isPhoneCallHistoryPolling = false;
+          }
+        },
         phoneCallHistoryEntityKey(entityType, entityId) {
           const normalizedEntityType = String(entityType || "").trim();
           const normalizedEntityId = this.toIntOrNull(entityId);
@@ -4522,8 +4582,11 @@
           this.toggleExclusiveCompanyPanel("phoneCallHistory");
           if (!wasOpen && this.showCompanyPhoneCallHistory) {
             await this.ensurePhoneCallHistoryLoaded("company", this.editingCompanyId);
+            this.ensurePhoneCallHistoryPolling();
             this.scrollPanelIntoView("company-phone-history-panel");
+            return;
           }
+          this.stopPhoneCallHistoryPollingIfIdle();
         },
         async toggleCompanyCommunicationsPanel() {
           const wasOpen = this.showCompanyCommunicationsPanel;
@@ -9817,6 +9880,7 @@
           };
           this.showModal = true;
           this.ensurePhoneCallHistoryLoaded("contact", this.editingContactId).catch(() => {});
+          this.ensurePhoneCallHistoryPolling();
         },
         openCompanyEditor(item, options = {}) {
           this.clearUiErrors({ modalOnly: true });
@@ -11080,8 +11144,11 @@
             this.showDealDocumentsPanel = false;
             this.stopCommunicationsPollingIfIdle();
             await this.ensurePhoneCallHistoryLoaded("deal", this.editingDealId);
+            this.ensurePhoneCallHistoryPolling();
             this.scrollPanelIntoView("deal-phone-history-panel");
+            return;
           }
+          this.stopPhoneCallHistoryPollingIfIdle();
         },
         openDealDocumentPicker() {
           if (!this.editingDealId || this.isDealDocumentUploading || this.isDealActGenerating) {
@@ -11226,7 +11293,10 @@
           if (this.showLeadPhoneCallHistory) {
             this.showLeadDocumentsPanel = false;
             await this.ensurePhoneCallHistoryLoaded("lead", this.editingLeadId);
+            this.ensurePhoneCallHistoryPolling();
+            return;
           }
+          this.stopPhoneCallHistoryPollingIfIdle();
         },
         openLeadDocumentPicker() {
           if (!this.editingLeadId || this.isLeadDocumentUploading) {
@@ -12883,6 +12953,7 @@
           this.companyDocumentsForActiveCompany = [];
           this.companyDealDocumentGroups = [];
           this.resetCompanySettlementState();
+          this.stopPhoneCallHistoryPollingIfIdle();
         },
         openCreateModal() {
           this.clearUiErrors({ modalOnly: true });
@@ -13962,6 +14033,7 @@
         document.removeEventListener("click", this.handleDocumentClick);
         document.removeEventListener("keydown", this.handleGlobalKeydown);
         this.stopTelephonyIncomingCallsPolling();
+        this.stopPhoneCallHistoryPollingIfIdle();
         this.stopAutomationNotificationsPolling();
         this.stopCommunicationsPollingIfIdle();
       }
