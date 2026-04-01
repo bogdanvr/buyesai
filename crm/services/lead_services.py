@@ -339,7 +339,11 @@ def _merge_duplicate_lead(
         update_fields.append("title")
 
     name = _text_or_empty(payload.get("name"))
-    if name and not _text_or_empty(lead.name):
+    current_name = _text_or_empty(lead.name)
+    if name and (
+        not current_name
+        or len(current_name.split()) < len(name.split())
+    ):
         lead.name = name
         update_fields.append("name")
 
@@ -477,7 +481,7 @@ def create_lead_from_payload(
 
     duplicate_lead = _find_duplicate_lead(payload=payload, website_session=website_session)
     if duplicate_lead is not None:
-        return _merge_duplicate_lead(
+        merged_lead = _merge_duplicate_lead(
             lead=duplicate_lead,
             form_type=form_type,
             payload=payload,
@@ -486,6 +490,9 @@ def create_lead_from_payload(
             website_session=website_session,
             client=client,
         )
+        if merged_lead.client_id:
+            sync_lead_contact_to_client(lead=merged_lead, client=merged_lead.client)
+        return merged_lead
 
     lead = Lead.objects.create(
         external_id=_text_or_empty(payload.get("external_id")),
@@ -503,6 +510,8 @@ def create_lead_from_payload(
     )
     if website_session is not None:
         sync_lead_tracking_data(lead, website_session, effective_primary_source)
+    if client is not None:
+        sync_lead_contact_to_client(lead=lead, client=client)
     return lead
 
 

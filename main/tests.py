@@ -114,6 +114,10 @@ class SendFormViewTests(TestCase):
         self.assertEqual(client.address, "г. Москва, ул. Тестовая, д. 1")
         self.assertEqual(client.industry, "Разработка ПО")
         self.assertEqual(client.okved, "62.01")
+        contact = Contact.objects.get(client=client)
+        self.assertEqual(contact.first_name, "Иван")
+        self.assertEqual(contact.phone, "+79990000000")
+        self.assertTrue(contact.is_primary)
 
     def test_send_form_links_tracking_session_history_and_sources(self):
         self.client.post(
@@ -279,6 +283,48 @@ class SendFormViewTests(TestCase):
         self.assertEqual(second_response.json()["crm_lead_id"], lead.id)
         self.assertEqual(lead.phone_normalized, "79990000000")
         self.assertEqual(lead.email, "ivan@example.com")
+
+    def test_deduplicated_form_lead_creates_company_contact(self):
+        self.client.post(
+            reverse("send_form"),
+            data=json.dumps(
+                {
+                    "form_type": "hero",
+                    "payload": {
+                        "name": "Иван",
+                        "phone": "+7 (999) 000-00-00",
+                    },
+                }
+            ),
+            content_type="application/json",
+        )
+
+        response = self.client.post(
+            reverse("send_form"),
+            data=json.dumps(
+                {
+                    "form_type": "hero",
+                    "payload": {
+                        "name": "Иван Петров",
+                        "phone": "8 999 000 00 00",
+                        "company_data": {
+                            "name": "ООО Тест",
+                            "inn": "7701234567",
+                        },
+                    },
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        lead = Lead.objects.get()
+        client = Client.objects.get(inn="7701234567")
+        self.assertEqual(lead.client_id, client.id)
+        contact = Contact.objects.get(client=client)
+        self.assertEqual(contact.first_name, "Иван")
+        self.assertEqual(contact.last_name, "Петров")
+        self.assertEqual(contact.phone, "8 999 000 00 00")
 
     def test_reuses_existing_company_for_form_lead(self):
         existing = Client.objects.create(name="Acme")

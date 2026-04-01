@@ -3336,6 +3336,7 @@
               const state = this.getPhoneCallHistoryEntityState(entityType, entityId, true);
               return this.loadPhoneCallHistory(entityType, entityId, {
                 force: true,
+                silent: true,
                 filterValue: state.currentFilter || "all",
                 page: Math.max(1, Number(state.page || 1) || 1),
               });
@@ -3376,6 +3377,51 @@
         phoneCallHistoryCacheKey(filterValue, page) {
           return `${String(filterValue || "all").trim() || "all"}:${Math.max(1, Number(page) || 1)}`;
         },
+        shallowEqualRecords(left, right) {
+          if (left === right) return true;
+          if (!left || !right || typeof left !== "object" || typeof right !== "object") {
+            return false;
+          }
+          const leftKeys = Object.keys(left);
+          const rightKeys = Object.keys(right);
+          if (leftKeys.length !== rightKeys.length) {
+            return false;
+          }
+          for (const key of leftKeys) {
+            if (left[key] !== right[key]) {
+              return false;
+            }
+          }
+          return true;
+        },
+        mergeCollectionByKey(currentItems, nextItems, resolveKey) {
+          const currentList = Array.isArray(currentItems) ? currentItems : [];
+          const incomingList = Array.isArray(nextItems) ? nextItems : [];
+          const keyResolver = typeof resolveKey === "function"
+            ? resolveKey
+            : ((item, index) => String(item?.id ?? index));
+          const existingByKey = new Map();
+          currentList.forEach((item, index) => {
+            const key = String(keyResolver(item, index) || "");
+            if (key) {
+              existingByKey.set(key, item);
+            }
+          });
+          return incomingList.map((item, index) => {
+            const key = String(keyResolver(item, index) || "");
+            const existing = key ? existingByKey.get(key) : null;
+            if (!existing || this.shallowEqualRecords(existing, item)) {
+              return existing || item;
+            }
+            Object.keys(existing).forEach((fieldName) => {
+              if (!(fieldName in item)) {
+                delete existing[fieldName];
+              }
+            });
+            Object.assign(existing, item);
+            return existing;
+          });
+        },
         buildPhoneCallHistoryQuery(entityType, entityId, filterValue, page) {
           const normalizedEntityType = String(entityType || "").trim();
           const normalizedEntityId = this.toIntOrNull(entityId);
@@ -3399,7 +3445,11 @@
           const normalizedPage = Math.max(1, Number(options.page || payload.page || 1) || 1);
           state.currentFilter = normalizedFilter;
           state.page = normalizedPage;
-          state.items = Array.isArray(payload.items) ? payload.items : [];
+          state.items = this.mergeCollectionByKey(
+            state.items,
+            Array.isArray(payload.items) ? payload.items : [],
+            (item, index) => String(item?.id ?? index)
+          );
           state.count = Math.max(0, Number(payload.count) || 0);
           state.next = payload.next || "";
           state.previous = payload.previous || "";
@@ -3418,8 +3468,13 @@
             this.applyPhoneCallHistoryState(state, state.cache[cacheKey], { filterValue, page });
             return;
           }
-          state.loading = true;
-          state.error = "";
+          const shouldShowLoading = !options.silent || !(Array.isArray(state.items) && state.items.length);
+          if (shouldShowLoading) {
+            state.loading = true;
+          }
+          if (!options.silent || !Array.isArray(state.items) || !state.items.length) {
+            state.error = "";
+          }
           try {
             const query = this.buildPhoneCallHistoryQuery(normalizedEntityType, normalizedEntityId, filterValue, page);
             const response = await this.apiRequest(`/api/telephony/calls/?${query}`);
@@ -3437,9 +3492,13 @@
             };
             this.applyPhoneCallHistoryState(state, payload, { filterValue, page });
           } catch (error) {
-            state.error = error.message || "Не удалось загрузить историю звонков.";
+            if (!options.silent || !Array.isArray(state.items) || !state.items.length) {
+              state.error = error.message || "Не удалось загрузить историю звонков.";
+            }
           } finally {
-            state.loading = false;
+            if (shouldShowLoading) {
+              state.loading = false;
+            }
           }
         },
         async ensurePhoneCallHistoryLoaded(entityType, entityId) {
@@ -6051,16 +6110,38 @@
             return;
           }
           const previousSelection = String(this.communicationsSelectedTimelineItemKey || "").trim();
-          this.isCommunicationsTimelineLoading = true;
+          const shouldShowLoading = !options.silent || !(
+            (this.communicationsConversations || []).length
+            || (this.communicationsMessages || []).length
+            || (this.communicationsCalls || []).length
+          );
+          if (shouldShowLoading) {
+            this.isCommunicationsTimelineLoading = true;
+          }
           try {
             const [conversationsPayload, messagesPayload, callsPayload] = await Promise.all([
               this.apiRequest(`/api/v1/communications/conversations/?client=${normalizedCompanyId}&page_size=100`),
               this.apiRequest(`/api/v1/communications/messages/?client=${normalizedCompanyId}&page_size=200`),
               this.apiRequest(`/api/telephony/calls/?entity_type=company&entity_id=${normalizedCompanyId}&page_size=100`),
             ]);
-            this.communicationsConversations = this.normalizePaginatedResponse(conversationsPayload).map((item) => this.mapConversation(item));
-            this.communicationsMessages = this.normalizePaginatedResponse(messagesPayload).map((item) => this.mapCommunicationsTimelineMessage(item));
-            this.communicationsCalls = this.normalizePaginatedResponse(callsPayload).map((item) => this.mapCommunicationsTimelineCall(item));
+            const nextConversations = this.normalizePaginatedResponse(conversationsPayload).map((item) => this.mapConversation(item));
+            const nextMessages = this.normalizePaginatedResponse(messagesPayload).map((item) => this.mapCommunicationsTimelineMessage(item));
+            const nextCalls = this.normalizePaginatedResponse(callsPayload).map((item) => this.mapCommunicationsTimelineCall(item));
+            this.communicationsConversations = this.mergeCollectionByKey(
+              this.communicationsConversations,
+              nextConversations,
+              (item, index) => `conversation-${String(item?.id ?? index)}`
+            );
+            this.communicationsMessages = this.mergeCollectionByKey(
+              this.communicationsMessages,
+              nextMessages,
+              (item, index) => String(item?.timelineKey || `message-${String(item?.id ?? index)}`)
+            );
+            this.communicationsCalls = this.mergeCollectionByKey(
+              this.communicationsCalls,
+              nextCalls,
+              (item, index) => String(item?.timelineKey || `call-${String(item?.id ?? index)}`)
+            );
             if (options.preserveSelection && previousSelection && this.communicationsFilteredTimelineItems.some((item) => item.timelineKey === previousSelection)) {
               this.communicationsSelectedTimelineItemKey = previousSelection;
             } else {
@@ -6070,7 +6151,9 @@
               this.ensureCommunicationsPolling();
             }
           } finally {
-            this.isCommunicationsTimelineLoading = false;
+            if (shouldShowLoading) {
+              this.isCommunicationsTimelineLoading = false;
+            }
           }
         },
         async selectCommunicationsCompany(companyId, options = {}) {
@@ -6681,6 +6764,7 @@
           if (this.activeSection === "communications" && this.toIntOrNull(this.communicationsSelectedCompanyId)) {
             tasks.push(this.loadCommunicationsTimeline(this.toIntOrNull(this.communicationsSelectedCompanyId), {
               preserveSelection: true,
+              silent: true,
             }));
           }
           if (this.showCompanyCommunicationsPanel && this.editingCompanyId) {
