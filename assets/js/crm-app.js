@@ -1178,7 +1178,43 @@
               messageDraftText: existingItem.messageDraftText || item.messageDraftText || "",
             };
           });
-          const notifications = [...dedupedQueueNotifications];
+          const unassignedLeadNotifications = (this.datasets.leads || [])
+            .filter((lead) => {
+              if (!lead || this.toIntOrNull(lead.assignedToId)) {
+                return false;
+              }
+              const createdAtTimestamp = this.parseTaskDueTimestamp(lead.createdAt);
+              if (!createdAtTimestamp) {
+                return false;
+              }
+              return createdAtTimestamp <= (Date.now() - 60 * 1000);
+            })
+            .map((lead) => {
+              const createdAtTimestamp = this.parseTaskDueTimestamp(lead.createdAt);
+              const thresholdAt = createdAtTimestamp
+                ? new Date(createdAtTimestamp + 60 * 1000).toISOString()
+                : (lead.createdAt || "");
+              return {
+                id: `lead-unassigned-${lead.id}`,
+                sourceType: "lead_assignment",
+                sourceId: this.toIntOrNull(lead.id),
+                leadId: this.toIntOrNull(lead.id),
+                leadTitle: String(lead.title || lead.name || `Лид #${lead.id}`).trim(),
+                companyId: this.toIntOrNull(lead.clientId),
+                companyName: String(lead.company || "").trim(),
+                title: "Новый лид без ответственного",
+                happenedAt: thresholdAt,
+                deadline: thresholdAt,
+                recommendedAction: "Назначьте ответственного по лиду",
+                uiPriority: "high",
+                needsConfirmation: false,
+                isDraft: false,
+                isPrimaryMessage: false,
+                availableActions: [],
+                sourceTouchSummary: "За 1 минуту после создания не назначен ответственный",
+              };
+            });
+          const notifications = [...dedupedQueueNotifications, ...unassignedLeadNotifications];
 
           notifications.sort((left, right) => {
             const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -6726,6 +6762,7 @@
             return this.automationDataLoadPromise;
           }
           this.automationDataLoadPromise = Promise.all([
+            this.loadSection("leads", { force }),
             this.loadAutomationDrafts(),
             this.loadAutomationQueue(),
             this.loadAutomationMessageDrafts(),
@@ -8166,6 +8203,21 @@
         },
         async openManagerNotification(item) {
           if (!item) return;
+          if (String(item.sourceType || "") === "lead_assignment" && this.toIntOrNull(item.leadId || item.sourceId)) {
+            this.showManagerNotifications = false;
+            const lead = (this.datasets.leads || []).find(
+              (entry) => String(entry.id) === String(this.toIntOrNull(item.leadId || item.sourceId))
+            ) || null;
+            if (lead) {
+              this.openLeadEditor(lead);
+              return;
+            }
+            const fetchedLead = await this.fetchLeadById(this.toIntOrNull(item.leadId || item.sourceId));
+            if (fetchedLead) {
+              this.openLeadEditor(fetchedLead);
+            }
+            return;
+          }
           if (this.toIntOrNull(item.messageDraftId) || this.notificationNeedsBinding(item)) {
             await this.openManagerNotificationSidebar(item, "overview");
             return;
