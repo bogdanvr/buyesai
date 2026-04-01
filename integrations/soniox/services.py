@@ -154,8 +154,6 @@ def refresh_phone_call_transcription(call: PhoneCall) -> dict:
 def submit_phone_call_transcription_if_needed(call: PhoneCall) -> dict:
     if not _is_enabled():
         return {"ok": False, "skipped": True, "reason": "soniox_disabled"}
-    if call.status != PhoneCallStatus.COMPLETED:
-        return {"ok": False, "skipped": True, "reason": "call_not_completed"}
     recording_url = str(call.recording_url or "").strip()
     if not recording_url:
         return {"ok": False, "skipped": True, "reason": "recording_missing"}

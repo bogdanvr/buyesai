@@ -61,6 +61,13 @@ def _trigger_transcription_if_ready(call: PhoneCall) -> dict:
         return {"ok": False, "error": str(error)}
 
 
+def _normalize_completed_status_from_recording(call: PhoneCall) -> PhoneCall:
+    if str(call.recording_url or "").strip() and call.status in {PhoneCallStatus.RINGING, PhoneCallStatus.ANSWERED}:
+        call.status = PhoneCallStatus.COMPLETED
+        call.ended_at = call.ended_at or timezone.now()
+    return call
+
+
 def _provider_client(account: TelephonyProviderAccount) -> NovofonClient:
     return NovofonClient(account)
 
@@ -358,8 +365,9 @@ def _upsert_phone_call_from_event(*, account: TelephonyProviderAccount, parsed: 
     if is_recording_update_event and not created:
         call.external_parent_event_id = parsed.external_event_id or call.external_parent_event_id
         call.recording_url = parsed.recording_url or call.recording_url
+        call = _normalize_completed_status_from_recording(call)
         call.raw_payload_last = parsed.raw_payload or call.raw_payload_last
-        call.save(update_fields=["external_parent_event_id", "recording_url", "raw_payload_last", "updated_at"])
+        call.save(update_fields=["external_parent_event_id", "recording_url", "status", "ended_at", "raw_payload_last", "updated_at"])
         _trigger_transcription_if_ready(call)
         return call
 
@@ -378,6 +386,7 @@ def _upsert_phone_call_from_event(*, account: TelephonyProviderAccount, parsed: 
     call.duration_sec = parsed.duration_sec if parsed.duration_sec is not None else call.duration_sec
     call.talk_duration_sec = parsed.talk_duration_sec if parsed.talk_duration_sec is not None else call.talk_duration_sec
     call.recording_url = parsed.recording_url or call.recording_url
+    call = _normalize_completed_status_from_recording(call)
     call.raw_payload_last = parsed.raw_payload or call.raw_payload_last
     _ensure_binding_for_call(account=account, call=call)
     call.save()

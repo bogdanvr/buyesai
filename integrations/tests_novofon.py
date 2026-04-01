@@ -473,6 +473,51 @@ class NovofonWebhookApiTests(APITestCase):
             "soniox-secret",
         )
 
+    @override_settings(SONIOX_API_KEY="soniox-key")
+    @patch("integrations.soniox.client.requests.request")
+    def test_recording_event_completes_ringing_call_and_submits_transcription(self, request_mock):
+        ringing_payload = self._payload(event_id="event-ringing-call")
+        ringing_payload["event_type"] = "in_call_session"
+        ringing_payload["status"] = "ringing"
+        ringing_payload["ended_at"] = ""
+        ringing_payload["duration"] = 0
+
+        initial_response = self.client.post(
+            reverse("integrations-novofon-webhook"),
+            ringing_payload,
+            format="json",
+            HTTP_X_WEBHOOK_SECRET="secret",
+        )
+        self.assertEqual(initial_response.status_code, status.HTTP_202_ACCEPTED)
+        call_command("process_novofon_webhook_queue", stdout=StringIO())
+
+        soniox_response = Mock()
+        soniox_response.raise_for_status.return_value = None
+        soniox_response.json.return_value = {"id": "tr-ringing-call-1", "status": "queued"}
+        request_mock.return_value = soniox_response
+
+        recording_response = self.client.post(
+            reverse("integrations-novofon-webhook"),
+            {
+                "event": "RECORD_CALL",
+                "event_id": "event-record-ringing-1",
+                "call_session_id": "call-1",
+                "call_record_file_info": {
+                    "file_link": "https://media.novofon.ru/records/call-1.mp3",
+                },
+            },
+            format="json",
+            HTTP_X_WEBHOOK_SECRET="secret",
+        )
+
+        self.assertEqual(recording_response.status_code, status.HTTP_202_ACCEPTED)
+        call_command("process_novofon_webhook_queue", stdout=StringIO())
+
+        call = PhoneCall.objects.get(external_call_id="call-1")
+        self.assertEqual(call.status, PhoneCallStatus.COMPLETED)
+        self.assertEqual(call.transcription_status, PhoneCallTranscriptionStatus.QUEUED)
+        self.assertEqual(call.transcription_external_id, "tr-ringing-call-1")
+
     def test_queue_processor_handles_embedded_json_payload_saved_in_event_log(self):
         wrapped_payload = {
             '{\n  "event_type": ""in_call_session"",\n  "call_session_id": "187020303",\n  "communication_id": "12323",\n  "direction": ""in"",\n  "calling_phone_number": ""79000000000"",\n  "called_phone_number": ""74950000000"",\n  "contact_phone_number": ""79000000000"",\n  "communication_number": "1",\n  "virtual_phone_number": ""74950000000"",\n  "notification_time": ""2026-03-28 16:30:00"",\n  "start_time": ""2026-03-28 16:29:07""\n}': ""
