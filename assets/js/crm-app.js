@@ -6066,6 +6066,9 @@
             } else {
               this.communicationsSelectedTimelineItemKey = this.communicationsFilteredTimelineItems[0]?.timelineKey || "";
             }
+            if (this.activeSection === "communications" && this.toIntOrNull(this.communicationsSelectedCompanyId) === normalizedCompanyId) {
+              this.ensureCommunicationsPolling();
+            }
           } finally {
             this.isCommunicationsTimelineLoading = false;
           }
@@ -6659,8 +6662,8 @@
         },
         stopCommunicationsPollingIfIdle() {
           if (
-            this.showModal
-            && (this.showCompanyCommunicationsPanel || this.showDealCommunicationsPanel)
+            (this.showModal && (this.showCompanyCommunicationsPanel || this.showDealCommunicationsPanel))
+            || (this.activeSection === "communications" && this.toIntOrNull(this.communicationsSelectedCompanyId))
           ) {
             return;
           }
@@ -6670,11 +6673,16 @@
           this.communicationsPollTimer = null;
         },
         async pollOpenCommunicationsPanels() {
-          if (!this.showModal) {
+          if (!this.showModal && this.activeSection !== "communications") {
             this.stopCommunicationsPollingIfIdle();
             return;
           }
           const tasks = [];
+          if (this.activeSection === "communications" && this.toIntOrNull(this.communicationsSelectedCompanyId)) {
+            tasks.push(this.loadCommunicationsTimeline(this.toIntOrNull(this.communicationsSelectedCompanyId), {
+              preserveSelection: true,
+            }));
+          }
           if (this.showCompanyCommunicationsPanel && this.editingCompanyId) {
             tasks.push(this.loadCompanyCommunications({
               silent: true,
