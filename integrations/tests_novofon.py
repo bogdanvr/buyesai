@@ -226,11 +226,8 @@ class NovofonWebhookApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
         event = TelephonyEventLog.objects.get(pk=response.data["event_id"])
-        self.assertEqual(event.status, TelephonyEventStatus.QUEUED)
-        self.assertFalse(PhoneCall.objects.filter(external_call_id="call-1").exists())
-
-        out = StringIO()
-        call_command("process_novofon_webhook_queue", stdout=out)
+        self.assertEqual(event.status, TelephonyEventStatus.PROCESSED)
+        self.assertTrue(response.data["processed_immediately"])
 
         call = PhoneCall.objects.get(external_call_id="call-1")
         self.assertEqual(call.contact_id, self.contact.pk)
@@ -322,7 +319,6 @@ class NovofonWebhookApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-        call_command("process_novofon_webhook_queue", stdout=StringIO())
 
         call = PhoneCall.objects.get(external_call_id="pbx-1")
         self.assertEqual(call.status, "answered")
@@ -349,7 +345,6 @@ class NovofonWebhookApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-        call_command("process_novofon_webhook_queue", stdout=StringIO())
 
         call = PhoneCall.objects.get(external_call_id="pbx-tz-1")
         self.assertEqual(timezone.localtime(call.started_at, ZoneInfo("Asia/Omsk")).strftime("%Y-%m-%d %H:%M:%S"), "2026-04-01 18:43:00")

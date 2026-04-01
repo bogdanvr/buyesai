@@ -29,6 +29,7 @@ from integrations.novofon.services import (
     get_novofon_account,
     import_novofon_calls_history,
     initiate_novofon_call,
+    process_novofon_webhook_event,
     queue_novofon_webhook_event,
     reprocess_novofon_event,
     sync_novofon_employees,
@@ -351,7 +352,16 @@ class NovofonWebhookAPIView(APIView):
         if auth_error:
             return Response({"ok": False, "error": auth_error}, status=status.HTTP_403_FORBIDDEN)
         event = queue_novofon_webhook_event(payload=payload, headers=headers, account=account)
+        result = process_novofon_webhook_event(event)
+        event.refresh_from_db()
         return Response(
-            {"ok": True, "event_id": event.pk, "queued": True, "status": event.status},
+            {
+                "ok": True,
+                "event_id": event.pk,
+                "queued": event.status == TelephonyEventStatus.QUEUED,
+                "status": event.status,
+                "processed_immediately": True,
+                "result": result,
+            },
             status=status.HTTP_202_ACCEPTED,
         )
