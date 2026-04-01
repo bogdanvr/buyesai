@@ -72,6 +72,14 @@ class PhoneCallStatus(models.TextChoices):
     CANCELED = "canceled", "Отменен"
 
 
+class PhoneCallTranscriptionStatus(models.TextChoices):
+    NOT_REQUESTED = "not_requested", "Не запрошена"
+    QUEUED = "queued", "В очереди"
+    PROCESSING = "processing", "Обрабатывается"
+    COMPLETED = "completed", "Готово"
+    FAILED = "failed", "Ошибка"
+
+
 class TelephonyEventStatus(models.TextChoices):
     RECEIVED = "received", "Получено"
     QUEUED = "queued", "В очереди"
@@ -232,6 +240,18 @@ class PhoneCall(TimestampedModel):
     duration_sec = models.PositiveIntegerField(blank=True, null=True, verbose_name="Длительность")
     talk_duration_sec = models.PositiveIntegerField(blank=True, null=True, verbose_name="Длительность разговора")
     recording_url = models.CharField(max_length=500, blank=True, default="", verbose_name="URL записи")
+    transcription_status = models.CharField(
+        max_length=32,
+        choices=PhoneCallTranscriptionStatus.choices,
+        default=PhoneCallTranscriptionStatus.NOT_REQUESTED,
+        verbose_name="Статус транскрибации",
+    )
+    transcription_external_id = models.CharField(max_length=128, blank=True, default="", verbose_name="Внешний ID транскрибации")
+    transcription_recording_url = models.CharField(max_length=500, blank=True, default="", verbose_name="URL записи для транскрибации")
+    transcription_text = models.TextField(blank=True, default="", verbose_name="Текст транскрибации")
+    transcription_error = models.TextField(blank=True, default="", verbose_name="Ошибка транскрибации")
+    transcription_requested_at = models.DateTimeField(blank=True, null=True, verbose_name="Транскрибация запрошена")
+    transcription_completed_at = models.DateTimeField(blank=True, null=True, verbose_name="Транскрибация завершена")
     raw_payload_last = models.JSONField(default=dict, blank=True, verbose_name="Последний payload")
 
     class Meta:
@@ -251,6 +271,8 @@ class PhoneCall(TimestampedModel):
             models.Index(fields=["started_at"]),
             models.Index(fields=["crm_user"]),
             models.Index(fields=["deal"]),
+            models.Index(fields=["transcription_external_id"]),
+            models.Index(fields=["transcription_status"]),
         ]
 
     def __str__(self):

@@ -18,6 +18,7 @@ from integrations.models import (
     PhoneCall,
     PhoneCallDirection,
     PhoneCallStatus,
+    PhoneCallTranscriptionStatus,
     TelephonyEventLog,
     TelephonyEventStatus,
     TelephonyProvider,
@@ -33,6 +34,8 @@ from integrations.novofon.selectors import (
     resolve_novofon_mapping,
 )
 from integrations.novofon.webhook_parser import ParsedNovofonEvent, parse_novofon_webhook
+from integrations.soniox.client import SonioxClientError
+from integrations.soniox.services import refresh_phone_call_transcription, submit_phone_call_transcription_if_needed
 
 
 logger = logging.getLogger(__name__)
@@ -45,6 +48,17 @@ ENTITY_MODELS: dict[str, Any] = {
     "lead": Lead,
     "deal": Deal,
 }
+
+
+def _trigger_transcription_if_ready(call: PhoneCall) -> dict:
+    try:
+        return submit_phone_call_transcription_if_needed(call)
+    except SonioxClientError as error:
+        logger.warning("Failed to submit phone call transcription. call_id=%s error=%s", call.pk, error)
+        call.transcription_status = PhoneCallTranscriptionStatus.FAILED
+        call.transcription_error = str(error)
+        call.save(update_fields=["transcription_status", "transcription_error", "updated_at"])
+        return {"ok": False, "error": str(error)}
 
 
 def _provider_client(account: TelephonyProviderAccount) -> NovofonClient:
@@ -220,6 +234,7 @@ def _upsert_phone_call_from_history(*, account: TelephonyProviderAccount, row: d
     call.raw_payload_last = row or call.raw_payload_last
     _ensure_binding_for_call(account=account, call=call)
     call.save()
+    _trigger_transcription_if_ready(call)
     return call, created
 
 
@@ -345,6 +360,7 @@ def _upsert_phone_call_from_event(*, account: TelephonyProviderAccount, parsed: 
         call.recording_url = parsed.recording_url or call.recording_url
         call.raw_payload_last = parsed.raw_payload or call.raw_payload_last
         call.save(update_fields=["external_parent_event_id", "recording_url", "raw_payload_last", "updated_at"])
+        _trigger_transcription_if_ready(call)
         return call
 
     call.external_parent_event_id = parsed.external_event_id or call.external_parent_event_id
@@ -365,6 +381,7 @@ def _upsert_phone_call_from_event(*, account: TelephonyProviderAccount, parsed: 
     call.raw_payload_last = parsed.raw_payload or call.raw_payload_last
     _ensure_binding_for_call(account=account, call=call)
     call.save()
+    _trigger_transcription_if_ready(call)
     return call
 
 
@@ -395,7 +412,12 @@ def create_missed_call_followup_task(call: PhoneCall):
 
 
 def refresh_call_recording_if_needed(call: PhoneCall):
-    return {"ok": True, "recording_url": call.recording_url}
+    refresh_result = refresh_phone_call_transcription(call)
+    return {
+        "ok": True,
+        "recording_url": call.recording_url,
+        "transcription": refresh_result,
+    }
 
 
 def queue_novofon_webhook_event(*, payload: dict, headers: dict | None = None) -> TelephonyEventLog:

@@ -31,6 +31,7 @@ from integrations.novofon.views import (
     TelephonyHealthAPIView,
     TelephonyEventReprocessAPIView,
 )
+from integrations.soniox.views import SonioxWebhookAPIView
 from crm_communications.public_views import DealDocumentShareDownloadView, DealDocumentShareEventView, DealDocumentSharePageView, DealDocumentSharePreviewView
 from main.views import (
     mainview,
@@ -74,6 +75,7 @@ urlpatterns = [
     path("documents/share/<str:token>/events/", DealDocumentShareEventView.as_view(), name="deal-document-share-event"),
     path("documents/share/<str:token>/download/", DealDocumentShareDownloadView.as_view(), name="deal-document-share-download"),
     path("api/integrations/novofon/webhook/", NovofonWebhookAPIView.as_view(), name="integrations-novofon-webhook"),
+    path("api/integrations/soniox/webhook/", SonioxWebhookAPIView.as_view(), name="integrations-soniox-webhook"),
     path("api/telephony/novofon/settings/", NovofonSettingsAPIView.as_view(), name="telephony-novofon-settings"),
     path("api/telephony/novofon/check-connection/", NovofonCheckConnectionAPIView.as_view(), name="telephony-novofon-check-connection"),
     path("api/telephony/novofon/sync-employees/", NovofonSyncEmployeesAPIView.as_view(), name="telephony-novofon-sync-employees"),

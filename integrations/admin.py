@@ -77,10 +77,10 @@ class TelephonyUserMappingAdmin(admin.ModelAdmin):
 @admin.register(PhoneCall, site=crm_admin_site)
 class PhoneCallAdmin(admin.ModelAdmin):
     admin_group = "Интеграции"
-    list_display = ("id", "provider", "external_call_id", "direction", "status", "phone_from", "phone_to", "responsible_user", "started_at")
-    list_filter = ("provider", "direction", "status")
+    list_display = ("id", "provider", "external_call_id", "direction", "status", "transcription_status", "phone_from", "phone_to", "responsible_user", "started_at")
+    list_filter = ("provider", "direction", "status", "transcription_status")
     search_fields = ("external_call_id", "phone_from", "phone_to", "client_phone_normalized")
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("created_at", "updated_at", "transcription_requested_at", "transcription_completed_at")
 
 
 @admin.register(TelephonyEventLog)

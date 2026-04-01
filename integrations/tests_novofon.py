@@ -7,6 +7,7 @@ from io import StringIO
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import SimpleTestCase
+from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -17,6 +18,7 @@ from integrations.models import (
     PhoneCall,
     PhoneCallDirection,
     PhoneCallStatus,
+    PhoneCallTranscriptionStatus,
     TelephonyEventLog,
     TelephonyEventStatus,
     TelephonyProvider,
@@ -414,6 +416,62 @@ class NovofonWebhookApiTests(APITestCase):
         self.assertEqual(call.status, PhoneCallStatus.COMPLETED)
         self.assertEqual(call.direction, PhoneCallDirection.INBOUND)
         self.assertEqual(call.recording_url, "https://media.novofon.ru/records/call-1.mp3")
+
+    @override_settings(
+        SONIOX_API_KEY="soniox-key",
+        CRM_PUBLIC_BASE_URL="https://crm.example.test",
+        SONIOX_WEBHOOK_SECRET="soniox-secret",
+    )
+    @patch("integrations.soniox.client.requests.request")
+    def test_recording_event_submits_transcription_to_soniox(self, request_mock):
+        initial_response = self.client.post(
+            reverse("integrations-novofon-webhook"),
+            self._payload(event_id="event-call-with-transcript"),
+            format="json",
+            HTTP_X_WEBHOOK_SECRET="secret",
+        )
+        self.assertEqual(initial_response.status_code, status.HTTP_202_ACCEPTED)
+        call_command("process_novofon_webhook_queue", stdout=StringIO())
+
+        soniox_response = Mock()
+        soniox_response.raise_for_status.return_value = None
+        soniox_response.json.return_value = {"id": "tr-call-1", "status": "queued"}
+        request_mock.return_value = soniox_response
+
+        recording_response = self.client.post(
+            reverse("integrations-novofon-webhook"),
+            {
+                "event": "RECORD_CALL",
+                "event_id": "event-record-transcript-1",
+                "call_session_id": "call-1",
+                "call_record_file_info": {
+                    "file_link": "https://media.novofon.ru/records/call-1.mp3",
+                },
+            },
+            format="json",
+            HTTP_X_WEBHOOK_SECRET="secret",
+        )
+
+        self.assertEqual(recording_response.status_code, status.HTTP_202_ACCEPTED)
+        call_command("process_novofon_webhook_queue", stdout=StringIO())
+
+        call = PhoneCall.objects.get(external_call_id="call-1")
+        self.assertEqual(call.transcription_status, PhoneCallTranscriptionStatus.QUEUED)
+        self.assertEqual(call.transcription_external_id, "tr-call-1")
+        self.assertEqual(call.transcription_recording_url, "https://media.novofon.ru/records/call-1.mp3")
+        request_kwargs = request_mock.call_args.kwargs
+        self.assertEqual(request_kwargs["method"], "POST")
+        self.assertEqual(request_kwargs["url"], "https://api.soniox.com/v1/transcriptions")
+        self.assertEqual(request_kwargs["json"]["audio_url"], "https://media.novofon.ru/records/call-1.mp3")
+        self.assertEqual(request_kwargs["json"]["model"], "stt-async-v4")
+        self.assertEqual(
+            request_kwargs["json"]["webhook"]["url"],
+            "https://crm.example.test/api/integrations/soniox/webhook/",
+        )
+        self.assertEqual(
+            request_kwargs["json"]["webhook"]["headers"]["X-Soniox-Webhook-Secret"],
+            "soniox-secret",
+        )
 
     def test_queue_processor_handles_embedded_json_payload_saved_in_event_log(self):
         wrapped_payload = {
@@ -987,6 +1045,52 @@ class NovofonImportCallsApiTests(APITestCase):
         self.assertEqual(call.deal_id, self.deal.pk)
         self.assertEqual(call.crm_user_id, self.user.pk)
 
+    @override_settings(SONIOX_API_KEY="soniox-key")
+    @patch("integrations.soniox.client.requests.request")
+    @patch("integrations.novofon.services.NovofonClient.get_calls_report")
+    def test_import_calls_submits_transcription_when_recording_exists(self, get_calls_report_mock, request_mock):
+        now = timezone.now()
+        get_calls_report_mock.side_effect = [
+            {
+                "metadata": {"total_items": 1},
+                "data": [
+                    {
+                        "id": 555010,
+                        "start_time": now.strftime("%Y-%m-%d %H:%M:%S"),
+                        "finish_time": now.strftime("%Y-%m-%d %H:%M:%S"),
+                        "direction": "in",
+                        "is_lost": False,
+                        "contact_phone_number": "+7 900 000-00-00",
+                        "virtual_phone_number": "+7 495 000-00-00",
+                        "operator_phone_number": "101",
+                        "talk_duration": 45,
+                        "clean_talk_duration": 40,
+                        "total_duration": 50,
+                        "full_record_file_link": "https://media.novofon.ru/1/transcribe-me",
+                        "communication_id": 7010,
+                        "last_answered_employee_id": "101",
+                        "employees": [{"employee_id": "101"}],
+                    }
+                ],
+            },
+            {"metadata": {"total_items": 1}, "data": []},
+        ]
+        soniox_response = Mock()
+        soniox_response.raise_for_status.return_value = None
+        soniox_response.json.return_value = {"id": "tr-history-1", "status": "queued"}
+        request_mock.return_value = soniox_response
+
+        response = self.client.post(
+            reverse("telephony-novofon-import-calls"),
+            {"days": 7, "limit": 100, "max_records": 100},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        call = PhoneCall.objects.get(external_call_id="555010")
+        self.assertEqual(call.transcription_status, PhoneCallTranscriptionStatus.QUEUED)
+        self.assertEqual(call.transcription_external_id, "tr-history-1")
+
     @patch("integrations.novofon.services.NovofonClient.get_calls_report")
     def test_import_calls_backfills_missing_lead_for_existing_phone_call(self, get_calls_report_mock):
         now = timezone.now()
@@ -1081,3 +1185,44 @@ class NovofonImportCallsApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         call = PhoneCall.objects.get(external_call_id="555003")
         self.assertEqual(timezone.localtime(call.started_at, ZoneInfo("Asia/Omsk")).strftime("%Y-%m-%d %H:%M:%S"), "2026-03-27 12:00:00")
+
+
+class SonioxWebhookApiTests(APITestCase):
+    @override_settings(SONIOX_API_KEY="soniox-key", SONIOX_WEBHOOK_SECRET="soniox-secret")
+    @patch("integrations.soniox.client.requests.request")
+    def test_webhook_completes_phone_call_transcription(self, request_mock):
+        call = PhoneCall.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            external_call_id="call-soniox-1",
+            direction=PhoneCallDirection.INBOUND,
+            status=PhoneCallStatus.COMPLETED,
+            phone_from="+7 900 000-00-00",
+            phone_to="+7 495 000-00-00",
+            recording_url="https://media.novofon.ru/records/call-soniox-1.mp3",
+            transcription_status=PhoneCallTranscriptionStatus.PROCESSING,
+            transcription_external_id="tr-soniox-1",
+            transcription_recording_url="https://media.novofon.ru/records/call-soniox-1.mp3",
+            transcription_requested_at=timezone.now(),
+        )
+
+        status_response = Mock()
+        status_response.raise_for_status.return_value = None
+        status_response.json.return_value = {"id": "tr-soniox-1", "status": "completed"}
+        transcript_response = Mock()
+        transcript_response.raise_for_status.return_value = None
+        transcript_response.json.return_value = {"text": "Добрый день, запись успешно распознана"}
+        request_mock.side_effect = [status_response, transcript_response]
+
+        response = self.client.post(
+            reverse("integrations-soniox-webhook"),
+            {"id": "tr-soniox-1", "status": "completed"},
+            format="json",
+            HTTP_X_SONIOX_WEBHOOK_SECRET="soniox-secret",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        call.refresh_from_db()
+        self.assertEqual(call.transcription_status, PhoneCallTranscriptionStatus.COMPLETED)
+        self.assertEqual(call.transcription_text, "Добрый день, запись успешно распознана")
+        self.assertIsNotNone(call.transcription_completed_at)
+        self.assertEqual(request_mock.call_count, 2)

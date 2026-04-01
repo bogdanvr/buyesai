@@ -2528,6 +2528,7 @@
         },
         "forms.touches.companyId": {
           handler() {
+            const companyId = this.toIntOrNull(this.forms.touches.companyId);
             const selectedContactId = this.toIntOrNull(this.forms.touches.contactId);
             if (!selectedContactId) {
             } else {
@@ -2537,6 +2538,9 @@
               if (!contactStillAvailable) {
                 this.forms.touches.contactId = null;
               }
+            }
+            if (!this.toIntOrNull(this.editingTouchId) && companyId && !this.toIntOrNull(this.forms.touches.contactId)) {
+              this.forms.touches.contactId = this.preferredTouchContactId(companyId);
             }
 
             const selectedLeadId = this.toIntOrNull(this.forms.touches.leadId);
@@ -3510,6 +3514,34 @@
             return "border-amber-400/30 bg-amber-400/10 text-amber-200";
           }
           return "border-crm-border bg-[#123753] text-white";
+        },
+        phoneCallTranscriptionStatusLabel(status) {
+          const normalized = String(status || "").trim();
+          if (normalized === "queued") return "В очереди";
+          if (normalized === "processing") return "Обрабатывается";
+          if (normalized === "completed") return "Готово";
+          if (normalized === "failed") return "Ошибка";
+          return "";
+        },
+        phoneCallTranscriptionStatusClass(status) {
+          const normalized = String(status || "").trim();
+          if (normalized === "completed") {
+            return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300";
+          }
+          if (normalized === "failed") {
+            return "border-red-400/30 bg-red-400/10 text-red-300";
+          }
+          if (normalized === "queued" || normalized === "processing") {
+            return "border-amber-400/30 bg-amber-400/10 text-amber-200";
+          }
+          return "border-crm-border bg-[#123753] text-white";
+        },
+        phoneCallHasTranscription(call) {
+          return !!(
+            String(call?.transcription_text || call?.transcriptionText || "").trim()
+            || String(call?.transcription_error || call?.transcriptionError || "").trim()
+            || String(call?.transcription_status || call?.transcriptionStatus || "").trim()
+          );
         },
         formatCallDuration(totalSeconds) {
           const normalizedSeconds = Math.max(0, Number(totalSeconds) || 0);
@@ -4702,6 +4734,19 @@
           }
           return this.toIntOrNull(contacts[0]?.id);
         },
+        preferredTouchContactId(companyId) {
+          const normalizedCompanyId = this.toIntOrNull(companyId);
+          if (!normalizedCompanyId) {
+            return null;
+          }
+          const contacts = (this.datasets.contacts || [])
+            .filter((item) => String(item.clientId || "") === String(normalizedCompanyId));
+          if (!contacts.length) {
+            return null;
+          }
+          const primaryContact = contacts.find((item) => item.isPrimary);
+          return this.toIntOrNull(primaryContact?.id || contacts[0]?.id);
+        },
         openNewCompanySettlementContractForm() {
           this.resetCompanySettlementContractForm();
           this.showCompanySettlementContractForm = true;
@@ -5572,6 +5617,9 @@
             phoneFrom: String(item.phone_from || "").trim(),
             phoneTo: String(item.phone_to || "").trim(),
             recordingUrl: String(item.recording_url || "").trim(),
+            transcriptionStatus: String(item.transcription_status || "").trim(),
+            transcriptionText: String(item.transcription_text || "").trim(),
+            transcriptionError: String(item.transcription_error || "").trim(),
             durationSec: Number.parseInt(item.duration_sec || 0, 10) || 0,
             talkDurationSec: Number.parseInt(item.talk_duration_sec || 0, 10) || 0,
             startedAt: item.started_at || "",
@@ -8214,7 +8262,7 @@
               companyId: resolvedCompanyId,
             }),
             companyId: resolvedCompanyId,
-            contactId: this.toIntOrNull(item?.contactId),
+            contactId: this.toIntOrNull(item?.contactId) || this.preferredTouchContactId(resolvedCompanyId),
             taskId: null,
             leadId: resolvedLeadId,
             dealId: resolvedDealId,
@@ -10442,6 +10490,7 @@
               ...this.getDefaultForm("touches"),
               happenedAt: this.toDateTimeLocal(new Date().toISOString()),
               companyId: this.toIntOrNull(this.forms.deals.companyId),
+              contactId: this.preferredTouchContactId(this.forms.deals.companyId),
               dealId: this.toIntOrNull(this.editingDealId),
               ownerId: this.resolveTouchOwnerIdFromContext({
                 dealId: this.editingDealId,
@@ -10477,6 +10526,7 @@
             ...this.getDefaultForm("touches"),
             happenedAt: this.toDateTimeLocal(new Date().toISOString()),
             companyId: this.toIntOrNull(this.forms.deals.companyId),
+            contactId: this.preferredTouchContactId(this.forms.deals.companyId),
             dealId: this.toIntOrNull(this.editingDealId),
             ownerId: this.resolveTouchOwnerIdFromContext({
               dealId: this.editingDealId,
@@ -11126,6 +11176,7 @@
             ...this.getDefaultForm("touches"),
             happenedAt: this.toDateTimeLocal(new Date().toISOString()),
             companyId: this.toIntOrNull(this.editingLeadItem?.clientId),
+            contactId: this.preferredTouchContactId(this.editingLeadItem?.clientId),
             leadId: this.toIntOrNull(this.editingLeadId),
             ownerId: this.resolveTouchOwnerIdFromContext({
               leadId: this.editingLeadId,
@@ -11367,6 +11418,7 @@
               ...this.getDefaultForm("touches"),
               happenedAt: this.toDateTimeLocal(new Date().toISOString()),
               companyId: this.toIntOrNull(this.editingCompanyId),
+              contactId: this.preferredTouchContactId(this.editingCompanyId),
               ownerId: this.resolveTouchOwnerIdFromContext({
                 companyId: this.editingCompanyId,
               }),
