@@ -67,11 +67,22 @@ class SonioxClient:
         webhook_url: str = "",
         webhook_secret: str = "",
         client_reference_id: str = "",
+        language_hints: list[str] | None = None,
+        language_hints_strict: bool | None = None,
     ) -> dict:
         payload: dict[str, Any] = {
             "model": self.model_id,
             "audio_url": audio_url,
         }
+        normalized_language_hints = [
+            str(item or "").strip()
+            for item in (language_hints or [])
+            if str(item or "").strip()
+        ]
+        if normalized_language_hints:
+            payload["language_hints"] = normalized_language_hints
+            if language_hints_strict is not None:
+                payload["language_hints_strict"] = bool(language_hints_strict)
         if client_reference_id:
             payload["client_reference_id"] = client_reference_id
         if webhook_url:

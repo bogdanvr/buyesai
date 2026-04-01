@@ -487,6 +487,8 @@ class NovofonWebhookApiTests(APITestCase):
         self.assertEqual(request_kwargs["url"], "https://api.soniox.com/v1/transcriptions")
         self.assertEqual(request_kwargs["json"]["audio_url"], "https://media.novofon.ru/records/call-1.mp3")
         self.assertEqual(request_kwargs["json"]["model"], "stt-async-v4")
+        self.assertEqual(request_kwargs["json"]["language_hints"], ["ru"])
+        self.assertTrue(request_kwargs["json"]["language_hints_strict"])
         self.assertEqual(
             request_kwargs["json"]["webhook"]["url"],
             "https://crm.example.test/api/integrations/soniox/webhook/",

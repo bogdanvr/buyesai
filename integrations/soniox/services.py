@@ -35,6 +35,14 @@ def _build_webhook_url() -> str:
     return f"{base_url}{reverse('integrations-soniox-webhook')}"
 
 
+def _language_hints() -> list[str]:
+    return [
+        str(item or "").strip()
+        for item in (getattr(settings, "SONIOX_LANGUAGE_HINTS", None) or ["ru"])
+        if str(item or "").strip()
+    ]
+
+
 def _get_client() -> SonioxClient:
     return SonioxClient()
 
@@ -179,6 +187,8 @@ def submit_phone_call_transcription_if_needed(call: PhoneCall) -> dict:
         webhook_url=webhook_url,
         webhook_secret=webhook_secret,
         client_reference_id=f"phone_call:{call.pk}:{call.external_call_id}",
+        language_hints=_language_hints(),
+        language_hints_strict=bool(getattr(settings, "SONIOX_LANGUAGE_HINTS_STRICT", True)),
     )
     transcription_id = _extract_transcription_id(payload)
     if not transcription_id:
