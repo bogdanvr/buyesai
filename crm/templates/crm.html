@@ -2166,16 +2166,16 @@
                   <div v-if="activeSection === 'deals'" class="px-4 py-4 text-sm min-w-0">
                     <div
                       class="truncate"
-                      :class="isDealOverdue(item.closeDate) ? 'text-red-300 font-medium' : 'text-crm-text'"
+                      :class="isDealOverdue(item.closeDate, item) ? 'text-red-300 font-medium' : 'text-crm-text'"
                     >
-                      [[ dealClosePrimaryLabel(item.closeDate) ]]
+                      [[ dealClosePrimaryLabel(item.closeDate, item) ]]
                     </div>
                     <div
-                      v-if="dealCloseSecondaryLabel(item.closeDate)"
+                      v-if="dealCloseSecondaryLabel(item.closeDate, item)"
                       class="mt-1 truncate text-xs"
-                      :class="isDealOverdue(item.closeDate) ? 'text-red-300' : 'text-crm-muted'"
+                      :class="isDealOverdue(item.closeDate, item) ? 'text-red-300' : 'text-crm-muted'"
                     >
-                      [[ dealCloseSecondaryLabel(item.closeDate) ]]
+                      [[ dealCloseSecondaryLabel(item.closeDate, item) ]]
                     </div>
                   </div>
                   <div v-else-if="activeSection === 'touches'" class="px-4 py-4 text-sm text-crm-text truncate">
@@ -2309,7 +2309,7 @@
                           Тип: [[ item.taskTypeName ]]
                         </div>
                         <div v-if="activeSection === 'deals'" class="mt-1 text-[11px] text-crm-muted truncate">
-                          [[ item.company || 'Без компании' ]] • [[ formatDealAmount(item.amount, item.currency) ]] • [[ dealClosePrimaryLabel(item.closeDate) || 'Без даты' ]]<span v-if="dealCloseSecondaryLabel(item.closeDate)"> • <span :class="isDealOverdue(item.closeDate) ? 'text-red-300' : 'text-crm-muted'">[[ dealCloseSecondaryLabel(item.closeDate) ]]</span></span> • [[ item.ownerName || 'Без ответственного' ]] • [[ countDealOpenTasks(item.id) ]] задач
+                          [[ item.company || 'Без компании' ]] • [[ formatDealAmount(item.amount, item.currency) ]] • [[ dealClosePrimaryLabel(item.closeDate, item) || 'Без даты' ]]<span v-if="dealCloseSecondaryLabel(item.closeDate, item)"> • <span :class="isDealOverdue(item.closeDate, item) ? 'text-red-300' : 'text-crm-muted'">[[ dealCloseSecondaryLabel(item.closeDate, item) ]]</span></span> • [[ item.ownerName || 'Без ответственного' ]] • [[ countDealOpenTasks(item.id) ]] задач
                         </div>
                         <div v-else-if="activeSection === 'contacts'" class="mt-0.5 text-[11px] text-crm-muted truncate leading-4">
                           [[ item.company || 'Без компании' ]]

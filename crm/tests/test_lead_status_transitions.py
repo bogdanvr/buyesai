@@ -3,7 +3,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from crm.models import Lead, LeadStatus
+from crm.models import Lead, LeadStatus, TrafficSource
 
 
 class LeadStatusTransitionTests(APITestCase):
@@ -94,3 +94,25 @@ class LeadStatusTransitionTests(APITestCase):
             self.assertEqual(response.status_code, status.HTTP_200_OK, target_code)
             lead.refresh_from_db()
             self.assertEqual(lead.status.code, target_code)
+
+    def test_can_assign_responsible_to_converted_lead(self):
+        owner = get_user_model().objects.create_user(
+            username="converted_owner",
+            password="testpass123",
+            is_staff=True,
+        )
+        source = TrafficSource.objects.create(code="traffic-source-yandex", name="Yandex")
+        lead = self.create_lead("converted")
+        lead.source = source
+        lead.save(update_fields=["source", "updated_at"])
+
+        response = self.client.patch(
+            reverse("leads-detail", kwargs={"pk": lead.pk}),
+            {"assigned_to": owner.pk},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        lead.refresh_from_db()
+        self.assertEqual(lead.assigned_to_id, owner.pk)
+        self.assertEqual(lead.source_id, source.pk)

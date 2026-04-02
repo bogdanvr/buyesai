@@ -137,16 +137,10 @@ class LeadSerializer(serializers.ModelSerializer):
                 existing_client or Client.objects.create(name=company_name)
             )
             validated_data["company"] = company_name
-        lead = super().create(validated_data)
-        if lead.source_id:
-            lead.sources.add(lead.source)
-        return lead
+        return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        lead = super().update(instance, validated_data)
-        if lead.source_id:
-            lead.sources.add(lead.source)
-        return lead
+        return super().update(instance, validated_data)
 
 
 def current_status_id_equals(current_status, new_status) -> bool:

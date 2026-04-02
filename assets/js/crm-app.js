@@ -11708,7 +11708,7 @@
             String(task.dealId || "") === String(normalizedDealId)
             && this.isTaskOverdue(task.dueAtRaw, task.taskStatus || task.status)
           ));
-          if (hasOverdueTask || this.isDealOverdue(deal?.closeDate)) {
+          if (hasOverdueTask || this.isDealOverdue(deal?.closeDate, deal)) {
             return "Просрочено";
           }
           const nextAction = this.dealNextActionSummaryByDealId(normalizedDealId);
@@ -11921,18 +11921,21 @@
           if (!parsed) return String(value || "");
           return parsed.toLocaleDateString("ru-RU");
         },
-        isDealOverdue(value) {
+        isDealOverdue(value, deal = null) {
+          if (deal?.isWon || String(deal?.stageCode || "").toLowerCase() === "won") {
+            return false;
+          }
           const parsed = this.parseDealCloseDate(value);
           if (!parsed) return false;
           return parsed.getTime() < Date.now();
         },
-        dealClosePrimaryLabel(value) {
+        dealClosePrimaryLabel(value, deal = null) {
           if (!value) return "";
-          return this.isDealOverdue(value) ? "Просрочено" : this.formatDealCloseDate(value);
+          return this.isDealOverdue(value, deal) ? "Просрочено" : this.formatDealCloseDate(value);
         },
-        dealCloseSecondaryLabel(value) {
+        dealCloseSecondaryLabel(value, deal = null) {
           if (!value) return "";
-          if (!this.isDealOverdue(value)) return "";
+          if (!this.isDealOverdue(value, deal)) return "";
           const parsed = this.parseDealCloseDate(value);
           if (!parsed) return "";
           const diffMinutes = Math.ceil((Date.now() - parsed.getTime()) / 60000);
