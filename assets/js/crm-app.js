@@ -9783,7 +9783,11 @@
         getDealStatusBucket(item) {
           if (!item) return "new";
           const stageCode = String(item.stageCode || "").toLowerCase();
-          if (item.isWon || item.status === "done" || stageCode === "won") {
+          const stage = this.metaOptions.dealStages.find(
+            (candidate) => String(candidate.id) === String(item.stageId)
+          );
+          const isFinalStage = !!(stage && stage.is_final);
+          if (item.isWon || item.status === "done" || stageCode === "won" || isFinalStage) {
             return "done";
           }
           if (stageCode === "primary_contact") {
@@ -12401,13 +12405,19 @@
             (candidate) => String(candidate.id) === String(item.stage)
           );
           const stageCode = String((stage && stage.code) || "").toLowerCase();
+          const isFinalStage = !!(stage && stage.is_final);
+          const isFailedStage = stageCode === "failed" || stageCode === "lost";
           const stageName = String(item.stage_name || "").toLowerCase();
           let normalized = this.uiStatus("progress", item.stage_name || "В работе");
-          if (item.is_won || item.closed_at || stageCode === "won") {
+          if (item.is_won || stageCode === "won") {
             const doneLabel = item.is_won
               ? "Выиграна"
               : (stageCode === "won" ? (item.stage_name || "Won") : "Закрыта");
             normalized = this.uiStatus("done", doneLabel);
+          } else if (isFailedStage || isFinalStage) {
+            normalized = this.uiStatus("done", item.stage_name || "Закрыта");
+          } else if (item.closed_at) {
+            normalized = this.uiStatus("done", item.stage_name || "Закрыта");
           } else if (
             stageCode === "primary_contact" ||
             stageName.includes("первич") ||

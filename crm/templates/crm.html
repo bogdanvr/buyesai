@@ -2406,9 +2406,13 @@
                     class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
                   />
                 </div>
-                <div class="rounded-xl border border-crm-accent/40 bg-crm-accent/10 px-3 py-2">
+                <div
+                  class="rounded-xl border border-crm-accent/40 bg-crm-accent/10 px-3 py-2"
+                  :class="!isLeadSummaryEditing('statusId') ? 'cursor-pointer' : ''"
+                  @click="!isLeadSummaryEditing('statusId') && openLeadSummaryField('statusId')"
+                >
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-accent">Статус лида</div>
-                  <button v-if="!isLeadSummaryEditing('statusId')" type="button" @click="openLeadSummaryField('statusId')" class="mt-1 text-left text-sm font-medium text-white hover:text-crm-accent transition">
+                  <button v-if="!isLeadSummaryEditing('statusId')" type="button" @click.stop="openLeadSummaryField('statusId')" class="mt-1 text-left text-sm font-medium text-white hover:text-crm-accent transition">
                     [[ leadSummaryStatusLabel ]]
                   </button>
                   <select
@@ -6933,9 +6937,13 @@
                     class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
                   />
                 </div>
-                <div class="rounded-xl border border-crm-accent/40 bg-crm-accent/10 px-3 py-2">
+                <div
+                  class="rounded-xl border border-crm-accent/40 bg-crm-accent/10 px-3 py-2"
+                  :class="editingTaskId && !isTaskSummaryEditing('status') ? 'cursor-pointer' : ''"
+                  @click="editingTaskId && !isTaskSummaryEditing('status') && openTaskSummaryField('status')"
+                >
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-accent">Статус</div>
-                  <button v-if="editingTaskId && !isTaskSummaryEditing('status')" type="button" @click="openTaskSummaryField('status')" class="mt-1 text-left text-sm font-medium text-white hover:text-crm-accent transition">
+                  <button v-if="editingTaskId && !isTaskSummaryEditing('status')" type="button" @click.stop="openTaskSummaryField('status')" class="mt-1 text-left text-sm font-medium text-white hover:text-crm-accent transition">
                     [[ taskSummaryStatusLabel ]]
                   </button>
                   <select
