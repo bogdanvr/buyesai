@@ -9780,14 +9780,40 @@
           }
           return "new";
         },
+        resolveDealStageMeta(item) {
+          if (!item) return null;
+          return this.metaOptions.dealStages.find(
+            (candidate) => String(candidate.id) === String(item.stageId || item.stage)
+          ) || null;
+        },
+        isDealWonStage(item) {
+          if (!item) return false;
+          const stage = this.resolveDealStageMeta(item);
+          const stageCode = String(item.stageCode || stage?.code || "").trim().toLowerCase();
+          const stageName = String(item.stageName || item.stage_name || stage?.name || "").trim().toLowerCase();
+          return !!item.isWon || !!item.is_won || stageCode === "won" || /(won|success|успеш)/.test(stageName);
+        },
+        isDealFailedStage(item) {
+          if (!item) return false;
+          const stage = this.resolveDealStageMeta(item);
+          const stageCode = String(item.stageCode || stage?.code || "").trim().toLowerCase();
+          const stageName = String(item.stageName || item.stage_name || stage?.name || "").trim().toLowerCase();
+          return stageCode === "failed"
+            || stageCode === "lost"
+            || /(lost|failed|not_realized|не реализ|проигр|провален|потерян)/.test(stageName);
+        },
+        isDealFinalStage(item) {
+          if (!item) return false;
+          if (this.isDealWonStage(item) || this.isDealFailedStage(item)) {
+            return true;
+          }
+          const stage = this.resolveDealStageMeta(item);
+          return !!(stage && stage.is_final);
+        },
         getDealStatusBucket(item) {
           if (!item) return "new";
           const stageCode = String(item.stageCode || "").toLowerCase();
-          const stage = this.metaOptions.dealStages.find(
-            (candidate) => String(candidate.id) === String(item.stageId)
-          );
-          const isFinalStage = !!(stage && stage.is_final);
-          if (item.isWon || item.status === "done" || stageCode === "won" || isFinalStage) {
+          if (item.status === "done" || this.isDealFinalStage(item)) {
             return "done";
           }
           if (stageCode === "primary_contact") {
@@ -12401,23 +12427,20 @@
           };
         },
         mapDeal(item) {
-          const stage = this.metaOptions.dealStages.find(
-            (candidate) => String(candidate.id) === String(item.stage)
-          );
+          const stage = this.resolveDealStageMeta(item);
           const stageCode = String((stage && stage.code) || "").toLowerCase();
-          const isFinalStage = !!(stage && stage.is_final);
-          const isFailedStage = stageCode === "failed" || stageCode === "lost";
+          const stageNameLabel = String(item.stage_name || stage?.name || "");
           const stageName = String(item.stage_name || "").toLowerCase();
           let normalized = this.uiStatus("progress", item.stage_name || "В работе");
-          if (item.is_won || stageCode === "won") {
+          if (this.isDealWonStage(item)) {
             const doneLabel = item.is_won
               ? "Выиграна"
-              : (stageCode === "won" ? (item.stage_name || "Won") : "Закрыта");
+              : (stageCode === "won" ? (stageNameLabel || "Won") : "Закрыта");
             normalized = this.uiStatus("done", doneLabel);
-          } else if (isFailedStage || isFinalStage) {
-            normalized = this.uiStatus("done", item.stage_name || "Закрыта");
+          } else if (this.isDealFinalStage(item)) {
+            normalized = this.uiStatus("done", stageNameLabel || "Закрыта");
           } else if (item.closed_at) {
-            normalized = this.uiStatus("done", item.stage_name || "Закрыта");
+            normalized = this.uiStatus("done", stageNameLabel || "Закрыта");
           } else if (
             stageCode === "primary_contact" ||
             stageName.includes("первич") ||
