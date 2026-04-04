@@ -15,6 +15,7 @@ from crm.models import Activity, Lead
 from crm.models.activity import ActivityType, TaskReminderOffset, TaskStatus
 from integrations.models import LlmProviderAccount, UserIntegrationProfile
 from integrations.services.llm_router import resolve_touch_analysis_llm_target
+from integrations.services.secrets import decrypt_secret_with_key, encrypt_secret_with_key
 
 
 User = get_user_model()
@@ -112,6 +113,56 @@ class LlmProviderAccountApiTests(TestCase):
 
         provider = LlmProviderAccount.objects.get(name="Yandex Studio")
         self.assertEqual(provider.get_api_key(), "yandex-secret-key")
+
+
+class ReencryptLlmSecretsCommandTests(TestCase):
+    def test_reencrypts_llm_provider_api_keys(self):
+        provider = LlmProviderAccount.objects.create(
+            name="Rotated Provider",
+            provider="custom",
+            api_style="openai_compatible",
+            base_url="https://example.test/v1",
+            model="model-x",
+            api_key_encrypted=encrypt_secret_with_key("rotated-secret", "old-master-key"),
+            api_key_last4="cret",
+        )
+
+        out = StringIO()
+        call_command(
+            "reencrypt_llm_secrets",
+            old_key="old-master-key",
+            new_key="new-master-key",
+            stdout=out,
+        )
+
+        provider.refresh_from_db()
+        self.assertEqual(decrypt_secret_with_key(provider.api_key_encrypted, "new-master-key"), "rotated-secret")
+        self.assertIn("Перешифровано ключей: 1", out.getvalue())
+
+    def test_dry_run_does_not_change_ciphertext(self):
+        initial_ciphertext = encrypt_secret_with_key("keep-secret", "old-master-key")
+        provider = LlmProviderAccount.objects.create(
+            name="Dry Run Provider",
+            provider="custom",
+            api_style="openai_compatible",
+            base_url="https://example.test/v1",
+            model="model-y",
+            api_key_encrypted=initial_ciphertext,
+            api_key_last4="cret",
+        )
+
+        out = StringIO()
+        call_command(
+            "reencrypt_llm_secrets",
+            old_key="old-master-key",
+            new_key="new-master-key",
+            dry_run=True,
+            stdout=out,
+        )
+
+        provider.refresh_from_db()
+        self.assertEqual(provider.api_key_encrypted, initial_ciphertext)
+        self.assertIn("Dry run: будет перешифровано ключей: 1", out.getvalue())
 
 
 class TaskDeadlineReminderCommandTests(TestCase):
