@@ -168,6 +168,8 @@ OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
 OPENAI_MODEL = env("OPENAI_MODEL", default="gpt-4o-mini")
 OPENAI_ORG = env("OPENAI_ORG", default="")
 OPENAI_PROJECT = env("OPENAI_PROJECT", default="")
+OPENAI_API_BASE_URL = env("OPENAI_API_BASE_URL", default="https://api.openai.com/v1")
+INTEGRATIONS_SECRET_KEY = env("INTEGRATIONS_SECRET_KEY", default="")
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = env("EMAIL_HOST", default="")

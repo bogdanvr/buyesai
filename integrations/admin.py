@@ -5,6 +5,7 @@ from django.contrib.auth.admin import UserAdmin
 from crm.admin.site import crm_admin_site
 from integrations.models import (
     IntegrationWebhookEvent,
+    LlmProviderAccount,
     PhoneCall,
     TelephonyEventLog,
     TelephonyProviderAccount,
@@ -60,6 +61,17 @@ class TelephonyProviderAccountAdmin(admin.ModelAdmin):
     list_filter = ("provider", "enabled", "last_connection_status")
     search_fields = ("provider", "api_base_url")
     readonly_fields = ("created_at", "updated_at", "last_connection_checked_at")
+
+
+@admin.register(LlmProviderAccount)
+@admin.register(LlmProviderAccount, site=crm_admin_site)
+class LlmProviderAccountAdmin(admin.ModelAdmin):
+    admin_group = "Интеграции"
+    list_display = ("name", "provider", "api_style", "model", "is_active", "use_for_touch_analysis", "priority", "updated_at")
+    list_filter = ("provider", "api_style", "is_active", "use_for_touch_analysis")
+    search_fields = ("name", "model", "base_url")
+    readonly_fields = ("api_key_last4", "created_at", "updated_at")
+    exclude = ("api_key_encrypted",)
 
 
 @admin.register(TelephonyUserMapping)

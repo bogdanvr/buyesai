@@ -18,6 +18,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
 from crm.admin import crm_admin_site
+from integrations.llm_views import LlmProviderAccountDetailAPIView, LlmProviderAccountListCreateAPIView
 from integrations.novofon.views import (
     IncomingPhoneCallPopupAPIView,
     NovofonCallAPIView,
@@ -76,6 +77,8 @@ urlpatterns = [
     path("documents/share/<str:token>/download/", DealDocumentShareDownloadView.as_view(), name="deal-document-share-download"),
     path("api/integrations/novofon/webhook/", NovofonWebhookAPIView.as_view(), name="integrations-novofon-webhook"),
     path("api/integrations/soniox/webhook/", SonioxWebhookAPIView.as_view(), name="integrations-soniox-webhook"),
+    path("api/integrations/llm/providers/", LlmProviderAccountListCreateAPIView.as_view(), name="integrations-llm-provider-list"),
+    path("api/integrations/llm/providers/<int:pk>/", LlmProviderAccountDetailAPIView.as_view(), name="integrations-llm-provider-detail"),
     path("api/telephony/novofon/settings/", NovofonSettingsAPIView.as_view(), name="telephony-novofon-settings"),
     path("api/telephony/novofon/check-connection/", NovofonCheckConnectionAPIView.as_view(), name="telephony-novofon-check-connection"),
     path("api/telephony/novofon/sync-employees/", NovofonSyncEmployeesAPIView.as_view(), name="telephony-novofon-sync-employees"),

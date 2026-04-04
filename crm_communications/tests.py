@@ -453,20 +453,22 @@ class TelegramInboundWebhookTests(TestCase):
         )
 
     def test_incoming_telegram_message_creates_conversation_message_and_touch(self):
-        response = self.client.post(
-            "/api/v1/webhooks/telegram/",
-            data={
-                "update_id": 4001,
-                "message": {
-                    "message_id": 55,
-                    "date": 1710000000,
-                    "chat": {"id": "123456789", "type": "private"},
-                    "from": {"id": "123456789", "first_name": "Ivan", "username": "ivancrm"},
-                    "text": "Здравствуйте, хочу обсудить КП",
-                },
-            },
-            content_type="application/json",
-        )
+        with patch("crm.services.ai_touch_analysis.TouchAiAnalysisService.analyze_message_touch_if_needed") as analyze_mock:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(
+                    "/api/v1/webhooks/telegram/",
+                    data={
+                        "update_id": 4001,
+                        "message": {
+                            "message_id": 55,
+                            "date": 1710000000,
+                            "chat": {"id": "123456789", "type": "private"},
+                            "from": {"id": "123456789", "first_name": "Ivan", "username": "ivancrm"},
+                            "text": "Здравствуйте, хочу обсудить КП",
+                        },
+                    },
+                    content_type="application/json",
+                )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Conversation.objects.count(), 1)
@@ -503,6 +505,7 @@ class TelegramInboundWebhookTests(TestCase):
         self.assertEqual(webhook_event.processing_status, WebhookProcessingStatus.PROCESSED)
         self.assertEqual(webhook_event.external_event_id, "4001")
         self.assertEqual(webhook_event.external_message_id, "telegram:123456789:55")
+        analyze_mock.assert_called_once()
 
     def test_duplicate_update_is_ignored_without_duplicate_message_or_touch(self):
         payload = {
@@ -814,13 +817,17 @@ class EmailInboundServiceTests(TestCase):
         return message.as_bytes()
 
     def test_process_raw_email_creates_conversation_message_touch(self):
-        result = EmailInboundService.process_raw_email(
-            raw_message=self.build_email(
-                message_id="email-1@example.com",
-                subject="Запрос по КП",
-                body="Здравствуйте, пришлите актуальное КП.",
-            )
-        )
+        with patch("crm.services.ai_touch_analysis.TouchAiAnalysisService.analyze_message_touch_if_needed") as analyze_mock:
+            with self.captureOnCommitCallbacks(execute=True):
+                result = EmailInboundService.process_raw_email(
+                    raw_message=self.build_email(
+                        message_id="email-1@example.com",
+                        subject="Запрос по КП",
+                        body="Здравствуйте, пришлите актуальное КП.",
+                    )
+                )
+
+        analyze_mock.assert_called_once()
 
         self.assertTrue(result["ok"])
         self.assertFalse(result["duplicate"])

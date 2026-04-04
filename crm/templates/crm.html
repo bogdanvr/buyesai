@@ -350,6 +350,9 @@
                       <span v-if="notification.deadline">Срок: [[ formatDueLabel(notification.deadline) ]]</span>
                       <span v-if="notification.needsConfirmation">Требует подтверждения</span>
                     </div>
+                    <div v-if="notification.sourceType === 'draft' && notification.summary" class="mt-2 text-xs text-crm-text [overflow-wrap:anywhere]">
+                      [[ notification.summary ]]
+                    </div>
                     <div
                       v-if="(
                         notification.sourceType === 'queue' && notification.queueKind !== 'next_step' && visibleManagerNotificationActions(notification).length
@@ -357,7 +360,8 @@
                         || managerNotificationMessageReplyButtonVisible(notification)
                         || (notification.sourceType === 'queue' && notification.queueKind === 'next_step')
                         || (notification.sourceType === 'queue')
-                        || (notification.sourceType === 'queue' && notificationNeedsBinding(notification))"
+                        || (notification.sourceType === 'queue' && notificationNeedsBinding(notification))
+                        || (notification.sourceType === 'draft')"
                       class="mt-3 grid grid-cols-2 gap-2"
                     >
                       <button
@@ -399,9 +403,33 @@
                         Подтвердить
                       </button>
                       <button
+                        v-if="notification.sourceType === 'draft'"
+                        type="button"
+                        @click.stop="openManagerNotification(notification)"
+                        class="inline-flex h-8 w-full items-center justify-center rounded-lg border border-sky-400/30 bg-sky-400/10 px-2 text-[11px] font-semibold text-center text-white transition hover:border-sky-300"
+                      >
+                        Открыть
+                      </button>
+                      <button
+                        v-if="notification.sourceType === 'draft'"
+                        type="button"
+                        @click.stop="confirmAutomationDraft(notification.sourceId)"
+                        class="inline-flex h-8 w-full items-center justify-center rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2 text-[11px] font-semibold text-center text-white transition hover:border-emerald-300"
+                      >
+                        Подтвердить
+                      </button>
+                      <button
                         v-if="notification.sourceType === 'queue'"
                         type="button"
                         @click.stop="dismissAutomationQueueItem(notification.sourceId)"
+                        class="inline-flex h-8 w-full items-center justify-center rounded-lg border border-crm-border bg-[#123753] px-2 text-[11px] font-semibold text-center text-white transition hover:border-crm-accent"
+                      >
+                        Скрыть
+                      </button>
+                      <button
+                        v-if="notification.sourceType === 'draft'"
+                        type="button"
+                        @click.stop="dismissAutomationDraft(notification.sourceId)"
                         class="inline-flex h-8 w-full items-center justify-center rounded-lg border border-crm-border bg-[#123753] px-2 text-[11px] font-semibold text-center text-white transition hover:border-crm-accent"
                       >
                         Скрыть
@@ -1215,6 +1243,133 @@
                     </button>
                     <div class="text-xs text-crm-muted">
                       API key и секрет webhook редактируются только в admin.
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="rounded-[28px] border border-crm-border bg-[#0b2740] shadow-panel overflow-hidden">
+                <div class="border-b border-crm-border bg-[#10314d] px-5 py-4 flex items-center justify-between gap-3">
+                  <div>
+                    <div class="text-sm font-semibold text-white">LLM-провайдеры</div>
+                    <div class="mt-1 text-xs text-crm-muted">Ключи хранятся в зашифрованном виде. Для сохранения нужен `INTEGRATIONS_SECRET_KEY` на сервере.</div>
+                  </div>
+                  <button
+                    type="button"
+                    @click="addLlmProviderAccount"
+                    class="inline-flex h-9 items-center justify-center rounded-xl border border-crm-border bg-[#123753] px-3 text-sm font-semibold text-white transition hover:border-crm-accent"
+                  >
+                    Добавить
+                  </button>
+                </div>
+                <div class="p-5 space-y-4">
+                  <div
+                    v-if="llmProviderNotice.text"
+                    class="rounded-2xl border px-4 py-3 text-sm"
+                    :class="llmProviderNotice.type === 'error' ? 'border-red-400/40 bg-red-400/10 text-red-200' : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100'"
+                  >
+                    [[ llmProviderNotice.text ]]
+                  </div>
+
+                  <div v-if="isLlmProvidersLoading" class="rounded-2xl border border-crm-border bg-[#102f4a] px-4 py-5 text-sm text-crm-muted">
+                    Загружаем LLM-провайдеров...
+                  </div>
+                  <div v-else-if="!(llmProviders || []).length" class="rounded-2xl border border-dashed border-crm-border bg-[#102f4a] px-4 py-5 text-sm text-crm-muted">
+                    Пока нет настроенных провайдеров. В этом случае CRM продолжит использовать глобальные `OPENAI_*` переменные, если они заданы.
+                  </div>
+                  <div v-else class="space-y-4">
+                    <div
+                      v-for="provider in llmProviders"
+                      :key="provider.localKey"
+                      class="rounded-2xl border border-crm-border bg-[#102f4a] p-4"
+                    >
+                      <div class="grid gap-4 md:grid-cols-2">
+                        <label class="block">
+                          <span class="text-xs text-crm-muted">Название</span>
+                          <input v-model.trim="provider.name" type="text" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" placeholder="Например, DeepSeek Production" />
+                        </label>
+                        <label class="block">
+                          <span class="text-xs text-crm-muted">Провайдер</span>
+                          <select v-model="provider.provider" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent">
+                            <option v-for="option in llmProviderTypeOptions" :key="`llm-provider-type-${provider.localKey}-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                          </select>
+                        </label>
+                        <label class="block">
+                          <span class="text-xs text-crm-muted">Стиль API</span>
+                          <select v-model="provider.apiStyle" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent">
+                            <option v-for="option in llmApiStyleOptions" :key="`llm-api-style-${provider.localKey}-${option.value}`" :value="option.value">[[ option.label ]]</option>
+                          </select>
+                        </label>
+                        <label class="block">
+                          <span class="text-xs text-crm-muted">Приоритет</span>
+                          <input v-model.number="provider.priority" type="number" min="1" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block md:col-span-2">
+                          <span class="text-xs text-crm-muted">Base URL</span>
+                          <input v-model.trim="provider.baseUrl" type="text" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" placeholder="https://api.deepseek.com/v1" />
+                        </label>
+                        <label class="block md:col-span-2">
+                          <span class="text-xs text-crm-muted">Модель</span>
+                          <input v-model.trim="provider.model" type="text" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" placeholder="gpt-4o-mini / deepseek-chat / yandexgpt" />
+                        </label>
+                        <label class="block">
+                          <span class="text-xs text-crm-muted">Organization</span>
+                          <input v-model.trim="provider.organization" type="text" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block">
+                          <span class="text-xs text-crm-muted">Project</span>
+                          <input v-model.trim="provider.project" type="text" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" />
+                        </label>
+                        <label class="block md:col-span-2">
+                          <span class="text-xs text-crm-muted">API key</span>
+                          <input v-model.trim="provider.apiKey" type="password" autocomplete="new-password" class="mt-1 h-10 w-full rounded-xl border border-crm-border bg-[#0f2f4a] px-3 outline-none focus:border-crm-accent" :placeholder="provider.hasApiKey ? 'Оставьте пустым, чтобы не менять ключ' : 'Введите ключ доступа'" />
+                          <div class="mt-2 flex flex-wrap items-center gap-3 text-xs text-crm-muted">
+                            <span>[[ provider.hasApiKey ? `Сохранённый ключ: ${provider.apiKeyMasked || 'есть'}` : 'Ключ ещё не сохранён' ]]</span>
+                            <button
+                              v-if="provider.hasApiKey"
+                              type="button"
+                              @click="markLlmProviderApiKeyForReset(provider)"
+                              class="inline-flex items-center rounded-lg border border-crm-border bg-[#123753] px-2 py-1 text-white transition hover:border-crm-accent"
+                            >
+                              Сбросить ключ
+                            </button>
+                            <span v-if="provider.clearApiKey" class="text-amber-100">Ключ будет удалён при сохранении</span>
+                          </div>
+                        </label>
+                      </div>
+
+                      <div class="mt-4 flex flex-wrap gap-4">
+                        <label class="inline-flex items-center gap-2 text-sm text-crm-text">
+                          <input v-model="provider.isActive" type="checkbox" class="h-4 w-4 rounded border-crm-border bg-transparent" />
+                          <span>Активен</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 text-sm text-crm-text">
+                          <input v-model="provider.useForTouchAnalysis" type="checkbox" class="h-4 w-4 rounded border-crm-border bg-transparent" />
+                          <span>Использовать для анализа касаний</span>
+                        </label>
+                      </div>
+
+                      <div class="mt-4 flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          @click="saveLlmProviderAccount(provider)"
+                          :disabled="activeLlmProviderSaveKey === provider.localKey"
+                          class="inline-flex h-10 items-center rounded-xl border border-crm-accent/40 bg-crm-accent/15 px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          [[ activeLlmProviderSaveKey === provider.localKey ? 'Сохраняем...' : 'Сохранить' ]]
+                        </button>
+                        <button
+                          type="button"
+                          @click="deleteLlmProviderAccount(provider)"
+                          :disabled="activeLlmProviderDeleteKey === provider.localKey"
+                          class="inline-flex h-10 items-center rounded-xl border border-crm-border bg-[#123753] px-4 text-sm font-semibold text-white transition hover:border-crm-accent disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          [[ activeLlmProviderDeleteKey === provider.localKey ? 'Удаляем...' : 'Удалить' ]]
+                        </button>
+                        <div class="text-xs text-crm-muted">
+                          [[ provider.updatedAt ? `Обновлён: ${formatEventTimestamp(provider.updatedAt)}` : 'Ещё не сохранён' ]]
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

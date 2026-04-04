@@ -13,7 +13,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from crm.models import Client, Contact, Deal, DealStage, Lead, TrafficSource
+from crm.models import Client, Contact, Deal, DealStage, Lead, Touch, TrafficSource
 from integrations.models import (
     PhoneCall,
     PhoneCallDirection,
@@ -1333,3 +1333,69 @@ class SonioxWebhookApiTests(APITestCase):
         self.assertEqual(call.transcription_text, "Добрый день, запись успешно распознана")
         self.assertIsNotNone(call.transcription_completed_at)
         self.assertEqual(request_mock.call_count, 2)
+
+    @override_settings(SONIOX_API_KEY="soniox-key", SONIOX_WEBHOOK_SECRET="soniox-secret")
+    @patch("crm.services.ai_touch_analysis.TouchAiAnalysisService.analyze_phone_call_if_needed", autospec=True)
+    @patch("integrations.soniox.client.requests.request")
+    def test_webhook_creates_phone_call_touch_before_ai_analysis(self, request_mock, analyze_mock):
+        company = Client.objects.create(name="AI Call Client")
+        contact = Contact.objects.create(client=company, first_name="Иван", phone="+79000000000")
+        stage = DealStage.objects.create(
+            name="В работе",
+            code="novofon_ai_touch_stage",
+            order=10,
+            is_active=True,
+            is_final=False,
+        )
+        deal = Deal.objects.create(title="AI Call Deal", client=company, contact=contact, stage=stage)
+        call = PhoneCall.objects.create(
+            provider=TelephonyProvider.NOVOFON,
+            external_call_id="call-soniox-2",
+            direction=PhoneCallDirection.INBOUND,
+            status=PhoneCallStatus.COMPLETED,
+            phone_from="+7 900 000-00-00",
+            phone_to="+7 495 000-00-00",
+            company=company,
+            contact=contact,
+            deal=deal,
+            recording_url="https://media.novofon.ru/records/call-soniox-2.mp3",
+            transcription_status=PhoneCallTranscriptionStatus.PROCESSING,
+            transcription_external_id="tr-soniox-2",
+            transcription_recording_url="https://media.novofon.ru/records/call-soniox-2.mp3",
+            transcription_requested_at=timezone.now(),
+        )
+
+        def _capture_call(phone_call):
+            phone_call.refresh_from_db()
+            self.assertIsNotNone(phone_call.touch_id)
+            self.assertTrue(
+                Touch.objects.filter(
+                    pk=phone_call.touch_id,
+                    deal=deal,
+                    client=company,
+                    contact=contact,
+                ).exists()
+            )
+            return None
+
+        analyze_mock.side_effect = _capture_call
+
+        status_response = Mock()
+        status_response.raise_for_status.return_value = None
+        status_response.json.return_value = {"id": "tr-soniox-2", "status": "completed"}
+        transcript_response = Mock()
+        transcript_response.raise_for_status.return_value = None
+        transcript_response.json.return_value = {"text": "Клиент согласовал следующий созвон на завтра"}
+        request_mock.side_effect = [status_response, transcript_response]
+
+        response = self.client.post(
+            reverse("integrations-soniox-webhook"),
+            {"id": "tr-soniox-2", "status": "completed"},
+            format="json",
+            HTTP_X_SONIOX_WEBHOOK_SECRET="soniox-secret",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        call.refresh_from_db()
+        self.assertIsNotNone(call.touch_id)
+        analyze_mock.assert_called_once()

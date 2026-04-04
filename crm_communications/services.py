@@ -706,6 +706,8 @@ class CommunicationTouchService:
     @staticmethod
     @transaction.atomic
     def ensure_touch_for_message(*, message: Message, happened_at=None) -> Touch:
+        from crm.services.ai_touch_analysis import TouchAiAnalysisService
+
         message = Message.objects.select_related("deal", "client", "contact", "author_user").get(pk=message.pk)
         if message.touch_id:
             return message.touch
@@ -725,6 +727,7 @@ class CommunicationTouchService:
         )
         message.touch = touch
         message.save(update_fields=["touch", "updated_at"])
+        transaction.on_commit(lambda: TouchAiAnalysisService.analyze_message_touch_if_needed(message=message, touch=touch))
         return touch
 
     @staticmethod

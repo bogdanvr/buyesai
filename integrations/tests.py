@@ -1,5 +1,6 @@
 from datetime import timedelta
 from io import StringIO
+import json
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -7,11 +8,13 @@ from django.core.management import call_command
 from django.core import mail
 from django.test import TestCase
 from django.test.utils import override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from crm.models import Activity, Lead
 from crm.models.activity import ActivityType, TaskReminderOffset, TaskStatus
-from integrations.models import UserIntegrationProfile
+from integrations.models import LlmProviderAccount, UserIntegrationProfile
+from integrations.services.llm_router import resolve_touch_analysis_llm_target
 
 
 User = get_user_model()
@@ -25,6 +28,90 @@ class UserIntegrationProfileTests(TestCase):
         self.assertEqual(profile.phone, "")
         self.assertEqual(profile.email, "")
         self.assertEqual(profile.telegram_chat_id, "")
+
+
+@override_settings(INTEGRATIONS_SECRET_KEY="integration-secret-for-tests")
+class LlmProviderAccountTests(TestCase):
+    def test_encrypts_and_decrypts_api_key(self):
+        provider = LlmProviderAccount.objects.create(
+            name="DeepSeek Prod",
+            provider="deepseek",
+            api_style="openai_compatible",
+            base_url="https://api.deepseek.com/v1",
+            model="deepseek-chat",
+        )
+
+        provider.set_api_key("super-secret-token")
+        provider.save(update_fields=["api_key_encrypted", "api_key_last4", "updated_at"])
+        provider.refresh_from_db()
+
+        self.assertNotEqual(provider.api_key_encrypted, "super-secret-token")
+        self.assertEqual(provider.api_key_last4, "oken")
+        self.assertEqual(provider.api_key_masked, "****oken")
+        self.assertEqual(provider.get_api_key(), "super-secret-token")
+
+    def test_router_prefers_provider_account_for_touch_analysis(self):
+        fallback_provider = LlmProviderAccount.objects.create(
+            name="Fallback",
+            provider="openai",
+            api_style="openai_compatible",
+            base_url="https://api.openai.com/v1",
+            model="gpt-4o-mini",
+            use_for_touch_analysis=True,
+            priority=50,
+        )
+        fallback_provider.set_api_key("fallback-secret")
+        fallback_provider.save(update_fields=["api_key_encrypted", "api_key_last4", "updated_at"])
+
+        primary_provider = LlmProviderAccount.objects.create(
+            name="Primary",
+            provider="yandexgpt",
+            api_style="openai_compatible",
+            base_url="https://llm.api.cloud.yandex.net/v1",
+            model="yandexgpt",
+            use_for_touch_analysis=True,
+            priority=10,
+        )
+        primary_provider.set_api_key("primary-secret")
+        primary_provider.save(update_fields=["api_key_encrypted", "api_key_last4", "updated_at"])
+
+        target = resolve_touch_analysis_llm_target()
+
+        self.assertIsNotNone(target)
+        self.assertEqual(target.provider_account_id, primary_provider.id)
+        self.assertEqual(target.api_key, "primary-secret")
+
+
+@override_settings(INTEGRATIONS_SECRET_KEY="integration-secret-for-tests")
+class LlmProviderAccountApiTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="llm_admin", password="secret", is_staff=True)
+        self.client.force_login(self.user)
+
+    def test_create_provider_masks_api_key_in_response(self):
+        response = self.client.post(
+            reverse("integrations-llm-provider-list"),
+            data=json.dumps({
+                "name": "Yandex Studio",
+                "provider": "yandexgpt",
+                "api_style": "openai_compatible",
+                "base_url": "https://llm.api.cloud.yandex.net/v1",
+                "model": "yandexgpt",
+                "api_key": "yandex-secret-key",
+                "use_for_touch_analysis": True,
+                "priority": 15,
+            }),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertNotIn("api_key", payload)
+        self.assertTrue(payload["has_api_key"])
+        self.assertEqual(payload["api_key_masked"], "****-key")
+
+        provider = LlmProviderAccount.objects.get(name="Yandex Studio")
+        self.assertEqual(provider.get_api_key(), "yandex-secret-key")
 
 
 class TaskDeadlineReminderCommandTests(TestCase):

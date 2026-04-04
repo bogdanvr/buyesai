@@ -58,6 +58,17 @@ class TelephonyProvider(models.TextChoices):
     NOVOFON = "novofon", "Novofon"
 
 
+class LlmProvider(models.TextChoices):
+    OPENAI = "openai", "OpenAI"
+    DEEPSEEK = "deepseek", "DeepSeek"
+    YANDEXGPT = "yandexgpt", "YandexGPT"
+    CUSTOM = "custom", "Свой провайдер"
+
+
+class LlmApiStyle(models.TextChoices):
+    OPENAI_COMPATIBLE = "openai_compatible", "OpenAI-совместимый API"
+
+
 class PhoneCallDirection(models.TextChoices):
     INBOUND = "inbound", "Входящий"
     OUTBOUND = "outbound", "Исходящий"
@@ -176,6 +187,76 @@ class TelephonyUserMapping(TimestampedModel):
         return f"{self.novofon_full_name or self.novofon_employee_id} -> {crm_user}"
 
 
+class LlmProviderAccount(TimestampedModel):
+    name = models.CharField(max_length=128, unique=True, verbose_name="Название")
+    provider = models.CharField(
+        max_length=32,
+        choices=LlmProvider.choices,
+        default=LlmProvider.CUSTOM,
+        verbose_name="Провайдер",
+    )
+    api_style = models.CharField(
+        max_length=32,
+        choices=LlmApiStyle.choices,
+        default=LlmApiStyle.OPENAI_COMPATIBLE,
+        verbose_name="Стиль API",
+    )
+    base_url = models.CharField(max_length=500, blank=True, default="", verbose_name="Базовый URL API")
+    model = models.CharField(max_length=255, blank=True, default="", verbose_name="Модель")
+    api_key_encrypted = models.TextField(blank=True, default="", verbose_name="API key (зашифрованный)")
+    api_key_last4 = models.CharField(max_length=16, blank=True, default="", verbose_name="Последние символы API key")
+    organization = models.CharField(max_length=255, blank=True, default="", verbose_name="Organization")
+    project = models.CharField(max_length=255, blank=True, default="", verbose_name="Project")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
+    use_for_touch_analysis = models.BooleanField(default=False, verbose_name="Использовать для анализа касаний")
+    priority = models.PositiveIntegerField(default=100, verbose_name="Приоритет")
+
+    class Meta:
+        verbose_name = "LLM провайдер"
+        verbose_name_plural = "LLM провайдеры"
+        ordering = ("priority", "name", "id")
+        indexes = [
+            models.Index(fields=["is_active", "use_for_touch_analysis", "priority"]),
+            models.Index(fields=["provider"]),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def has_api_key(self) -> bool:
+        return bool(str(self.api_key_encrypted or "").strip())
+
+    @property
+    def api_key_masked(self) -> str:
+        if not self.has_api_key:
+            return ""
+        suffix = str(self.api_key_last4 or "").strip()
+        return f"****{suffix}" if suffix else "Сохранён"
+
+    def set_api_key(self, raw_value: str) -> None:
+        from integrations.services.secrets import encrypt_secret
+
+        normalized = str(raw_value or "").strip()
+        if not normalized:
+            self.api_key_encrypted = ""
+            self.api_key_last4 = ""
+            return
+        self.api_key_encrypted = encrypt_secret(normalized)
+        self.api_key_last4 = normalized[-4:]
+
+    def clear_api_key(self) -> None:
+        self.api_key_encrypted = ""
+        self.api_key_last4 = ""
+
+    def get_api_key(self) -> str:
+        from integrations.services.secrets import decrypt_secret
+
+        if not self.has_api_key:
+            return ""
+        return decrypt_secret(self.api_key_encrypted)
+
+
 class PhoneCall(TimestampedModel):
     provider = models.CharField(max_length=32, choices=TelephonyProvider.choices, verbose_name="Провайдер")
     external_call_id = models.CharField(max_length=128, blank=True, default="", verbose_name="Внешний ID звонка")
@@ -233,6 +314,14 @@ class PhoneCall(TimestampedModel):
         null=True,
         on_delete=models.SET_NULL,
         verbose_name="Сделка",
+    )
+    touch = models.OneToOneField(
+        "crm.Touch",
+        related_name="phone_call",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Касание",
     )
     started_at = models.DateTimeField(blank=True, null=True, verbose_name="Начало")
     answered_at = models.DateTimeField(blank=True, null=True, verbose_name="Ответ")

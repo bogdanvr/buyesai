@@ -276,12 +276,19 @@
             type: "",
             text: "",
           },
+          llmProviderNotice: {
+            type: "",
+            text: "",
+          },
           isTelephonySettingsLoading: false,
           isTelephonySettingsSaving: false,
           isTelephonyConnectionChecking: false,
           isTelephonyEmployeesSyncing: false,
           isTelephonyCallsImporting: false,
           isTelephonyHealthLoading: false,
+          isLlmProvidersLoading: false,
+          activeLlmProviderSaveKey: "",
+          activeLlmProviderDeleteKey: "",
           telephonyHealth: {
             counts: {
               queued: 0,
@@ -297,6 +304,7 @@
             problemEvents: [],
           },
           telephonySettingsLoaded: false,
+          llmProvidersLoaded: false,
           telephonyLastImportResult: null,
           telephonyIncomingCallCursor: 0,
           telephonyIncomingCallPopups: [],
@@ -328,6 +336,17 @@
             mappings: [],
             settingsJson: {},
           },
+          llmProviderLocalCounter: 0,
+          llmProviderTypeOptions: [
+            { value: "openai", label: "OpenAI" },
+            { value: "deepseek", label: "DeepSeek" },
+            { value: "yandexgpt", label: "YandexGPT" },
+            { value: "custom", label: "Свой провайдер" },
+          ],
+          llmApiStyleOptions: [
+            { value: "openai_compatible", label: "OpenAI-совместимый API" },
+          ],
+          llmProviders: [],
           phoneCallHistoryFilters: [
             { value: "all", label: "Все" },
             { value: "inbound", label: "Входящие" },
@@ -1086,6 +1105,45 @@
               messageDraftsByTouchEventKey.set(key, draft);
             }
           });
+          const draftNotifications = (this.pendingAutomationDrafts || [])
+            .filter((draft) => (
+              String(draft.draftKind || "") === "touch"
+              && String(draft.sourceEventType || "").trim() === "ai_touch_analysis_ready"
+            ))
+            .map((draft) => ({
+              id: `draft-${draft.id}`,
+              sourceType: "draft",
+              sourceId: draft.id,
+              queueKind: "",
+              touchId: this.toIntOrNull(draft.sourceTouchId),
+              sourceTouchSummary: draft.sourceTouchSummary || "",
+              sourceTouchHappenedAt: draft.sourceTouchHappenedAt || "",
+              conversationId: null,
+              dealId: this.toIntOrNull(draft.dealId),
+              dealTitle: draft.dealTitle || "",
+              companyId: this.toIntOrNull(draft.clientId),
+              companyName: draft.clientName || "",
+              leadId: this.toIntOrNull(draft.leadId),
+              leadTitle: draft.leadTitle || "",
+              contactId: this.toIntOrNull(draft.contactId),
+              ownerId: this.toIntOrNull(draft.ownerId),
+              title: draft.title || "Автоматическое касание",
+              summary: draft.summary || "",
+              eventType: draft.sourceEventType || "",
+              happenedAt: draft.sourceTouchHappenedAt || draft.createdAt || "",
+              deadline: draft.proposedNextStepAt || "",
+              recommendedAction: draft.proposedNextStep || "",
+              uiPriority: String(draft.automationRuleUiPriority || "high"),
+              needsConfirmation: true,
+              isDraft: true,
+              isPrimaryMessage: false,
+              availableActions: [],
+              messageDraft: null,
+              hasMessageDraft: false,
+              messageDraftId: null,
+              messageDraftTitle: "",
+              messageDraftText: "",
+            }));
           const queueNotifications = this.pendingAutomationQueueItems.map((item) => ({
             id: `queue-${item.id}`,
             sourceType: "queue",
@@ -1214,7 +1272,7 @@
                 sourceTouchSummary: "За 1 минуту после создания не назначен ответственный",
               };
             });
-          const notifications = [...dedupedQueueNotifications, ...unassignedLeadNotifications];
+          const notifications = [...draftNotifications, ...dedupedQueueNotifications, ...unassignedLeadNotifications];
 
           notifications.sort((left, right) => {
             const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -1641,19 +1699,13 @@
           });
         },
         companySummaryActiveDeals() {
-          return this.companySummaryDeals.filter((deal) => this.getDealStatusBucket(deal) !== "done");
+          return this.companySummaryDeals.filter((deal) => this.isDealActive(deal));
         },
         companySummaryWonDeals() {
-          return this.companySummaryDeals.filter((deal) => {
-            const stageCode = String(deal.stageCode || "").trim().toLowerCase();
-            return !!deal.isWon || stageCode === "won";
-          });
+          return this.companySummaryDeals.filter((deal) => this.isDealWonStage(deal));
         },
         companySummaryFailedDeals() {
-          return this.companySummaryDeals.filter((deal) => {
-            const stageCode = String(deal.stageCode || "").trim().toLowerCase();
-            return stageCode === "failed" || stageCode === "lost";
-          });
+          return this.companySummaryDeals.filter((deal) => this.getDealStatusBucket(deal) === "failed");
         },
         companySummaryTouches() {
           const companyId = this.toIntOrNull(this.editingCompanyId);
@@ -3171,6 +3223,151 @@
               : {},
           };
         },
+        nextLlmProviderLocalKey() {
+          this.llmProviderLocalCounter = Number(this.llmProviderLocalCounter || 0) + 1;
+          return `llm-provider-${this.llmProviderLocalCounter}`;
+        },
+        normalizeLlmProviderAccount(payload = {}) {
+          return {
+            id: this.toIntOrNull(payload.id),
+            localKey: String(payload.localKey || (payload.id ? `llm-provider-${payload.id}` : this.nextLlmProviderLocalKey())),
+            name: String(payload.name || "").trim(),
+            provider: String(payload.provider || "custom").trim() || "custom",
+            apiStyle: String(payload.api_style || "openai_compatible").trim() || "openai_compatible",
+            baseUrl: String(payload.base_url || "").trim(),
+            model: String(payload.model || "").trim(),
+            organization: String(payload.organization || "").trim(),
+            project: String(payload.project || "").trim(),
+            isActive: payload.is_active !== false,
+            useForTouchAnalysis: !!payload.use_for_touch_analysis,
+            priority: Math.max(1, Number(payload.priority || 100)),
+            hasApiKey: !!payload.has_api_key,
+            apiKeyMasked: String(payload.api_key_masked || "").trim(),
+            apiKey: "",
+            clearApiKey: false,
+            createdAt: String(payload.created_at || "").trim(),
+            updatedAt: String(payload.updated_at || "").trim(),
+          };
+        },
+        defaultLlmProviderAccount() {
+          return this.normalizeLlmProviderAccount({
+            localKey: this.nextLlmProviderLocalKey(),
+            provider: "custom",
+            api_style: "openai_compatible",
+            is_active: true,
+            use_for_touch_analysis: false,
+            priority: 100,
+          });
+        },
+        clearLlmProviderNotice() {
+          this.llmProviderNotice = { type: "", text: "" };
+        },
+        setLlmProviderNotice(text = "", type = "success") {
+          this.llmProviderNotice = {
+            type: String(type || "success").trim(),
+            text: String(text || "").trim(),
+          };
+        },
+        llmProviderSavePayload(provider = {}) {
+          const payload = {
+            name: String(provider.name || "").trim(),
+            provider: String(provider.provider || "custom").trim() || "custom",
+            api_style: String(provider.apiStyle || "openai_compatible").trim() || "openai_compatible",
+            base_url: String(provider.baseUrl || "").trim(),
+            model: String(provider.model || "").trim(),
+            organization: String(provider.organization || "").trim(),
+            project: String(provider.project || "").trim(),
+            is_active: provider.isActive !== false,
+            use_for_touch_analysis: !!provider.useForTouchAnalysis,
+            priority: Math.max(1, Number(provider.priority || 100)),
+          };
+          const apiKey = String(provider.apiKey || "").trim();
+          if (apiKey) {
+            payload.api_key = apiKey;
+          }
+          if (provider.clearApiKey) {
+            payload.clear_api_key = true;
+          }
+          return payload;
+        },
+        addLlmProviderAccount() {
+          this.llmProviders = [...(this.llmProviders || []), this.defaultLlmProviderAccount()];
+        },
+        markLlmProviderApiKeyForReset(provider) {
+          if (!provider) return;
+          provider.apiKey = "";
+          provider.clearApiKey = true;
+        },
+        async loadLlmProviderAccounts(force = false) {
+          if (this.llmProvidersLoaded && !force) {
+            return;
+          }
+          this.isLlmProvidersLoading = true;
+          this.errorMessage = "";
+          try {
+            const payload = await this.apiRequest("/api/integrations/llm/providers/");
+            const records = this.normalizePaginatedResponse(payload);
+            this.llmProviders = records.map((item) => this.normalizeLlmProviderAccount(item));
+            this.llmProvidersLoaded = true;
+          } catch (error) {
+            this.errorMessage = `Ошибка загрузки LLM-провайдеров: ${error.message}`;
+            throw error;
+          } finally {
+            this.isLlmProvidersLoading = false;
+          }
+        },
+        async saveLlmProviderAccount(provider) {
+          if (!provider) return;
+          const localKey = String(provider.localKey || "").trim();
+          this.activeLlmProviderSaveKey = localKey;
+          this.clearLlmProviderNotice();
+          try {
+            const payload = await this.apiRequest(
+              this.toIntOrNull(provider.id)
+                ? `/api/integrations/llm/providers/${this.toIntOrNull(provider.id)}/`
+                : "/api/integrations/llm/providers/",
+              {
+                method: this.toIntOrNull(provider.id) ? "PUT" : "POST",
+                body: this.llmProviderSavePayload(provider),
+              }
+            );
+            const normalized = this.normalizeLlmProviderAccount(payload);
+            this.llmProviders = (this.llmProviders || []).map((item) => (
+              String(item.localKey || "") === localKey || String(item.id || "") === String(normalized.id || "")
+                ? normalized
+                : item
+            ));
+            if (!(this.llmProviders || []).some((item) => String(item.id || "") === String(normalized.id || ""))) {
+              this.llmProviders = [...(this.llmProviders || []), normalized];
+            }
+            this.setLlmProviderNotice(`Провайдер ${normalized.name || ""} сохранён.`.trim());
+          } catch (error) {
+            this.setLlmProviderNotice(`Ошибка сохранения провайдера: ${error.message}`, "error");
+          } finally {
+            this.activeLlmProviderSaveKey = "";
+          }
+        },
+        async deleteLlmProviderAccount(provider) {
+          if (!provider) return;
+          const localKey = String(provider.localKey || "").trim();
+          if (!this.toIntOrNull(provider.id)) {
+            this.llmProviders = (this.llmProviders || []).filter((item) => String(item.localKey || "") !== localKey);
+            return;
+          }
+          this.activeLlmProviderDeleteKey = localKey;
+          this.clearLlmProviderNotice();
+          try {
+            await this.apiRequest(`/api/integrations/llm/providers/${this.toIntOrNull(provider.id)}/`, {
+              method: "DELETE",
+            });
+            this.llmProviders = (this.llmProviders || []).filter((item) => String(item.id || "") !== String(provider.id || ""));
+            this.setLlmProviderNotice(`Провайдер ${provider.name || ""} удалён.`.trim());
+          } catch (error) {
+            this.setLlmProviderNotice(`Ошибка удаления провайдера: ${error.message}`, "error");
+          } finally {
+            this.activeLlmProviderDeleteKey = "";
+          }
+        },
         telephonyAllowedVirtualNumbersList() {
           return String(this.telephonySettings.allowedVirtualNumbersText || "")
             .split(/\n|,|;/)
@@ -3205,7 +3402,7 @@
           };
         },
         async loadTelephonySettings(force = false) {
-          if (this.telephonySettingsLoaded && !force) {
+          if (this.telephonySettingsLoaded && this.llmProvidersLoaded && !force) {
             return;
           }
           this.isTelephonySettingsLoading = true;
@@ -3214,7 +3411,10 @@
             const payload = await this.apiRequest("/api/telephony/novofon/settings/");
             this.telephonySettings = this.normalizeTelephonySettings(payload);
             this.telephonySettingsLoaded = true;
-            await this.loadTelephonyHealth();
+            await Promise.all([
+              this.loadTelephonyHealth(),
+              this.loadLlmProviderAccounts(force),
+            ]);
           } catch (error) {
             this.errorMessage = `Ошибка загрузки телефонии: ${error.message}`;
             throw error;
@@ -8380,7 +8580,7 @@
           const activeDeals = (this.datasets.deals || [])
             .filter((deal) => (
               String(deal.clientId || "") === String(normalizedCompanyId)
-              && this.getDealStatusBucket(deal) !== "done"
+              && this.isDealActive(deal)
             ))
             .slice()
             .sort((left, right) => {
@@ -9604,7 +9804,7 @@
             if (String(deal.clientId || "") !== String(normalizedCompanyId)) {
               return false;
             }
-            return this.getDealStatusBucket(deal) !== "done";
+            return this.isDealActive(deal);
           });
         },
         countCompanyActiveDeals(companyId) {
@@ -9614,7 +9814,7 @@
             if (String(deal.clientId || "") !== String(normalizedCompanyId)) {
               return false;
             }
-            return this.getDealStatusBucket(deal) !== "done";
+            return this.isDealActive(deal);
           }).length;
         },
         countCompanyOpenTasks(companyId) {
@@ -9810,16 +10010,34 @@
           const stage = this.resolveDealStageMeta(item);
           return !!(stage && stage.is_final);
         },
+        isDealClosedWithoutSuccess(item) {
+          if (!item) return false;
+          if (this.isDealWonStage(item)) {
+            return false;
+          }
+          if (this.isDealFailedStage(item)) {
+            return true;
+          }
+          const stage = this.resolveDealStageMeta(item);
+          return !!(stage && stage.is_final);
+        },
         getDealStatusBucket(item) {
           if (!item) return "new";
           const stageCode = String(item.stageCode || "").toLowerCase();
-          if (item.status === "done" || this.isDealFinalStage(item)) {
+          if (this.isDealClosedWithoutSuccess(item)) {
+            return "failed";
+          }
+          if (item.status === "done" || this.isDealWonStage(item)) {
             return "done";
           }
           if (stageCode === "primary_contact") {
             return "new";
           }
           return "progress";
+        },
+        isDealActive(item) {
+          const bucket = this.getDealStatusBucket(item);
+          return bucket === "new" || bucket === "progress";
         },
         getItemStatusBucket(item) {
           if (this.activeSection === "deals") {

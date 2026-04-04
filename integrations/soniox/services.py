@@ -117,6 +117,8 @@ def _save_transcription_state(call: PhoneCall, *, save_fields: list[str]) -> Non
 
 
 def refresh_phone_call_transcription(call: PhoneCall) -> dict:
+    from crm.services.ai_touch_analysis import TouchAiAnalysisService
+
     if not _is_enabled():
         return {"ok": False, "skipped": True, "reason": "soniox_disabled"}
     transcription_id = str(call.transcription_external_id or "").strip()
@@ -142,6 +144,7 @@ def refresh_phone_call_transcription(call: PhoneCall) -> dict:
                 "transcription_completed_at",
             ],
         )
+        TouchAiAnalysisService.analyze_phone_call_if_needed(call)
         return {"ok": True, "status": call.transcription_status, "completed": True}
     if normalized_status == PhoneCallTranscriptionStatus.FAILED:
         call.transcription_completed_at = timezone.now()
