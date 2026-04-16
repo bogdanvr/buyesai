@@ -4457,7 +4457,7 @@
                 </div>
               </div>
             </label>
-            <div v-if="editingDealId" id="deal-task-panel" class="md:col-span-2 mt-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
+            <div id="deal-task-panel" class="md:col-span-2 mt-2 rounded-2xl border border-crm-border/80 bg-[#0f2f4a] p-4">
               <button
                 type="button"
                 @click="toggleDealTaskForm"
@@ -4517,7 +4517,7 @@
                 </div>
               </div>
 
-              <div class="mt-4">
+              <div v-if="editingDealId" class="mt-4">
                 <button
                   type="button"
                   class="text-sm font-semibold text-white hover:text-crm-accent transition"
@@ -4558,6 +4558,9 @@
                     </div>
                   </div>
                 </div>
+              </div>
+              <div v-else class="mt-4 text-sm text-crm-muted">
+                Существующие задачи появятся после сохранения сделки.
               </div>
             </div>
           </template>
