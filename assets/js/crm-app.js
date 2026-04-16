@@ -483,6 +483,11 @@
               documentUploadTarget: ""
             }
           },
+          dealCompanyAutocompleteQuery: "",
+          dealCompanyAutocompleteResults: [],
+          dealCompanyAutocompleteOpen: false,
+          dealCompanyAutocompleteLoading: false,
+          dealCompanyAutocompleteSearchToken: 0,
           dealTaskForm: {
             subject: "",
             taskCategoryId: null,
@@ -2801,6 +2806,11 @@
         "forms.deals.description": {
           handler() {
             this.$nextTick(() => this.resizeTextareaById("deal-description-textarea"));
+          }
+        },
+        "forms.deals.companyId": {
+          handler() {
+            this.syncDealCompanyAutocompleteQueryFromSelection();
           }
         }
       },
@@ -10921,9 +10931,25 @@
         stopDealSummaryEdit(fieldKey = "") {
           if (!fieldKey || this.isDealSummaryEditing(fieldKey)) {
             this.dealSummaryEditingField = "";
+            if (!fieldKey || String(fieldKey) === "companyId") {
+              this.closeDealCompanyAutocomplete();
+            }
           }
         },
         openDealSummaryField(fieldKey) {
+          if (fieldKey === "companyId") {
+            this.startDealSummaryEdit(fieldKey);
+            this.$nextTick(() => {
+              const input = this.$refs.dealCompanyAutocompleteInput;
+              if (input && typeof input.focus === "function") {
+                input.focus();
+              }
+              this.openDealCompanyAutocomplete().catch((error) => {
+                this.setUiError(`Ошибка загрузки компаний: ${error.message}`, { modal: true });
+              });
+            });
+            return;
+          }
           if (fieldKey === "contact") {
             if (!this.toIntOrNull(this.forms.deals.companyId)) {
               this.startDealSummaryEdit("companyId");
@@ -10972,6 +10998,85 @@
             return;
           }
           this.startDealSummaryEdit(fieldKey);
+        },
+        syncDealCompanyAutocompleteQueryFromSelection() {
+          const companyId = this.toIntOrNull(this.forms.deals.companyId);
+          if (!companyId) {
+            this.dealCompanyAutocompleteQuery = "";
+            return;
+          }
+          const selectedCompany = (this.datasets.companies || []).find(
+            (company) => String(company.id) === String(companyId)
+          );
+          if (selectedCompany) {
+            this.dealCompanyAutocompleteQuery = String(selectedCompany.name || "").trim();
+            return;
+          }
+          this.dealCompanyAutocompleteQuery = this.dealSelectedCompanyName || "";
+        },
+        closeDealCompanyAutocomplete() {
+          this.dealCompanyAutocompleteOpen = false;
+          this.dealCompanyAutocompleteLoading = false;
+          this.dealCompanyAutocompleteResults = [];
+        },
+        async openDealCompanyAutocomplete() {
+          this.dealCompanyAutocompleteOpen = true;
+          await this.searchDealCompanyAutocomplete(this.dealCompanyAutocompleteQuery);
+        },
+        async onDealCompanyAutocompleteInput() {
+          const selectedName = String(this.dealSelectedCompanyName || "").trim();
+          if (String(this.dealCompanyAutocompleteQuery || "").trim() !== selectedName) {
+            this.forms.deals.companyId = null;
+            this.handleDealCompanySelectChange();
+          }
+          await this.searchDealCompanyAutocomplete(this.dealCompanyAutocompleteQuery);
+        },
+        async searchDealCompanyAutocomplete(query = "") {
+          const normalizedQuery = String(query || "").trim();
+          const requestToken = ++this.dealCompanyAutocompleteSearchToken;
+          this.dealCompanyAutocompleteLoading = true;
+          try {
+            const searchSuffix = normalizedQuery ? `&q=${encodeURIComponent(normalizedQuery)}` : "";
+            const payload = await this.apiRequest(`/api/v1/clients/?page_size=20${searchSuffix}`);
+            const records = this.normalizePaginatedResponse(payload).map((item) => this.mapClient(item));
+            this.datasets.companies = this.mergeSectionRecords(this.datasets.companies, records);
+            if (requestToken !== this.dealCompanyAutocompleteSearchToken) {
+              return;
+            }
+            this.dealCompanyAutocompleteResults = records;
+          } finally {
+            if (requestToken === this.dealCompanyAutocompleteSearchToken) {
+              this.dealCompanyAutocompleteLoading = false;
+            }
+          }
+        },
+        selectDealCompanyAutocomplete(companyId) {
+          this.forms.deals.companyId = this.toIntOrNull(companyId);
+          this.handleDealCompanySelectChange();
+          this.syncDealCompanyAutocompleteQueryFromSelection();
+          this.stopDealSummaryEdit("companyId");
+        },
+        startDealCompanyCreateFromAutocomplete() {
+          this.forms.deals.companyId = "__create__";
+          this.handleDealCompanySelectChange();
+          this.dealCompanyAutocompleteQuery = "";
+          this.stopDealSummaryEdit("companyId");
+        },
+        handleDealCompanyAutocompleteBlur() {
+          window.setTimeout(() => {
+            if (this.isDealSummaryEditing("companyId")) {
+              this.stopDealSummaryEdit("companyId");
+            }
+          }, 120);
+        },
+        confirmDealCompanyAutocompleteSelection() {
+          if (this.dealCompanyAutocompleteResults.length) {
+            this.selectDealCompanyAutocomplete(this.dealCompanyAutocompleteResults[0].id);
+            return;
+          }
+          if (!String(this.dealCompanyAutocompleteQuery || "").trim()) {
+            this.selectDealCompanyAutocomplete(null);
+          }
         },
         quickAddDealTouch() {
           this.modalParentContext = this.captureModalParentContext();

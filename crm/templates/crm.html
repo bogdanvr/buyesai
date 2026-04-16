@@ -3303,17 +3303,55 @@
                   <button v-if="!isDealSummaryEditing('companyId')" type="button" @click="openDealSummaryField('companyId')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
                     [[ dealSelectedCompanyName || 'Не выбрана' ]]
                   </button>
-                  <select
-                    v-else
-                    v-model="forms.deals.companyId"
-                    @change="handleDealCompanySelectChange(); stopDealSummaryEdit('companyId')"
-                    @blur="stopDealSummaryEdit('companyId')"
-                    class="mt-1 w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
-                  >
-                    <option :value="null">Не выбрана</option>
-                    <option value="__create__">+ Добавить новую компанию</option>
-                    <option v-for="company in companyOptions" :key="`deal-summary-company-${company.id}`" :value="company.id">[[ company.name ]]</option>
-                  </select>
+                  <div v-else class="mt-1 relative">
+                    <input
+                      ref="dealCompanyAutocompleteInput"
+                      v-model="dealCompanyAutocompleteQuery"
+                      type="text"
+                      placeholder="Начните вводить название компании"
+                      autocomplete="off"
+                      @focus="openDealCompanyAutocomplete"
+                      @input="onDealCompanyAutocompleteInput"
+                      @keydown.enter.prevent="confirmDealCompanyAutocompleteSelection"
+                      @keydown.esc.prevent="stopDealSummaryEdit('companyId')"
+                      @blur="handleDealCompanyAutocompleteBlur"
+                      class="w-full h-9 rounded-lg border border-crm-border bg-[#102f4a] px-3 text-sm outline-none focus:border-crm-accent"
+                    />
+                    <div v-if="dealCompanyAutocompleteOpen" class="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-crm-border bg-[#102f4a] shadow-panel">
+                      <button
+                        type="button"
+                        @mousedown.prevent="selectDealCompanyAutocomplete(null)"
+                        class="flex w-full items-center px-3 py-2 text-left text-sm text-crm-muted transition hover:bg-white/5 hover:text-white"
+                      >
+                        Не выбрана
+                      </button>
+                      <button
+                        type="button"
+                        @mousedown.prevent="startDealCompanyCreateFromAutocomplete"
+                        class="flex w-full items-center px-3 py-2 text-left text-sm text-crm-accent transition hover:bg-white/5"
+                      >
+                        + Добавить новую компанию
+                      </button>
+                      <div v-if="dealCompanyAutocompleteLoading" class="px-3 py-2 text-sm text-crm-muted">
+                        Ищем компании...
+                      </div>
+                      <template v-else>
+                        <button
+                          v-for="company in dealCompanyAutocompleteResults"
+                          :key="`deal-summary-company-${company.id}`"
+                          type="button"
+                          @mousedown.prevent="selectDealCompanyAutocomplete(company.id)"
+                          class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-white transition hover:bg-white/5"
+                        >
+                          <span class="truncate">[[ company.name ]]</span>
+                          <span v-if="company.inn" class="shrink-0 text-xs text-crm-muted">ИНН [[ company.inn ]]</span>
+                        </button>
+                        <div v-if="!dealCompanyAutocompleteResults.length" class="px-3 py-2 text-sm text-crm-muted">
+                          Компании не найдены.
+                        </div>
+                      </template>
+                    </div>
+                  </div>
                 </div>
                 <div class="py-1">
                   <div class="flex items-center gap-2 text-[11px] uppercase tracking-[0.12em] text-crm-muted">
