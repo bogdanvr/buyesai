@@ -984,13 +984,13 @@
         taskPomodoroEventItems() {
           return this.parseEventLog(this.forms.tasks.events);
         },
-        taskPomodoroTotalSpentMinutes() {
+        taskPomodoroTotalSpentSeconds() {
           return this.taskPomodoroEventItems.reduce((total, item) => {
-            return total + this.parsePomodoroHistoryDurationMinutes(item.result);
+            return total + this.parsePomodoroHistoryDurationSeconds(item.result);
           }, 0);
         },
         taskPomodoroTotalSpentLabel() {
-          return this.taskSpentDurationLabel(this.taskPomodoroTotalSpentMinutes);
+          return this.pomodoroSpentDurationLabel(this.taskPomodoroTotalSpentSeconds);
         },
         taskPomodoroTimerTaskId() {
           return this.toIntOrNull(this.pomodoroTimer.taskId);
@@ -10917,28 +10917,42 @@
           const seconds = totalSeconds % 60;
           return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
         },
-        formatPomodoroHistoryResult(startedAt, durationMinutes) {
+        pomodoroSpentDurationLabel(totalSeconds) {
+          const normalizedSeconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+          const hours = Math.floor(normalizedSeconds / 3600);
+          const minutes = Math.floor((normalizedSeconds % 3600) / 60);
+          const seconds = normalizedSeconds % 60;
+          if (hours > 0) {
+            if (minutes > 0 || seconds > 0) {
+              return `${hours} ч ${minutes} мин ${seconds} сек`;
+            }
+            return `${hours} ч`;
+          }
+          if (minutes > 0) {
+            if (seconds > 0) {
+              return `${minutes} мин ${seconds} сек`;
+            }
+            return `${minutes} мин`;
+          }
+          return `${seconds} сек`;
+        },
+        formatPomodoroHistoryResult(startedAt, durationSeconds) {
           const startedLabel = this.formatEventTimestamp(startedAt || "") || this.formatEventTimestamp(new Date().toISOString());
-          const durationLabel = this.taskSpentDurationLabel(durationMinutes) || "0 мин";
+          const durationLabel = this.pomodoroSpentDurationLabel(durationSeconds);
           return `${startedLabel}, ${durationLabel}`;
         },
-        parsePomodoroHistoryDurationMinutes(value) {
+        parsePomodoroHistoryDurationSeconds(value) {
           const raw = String(value || "").trim();
           if (!raw) {
             return 0;
           }
-          const hourMatch = raw.match(/(\d+)\s*ч(?:\s*(\d+)\s*мин)?/i);
-          if (hourMatch) {
-            const hours = Number.parseInt(hourMatch[1] || "0", 10) || 0;
-            const minutes = Number.parseInt(hourMatch[2] || "0", 10) || 0;
-            return (hours * 60) + minutes;
-          }
-          const minuteMatches = [...raw.matchAll(/(\d+)\s*мин/gi)];
-          if (minuteMatches.length) {
-            const lastMatch = minuteMatches[minuteMatches.length - 1];
-            return Number.parseInt(lastMatch[1] || "0", 10) || 0;
-          }
-          return 0;
+          const hoursMatch = raw.match(/(\d+)\s*ч/i);
+          const minutesMatch = raw.match(/(\d+)\s*мин/i);
+          const secondsMatch = raw.match(/(\d+)\s*сек/i);
+          const hours = Number.parseInt(hoursMatch?.[1] || "0", 10) || 0;
+          const minutes = Number.parseInt(minutesMatch?.[1] || "0", 10) || 0;
+          const seconds = Number.parseInt(secondsMatch?.[1] || "0", 10) || 0;
+          return (hours * 3600) + (minutes * 60) + seconds;
         },
         appendTaskPomodoroEvent(existingValue, resultText) {
           const entryLines = [
@@ -11114,8 +11128,8 @@
             ? this.forms.tasks.events || ""
             : task?.events || "";
           const nextCount = currentCount + 1;
-          const durationMinutes = Math.max(1, Math.round((TASK_POMODORO_FOCUS_MS - this.taskPomodoroTimeLeftMs) / 60000) || 0);
-          const pomodoroHistoryLabel = this.formatPomodoroHistoryResult(this.pomodoroTimer.startedAt, durationMinutes);
+          const durationSeconds = Math.max(0, Math.floor((TASK_POMODORO_FOCUS_MS - this.taskPomodoroTimeLeftMs) / 1000) || 0);
+          const pomodoroHistoryLabel = this.formatPomodoroHistoryResult(this.pomodoroTimer.startedAt, durationSeconds);
           const nextEvents = this.appendTaskPomodoroEvent(
             currentEvents,
             pomodoroHistoryLabel,
