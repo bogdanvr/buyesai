@@ -7354,14 +7354,28 @@
                   </div>
                 </div>
               </div>
-              <div v-if="taskPomodoroEventItems.length" class="mt-4 space-y-2">
-                <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">История</div>
-                <div
-                  v-for="(eventItem, eventIndex) in taskPomodoroEventItems"
-                  :key="`task-pomodoro-event-${eventIndex}`"
-                  class="rounded-xl border border-crm-border bg-[#102f4a] px-3 py-3"
+              <div v-if="taskPomodoroEventItems.length" class="mt-4">
+                <button
+                  type="button"
+                  @click="toggleOptionalField('tasks', 'pomodoroHistory')"
+                  class="flex w-full items-center justify-between gap-3 rounded-xl border border-crm-border bg-[#102f4a] px-3 py-3 text-left transition hover:border-crm-accent"
                 >
-                  <div class="text-sm text-white">[[ eventItem.result || formatEventTimestamp(eventItem.timestamp) || 'Событие' ]]</div>
+                  <div>
+                    <div class="text-[11px] uppercase tracking-[0.16em] text-crm-muted">История</div>
+                    <div class="mt-1 text-sm text-white">[[ taskPomodoroEventItems.length ]] сессий</div>
+                  </div>
+                  <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-xs text-crm-accent shrink-0">
+                    [[ isOptionalFieldExpanded('tasks', 'pomodoroHistory') ? '−' : '+' ]]
+                  </span>
+                </button>
+                <div v-if="isOptionalFieldExpanded('tasks', 'pomodoroHistory')" class="mt-2 space-y-2">
+                  <div
+                    v-for="(eventItem, eventIndex) in taskPomodoroEventItems"
+                    :key="`task-pomodoro-event-${eventIndex}`"
+                    class="rounded-xl border border-crm-border bg-[#102f4a] px-3 py-3"
+                  >
+                    <div class="text-sm text-white">[[ eventItem.result || formatEventTimestamp(eventItem.timestamp) || 'Событие' ]]</div>
+                  </div>
                 </div>
               </div>
             </div>
