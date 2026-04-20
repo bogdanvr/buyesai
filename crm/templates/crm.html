@@ -1153,12 +1153,16 @@
               class="shrink-0 inline-flex items-center gap-3 rounded-2xl border border-crm-accent/30 bg-crm-accent/10 px-3 py-2.5 shadow-panel min-w-fit"
             >
               <div class="min-w-0">
-                <div class="text-[10px] uppercase tracking-[0.16em] text-crm-muted">Pomodoro</div>
                 <div class="text-[13px] md:text-[15px] font-semibold text-white whitespace-nowrap">
                   [[ taskListPomodoroTimerLabel ]]
-                  <span v-if="activePomodoroTaskItem?.subject || activePomodoroTaskItem?.name" class="ml-2 text-[11px] md:text-xs font-normal text-crm-muted">
+                  <button
+                    v-if="activePomodoroTaskItem?.subject || activePomodoroTaskItem?.name"
+                    type="button"
+                    @click.stop="openTaskEditor(activePomodoroTaskItem)"
+                    class="ml-2 text-[11px] md:text-xs font-normal text-crm-muted transition hover:text-white"
+                  >
                     [[ activePomodoroTaskItem?.subject || activePomodoroTaskItem?.name ]]
-                  </span>
+                  </button>
                 </div>
               </div>
               <button
