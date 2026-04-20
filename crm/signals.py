@@ -815,6 +815,7 @@ def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
 
     happened_at = instance.completed_at or timezone.now()
     completion_event_type = _resolve_task_completion_event_type(instance) or "task"
+    pomodoro_minutes = max(0, int(getattr(instance, "pomodoro_count", 0) or 0)) * 25
     entry = _format_structured_event_entry(
         result_text=result_text,
         happened_at=happened_at,
@@ -828,6 +829,7 @@ def activity_task_events_signal(sender, instance: Activity, created, **kwargs):
             f"task_status_label: {_task_status_label(instance.status)}",
             instance.due_at and f"due_at: {timezone.localtime(instance.due_at).isoformat()}",
             f"owner_name: {_actor_display_name(getattr(instance, 'created_by', None))}",
+            pomodoro_minutes and f"task_spent_minutes: {pomodoro_minutes}",
             result_text and f"task_result: {result_text}",
         ],
     )
