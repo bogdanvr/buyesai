@@ -7326,18 +7326,18 @@
                 <div
                   v-for="(checklistItem, checklistIndex) in visibleTaskChecklist()"
                   :key="checklistItem.id"
-                  class="flex items-start gap-3 rounded-xl border border-crm-border bg-[#102f4a] px-3 py-3"
+                  class="flex items-center gap-3 rounded-xl border border-crm-border bg-[#102f4a] px-3 py-3"
                 >
                   <input
                     v-model="forms.tasks.checklist[checklistItem.originalIndex].isDone"
                     type="checkbox"
-                    class="mt-1 h-4 w-4 rounded border-crm-border bg-transparent"
+                    class="h-4 w-4 shrink-0 rounded border-crm-border bg-transparent"
                   />
                   <input
                     v-model.trim="forms.tasks.checklist[checklistItem.originalIndex].text"
                     type="text"
                     placeholder="Новый пункт чек-листа"
-                    class="min-w-0 flex-1 h-10 rounded-lg border border-crm-border bg-[#0f2f4a] px-3 text-sm text-white outline-none focus:border-crm-accent"
+                    class="min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm text-white outline-none"
                     :class="checklistItem.isDone && !taskChecklistHideCompleted ? 'line-through text-crm-muted' : ''"
                   />
                   <button
