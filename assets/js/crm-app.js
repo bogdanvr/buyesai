@@ -1002,7 +1002,7 @@
           );
         },
         taskPomodoroTimeLeftMs() {
-          if (!this.isCurrentTaskPomodoroTimerActive) {
+          if (!this.taskPomodoroTimerTaskId) {
             return 0;
           }
           if (this.pomodoroTimer.phase === "focus_paused" || this.pomodoroTimer.phase === "break_paused") {
@@ -1079,6 +1079,47 @@
             return "Продолжить";
           }
           return "Пауза";
+        },
+        activePomodoroTaskItem() {
+          const taskId = this.taskPomodoroTimerTaskId;
+          if (!taskId) {
+            return null;
+          }
+          return (this.datasets.tasks || []).find((task) => String(task.id) === String(taskId)) || null;
+        },
+        taskListPomodoroVisible() {
+          return (
+            this.activeSection === "tasks"
+            && !!this.taskPomodoroTimerTaskId
+            && String(this.pomodoroTimer.phase || "") !== "idle"
+          );
+        },
+        taskListPomodoroTimerLabel() {
+          const countdown = this.formatPomodoroCountdown(this.taskPomodoroTimeLeftMs);
+          const phase = String(this.pomodoroTimer.phase || "");
+          if (phase === "focus" || phase === "focus_paused") {
+            return countdown || "25:00";
+          }
+          if (phase === "break") {
+            return countdown || "05:00";
+          }
+          if (phase === "break_paused") {
+            return countdown || "05:00";
+          }
+          if (phase === "break_ready") {
+            return "00:00";
+          }
+          return "";
+        },
+        taskListPomodoroPauseIcon() {
+          const phase = String(this.pomodoroTimer.phase || "");
+          if (phase === "focus_paused" || phase === "break_paused") {
+            return "▶";
+          }
+          return "⏸";
+        },
+        taskListPomodoroPauseTitle() {
+          return this.taskPomodoroPauseButtonLabel;
         },
         editingLeadItem() {
           const leadId = this.toIntOrNull(this.editingLeadId);
@@ -10996,23 +11037,25 @@
             this.completeTaskPomodoroBreak();
           }
         },
-        handleTaskPomodoroPauseToggle() {
-          if (!this.isCurrentTaskPomodoroTimerActive) {
+        handleTaskPomodoroPauseToggle(targetTaskId = null) {
+          const normalizedTaskId = this.toIntOrNull(targetTaskId) || this.taskPomodoroTimerTaskId;
+          if (!normalizedTaskId || String(normalizedTaskId) !== String(this.taskPomodoroTimerTaskId)) {
             return;
           }
           const phase = String(this.pomodoroTimer.phase || "");
           if (phase === "focus") {
             this.pomodoroTimer = this.createPomodoroTimerState({
-              taskId: this.taskPomodoroTimerTaskId,
+              taskId: normalizedTaskId,
               phase: "focus_paused",
               remainingMs: this.taskPomodoroTimeLeftMs,
+              startedAt: this.pomodoroTimer.startedAt,
             });
             this.persistPomodoroTimerState();
             return;
           }
           if (phase === "focus_paused") {
             this.pomodoroTimer = this.createPomodoroTimerState({
-              taskId: this.taskPomodoroTimerTaskId,
+              taskId: normalizedTaskId,
               phase: "focus",
               endsAt: new Date(Date.now() + this.taskPomodoroTimeLeftMs).toISOString(),
               startedAt: this.pomodoroTimer.startedAt,
@@ -11022,7 +11065,7 @@
           }
           if (phase === "break") {
             this.pomodoroTimer = this.createPomodoroTimerState({
-              taskId: this.taskPomodoroTimerTaskId,
+              taskId: normalizedTaskId,
               phase: "break_paused",
               remainingMs: this.taskPomodoroTimeLeftMs,
             });
@@ -11031,11 +11074,29 @@
           }
           if (phase === "break_paused") {
             this.pomodoroTimer = this.createPomodoroTimerState({
-              taskId: this.taskPomodoroTimerTaskId,
+              taskId: normalizedTaskId,
               phase: "break",
               endsAt: new Date(Date.now() + this.taskPomodoroTimeLeftMs).toISOString(),
             });
             this.persistPomodoroTimerState();
+          }
+        },
+        async handleActivePomodoroFinish() {
+          const taskId = this.taskPomodoroTimerTaskId;
+          if (!taskId) {
+            return;
+          }
+          const phase = String(this.pomodoroTimer.phase || "");
+          if (phase === "focus" || phase === "focus_paused") {
+            await this.completeTaskPomodoroFocus({ automatic: false });
+            return;
+          }
+          if (phase === "break" || phase === "break_paused") {
+            this.completeTaskPomodoroBreak();
+            return;
+          }
+          if (phase === "break_ready") {
+            this.completeTaskPomodoroBreak();
           }
         },
         async completeTaskPomodoroFocus({ automatic }) {
@@ -11067,12 +11128,17 @@
             }
           });
           this.updateTaskPomodoroDataLocally(taskId, nextCount, nextEvents);
-          this.pomodoroTimer = this.createPomodoroTimerState({
-            taskId,
-            phase: "break_ready",
-          });
-          this.persistPomodoroTimerState();
-          this.showPomodoroBrowserNotification("Pomodoro завершен", "5 минут отдых.");
+          if (automatic) {
+            this.pomodoroTimer = this.createPomodoroTimerState({
+              taskId,
+              phase: "break_ready",
+            });
+            this.persistPomodoroTimerState();
+            this.showPomodoroBrowserNotification("Pomodoro завершен", "5 минут отдых.");
+            return;
+          }
+          this.pomodoroTimer = this.createPomodoroTimerState();
+          this.clearPersistedPomodoroTimerState();
         },
         completeTaskPomodoroBreak() {
           this.pomodoroTimer = this.createPomodoroTimerState();

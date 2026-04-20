@@ -2000,6 +2000,38 @@
         </div>
         <div v-else class="h-full min-h-0 rounded-[28px] border border-crm-border bg-[#0b2740] overflow-hidden shadow-panel md:min-h-[540px] flex flex-col">
           <div
+            v-if="taskListPomodoroVisible"
+            class="flex items-center justify-end gap-3 border-b border-crm-border bg-[#0f2f4a] px-4 py-3"
+          >
+            <div class="inline-flex items-center gap-3 rounded-2xl border border-crm-accent/30 bg-crm-accent/10 px-3 py-2">
+              <div class="min-w-0">
+                <div class="text-[10px] uppercase tracking-[0.16em] text-crm-muted">Pomodoro</div>
+                <div class="text-sm font-semibold text-white">
+                  [[ taskListPomodoroTimerLabel ]]
+                  <span v-if="activePomodoroTaskItem?.subject || activePomodoroTaskItem?.name" class="ml-2 text-xs font-normal text-crm-muted">
+                    [[ activePomodoroTaskItem?.subject || activePomodoroTaskItem?.name ]]
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                @click.stop="handleTaskPomodoroPauseToggle(taskPomodoroTimerTaskId)"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-crm-border bg-[#123753] text-white transition hover:border-crm-accent"
+                :title="taskListPomodoroPauseTitle"
+              >
+                <span class="text-base leading-none">[[ taskListPomodoroPauseIcon ]]</span>
+              </button>
+              <button
+                type="button"
+                @click.stop="handleActivePomodoroFinish"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-crm-border bg-[#123753] text-white transition hover:border-crm-accent"
+                title="Завершить"
+              >
+                <span class="text-base leading-none">■</span>
+              </button>
+            </div>
+          </div>
+          <div
             class="hidden lg:grid items-center border-b border-crm-border bg-[#10314d] text-crm-muted text-xs uppercase tracking-[0.16em]"
             :class="activeSection === 'companies' ? 'grid-cols-[72px_1.2fr_1fr_1fr_1fr_120px_160px]' : (activeSection === 'deals' ? 'grid-cols-[72px_1.2fr_1fr_160px_150px_150px_110px_160px]' : (activeSection === 'tasks' ? 'grid-cols-[72px_1.15fr_0.9fr_1fr_1fr_1fr_160px]' : (activeSection === 'touches' ? 'grid-cols-[72px_1.15fr_1fr_1fr_140px_160px_160px]' : 'grid-cols-[72px_1.3fr_1fr_1fr_1fr_160px]')))"
           >
