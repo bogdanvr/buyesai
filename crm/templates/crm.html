@@ -1152,9 +1152,11 @@
               v-if="activeSection === 'tasks' && taskListPomodoroVisible"
               class="shrink-0 inline-flex items-center gap-3 rounded-2xl border border-crm-accent/30 bg-crm-accent/10 px-3 py-2.5 shadow-panel min-w-fit"
             >
-              <div class="min-w-0">
-                <div class="text-[13px] md:text-[15px] font-semibold text-white whitespace-nowrap">
+              <div class="min-w-0 flex items-center gap-2">
+                <div class="w-[58px] text-[13px] md:text-[15px] font-semibold text-white whitespace-nowrap tabular-nums text-right">
                   [[ taskListPomodoroTimerLabel ]]
+                </div>
+                <div class="text-[13px] md:text-[15px] font-semibold text-white whitespace-nowrap">
                   <button
                     v-if="activePomodoroTaskItem?.subject || activePomodoroTaskItem?.name"
                     type="button"
