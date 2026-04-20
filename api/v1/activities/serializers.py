@@ -256,6 +256,8 @@ class ActivitySerializer(serializers.ModelSerializer):
             "has_follow_up_task",
             "save_company_note",
             "company_note",
+            "pomodoro_count",
+            "events",
             "lead",
             "lead_title",
             "deal",

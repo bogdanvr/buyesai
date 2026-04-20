@@ -17,6 +17,9 @@
       touches: "/api/v1/touches/?page_size=100"
     };
     const FILTERS_STORAGE_KEY = "crm_section_filters";
+    const TASK_POMODORO_STORAGE_KEY = "crm_task_pomodoro_timer";
+    const TASK_POMODORO_FOCUS_MS = 25 * 60 * 1000;
+    const TASK_POMODORO_BREAK_MS = 5 * 60 * 1000;
     const TIMELINE_FILTER_OPTIONS = [
       { value: "messages", label: "Сообщения" },
       { value: "email", label: "Email" },
@@ -462,6 +465,8 @@
               result: "",
               saveCompanyNote: false,
               companyNote: "",
+              pomodoroCount: 0,
+              events: "",
               status: "todo"
             },
             touches: {
@@ -515,6 +520,14 @@
             reminderOffsetMinutes: 30,
             description: ""
           },
+          pomodoroTimer: {
+            taskId: null,
+            phase: "idle",
+            endsAt: "",
+          },
+          pomodoroTickerId: null,
+          pomodoroNowTs: Date.now(),
+          pomodoroTimerBusy: false,
           dealCompanyForm: {
             name: "",
             inn: "",
@@ -964,6 +977,70 @@
           const taskId = this.toIntOrNull(this.editingTaskId);
           if (!taskId) return null;
           return (this.datasets.tasks || []).find((task) => String(task.id) === String(taskId)) || null;
+        },
+        taskPomodoroCount() {
+          return Math.max(0, Number(this.forms.tasks.pomodoroCount || 0) || 0);
+        },
+        taskPomodoroEventItems() {
+          return this.parseEventLog(this.forms.tasks.events);
+        },
+        taskPomodoroTimerTaskId() {
+          return this.toIntOrNull(this.pomodoroTimer.taskId);
+        },
+        isCurrentTaskPomodoroTimerActive() {
+          return (
+            !!this.toIntOrNull(this.editingTaskId)
+            && this.toIntOrNull(this.editingTaskId) === this.taskPomodoroTimerTaskId
+          );
+        },
+        taskPomodoroTimeLeftMs() {
+          if (!this.isCurrentTaskPomodoroTimerActive) {
+            return 0;
+          }
+          const endsAtTs = Date.parse(String(this.pomodoroTimer.endsAt || ""));
+          if (Number.isNaN(endsAtTs)) {
+            return 0;
+          }
+          return Math.max(0, endsAtTs - this.pomodoroNowTs);
+        },
+        taskPomodoroStatusText() {
+          if (!this.isCurrentTaskPomodoroTimerActive) {
+            return "";
+          }
+          const countdown = this.formatPomodoroCountdown(this.taskPomodoroTimeLeftMs);
+          if (this.pomodoroTimer.phase === "focus") {
+            return countdown ? `Фокус: ${countdown}` : "Фокус";
+          }
+          if (this.pomodoroTimer.phase === "break_ready") {
+            return "Фокус завершен. Можно начать перерыв 5 минут.";
+          }
+          if (this.pomodoroTimer.phase === "break") {
+            return countdown ? `Перерыв: ${countdown}` : "Перерыв";
+          }
+          return "";
+        },
+        taskPomodoroButtonLabel() {
+          if (!this.toIntOrNull(this.editingTaskId)) {
+            return "Начать";
+          }
+          if (this.isCurrentTaskPomodoroTimerActive) {
+            if (this.pomodoroTimer.phase === "focus") {
+              return "Завершить";
+            }
+            if (this.pomodoroTimer.phase === "break_ready") {
+              return "Перерыв";
+            }
+            if (this.pomodoroTimer.phase === "break") {
+              return "Завершить перерыв";
+            }
+          }
+          return "Начать";
+        },
+        taskPomodoroButtonDisabled() {
+          if (!this.toIntOrNull(this.editingTaskId)) {
+            return true;
+          }
+          return !!(this.taskPomodoroTimerTaskId && !this.isCurrentTaskPomodoroTimerActive);
         },
         editingLeadItem() {
           const leadId = this.toIntOrNull(this.editingLeadId);
@@ -10397,6 +10474,8 @@
             result: item.result || this.resolveTaskTypeDefaultResultById(item.taskTypeId),
             saveCompanyNote: !!item.saveCompanyNote,
             companyNote: item.companyNote || "",
+            pomodoroCount: Math.max(0, Number(item.pomodoroCount || item.pomodoro_count || 0) || 0),
+            events: item.events || "",
             status: item.taskStatus || item.status || "todo"
           };
           this.taskChecklistHideCompleted = false;
@@ -10678,6 +10757,219 @@
             reminderOffsetMinutes: 30,
             description: ""
           };
+        },
+        createPomodoroTimerState(overrides = {}) {
+          return {
+            taskId: this.toIntOrNull(overrides.taskId),
+            phase: ["focus", "break_ready", "break"].includes(String(overrides.phase || ""))
+              ? String(overrides.phase)
+              : "idle",
+            endsAt: String(overrides.endsAt || "").trim(),
+          };
+        },
+        persistPomodoroTimerState() {
+          window.localStorage.setItem(TASK_POMODORO_STORAGE_KEY, JSON.stringify(this.createPomodoroTimerState(this.pomodoroTimer)));
+        },
+        clearPersistedPomodoroTimerState() {
+          window.localStorage.removeItem(TASK_POMODORO_STORAGE_KEY);
+        },
+        restorePomodoroTimerState() {
+          const rawValue = window.localStorage.getItem(TASK_POMODORO_STORAGE_KEY);
+          if (!rawValue) {
+            this.pomodoroTimer = this.createPomodoroTimerState();
+            return;
+          }
+          try {
+            const parsed = JSON.parse(rawValue);
+            const normalized = this.createPomodoroTimerState(parsed);
+            if (normalized.phase === "idle" || !normalized.taskId) {
+              this.pomodoroTimer = this.createPomodoroTimerState();
+              this.clearPersistedPomodoroTimerState();
+              return;
+            }
+            this.pomodoroTimer = normalized;
+          } catch (error) {
+            this.pomodoroTimer = this.createPomodoroTimerState();
+            this.clearPersistedPomodoroTimerState();
+          }
+        },
+        startPomodoroTicker() {
+          this.stopPomodoroTicker();
+          this.pomodoroNowTs = Date.now();
+          this.pomodoroTickerId = window.setInterval(() => {
+            this.pomodoroNowTs = Date.now();
+            this.syncPomodoroTimer().catch(() => {});
+          }, 1000);
+        },
+        stopPomodoroTicker() {
+          if (this.pomodoroTickerId) {
+            window.clearInterval(this.pomodoroTickerId);
+            this.pomodoroTickerId = null;
+          }
+        },
+        formatPomodoroCountdown(value) {
+          const totalMs = Math.max(0, Number(value) || 0);
+          const totalSeconds = Math.ceil(totalMs / 1000);
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = totalSeconds % 60;
+          return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+        },
+        appendTaskPomodoroEvent(existingValue, resultText, extraLines = []) {
+          const entryLines = [
+            this.formatEventTimestamp(new Date().toISOString()),
+            `Результат: ${String(resultText || "").trim()}`,
+            "event_type: system",
+            "priority: low",
+            "title: Pomodoro",
+            ...extraLines.filter(Boolean),
+          ];
+          const nextEntry = entryLines.join("\n");
+          const current = String(existingValue || "").trim();
+          return current ? `${nextEntry}\n\n${current}` : nextEntry;
+        },
+        requestPomodoroNotificationPermission() {
+          if (typeof window === "undefined" || !("Notification" in window)) {
+            return;
+          }
+          if (window.Notification.permission === "default") {
+            window.Notification.requestPermission().catch(() => {});
+          }
+        },
+        showPomodoroBrowserNotification(title, body) {
+          if (typeof window === "undefined" || !("Notification" in window)) {
+            return;
+          }
+          if (window.Notification.permission !== "granted") {
+            return;
+          }
+          try {
+            const notification = new window.Notification(title, {
+              body,
+              tag: `task-pomodoro-${this.taskPomodoroTimerTaskId || "global"}`,
+            });
+            window.setTimeout(() => notification.close(), 8000);
+          } catch (error) {
+            // Ignore browser notification failures.
+          }
+        },
+        async syncPomodoroTimer() {
+          if (this.pomodoroTimerBusy) {
+            return;
+          }
+          const phase = String(this.pomodoroTimer.phase || "");
+          if (phase !== "focus" && phase !== "break") {
+            return;
+          }
+          const endsAtTs = Date.parse(String(this.pomodoroTimer.endsAt || ""));
+          if (Number.isNaN(endsAtTs) || endsAtTs > Date.now()) {
+            return;
+          }
+          this.pomodoroTimerBusy = true;
+          try {
+            if (phase === "focus") {
+              await this.completeTaskPomodoroFocus({ automatic: true });
+            } else if (phase === "break") {
+              this.completeTaskPomodoroBreak();
+            }
+          } finally {
+            this.pomodoroTimerBusy = false;
+          }
+        },
+        async handleTaskPomodoroAction() {
+          const taskId = this.toIntOrNull(this.editingTaskId);
+          if (!taskId) {
+            return;
+          }
+          if (this.taskPomodoroButtonDisabled) {
+            this.setUiError("Сейчас активен Pomodoro в другой задаче. Сначала завершите его.", { modal: true });
+            return;
+          }
+          if (!this.isCurrentTaskPomodoroTimerActive || this.pomodoroTimer.phase === "idle") {
+            this.requestPomodoroNotificationPermission();
+            this.pomodoroTimer = this.createPomodoroTimerState({
+              taskId,
+              phase: "focus",
+              endsAt: new Date(Date.now() + TASK_POMODORO_FOCUS_MS).toISOString(),
+            });
+            this.persistPomodoroTimerState();
+            return;
+          }
+          if (this.pomodoroTimer.phase === "focus") {
+            await this.completeTaskPomodoroFocus({ automatic: false });
+            return;
+          }
+          if (this.pomodoroTimer.phase === "break_ready") {
+            this.pomodoroTimer = this.createPomodoroTimerState({
+              taskId,
+              phase: "break",
+              endsAt: new Date(Date.now() + TASK_POMODORO_BREAK_MS).toISOString(),
+            });
+            this.persistPomodoroTimerState();
+            return;
+          }
+          if (this.pomodoroTimer.phase === "break") {
+            this.completeTaskPomodoroBreak();
+          }
+        },
+        async completeTaskPomodoroFocus({ automatic }) {
+          const taskId = this.taskPomodoroTimerTaskId;
+          if (!taskId) {
+            this.pomodoroTimer = this.createPomodoroTimerState();
+            this.clearPersistedPomodoroTimerState();
+            return;
+          }
+          const task = (this.datasets.tasks || []).find((item) => String(item.id) === String(taskId)) || null;
+          const currentCount = String(this.editingTaskId || "") === String(taskId)
+            ? Math.max(0, Number(this.forms.tasks.pomodoroCount || 0) || 0)
+            : Math.max(0, Number(task?.pomodoroCount || 0) || 0);
+          const currentEvents = String(this.editingTaskId || "") === String(taskId)
+            ? this.forms.tasks.events || ""
+            : task?.events || "";
+          const nextCount = currentCount + 1;
+          const nextEvents = this.appendTaskPomodoroEvent(
+            currentEvents,
+            `Завершен Pomodoro #${nextCount}`,
+            [
+              "pomodoro_type: focus",
+              automatic ? "pomodoro_finish: auto" : "pomodoro_finish: manual",
+              "pomodoro_duration_minutes: 25",
+            ],
+          );
+          await this.apiRequest(`/api/v1/activities/${taskId}/`, {
+            method: "PATCH",
+            body: {
+              pomodoro_count: nextCount,
+              events: nextEvents,
+            }
+          });
+          this.updateTaskPomodoroDataLocally(taskId, nextCount, nextEvents);
+          this.pomodoroTimer = this.createPomodoroTimerState({
+            taskId,
+            phase: "break_ready",
+          });
+          this.persistPomodoroTimerState();
+          this.showPomodoroBrowserNotification("Pomodoro завершен", "5 минут отдых.");
+        },
+        completeTaskPomodoroBreak() {
+          this.pomodoroTimer = this.createPomodoroTimerState();
+          this.clearPersistedPomodoroTimerState();
+          this.showPomodoroBrowserNotification("Перерыв завершен", "Можно начать следующий Pomodoro.");
+        },
+        updateTaskPomodoroDataLocally(taskId, pomodoroCount, events) {
+          this.datasets.tasks = (this.datasets.tasks || []).map((item) => {
+            if (String(item.id) !== String(taskId)) {
+              return item;
+            }
+            return {
+              ...item,
+              pomodoroCount,
+              events,
+            };
+          });
+          if (String(this.editingTaskId || "") === String(taskId)) {
+            this.forms.tasks.pomodoroCount = pomodoroCount;
+            this.forms.tasks.events = events;
+          }
         },
         createTaskChecklistItem(overrides = {}) {
           return {
@@ -12882,6 +13174,8 @@
             result: item.result || "",
             saveCompanyNote: !!item.save_company_note,
             companyNote: item.company_note || "",
+            pomodoroCount: Math.max(0, Number(item.pomodoro_count || item.pomodoroCount || 0) || 0),
+            events: item.events || "",
             taskTypeCategoryId: item.task_type_category || null,
             taskTypeCategoryName: item.task_type_category_name || "",
             taskTypeId: item.task_type || null,
@@ -13609,13 +13903,15 @@
               leadId: null,
               dealId: null,
               relatedTouchId: null,
-            dueAt: "",
-            reminderOffsetMinutes: 30,
-            checklist: [],
-            description: "",
-            result: "",
+              dueAt: "",
+              reminderOffsetMinutes: 30,
+              checklist: [],
+              description: "",
+              result: "",
               saveCompanyNote: false,
               companyNote: "",
+              pomodoroCount: 0,
+              events: "",
               status: "todo"
             };
           }
@@ -14139,6 +14435,8 @@
               description: form.description.trim(),
               checklist: this.serializeTaskChecklist(form.checklist),
               result: form.result.trim(),
+              pomodoro_count: Math.max(0, Number(form.pomodoroCount || 0) || 0),
+              events: String(form.events || "").trim(),
               due_at: this.toIsoDateTime(form.dueAt),
               deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
               client: clientId,
@@ -14186,6 +14484,8 @@
               description: form.description.trim(),
               checklist: this.serializeTaskChecklist(form.checklist),
               result: form.result.trim(),
+              pomodoro_count: Math.max(0, Number(form.pomodoroCount || 0) || 0),
+              events: String(form.events || "").trim(),
               due_at: this.toIsoDateTime(form.dueAt),
               deadline_reminder_offset_minutes: Number(form.reminderOffsetMinutes || 30),
               client: clientId,
@@ -14497,6 +14797,8 @@
       async mounted() {
         document.addEventListener("click", this.handleDocumentClick);
         document.addEventListener("keydown", this.handleGlobalKeydown);
+        this.restorePomodoroTimerState();
+        this.startPomodoroTicker();
         const savedSection = window.localStorage.getItem("crm_active_section");
         if (
           savedSection
@@ -14535,6 +14837,7 @@
       beforeUnmount() {
         document.removeEventListener("click", this.handleDocumentClick);
         document.removeEventListener("keydown", this.handleGlobalKeydown);
+        this.stopPomodoroTicker();
         this.stopTelephonyIncomingCallsPolling();
         this.stopPhoneCallHistoryPollingIfIdle();
         this.stopAutomationNotificationsPolling();

@@ -312,6 +312,8 @@ class Activity(TimestampedModel):
         verbose_name="Сохранить значимую информацию в компании",
     )
     company_note = models.TextField(blank=True, default="", verbose_name="Факты о компании")
+    pomodoro_count = models.PositiveIntegerField(default=0, verbose_name="Количество pomodoro")
+    events = models.TextField(blank=True, default="", verbose_name="История задачи")
     lead = models.ForeignKey(
         "crm.Lead",
         related_name="activities",
