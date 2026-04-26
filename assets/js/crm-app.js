@@ -11221,6 +11221,16 @@
           this.forms.tasks.checklist = this.normalizeTaskChecklist(this.forms.tasks.checklist)
             .filter((item, itemIndex) => itemIndex !== index);
         },
+        moveTaskChecklistItem(index, direction) {
+          const checklist = this.normalizeTaskChecklist(this.forms.tasks.checklist);
+          const targetIndex = index + direction;
+          if (targetIndex < 0 || targetIndex >= checklist.length) {
+            return;
+          }
+          const [movedItem] = checklist.splice(index, 1);
+          checklist.splice(targetIndex, 0, movedItem);
+          this.forms.tasks.checklist = checklist;
+        },
         visibleTaskChecklist() {
           return this.normalizeTaskChecklist(this.forms.tasks.checklist)
             .map((item, index) => ({

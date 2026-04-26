@@ -7421,6 +7421,26 @@
                     class="min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm text-white outline-none"
                     :class="checklistItem.isDone && !taskChecklistHideCompleted ? 'line-through text-crm-muted' : ''"
                   />
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      @click="moveTaskChecklistItem(checklistItem.originalIndex, -1)"
+                      :disabled="checklistItem.originalIndex === 0"
+                      class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-sm text-crm-muted transition shrink-0 disabled:cursor-not-allowed disabled:opacity-40 hover:border-crm-accent hover:text-crm-accent"
+                      title="Переместить выше"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      @click="moveTaskChecklistItem(checklistItem.originalIndex, 1)"
+                      :disabled="checklistItem.originalIndex === forms.tasks.checklist.length - 1"
+                      class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-crm-border bg-[#123753] text-sm text-crm-muted transition shrink-0 disabled:cursor-not-allowed disabled:opacity-40 hover:border-crm-accent hover:text-crm-accent"
+                      title="Переместить ниже"
+                    >
+                      ↓
+                    </button>
+                  </div>
                   <button
                     type="button"
                     @click="removeTaskChecklistItem(checklistItem.originalIndex)"
