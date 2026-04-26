@@ -760,6 +760,11 @@
             { value: 180, label: "3 часа" }
           ],
           taskChecklistHideCompleted: false,
+          taskChecklistDrag: {
+            sourceIndex: null,
+            targetIndex: null,
+            position: null,
+          },
           sidebarItems: [
             { key: "leads", label: "Лиды", shortLabel: "Лиды", icon: "◎" },
             { key: "deals", label: "Сделки", shortLabel: "Сделки", icon: "◔" },
@@ -9068,6 +9073,7 @@
             status: "todo",
           };
           this.taskChecklistHideCompleted = false;
+          this.resetTaskChecklistDrag();
           this.showModal = true;
         },
         handleAutomationQuickAction(item, actionId) {
@@ -10580,6 +10586,7 @@
             status: item.taskStatus || item.status || "todo"
           };
           this.taskChecklistHideCompleted = false;
+          this.resetTaskChecklistDrag();
           this.resetTaskFollowUpForm();
           this.showModal = true;
           this.loadTaskTouchOptions();
@@ -11221,15 +11228,80 @@
           this.forms.tasks.checklist = this.normalizeTaskChecklist(this.forms.tasks.checklist)
             .filter((item, itemIndex) => itemIndex !== index);
         },
-        moveTaskChecklistItem(index, direction) {
-          const checklist = this.normalizeTaskChecklist(this.forms.tasks.checklist);
-          const targetIndex = index + direction;
-          if (targetIndex < 0 || targetIndex >= checklist.length) {
+        resetTaskChecklistDrag() {
+          this.taskChecklistDrag = {
+            sourceIndex: null,
+            targetIndex: null,
+            position: null,
+          };
+        },
+        startTaskChecklistDrag(index, event) {
+          this.taskChecklistDrag = {
+            sourceIndex: index,
+            targetIndex: null,
+            position: null,
+          };
+          if (event?.dataTransfer) {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", String(index));
+          }
+        },
+        updateTaskChecklistDragTarget(index, event) {
+          if (this.taskChecklistDrag.sourceIndex === null || !event?.currentTarget) {
             return;
           }
-          const [movedItem] = checklist.splice(index, 1);
-          checklist.splice(targetIndex, 0, movedItem);
+          const rect = event.currentTarget.getBoundingClientRect();
+          const offsetY = event.clientY - rect.top;
+          const position = offsetY < rect.height / 2 ? "before" : "after";
+          this.taskChecklistDrag = {
+            ...this.taskChecklistDrag,
+            targetIndex: index,
+            position,
+          };
+        },
+        clearTaskChecklistDragTarget(index = null) {
+          if (
+            index !== null
+            && String(this.taskChecklistDrag.targetIndex ?? "") !== String(index)
+          ) {
+            return;
+          }
+          this.taskChecklistDrag = {
+            ...this.taskChecklistDrag,
+            targetIndex: null,
+            position: null,
+          };
+        },
+        moveTaskChecklistItem(fromIndex, toIndex) {
+          const checklist = this.normalizeTaskChecklist(this.forms.tasks.checklist);
+          if (
+            fromIndex < 0
+            || fromIndex >= checklist.length
+            || toIndex < 0
+            || toIndex >= checklist.length
+            || fromIndex === toIndex
+          ) {
+            return;
+          }
+          const [movedItem] = checklist.splice(fromIndex, 1);
+          checklist.splice(toIndex, 0, movedItem);
           this.forms.tasks.checklist = checklist;
+        },
+        dropTaskChecklistItem(targetIndex) {
+          const { sourceIndex, position } = this.taskChecklistDrag;
+          if (sourceIndex === null || targetIndex === null || !position) {
+            this.resetTaskChecklistDrag();
+            return;
+          }
+          let nextIndex = targetIndex;
+          if (position === "after") {
+            nextIndex += 1;
+          }
+          if (sourceIndex < nextIndex) {
+            nextIndex -= 1;
+          }
+          this.moveTaskChecklistItem(sourceIndex, nextIndex);
+          this.resetTaskChecklistDrag();
         },
         visibleTaskChecklist() {
           return this.normalizeTaskChecklist(this.forms.tasks.checklist)
@@ -13959,6 +14031,7 @@
           this.showCompanyNoteDraft = false;
           this.showCompanyOkvedDetails = false;
           this.taskChecklistHideCompleted = false;
+          this.resetTaskChecklistDrag();
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
           this.companyDocumentsForActiveCompany = [];
@@ -14018,6 +14091,7 @@
           this.showCompanyLeadsPanel = false;
           this.showCompanyOkvedDetails = false;
           this.taskChecklistHideCompleted = false;
+          this.resetTaskChecklistDrag();
           this.resetCompanyContactForm();
           this.companyContactsForActiveCompany = [];
           this.resetCompanySettlementState();
