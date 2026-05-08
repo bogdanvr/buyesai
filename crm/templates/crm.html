@@ -5363,7 +5363,7 @@
                   <div class="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                     <div class="rounded-xl border border-crm-border bg-[#0d2942] p-3">
                       <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Счета к оплате</div>
-                      <div class="mt-2 text-sm font-semibold text-white">[[ formatSettlementAmount(companySettlementSummary.overview.expectedReceivable, forms.companies.currency || 'RUB') ]]</div>
+                      <div class="mt-2 text-sm font-semibold text-white">[[ formatSettlementAmount(companySettlementSummary.overview.payable, forms.companies.currency || 'RUB') ]]</div>
                     </div>
                     <div class="rounded-xl border border-crm-border bg-[#0d2942] p-3">
                       <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Дебиторская задолженность</div>
@@ -5690,7 +5690,7 @@
                         <div class="mt-3 grid grid-cols-2 xl:grid-cols-3 gap-2 text-xs">
                           <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
                             <div class="text-crm-muted">Счета к оплате</div>
-                            <div class="mt-1 text-white">[[ formatSettlementAmount(contract.stats.expectedReceivable, contract.currency) ]]</div>
+                            <div class="mt-1 text-white">[[ formatSettlementAmount(contract.stats.payable, contract.currency) ]]</div>
                           </div>
                           <div class="rounded-lg border border-crm-border bg-[#102f4a] px-3 py-2">
                             <div class="text-crm-muted">Нам должны</div>

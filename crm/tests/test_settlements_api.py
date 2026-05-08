@@ -187,6 +187,93 @@ class SettlementsApiTests(APITestCase):
         self.assertEqual(Decimal(summary_response.data["overview"]["advances_received"]), Decimal("0.00"))
         self.assertEqual(Decimal(summary_response.data["overview"]["balance"]), Decimal("70000.00"))
 
+    def test_outgoing_payment_after_supplier_receipt_automatically_reduces_payable(self):
+        receipt_response = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "document_type": "supplier_receipt",
+                "number": "SUP-001",
+                "document_date": "2026-03-30",
+                "due_date": "2026-04-05",
+                "currency": "RUB",
+                "amount": "120000.00",
+            },
+            format="json",
+        )
+        self.assertEqual(receipt_response.status_code, status.HTTP_201_CREATED, receipt_response.content.decode())
+
+        payment_response = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "document_type": "outgoing_payment",
+                "number": "PAY-OUT-001",
+                "document_date": "2026-03-31",
+                "currency": "RUB",
+                "amount": "50000.00",
+            },
+            format="json",
+        )
+        self.assertEqual(payment_response.status_code, status.HTTP_201_CREATED, payment_response.content.decode())
+
+        receipt = SettlementDocument.objects.get(pk=receipt_response.data["id"])
+        payment = SettlementDocument.objects.get(pk=payment_response.data["id"])
+        self.assertEqual(receipt.open_amount, Decimal("70000.00"))
+        self.assertEqual(payment.open_amount, Decimal("0.00"))
+
+        summary_response = self.client.get(f"{reverse('settlement-summary')}?client={self.company.pk}")
+        self.assertEqual(summary_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(summary_response.data["overview"]["payable"]), Decimal("70000.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["advances_issued"]), Decimal("0.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["balance"]), Decimal("-70000.00"))
+
+    def test_old_outgoing_payment_is_automatically_offset_when_supplier_receipt_is_created(self):
+        payment_response = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "document_type": "outgoing_payment",
+                "number": "PAY-OUT-ADV-001",
+                "document_date": "2026-03-30",
+                "currency": "RUB",
+                "amount": "200000.00",
+            },
+            format="json",
+        )
+        self.assertEqual(payment_response.status_code, status.HTTP_201_CREATED, payment_response.content.decode())
+
+        summary_response = self.client.get(f"{reverse('settlement-summary')}?client={self.company.pk}")
+        self.assertEqual(summary_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(summary_response.data["overview"]["advances_issued"]), Decimal("200000.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["payable"]), Decimal("0.00"))
+
+        receipt_response = self.client.post(
+            reverse("settlement-documents-list"),
+            {
+                "client": self.company.pk,
+                "document_type": "supplier_receipt",
+                "number": "SUP-001",
+                "document_date": "2026-03-31",
+                "due_date": "2026-04-10",
+                "currency": "RUB",
+                "amount": "120000.00",
+            },
+            format="json",
+        )
+        self.assertEqual(receipt_response.status_code, status.HTTP_201_CREATED, receipt_response.content.decode())
+
+        receipt = SettlementDocument.objects.get(pk=receipt_response.data["id"])
+        payment = SettlementDocument.objects.get(pk=payment_response.data["id"])
+        self.assertEqual(receipt.open_amount, Decimal("0.00"))
+        self.assertEqual(payment.open_amount, Decimal("80000.00"))
+
+        summary_response = self.client.get(f"{reverse('settlement-summary')}?client={self.company.pk}")
+        self.assertEqual(summary_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(summary_response.data["overview"]["advances_issued"]), Decimal("80000.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["payable"]), Decimal("0.00"))
+        self.assertEqual(Decimal(summary_response.data["overview"]["balance"]), Decimal("80000.00"))
+
     def test_invoice_expected_receivable_is_reduced_by_realization_of_same_deal(self):
         invoice_response = self.client.post(
             reverse("settlement-documents-list"),
