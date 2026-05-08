@@ -4578,6 +4578,12 @@
           if (explicitResult) {
             return explicitResult;
           }
+          const completedChecklistItems = this.serializeTaskChecklist(form.checklist)
+            .filter((item) => item.is_done && String(item.text || "").trim())
+            .map((item) => String(item.text || "").trim());
+          if (completedChecklistItems.length) {
+            return completedChecklistItems.join("\n");
+          }
           return this.resolveTaskTypeDefaultResultById(form.taskTypeId);
         },
         formatHistoryTimestamp(value) {
