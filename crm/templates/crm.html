@@ -3467,7 +3467,7 @@
                 <div class="py-1">
                   <div class="text-[11px] uppercase tracking-[0.12em] text-crm-muted">Сумма</div>
                   <button v-if="!isDealSummaryEditing('amount')" type="button" @click="openDealSummaryField('amount')" class="mt-1 text-left text-sm text-white hover:text-crm-accent transition">
-                    [[ formatDealAmountSummary(forms.deals.amount, datasets.companies.find(company => String(company.id) === String(forms.deals.companyId))?.currency || 'RUB') ]]
+                    [[ formatDealAmountSummary(forms.deals.amount, dealSummaryCurrency) ]]
                   </button>
                   <input
                     v-else

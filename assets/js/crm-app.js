@@ -918,6 +918,11 @@
           const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId)) || null;
           return company?.currency || this.editingDealItem?.currency || "RUB";
         },
+        dealSummaryCurrency() {
+          const companyId = this.toIntOrNull(this.forms.deals.companyId) || this.toIntOrNull(this.editingDealItem?.clientId);
+          const company = (this.datasets.companies || []).find((item) => String(item.id) === String(companyId)) || null;
+          return company?.currency || this.editingDealItem?.currency || "RUB";
+        },
         selectedDealDocumentGeneratorContract() {
           const contractId = this.toIntOrNull(this.dealActGeneratorForm.contractId);
           if (!contractId) return null;
