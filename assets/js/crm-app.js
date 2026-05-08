@@ -9693,6 +9693,43 @@
         statusFilterSections() {
           return ["leads", "deals", "contacts", "companies", "tasks", "touches"];
         },
+        defaultStatusFiltersForSection(section) {
+          const normalizedSection = String(section || "").trim();
+          if (normalizedSection === "leads") {
+            return ["Новый"];
+          }
+          if (normalizedSection === "tasks") {
+            return ["Новая", "В работе"];
+          }
+          if (normalizedSection === "deals") {
+            return this.resolveDefaultDealStatusFilters();
+          }
+          return [];
+        },
+        resolveDefaultDealStatusFilters() {
+          const preferredCodes = ["in_progress", "primary_contact", "proposal_sent", "proposal_made"];
+          const preferredNameParts = ["в работе", "первич", "предложение сделано"];
+          const stages = Array.isArray(this.metaOptions?.dealStages) ? this.metaOptions.dealStages : [];
+          const resolved = [];
+
+          preferredCodes.forEach((code) => {
+            const matchedStage = stages.find((stage) => String(stage?.code || "").trim().toLowerCase() === code);
+            const matchedName = String(matchedStage?.name || "").trim();
+            if (matchedName && !resolved.includes(matchedName)) {
+              resolved.push(matchedName);
+            }
+          });
+
+          preferredNameParts.forEach((namePart) => {
+            const matchedStage = stages.find((stage) => String(stage?.name || "").trim().toLowerCase().includes(namePart));
+            const matchedName = String(matchedStage?.name || "").trim();
+            if (matchedName && !resolved.includes(matchedName)) {
+              resolved.push(matchedName);
+            }
+          });
+
+          return resolved;
+        },
         statsQuickFilterSections() {
           return ["leads", "deals", "companies", "tasks"];
         },
@@ -9711,15 +9748,18 @@
           const nextFilters = this.statusFilterSections().includes(normalizedSection)
             ? this.statusFiltersBySection?.[normalizedSection]
             : [];
-          this.selectedStatusFilters = Array.isArray(nextFilters)
+          const normalizedFilters = Array.isArray(nextFilters)
             ? nextFilters.map((item) => String(item || "").trim()).filter(Boolean)
             : [];
+          const fallbackFilters = this.defaultStatusFiltersForSection(normalizedSection);
+          this.selectedStatusFilters = normalizedFilters.length ? normalizedFilters : fallbackFilters;
         },
         normalizeStatusFiltersBySection(payload) {
           const normalized = {};
           this.statusFilterSections().forEach((section) => {
             const rawValue = payload && Array.isArray(payload[section]) ? payload[section] : [];
-            normalized[section] = rawValue.map((item) => String(item || "").trim()).filter(Boolean);
+            const normalizedValue = rawValue.map((item) => String(item || "").trim()).filter(Boolean);
+            normalized[section] = normalizedValue.length ? normalizedValue : this.defaultStatusFiltersForSection(section);
           });
           return normalized;
         },
@@ -9809,15 +9849,14 @@
         restoreFilters() {
           try {
             const rawValue = window.localStorage.getItem(FILTERS_STORAGE_KEY);
-            if (!rawValue) return;
+            if (!rawValue) {
+              this.statusFiltersBySection = this.normalizeStatusFiltersBySection({});
+              this.applyStatusFiltersForSection(this.activeSection);
+              return;
+            }
             const payload = JSON.parse(rawValue);
             const normalizedStatusFilters = this.normalizeStatusFiltersBySection(payload?.statusFiltersBySection);
             this.statsQuickFilterBySection = this.normalizeStatsQuickFilterBySection(payload?.statsQuickFilterBySection);
-            if (Array.isArray(payload?.selectedStatusFilters)) {
-              normalizedStatusFilters[this.activeSection] = payload.selectedStatusFilters
-                .map((item) => String(item || "").trim())
-                .filter(Boolean);
-            }
             this.statusFiltersBySection = normalizedStatusFilters;
             this.applyStatusFiltersForSection(this.activeSection);
             this.applyStatsQuickFilterForSection(this.activeSection);
@@ -9837,6 +9876,8 @@
             this.touchDealFilterId = payload?.touchDealFilterId ? String(payload.touchDealFilterId).trim() : null;
             this.touchDealFilterLabel = String(payload?.touchDealFilterLabel || "").trim();
           } catch (error) {
+            this.statusFiltersBySection = this.normalizeStatusFiltersBySection({});
+            this.applyStatusFiltersForSection(this.activeSection);
           }
         },
         toggleStatusFilter() {
@@ -9860,7 +9901,7 @@
           this.persistFilters();
         },
         clearStatusFilter() {
-          this.selectedStatusFilters = [];
+          this.selectedStatusFilters = this.defaultStatusFiltersForSection(this.activeSection);
           this.persistFilters();
         },
         toggleDealCompanyFilter() {
