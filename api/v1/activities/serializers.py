@@ -106,6 +106,16 @@ class ActivitySerializer(serializers.ModelSerializer):
         if result:
             attrs["result"] = result
             return result
+        checklist = attrs.get("checklist", getattr(self.instance, "checklist", [])) or []
+        completed_checklist_items = [
+            str(item.get("text") or "").strip()
+            for item in checklist
+            if isinstance(item, dict) and item.get("is_done") and str(item.get("text") or "").strip()
+        ]
+        if completed_checklist_items:
+            checklist_result = "\n".join(completed_checklist_items)
+            attrs["result"] = checklist_result
+            return checklist_result
         task_type_result = str(getattr(task_type, "touch_result", "") or "").strip()
         if task_type_result:
             attrs["result"] = task_type_result

@@ -300,6 +300,62 @@ class TaskResultAndEventsTests(APITestCase):
         task.refresh_from_db()
         self.assertEqual(task.result, "Договор подготовлен")
 
+    def test_task_completion_uses_completed_checklist_items_as_result(self):
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Подготовить договор",
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
+            checklist=[
+                {"id": "collect", "text": "Собрать вводные", "is_done": True},
+                {"id": "draft", "text": "Подготовить договор", "is_done": True},
+                {"id": "send", "text": "Отправить клиенту", "is_done": False},
+            ],
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "has_follow_up_task": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        task.refresh_from_db()
+        self.assertEqual(task.result, "Собрать вводные\nПодготовить договор")
+
+    def test_explicit_result_has_priority_over_completed_checklist_items(self):
+        task = Activity.objects.create(
+            type=ActivityType.TASK,
+            subject="Подготовить договор",
+            deal=self.deal,
+            client=self.company,
+            due_at=timezone.now() + timedelta(days=1),
+            created_by=self.user,
+            checklist=[
+                {"id": "collect", "text": "Собрать вводные", "is_done": True},
+                {"id": "draft", "text": "Подготовить договор", "is_done": True},
+            ],
+        )
+
+        response = self.client.patch(
+            reverse("activities-detail", kwargs={"pk": task.pk}),
+            {
+                "is_done": True,
+                "result": "Договор согласован",
+                "has_follow_up_task": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        task.refresh_from_db()
+        self.assertEqual(task.result, "Договор согласован")
+
     def test_client_task_completion_writes_client_task_event_type(self):
         task_type = TaskType.objects.create(name="Отправить письмо", group=TaskTypeGroup.CLIENT_TASK)
         channel = CommunicationChannel.objects.create(name="Email")
