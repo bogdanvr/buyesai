@@ -1069,6 +1069,8 @@ def update_generated_deal_document(
         settlement_document.amount = amount
         settlement_document.generator_payload = _generator_payload(executor_company=executor_company, contract=resolved_contract, items=line_items)
         settlement_document.save()
+        if settlement_document.document_type == SettlementDocument.DocumentType.REALIZATION:
+            settlement_document.auto_allocate_from_received_advances()
 
         file_name = _document_file_name(file_prefix=file_prefix, settlement_document=settlement_document)
         original_name = _document_original_name(original_label=original_label, settlement_document=settlement_document)

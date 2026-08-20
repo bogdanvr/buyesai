@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test.utils import override_settings
@@ -6,7 +7,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from zipfile import ZipFile
 
-from crm.models import Client, ClientDocument, Deal, DealDocument, SettlementContract, SettlementDocument
+from crm.models import Client, ClientDocument, Deal, DealDocument, SettlementAllocation, SettlementContract, SettlementDocument
 
 
 class DealDocumentsApiTests(APITestCase):
@@ -317,3 +318,62 @@ class DealDocumentsApiTests(APITestCase):
 
         self.assertIn("Обновленная услуга", document_xml)
         self.assertIn("45000,00", document_xml.replace(" ", ""))
+
+    @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
+    def test_regenerating_act_to_higher_amount_offsets_remaining_received_advance(self):
+        payment = SettlementDocument.objects.create(
+            client=self.company,
+            document_type=SettlementDocument.DocumentType.INCOMING_PAYMENT,
+            number="PAY-ADV-001",
+            document_date="2026-03-30",
+            currency="KZT",
+            amount="15000.00",
+        )
+        create_response = self.client.post(
+            reverse("deal-documents-generate-act"),
+            {
+                "deal": self.deal.pk,
+                "executor_company": self.own_company.pk,
+                "items": [
+                    {
+                        "description": "Первоначальная услуга",
+                        "quantity": "1.00",
+                        "unit": "час",
+                        "price": "10000.00",
+                    },
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED, create_response.content.decode())
+
+        generated_document = DealDocument.objects.get(pk=create_response.data["id"])
+        realization = SettlementDocument.objects.get(pk=generated_document.settlement_document_id)
+        payment.refresh_from_db()
+        self.assertEqual(realization.open_amount, Decimal("0.00"))
+        self.assertEqual(payment.open_amount, Decimal("5000.00"))
+
+        update_response = self.client.post(
+            reverse("deal-documents-regenerate", kwargs={"pk": generated_document.pk}),
+            {
+                "executor_company": self.own_company.pk,
+                "contract": self.contract_latest.pk,
+                "items": [
+                    {
+                        "description": "Обновленная услуга",
+                        "quantity": "1.00",
+                        "unit": "час",
+                        "price": "15000.00",
+                    },
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK, update_response.content.decode())
+        realization.refresh_from_db()
+        payment.refresh_from_db()
+        self.assertEqual(realization.amount, Decimal("15000.00"))
+        self.assertEqual(realization.open_amount, Decimal("0.00"))
+        self.assertEqual(payment.open_amount, Decimal("0.00"))
+        self.assertEqual(SettlementAllocation.objects.filter(source_document=payment, target_document=realization).count(), 2)

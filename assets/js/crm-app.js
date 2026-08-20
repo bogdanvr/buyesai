@@ -2432,7 +2432,7 @@
           }
           return rows;
         },
-        filteredItemsBase() {
+        buildFilteredItemsBase({ ignoreStatusFilters = false } = {}) {
           if (this.isTelephonySection || this.isCommunicationsSection) {
             return [];
           }
@@ -2470,7 +2470,8 @@
               .filter(Boolean)
               .some((value) => String(value).toLowerCase().includes(q));
             const matchesStatus =
-              !this.selectedStatusFilters.length ||
+              ignoreStatusFilters
+              || !this.selectedStatusFilters.length ||
               this.selectedStatusFilters.includes(item.statusLabel);
             return matchesDealFilter && matchesCompanyFilter && matchesTaskCategoryFilter && matchesSearch && matchesStatus;
           });
@@ -2510,6 +2511,12 @@
             return left.index - right.index;
           });
           return ordered.map((entry) => entry.item);
+        },
+        filteredItemsBase() {
+          return this.buildFilteredItemsBase();
+        },
+        filteredItemsForStats() {
+          return this.buildFilteredItemsBase({ ignoreStatusFilters: true });
         },
         activeStatsQuickFilter() {
           const section = String(this.activeSection || "").trim();
@@ -2664,7 +2671,7 @@
           ));
         },
         stats() {
-          const items = this.filteredItemsBase;
+          const items = this.filteredItemsForStats;
           const newItems = items.filter((item) => this.getItemStatusBucket(item) === "new");
           const inProgressItems = items.filter((item) => this.getItemStatusBucket(item) === "progress");
           const doneItems = items.filter((item) => this.getItemStatusBucket(item) === "done");
@@ -2688,7 +2695,7 @@
             };
           }
 
-          const companies = this.filteredItemsBase;
+          const companies = this.filteredItemsForStats;
           return {
             totalCount: companies.length,
             activeCount: companies.filter((item) => item.isActive !== false).length,
