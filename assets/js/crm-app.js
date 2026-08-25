@@ -2432,86 +2432,6 @@
           }
           return rows;
         },
-        buildFilteredItemsBase({ ignoreStatusFilters = false } = {}) {
-          if (this.isTelephonySection || this.isCommunicationsSection) {
-            return [];
-          }
-          const q = this.search.trim().toLowerCase();
-          const filtered = this.currentItems.filter((item) => {
-            const matchesDealFilter =
-              (
-                this.activeSection !== "deals" ||
-                !this.dealCompanyFilterId ||
-                String(item.clientId || "") === String(this.dealCompanyFilterId)
-              ) && (
-                this.activeSection !== "tasks" ||
-                !this.taskDealFilterId ||
-                String(item.dealId || "") === String(this.taskDealFilterId)
-              ) && (
-                this.activeSection !== "touches" ||
-                !this.touchDealFilterId ||
-                String(item.dealId || "") === String(this.touchDealFilterId)
-              );
-            const matchesCompanyFilter =
-              (
-                this.activeSection !== "tasks"
-                || !this.selectedTaskCompanyFilters.length
-                || this.selectedTaskCompanyFilters.includes(String(item.clientId || ""))
-              ) && (
-                this.activeSection !== "touches"
-                || !this.selectedTouchCompanyFilters.length
-                || this.selectedTouchCompanyFilters.includes(String(item.clientId || ""))
-              );
-            const matchesTaskCategoryFilter =
-              this.activeSection !== "tasks"
-              || !this.selectedTaskCategoryFilters.length
-              || this.selectedTaskCategoryFilters.includes(String(item.taskTypeCategoryId || ""));
-            const matchesSearch = !q || [item.name, item.company, item.deal, item.phone, item.email, item.statusLabel]
-              .filter(Boolean)
-              .some((value) => String(value).toLowerCase().includes(q));
-            const matchesStatus =
-              ignoreStatusFilters
-              || !this.selectedStatusFilters.length ||
-              this.selectedStatusFilters.includes(item.statusLabel);
-            return matchesDealFilter && matchesCompanyFilter && matchesTaskCategoryFilter && matchesSearch && matchesStatus;
-          });
-          const ordered = filtered.map((item, index) => ({ item, index }));
-          ordered.sort((left, right) => {
-            const leftTop = this.isTopPriorityItem(left.item);
-            const rightTop = this.isTopPriorityItem(right.item);
-            if (leftTop !== rightTop) {
-              return leftTop ? -1 : 1;
-            }
-
-            const leftRank = this.getSortRank(left.item);
-            const rightRank = this.getSortRank(right.item);
-            if (leftRank !== rightRank) {
-              return leftRank - rightRank;
-            }
-
-            if (this.activeSection === "deals") {
-              const leftOpenTasks = this.countDealOpenTasks(left.item?.id);
-              const rightOpenTasks = this.countDealOpenTasks(right.item?.id);
-              if (leftOpenTasks !== rightOpenTasks) {
-                return rightOpenTasks - leftOpenTasks;
-              }
-              const leftCloseTs = this.parseDealCloseDate(left.item?.closeDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-              const rightCloseTs = this.parseDealCloseDate(right.item?.closeDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-              if (leftCloseTs !== rightCloseTs) {
-                return leftCloseTs - rightCloseTs;
-              }
-            }
-
-            if (this.activeSection === "tasks" && leftRank === 0 && rightRank === 0) {
-              const taskOrder = this.compareActiveTasksByDueAt(left.item, right.item);
-              if (taskOrder !== 0) {
-                return taskOrder;
-              }
-            }
-            return left.index - right.index;
-          });
-          return ordered.map((entry) => entry.item);
-        },
         filteredItemsBase() {
           return this.buildFilteredItemsBase();
         },
@@ -2988,6 +2908,86 @@
         }
       },
       methods: {
+        buildFilteredItemsBase({ ignoreStatusFilters = false } = {}) {
+          if (this.isTelephonySection || this.isCommunicationsSection) {
+            return [];
+          }
+          const q = this.search.trim().toLowerCase();
+          const filtered = this.currentItems.filter((item) => {
+            const matchesDealFilter =
+              (
+                this.activeSection !== "deals" ||
+                !this.dealCompanyFilterId ||
+                String(item.clientId || "") === String(this.dealCompanyFilterId)
+              ) && (
+                this.activeSection !== "tasks" ||
+                !this.taskDealFilterId ||
+                String(item.dealId || "") === String(this.taskDealFilterId)
+              ) && (
+                this.activeSection !== "touches" ||
+                !this.touchDealFilterId ||
+                String(item.dealId || "") === String(this.touchDealFilterId)
+              );
+            const matchesCompanyFilter =
+              (
+                this.activeSection !== "tasks"
+                || !this.selectedTaskCompanyFilters.length
+                || this.selectedTaskCompanyFilters.includes(String(item.clientId || ""))
+              ) && (
+                this.activeSection !== "touches"
+                || !this.selectedTouchCompanyFilters.length
+                || this.selectedTouchCompanyFilters.includes(String(item.clientId || ""))
+              );
+            const matchesTaskCategoryFilter =
+              this.activeSection !== "tasks"
+              || !this.selectedTaskCategoryFilters.length
+              || this.selectedTaskCategoryFilters.includes(String(item.taskTypeCategoryId || ""));
+            const matchesSearch = !q || [item.name, item.company, item.deal, item.phone, item.email, item.statusLabel]
+              .filter(Boolean)
+              .some((value) => String(value).toLowerCase().includes(q));
+            const matchesStatus =
+              ignoreStatusFilters
+              || !this.selectedStatusFilters.length ||
+              this.selectedStatusFilters.includes(item.statusLabel);
+            return matchesDealFilter && matchesCompanyFilter && matchesTaskCategoryFilter && matchesSearch && matchesStatus;
+          });
+          const ordered = filtered.map((item, index) => ({ item, index }));
+          ordered.sort((left, right) => {
+            const leftTop = this.isTopPriorityItem(left.item);
+            const rightTop = this.isTopPriorityItem(right.item);
+            if (leftTop !== rightTop) {
+              return leftTop ? -1 : 1;
+            }
+
+            const leftRank = this.getSortRank(left.item);
+            const rightRank = this.getSortRank(right.item);
+            if (leftRank !== rightRank) {
+              return leftRank - rightRank;
+            }
+
+            if (this.activeSection === "deals") {
+              const leftOpenTasks = this.countDealOpenTasks(left.item?.id);
+              const rightOpenTasks = this.countDealOpenTasks(right.item?.id);
+              if (leftOpenTasks !== rightOpenTasks) {
+                return rightOpenTasks - leftOpenTasks;
+              }
+              const leftCloseTs = this.parseDealCloseDate(left.item?.closeDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+              const rightCloseTs = this.parseDealCloseDate(right.item?.closeDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+              if (leftCloseTs !== rightCloseTs) {
+                return leftCloseTs - rightCloseTs;
+              }
+            }
+
+            if (this.activeSection === "tasks" && leftRank === 0 && rightRank === 0) {
+              const taskOrder = this.compareActiveTasksByDueAt(left.item, right.item);
+              if (taskOrder !== 0) {
+                return taskOrder;
+              }
+            }
+            return left.index - right.index;
+          });
+          return ordered.map((entry) => entry.item);
+        },
         getCsrfToken() {
           const cookie = document.cookie || "";
           const parts = cookie.split(";").map((x) => x.trim());
