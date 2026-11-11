@@ -30,13 +30,20 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-9f!0+gp#q#x3#!v7hg5byv+gj#ww18^i(cw5g=oi(896)0l(1u"
+SECRET_KEY = env("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
 # HOST = env("HOST")
 # ALLOWED_HOSTS = [HOST, "localhost"]
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
+ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
+
+# Enable only behind a trusted proxy that overwrites X-Forwarded-Proto.
+if env.bool("DJANGO_TRUST_PROXY_HEADERS", default=False):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SESSION_COOKIE_SECURE = env.bool("DJANGO_SESSION_COOKIE_SECURE", default=False)
+CSRF_COOKIE_SECURE = env.bool("DJANGO_CSRF_COOKIE_SECURE", default=False)
 
 
 # Application definition
@@ -98,14 +105,20 @@ WSGI_APPLICATION = "core.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": env("ENGINE"),
-        "NAME": env("DB_NAME"),
-        "USER": env("DB_USER"),
-        "PASSWORD": env("DB_PASSWORD"),
-        "HOST": env("DB_HOST"),
-        "PORT": env("DB_PORT"),
+        "ENGINE": env("ENGINE", default="django.db.backends.postgresql"),
+        "NAME": env("DB_NAME", default="buyesai"),
+        "USER": env("DB_USER", default="buyesai"),
+        "PASSWORD": env("DB_PASSWORD", default=""),
+        "HOST": env("DB_HOST", default="localhost"),
+        "PORT": env("DB_PORT", default="5432"),
     }
 }
+
+if DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql":
+    DATABASES["default"]["OPTIONS"] = {
+        "connect_timeout": env.int("DB_CONNECT_TIMEOUT", default=5),
+        "sslmode": env("DB_SSLMODE", default="prefer"),
+    }
 
 
 # Password validation
@@ -149,9 +162,9 @@ STATICFILES_DIRS = [
     BASE_DIR / "assets",  # папка с css/js/img рядом с manage.py
 ]
 
-STATIC_ROOT = env("STATIC_ROOT")
+STATIC_ROOT = env("STATIC_ROOT", default=str(BASE_DIR / "staticfiles"))
 MEDIA_URL = "/media/"
-MEDIA_ROOT = env("MEDIA_ROOT")
+MEDIA_ROOT = env("MEDIA_ROOT", default=str(BASE_DIR / "media"))
 
 # DaData API key (stored in .env as DADATA_KEY)
 DADATA_KEY = env("DADATA_KEY", default="")
@@ -198,9 +211,9 @@ SONIOX_WEBHOOK_SECRET = env("SONIOX_WEBHOOK_SECRET", default="")
 SONIOX_LANGUAGE_HINTS = env.list("SONIOX_LANGUAGE_HINTS", default=["ru"])
 SONIOX_LANGUAGE_HINTS_STRICT = env.bool("SONIOX_LANGUAGE_HINTS_STRICT", default=True)
 
-CHAT_WS_JWT_SECRET = env("CHAT_WS_JWT_SECRET")
-CHAT_WS_JWT_TTL_SECONDS = env("CHAT_WS_JWT_TTL_SECONDS")
-CHAT_WS_URL = env("CHAT_WS_URL")
+CHAT_WS_JWT_SECRET = env("CHAT_WS_JWT_SECRET", default=SECRET_KEY)
+CHAT_WS_JWT_TTL_SECONDS = env.int("CHAT_WS_JWT_TTL_SECONDS", default=300)
+CHAT_WS_URL = env("CHAT_WS_URL", default="")
 
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [

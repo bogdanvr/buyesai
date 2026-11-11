@@ -48,6 +48,9 @@ env/bin/python manage.py migrate
 4. Проверить webhook URL.
 5. Настроить фоновую обработку webhook-событий.
 
+В Docker обработчик запускается сервисом `novofon` из Compose,
+см. [docker.md](docker.md).
+
 Рекомендуемый вариант: `systemd service` из `deploy/systemd/buyesai-process-novofon-webhook-queue.service`.
 
 Fallback-вариант через cron:

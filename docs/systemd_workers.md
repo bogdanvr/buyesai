@@ -1,5 +1,8 @@
 # Systemd Workers
 
+При запуске через Docker эти же обработчики работают как сервисы Compose;
+установка systemd-unit не требуется. См. [docker.md](docker.md).
+
 Этот документ описывает перевод фоновых poller/worker задач с cron на `systemd service`.
 
 ## Что переводим

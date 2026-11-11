@@ -147,6 +147,9 @@ python manage.py process_communications_outbox --telegram-only
 
 ## Рекомендуемый scheduler
 
+Для Docker использовать сервисы `outbox` и `imap` из Compose;
+настройка описана в [docker.md](docker.md). Не запускать параллельно с systemd/cron.
+
 Рекомендуемый production-вариант: `systemd service` с коротким polling loop.
 
 Файлы для установки лежат в:

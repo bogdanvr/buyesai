@@ -1,0 +1,94 @@
+name: buyesai
+
+x-app: &app
+  image: buyesai-app:local
+  env_file:
+    - ${APP_ENV_FILE:-.env}
+  environment:
+    DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
+    ENGINE: django.db.backends.postgresql
+    DB_NAME: ${DB_NAME:-buyesai}
+    DB_USER: ${DB_USER:-buyesai}
+    DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    DB_HOST: ${DB_HOST:?Set DB_HOST in .env}
+    DB_PORT: ${DB_PORT:-5432}
+    STATIC_ROOT: /app/staticfiles
+    MEDIA_ROOT: /app/media
+    WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+  volumes:
+    - static_data:/app/staticfiles
+    - media_data:/app/media
+  init: true
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  setup:
+    <<: *app
+    command:
+      - sh
+      - -c
+      - python -m deploy.docker.wait_for_db && python manage.py migrate --noinput && python manage.py collectstatic --noinput
+    restart: "no"
+
+  web:
+    <<: *app
+    build: .
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import socket; socket.create_connection(('127.0.0.1', 8000), timeout=5).close()"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.nginx
+    image: buyesai-nginx:local
+    ports:
+      - "${HTTP_BIND_ADDRESS:-127.0.0.1}:${HTTP_PORT:-8080}:80"
+    volumes:
+      - static_data:/app/staticfiles:ro
+      - media_data:/app/media:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+  outbox:
+    <<: *app
+    command: ["bash", "scripts/systemd/run_process_communications_outbox.sh"]
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+  novofon:
+    <<: *app
+    command: ["bash", "scripts/systemd/run_process_novofon_webhook_queue.sh"]
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+  imap:
+    <<: *app
+    profiles: ["mail"]
+    command: ["bash", "scripts/systemd/run_fetch_imap_inbox.sh"]
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  static_data:
+  media_data:
