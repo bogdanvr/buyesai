@@ -180,16 +180,19 @@ docker compose down
 
 ## Публичный сервер и HTTPS
 
-Для доступа извне задать `HTTP_BIND_ADDRESS=0.0.0.0` и нужный `HTTP_PORT`,
-добавить домен в `DJANGO_ALLOWED_HOSTS` и адрес с `https://` в
-`DJANGO_CSRF_TRUSTED_ORIGINS` / `CRM_PUBLIC_BASE_URL`.
+Для нескольких приложений используется общий серверный Nginx на портах 80/443.
+Он завершает TLS и направляет `buyes.pro` на `127.0.0.1:8080`; внутренний Nginx
+отдаёт файлы и проксирует Django. Публикация Docker-порта ограничена `127.0.0.1`
+в `compose.yaml`, переменная `HTTP_BIND_ADDRESS` больше не используется.
 
-Включить TLS в Nginx с сертификатом и для HTTPS задать
-`DJANGO_TRUST_PROXY_HEADERS=True`, `DJANGO_SESSION_COOKIE_SECURE=True`,
-`DJANGO_CSRF_COOKIE_SECURE=True`. В поставляемой HTTP-конфигурации Nginx сам
-перезаписывает `X-Forwarded-Proto` своим `$scheme`. Если TLS завершается на внешнем
-прокси, ограничить доступ к Nginx этим прокси и настроить передачу доверенного
-протокола вместо `$scheme`, прежде чем включать доверие заголовку в Django.
+Готовый конфиг, параметры `.env` и команды установки сертификата находятся в
+[deploy/nginx/README.md](../deploy/nginx/README.md).
+
+Серверный Nginx перезаписывает заголовки протокола и клиентского IP; внутренний
+сохраняет их при передаче в Django. Оба перехода используют keepalive.
+После настройки сертификата включить `DJANGO_TRUST_PROXY_HEADERS=True`,
+`DJANGO_SESSION_COOKIE_SECURE=True` и `DJANGO_CSRF_COOKIE_SECURE=True`, а
+`DJANGO_CSRF_TRUSTED_ORIGINS` / `CRM_PUBLIC_BASE_URL` настроить на `https://buyes.pro`.
 
 Nginx отдаёт файлы `/media/` по прямым ссылкам, включая загруженные документы.
 Для документов, требующих авторизации, следует использовать защищённую выдачу

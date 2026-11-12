@@ -55,7 +55,8 @@ services:
       dockerfile: deploy/docker/Dockerfile.nginx
     image: buyesai-nginx:local
     ports:
-      - "${HTTP_BIND_ADDRESS:-127.0.0.1}:${HTTP_PORT:-8080}:80"
+      # Only the host reverse proxy may reach this HTTP listener.
+      - "127.0.0.1:${HTTP_PORT:-8080}:80"
     volumes:
       - static_data:/app/staticfiles:ro
       - media_data:/app/media:ro
